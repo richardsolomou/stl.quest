@@ -63,6 +63,8 @@ import {
   workspaceOnboarding,
 } from './schema'
 import { notificationPreferences, type NotificationKind } from '../core/notifications'
+import { messagesFor, type Messages } from '../core/i18n'
+import { isLocale, type Locale } from '../core/i18n/locales'
 import { normalizeOnboardingTasks, onboardingTaskScope, type OnboardingProgress } from '../core/onboarding'
 import { mapAssetGenerationJob, mapInvite, mapRequest, mapUserIdentity, parseOperationPayload, type RequestRow } from './repository/mappers'
 import { requestConditions, requestOrderBy, requestSelection, type RequestFilterOptions } from './repository/requestQuery'
@@ -2565,6 +2567,19 @@ export class DrizzleRepository implements Repository {
     return (await this.database.select({ count: count() }).from(user).get())?.count ?? 0
   }
 
+  async setUserLocale(userId: string, locale: Locale | undefined) {
+    await this.database
+      .update(user)
+      .set({ locale: locale ?? null })
+      .where(eq(user.id, userId))
+      .run()
+  }
+
+  async userLocale(userId: string) {
+    const locale = (await this.database.select({ locale: user.locale }).from(user).where(eq(user.id, userId)).get())?.locale
+    return isLocale(locale) ? locale : undefined
+  }
+
   async getUserOnboarding(userId: string, workspaceId?: string): Promise<OnboardingProgress> {
     const [userProgress, workspaceProgress] = await Promise.all([
       this.database.select().from(userOnboarding).where(eq(userOnboarding.userId, userId)).get(),
@@ -2806,7 +2821,7 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  async ensurePersonalWorkspace(identity: { id: string; name: string }) {
+  async ensurePersonalWorkspace(identity: { id: string; name: string }, t: Messages['common'] = messagesFor().common) {
     const existing = await this.database
       .select({ id: organization.id, name: organization.name, slug: organization.slug, role: member.role })
       .from(organization)
@@ -2836,7 +2851,7 @@ export class DrizzleRepository implements Repository {
       const membership = await tx.select({ id: member.id }).from(member).where(eq(member.userId, identity.id)).get()
       if (membership) return undefined
 
-      return await this.createOwnedWorkspace(tx, identity.id, personalWorkspaceName(identity.name), {
+      return await this.createOwnedWorkspace(tx, identity.id, personalWorkspaceName(identity.name, t), {
         personalOwnerId: identity.id,
         slugName: identity.name,
       })

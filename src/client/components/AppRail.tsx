@@ -8,10 +8,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils'
 import { AccountMenu } from './AccountMenu'
 import { RailBrand } from './Brand'
+import { useI18n } from '../i18n'
 import { sessionQuery } from '../queries'
 import { useWorkspaceSlug } from '../workspace'
 import { formatBytes } from '../../core/format'
-import { nextStoragePlan, storagePlans, storageUsageLevel } from '../../core/plans'
+import { nextStoragePlan, storageUsageLevel } from '../../core/plans'
 import { ProductTour } from './ProductTour'
 
 export type AppView = 'board' | 'archive' | 'calculator' | 'settings' | 'account' | 'admin'
@@ -27,37 +28,38 @@ export function AppRail({
   isSuperAdmin?: boolean
   navigationEnabled?: boolean
 }) {
+  const { t } = useI18n()
   return (
     <aside
       className="flex w-14 shrink-0 flex-col items-center gap-5 border-r-2 border-dashed border-blueprint/25 bg-background py-4"
       data-hydrated={navigationEnabled}
     >
       {navigationEnabled ? (
-        <Link to="/" className="text-inherit no-underline hover:opacity-85" aria-label="Go to board">
+        <Link to="/" className="text-inherit no-underline hover:opacity-85" aria-label={t.shell.rail.goToBoard}>
           <RailBrand />
         </Link>
       ) : (
-        <span aria-label="Go to board">
+        <span aria-label={t.shell.rail.goToBoard}>
           <RailBrand />
         </span>
       )}
-      <nav className="flex flex-1 flex-col items-center gap-1" aria-label="Main navigation">
-        <RailLink active={active === 'board'} enabled={navigationEnabled} to="/" label="Board" icon={<LayoutDashboard />} />
-        <RailLink active={active === 'archive'} enabled={navigationEnabled} to="/archive" label="Archive" icon={<Archive />} />
+      <nav className="flex flex-1 flex-col items-center gap-1" aria-label={t.shell.rail.mainNavigation}>
+        <RailLink active={active === 'board'} enabled={navigationEnabled} to="/" label={t.shell.rail.board} icon={<LayoutDashboard />} />
+        <RailLink active={active === 'archive'} enabled={navigationEnabled} to="/archive" label={t.shell.rail.archive} icon={<Archive />} />
         {isAdmin && (
           <>
             <RailLink
               active={active === 'calculator'}
               enabled={navigationEnabled}
               to="/calculator"
-              label="Calculator"
+              label={t.shell.rail.calculator}
               icon={<Calculator />}
             />
             <RailLink
               active={active === 'settings'}
               enabled={navigationEnabled}
               to="/settings/$section"
-              label="Settings"
+              label={t.shell.rail.settings}
               icon={<Settings />}
             />
           </>
@@ -71,6 +73,7 @@ export function AppRail({
 }
 
 function StorageRemaining() {
+  const { t, locale } = useI18n()
   const workspaceSlug = useWorkspaceSlug()
   const { data } = useSuspenseQuery(sessionQuery(workspaceSlug))
   const [open, setOpen] = useState(false)
@@ -84,7 +87,7 @@ function StorageRemaining() {
   const usedBytes = Math.max(0, usage.quotaBytes - usage.availableBytes)
   const used = Math.max(0, Math.min(1, usedBytes / usage.quotaBytes))
   const level = storageUsageLevel(usedBytes, usage.quotaBytes)
-  const label = `${formatBytes(usage.availableBytes)} storage available`
+  const label = t.shell.rail.storageAvailable(formatBytes(usage.availableBytes, locale))
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
@@ -118,11 +121,11 @@ function StorageRemaining() {
       </PopoverTrigger>
       <PopoverContent side="right" align="end" sideOffset={12} className="w-64 max-w-[calc(100vw-1rem)] gap-3 p-3">
         <span className="self-start rounded-sm border-2 border-blueprint/30 bg-background px-2 py-0.5 font-heading text-[11px] font-semibold tracking-[0.08em] text-foreground uppercase">
-          Included storage
+          {t.shell.rail.includedStorage}
         </span>
         <div className="flex items-baseline justify-between gap-2">
-          <span className="font-heading text-xl leading-none">{formatBytes(usedBytes)}</span>
-          <span className="text-xs text-muted-foreground">of {formatBytes(usage.quotaBytes)} used</span>
+          <span className="font-heading text-xl leading-none">{formatBytes(usedBytes, locale)}</span>
+          <span className="text-xs text-muted-foreground">{t.shell.rail.storageUsedOf(formatBytes(usage.quotaBytes, locale))}</span>
         </div>
         <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
           <div
@@ -130,12 +133,10 @@ function StorageRemaining() {
             style={{ width: `${used * 100}%` }}
           />
         </div>
-        {level !== 'ok' && (
-          <p className="text-sm">{level === 'full' ? 'Storage is full, so new uploads will fail.' : 'Storage is nearly full.'}</p>
-        )}
+        {level !== 'ok' && <p className="text-sm">{level === 'full' ? t.shell.rail.storageFull : t.shell.rail.storageNearlyFull}</p>}
         <div className="border-t border-dashed border-border pt-3">
           <Link to="/plan" className={cn(buttonVariants({ size: 'sm' }), 'w-full')} onClick={() => setOpen(false)}>
-            {upgrade ? `Upgrade to ${storagePlans[upgrade].name}` : 'View plan'}
+            {upgrade ? t.shell.rail.upgradeTo(t.settings.plan.names[upgrade]) : t.shell.rail.viewPlan}
           </Link>
         </div>
       </PopoverContent>

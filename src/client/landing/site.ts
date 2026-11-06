@@ -37,3 +37,7 @@ export const PAGES: readonly SitePage[] = [
 
 /** The hosted service greets signed-out visitors with the landing page; a self-hosted install shows its sign-in and setup screen. */
 export const showsLanding = (session: { hosted: boolean; identity: unknown }) => session.hosted && !session.identity
+
+/** The marketing and legal pages are written only in English, so they keep `<html lang="en">` whatever the visitor's language. */
+export const showsEnglishLandingPage = (session: { hosted: boolean; identity: unknown }, pathname: string) =>
+  pathname === '/' ? showsLanding(session) : session.hosted && (pathname === '/home' || PAGES.some((page) => page.path === pathname))

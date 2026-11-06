@@ -20,6 +20,7 @@ export const user = sqliteTable('user', {
   banReason: text(),
   banExpires: isoDate(),
   color: text(),
+  locale: text(),
   twoFactorEnabled: integer({ mode: 'boolean' }).notNull().default(false),
   stripeCustomerId: text('stripe_customer_id'),
 })

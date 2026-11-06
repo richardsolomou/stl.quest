@@ -6,6 +6,9 @@ import {
   truncateWorkspaceName,
   workspaceSlug,
 } from './workspaces'
+import { messagesFor } from './i18n'
+
+const en = messagesFor('en').common
 
 describe('workspace identity', () => {
   it('creates a stable URL slug', () => {
@@ -19,15 +22,23 @@ describe('workspace identity', () => {
 
 describe('workspace names', () => {
   it('names a personal workspace after its owner', () => {
-    expect(personalWorkspaceName('  Ada  ')).toBe("Ada's workspace")
+    expect(personalWorkspaceName('  Ada  ', en)).toBe("Ada's workspace")
+  })
+
+  it('names a personal workspace in the creator language', () => {
+    expect(personalWorkspaceName('Jonas', messagesFor('de').common)).toBe('Arbeitsbereich von Jonas')
+  })
+
+  it('keeps a long French personal workspace name within the limit', () => {
+    expect(personalWorkspaceName('L'.repeat(300), messagesFor('fr').common)).toHaveLength(MAX_WORKSPACE_NAME_LENGTH)
   })
 
   it('names a personal workspace without an owner name generically', () => {
-    expect(personalWorkspaceName('   ')).toBe('My workspace')
+    expect(personalWorkspaceName('   ', en)).toBe('My workspace')
   })
 
   it('keeps a personal workspace named after a long user name within the limit', () => {
-    expect(personalWorkspaceName('L'.repeat(300))).toBe(`${'L'.repeat(MAX_WORKSPACE_NAME_LENGTH - 12)}'s workspace`)
+    expect(personalWorkspaceName('L'.repeat(300), en)).toBe(`${'L'.repeat(MAX_WORKSPACE_NAME_LENGTH - 12)}'s workspace`)
   })
 
   it('does not split a surrogate pair when shortening a name', () => {
@@ -42,9 +53,9 @@ describe('account deletion workspaces', () => {
     const coOwned = { id: 'co-owned', name: 'Co-owned', ownerCount: 2, memberCount: 2 }
 
     expect(accountDeletionWorkspaces([solo, shared, coOwned])).toEqual({
-      conflict: 'this user is the only owner of Shared. Remove the other members or delete that workspace first',
+      blocking: ['Shared'],
       removed: [solo],
     })
-    expect(accountDeletionWorkspaces([solo, coOwned]).conflict).toBeUndefined()
+    expect(accountDeletionWorkspaces([solo, coOwned]).blocking).toEqual([])
   })
 })

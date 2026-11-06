@@ -12,9 +12,11 @@ import {
   type EmailTemplateKind,
   type EmailTemplates,
 } from '../core/email'
+import { messagesFor, type Locale } from '../core/i18n'
 import { inviteEmail, printReadyEmail } from '../core/notifications'
 import type { Notifier, Repository, Telemetry } from '../core/types'
 import { decryptSetting, type EncryptedSetting } from './integrations'
+import { serverMessages } from './locale'
 import { logger } from './logger'
 
 export async function readEmailBranding(repository: Pick<Repository, 'getSetting'>): Promise<EmailBranding> {
@@ -44,6 +46,7 @@ export function mailerTemplate(mailer: WorkspaceMailer, branding: EmailBranding,
   return mailer.ownServer ? branding.templates?.[kind] : undefined
 }
 
+/** Written in the inviter's language, the only one known before the recipient has an account. */
 export async function sendInviteEmail(
   mailer: WorkspaceMailer,
   branding: EmailBranding,
@@ -53,7 +56,10 @@ export async function sendInviteEmail(
   const template = mailerTemplate(mailer, branding, 'invite')
   await mailer.delivery.send({
     to: invite.to,
-    ...brandedMessage(inviteEmail({ workspaceName: invite.workspaceName, logoSrc, url: invite.url, template }), parts),
+    ...brandedMessage(
+      inviteEmail({ t: serverMessages().email, workspaceName: invite.workspaceName, logoSrc, url: invite.url, template }),
+      parts,
+    ),
   })
 }
 
@@ -109,6 +115,8 @@ export function emailNotifier(options: {
   branding: () => Promise<EmailBranding>
   appUrl: () => string | undefined
   deliveries: DeliveryTracker
+  /** The recipient's chosen language; undefined sends English. */
+  recipientLocale: (userId: string) => Promise<Locale | undefined>
 }): Notifier {
   const deliver: Notifier['printsReady'] = async (recipient, prints) => {
     const url = options.appUrl()
@@ -118,7 +126,15 @@ export function emailNotifier(options: {
       const branding = await options.branding()
       const { logoSrc, ...parts } = brandedEmailParts(branding, mailer.relayed)
       const template = mailerTemplate(mailer, branding, 'print-ready')
-      const email = printReadyEmail({ workspaceName: await options.workspaceName(), logoSrc, name: recipient.name, prints, url, template })
+      const email = printReadyEmail({
+        t: messagesFor(await options.recipientLocale(recipient.id)).email,
+        workspaceName: await options.workspaceName(),
+        logoSrc,
+        name: recipient.name,
+        prints,
+        url,
+        template,
+      })
       await mailer.delivery.send({ to: recipient.email, ...brandedMessage(email, parts) })
       void options.telemetry
         .capture(recipient.id, 'print_ready_email_sent', {

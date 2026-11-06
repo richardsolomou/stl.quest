@@ -30,13 +30,10 @@ import { SettingNotice } from '../SettingNotice'
 import { PrinterPresetImage } from './PrinterPresetImage'
 import { PrinterPresetPicker } from './PrinterPresetPicker'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { useI18n } from '../../i18n'
 
-const PRINT_TYPES: { value: PrintType; label: string }[] = [
-  { value: 'resin', label: 'Resin' },
-  { value: 'filament', label: 'Filament' },
-]
-
-const printTypeLabel = (printType: PrintType) => PRINT_TYPES.find(({ value }) => value === printType)?.label
+const printTypeOptions = (labels: Record<PrintType, string>) =>
+  (['resin', 'filament'] as const).map((value) => ({ value, label: labels[value] }))
 
 export function PrintersPane({
   onboarding = false,
@@ -55,6 +52,8 @@ export function PrintersPane({
   dirtyRef.current = dirty
   const callSave = useServerFn(savePrinterProfiles)
   const queryClient = useQueryClient()
+  const { t } = useI18n()
+  const copy = t.settings.printers
   const mutation = useMutation({
     mutationFn: (next: PrinterProfile[]) => callSave({ data: { workspaceSlug, profiles: next } }),
     onMutate: () => {
@@ -82,7 +81,7 @@ export function PrintersPane({
     setSavedProfiles(next)
   }, [data])
 
-  const error = useMemo(() => printerProfilesValidationError(profiles), [profiles])
+  const error = useMemo(() => printerProfilesValidationError(profiles, t), [profiles, t])
   useEffect(() => {
     if (onboarding || !dirty || error || mutation.isPending) return
     const next = profiles.map(normalizePrinterProfile)
@@ -109,8 +108,8 @@ export function PrintersPane({
       <QueryState
         loading={query.isPending}
         error={query.error}
-        loadingLabel="Loading printer settings…"
-        errorTitle="Could not load printer settings"
+        loadingLabel={copy.loading}
+        errorTitle={copy.loadError}
         onRetry={() => void query.refetch()}
       />
     )
@@ -123,12 +122,12 @@ export function PrintersPane({
         <TableHeader className="@max-lg:hidden">
           <TableRow className="hover:bg-transparent">
             <TableHead className="w-14">
-              <span className="sr-only">Image</span>
+              <span className="sr-only">{copy.table.image}</span>
             </TableHead>
-            <TableHead>Printer</TableHead>
-            <TableHead>Print type</TableHead>
+            <TableHead>{copy.table.printer}</TableHead>
+            <TableHead>{copy.table.printType}</TableHead>
             <TableHead className="w-10">
-              <span className="sr-only">Remove</span>
+              <span className="sr-only">{t.common.remove}</span>
             </TableHead>
           </TableRow>
         </TableHeader>
@@ -147,21 +146,18 @@ export function PrintersPane({
       </Table>
     </div>
   )
-  const failure = mutation.error ? errorMessage(mutation.error, 'Please try again.') : undefined
+  const failure = mutation.error ? errorMessage(mutation.error, copy.tryAgainFallback) : undefined
 
   const content = onboarding ? (
     <div className="flex flex-col gap-5">
       <div className="space-y-2">
         {onBack && (
           <Button type="button" variant="ghost" size="sm" className="-ml-2 text-muted-foreground" onClick={onBack}>
-            <ArrowLeft /> Back to storage
+            <ArrowLeft /> {copy.onboarding.back}
           </Button>
         )}
-        <h3 className="font-heading text-xl font-semibold">Add the printers you own</h3>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Operators assign queued prints to these machines. Slicing and build preparation stay in your slicer, so a name and a print type
-          are all STL Quest needs.
-        </p>
+        <h3 className="font-heading text-xl font-semibold">{copy.onboarding.title}</h3>
+        <p className="text-sm leading-relaxed text-muted-foreground">{copy.onboarding.description}</p>
       </div>
       {profiles.length > 0 ? (
         <div className="flex flex-col gap-3">
@@ -180,12 +176,10 @@ export function PrintersPane({
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">Start from a known model</span>
-              <Badge>{PRINTER_PRESETS.length} presets</Badge>
+              <span className="font-medium">{copy.onboarding.presetsTitle}</span>
+              <Badge>{copy.onboarding.presetCount(PRINTER_PRESETS.length)}</Badge>
             </div>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Search by brand or model and the print type is filled in for you. Anything unusual can be added by hand.
-            </p>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{copy.onboarding.presetsDescription}</p>
             <div className="mt-3">
               <PrinterPresetPicker
                 variant="default"
@@ -200,11 +194,7 @@ export function PrintersPane({
       )}
       <FieldError>{error}</FieldError>
       <SettingNotice
-        notice={
-          failure
-            ? { tone: 'error', title: 'Printers were not saved', hint: 'Your edits are still here. Try saving again.', detail: failure }
-            : undefined
-        }
+        notice={failure ? { tone: 'error', title: copy.notSaved, hint: copy.onboarding.notSavedHint, detail: failure } : undefined}
       />
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -213,30 +203,24 @@ export function PrintersPane({
             disabled={!profiles.length || !!error || mutation.isPending}
             onClick={() => mutation.mutate(profiles.map(normalizePrinterProfile))}
           >
-            {mutation.isPending ? 'Saving…' : 'Save and continue'}
+            {mutation.isPending ? t.common.saving : copy.onboarding.save}
           </Button>
           {!profiles.length && (
             <Button type="button" variant="ghost" size="sm" disabled={mutation.isPending} onClick={() => mutation.mutate([])}>
-              Skip for now
+              {copy.onboarding.skip}
             </Button>
           )}
         </div>
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          The board works without printers. Add them any time from Settings, and queued prints stay unassigned until you do.
-        </p>
+        <p className="text-xs leading-relaxed text-muted-foreground">{copy.onboarding.skipHint}</p>
       </div>
     </div>
   ) : (
     <>
-      <SettingsHeader title="Printers" description="Manage the machines available for print assignment." />
+      <SettingsHeader title={copy.title} description={copy.description} />
 
       <SettingsSection
-        title="Your printers"
-        description={
-          activeProfiles.length
-            ? `${activeProfiles.length} printer${activeProfiles.length === 1 ? '' : 's'} configured.`
-            : 'No printers configured. Add a machine to assign queued work.'
-        }
+        title={copy.active.title}
+        description={activeProfiles.length ? copy.active.count(activeProfiles.length) : copy.active.empty}
       >
         <div className="flex flex-col gap-3" data-onboarding="printers">
           {printerTable}
@@ -251,7 +235,7 @@ export function PrintersPane({
       </SettingsSection>
 
       {archivedProfiles.length > 0 && (
-        <SettingsSection title="Archived printers" description="Kept for the history of prints completed on them.">
+        <SettingsSection title={copy.archived.title} description={copy.archived.description}>
           <div className="@container overflow-hidden rounded-lg border">
             <Table>
               <TableBody>
@@ -261,9 +245,9 @@ export function PrintersPane({
                       <span className="block truncate font-medium" title={profile.name}>
                         {profile.name}
                       </span>
-                      <span className="block text-xs text-muted-foreground @sm:hidden">{printTypeLabel(profile.printType)}</span>
+                      <span className="block text-xs text-muted-foreground @sm:hidden">{copy.printTypes[profile.printType]}</span>
                     </TableCell>
-                    <TableCell className="text-muted-foreground @max-sm:hidden">{printTypeLabel(profile.printType)}</TableCell>
+                    <TableCell className="text-muted-foreground @max-sm:hidden">{copy.printTypes[profile.printType]}</TableCell>
                     <TableCell className="text-right">
                       <Button
                         type="button"
@@ -277,7 +261,7 @@ export function PrintersPane({
                         }
                       >
                         <RotateCcw />
-                        <span className="@max-sm:sr-only">Restore printer</span>
+                        <span className="@max-sm:sr-only">{copy.archived.restore}</span>
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -288,13 +272,7 @@ export function PrintersPane({
         </SettingsSection>
       )}
 
-      <SettingNotice
-        notice={
-          failure
-            ? { tone: 'error', title: 'Printers were not saved', hint: 'Your edits are still here. Try again.', detail: failure }
-            : undefined
-        }
-      />
+      <SettingNotice notice={failure ? { tone: 'error', title: copy.notSaved, hint: copy.notSavedHint, detail: failure } : undefined} />
       {failure ? (
         <SettingsActions>
           <Button
@@ -302,7 +280,7 @@ export function PrintersPane({
             disabled={!!error || mutation.isPending}
             onClick={() => mutation.mutate(profiles.map(normalizePrinterProfile))}
           >
-            Try again
+            {t.common.retry}
           </Button>
         </SettingsActions>
       ) : null}
@@ -312,13 +290,13 @@ export function PrintersPane({
   const removalDialog = (
     <ConfirmDialog
       open={!!removeProfile}
-      title={removeProfile ? `${removeProfile.used ? 'Archive' : 'Remove'} “${removeProfile.name || 'this printer'}”?` : 'Remove printer?'}
-      description={
-        removeProfile?.used
-          ? 'This printer has print history. It will no longer be available for new assignments, but completed prints will continue to show it.'
-          : 'This printer has not been used and will be removed permanently.'
+      title={
+        removeProfile
+          ? (removeProfile.used ? copy.remove.archiveTitle : copy.remove.removeTitle)(removeProfile.name || copy.remove.thisPrinter)
+          : copy.remove.fallbackTitle
       }
-      confirmLabel={removeProfile?.used ? 'Archive printer' : 'Remove printer'}
+      description={removeProfile?.used ? copy.remove.archiveDescription : copy.remove.removeDescription}
+      confirmLabel={removeProfile?.used ? copy.remove.archiveAction : copy.remove.removeAction}
       destructive
       onCancel={() => setRemoveId(null)}
       onConfirm={() => {
@@ -362,10 +340,14 @@ function PrinterRow({
   onRemove: () => void
 }) {
   const preset = getPrinterPreset(profile.presetId)
+  const { t } = useI18n()
+  const copy = t.settings.printers
+  const printTypes = printTypeOptions(copy.printTypes)
+  const displayName = profile.name || copy.row.fallbackName(index + 1)
 
   return (
     <TableRow
-      aria-label={`Printer ${index + 1}`}
+      aria-label={copy.row.label(index + 1)}
       className="@max-lg:grid @max-lg:grid-cols-[minmax(0,1fr)_auto] @max-lg:gap-x-3 @max-lg:gap-y-3 @max-lg:p-3"
     >
       <TableCell className="@max-lg:p-0">
@@ -374,12 +356,12 @@ function PrinterRow({
       <TableCell className="w-full min-w-40 whitespace-normal @max-lg:col-span-2 @max-lg:row-start-2 @max-lg:min-w-0 @max-lg:p-0">
         <Field>
           <FieldLabel htmlFor={`${profile.id}-name`} className="@lg:sr-only">
-            Printer name
+            {copy.row.name}
           </FieldLabel>
           <Input
             id={`${profile.id}-name`}
             value={profile.name}
-            placeholder={profile.printType === 'resin' ? 'Resin printer' : 'Filament printer'}
+            placeholder={copy.row.placeholder[profile.printType]}
             maxLength={100}
             disabled={disabled}
             onChange={(event) => onChange({ ...profile, name: event.target.value })}
@@ -389,25 +371,21 @@ function PrinterRow({
       <TableCell className="min-w-36 @max-lg:col-span-2 @max-lg:row-start-3 @max-lg:min-w-0 @max-lg:p-0">
         <Field>
           <FieldLabel htmlFor={`${profile.id}-print-type`} className="@lg:sr-only">
-            Print type
+            {copy.table.printType}
           </FieldLabel>
           <Select
-            items={PRINT_TYPES}
+            items={printTypes}
             value={profile.printType}
             disabled={disabled}
             onValueChange={(printType) =>
               printType && onChange({ ...profile, printType, presetId: printType === profile.printType ? profile.presetId : undefined })
             }
           >
-            <SelectTrigger
-              id={`${profile.id}-print-type`}
-              className="w-full"
-              aria-label={`Print type for ${profile.name || `printer ${index + 1}`}`}
-            >
+            <SelectTrigger id={`${profile.id}-print-type`} className="w-full" aria-label={copy.row.printTypeLabel(displayName)}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {PRINT_TYPES.map((printType) => (
+              {printTypes.map((printType) => (
                 <SelectItem key={printType.value} value={printType.value}>
                   {printType.label}
                 </SelectItem>
@@ -422,7 +400,7 @@ function PrinterRow({
           variant="ghost"
           size="icon-sm"
           className="shrink-0 text-muted-foreground hover:text-destructive"
-          aria-label={`${profile.used ? 'Archive' : 'Remove'} ${profile.name || `printer ${index + 1}`}`}
+          aria-label={(profile.used ? copy.row.archiveLabel : copy.row.removeLabel)(displayName)}
           disabled={disabled}
           onClick={onRemove}
         >

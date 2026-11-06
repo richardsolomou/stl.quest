@@ -6,6 +6,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { MAX_REQUEST_QUANTITY, MIN_REQUEST_QUANTITY, normalizeRequestQuantity } from '../../core/request'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
+import { useI18n } from '../i18n'
 
 export function RepeatRequestDialog({
   requestNames,
@@ -22,10 +23,11 @@ export function RepeatRequestDialog({
   onConfirm: (quantity: number) => void
   onCancel: () => void
 }) {
+  const { t } = useI18n()
   const [value, setValue] = useState(String(quantity))
 
   return (
-    <DialogShell onClose={onCancel} title="Print again" className="sm:max-w-[360px]" preventClose={pending}>
+    <DialogShell onClose={onCancel} title={t.requests.repeat.title} className="sm:max-w-[360px]" preventClose={pending}>
       <form
         onSubmit={(event) => {
           event.preventDefault()
@@ -34,11 +36,11 @@ export function RepeatRequestDialog({
       >
         <p className="mb-3 text-sm text-muted-foreground">
           {requestNames.length === 1
-            ? `Create a new request for “${requestNames[0]}”. The existing request and its progress will not change.`
-            : `Create new requests for ${requestNames.length} selected prints. The existing requests and their progress will not change.`}
+            ? t.requests.repeat.descriptionSingle(requestNames[0])
+            : t.requests.repeat.descriptionMultiple(requestNames.length)}
         </p>
         <Field>
-          <FieldLabel htmlFor="repeat-request-quantity">Copies</FieldLabel>
+          <FieldLabel htmlFor="repeat-request-quantity">{t.requests.fields.copies}</FieldLabel>
           <Input
             id="repeat-request-quantity"
             type="number"
@@ -50,21 +52,17 @@ export function RepeatRequestDialog({
           />
         </Field>
         <DialogProblem
-          title={requestNames.length === 1 ? 'The request was not created' : 'The requests could not all be created'}
-          hint={
-            requestNames.length === 1
-              ? 'The existing request was not changed. Try again.'
-              : 'Some requests may have been created. Check the queue before trying again.'
-          }
+          title={requestNames.length === 1 ? t.requests.repeat.failedSingleTitle : t.requests.repeat.failedMultipleTitle}
+          hint={requestNames.length === 1 ? t.requests.repeat.failedSingleHint : t.requests.repeat.failedMultipleHint}
           error={error}
         />
         <div className="mt-2 flex justify-end gap-2.5">
           <Button type="button" variant="outline" disabled={pending} onClick={onCancel}>
-            Cancel
+            {t.common.cancel}
           </Button>
           <Button type="submit" disabled={pending}>
             {pending && <Spinner />}
-            {pending ? 'Creating…' : requestNames.length === 1 ? 'Create request' : 'Create requests'}
+            {pending ? t.requests.repeat.creating : t.requests.repeat.create(requestNames.length)}
           </Button>
         </div>
       </form>

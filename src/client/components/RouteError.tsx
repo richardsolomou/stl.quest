@@ -1,18 +1,18 @@
 import type { ErrorComponentProps } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { reportRouteError } from '../../server/fns'
+import { useI18n } from '../i18n'
 
 export function RouteError({ error, reset }: ErrorComponentProps) {
+  const { t } = useI18n()
   useEffect(() => {
     void reportRouteError({ data: serializeRouteError(error) }).catch(() => undefined)
   }, [error])
 
   return (
     <main className="mx-auto mt-[15vh] max-w-lg p-6 text-center">
-      <h1>Something went wrong</h1>
-      <p className="text-muted-foreground">
-        The server could not load this page. Refresh to try again, then check the server logs if it continues.
-      </p>
+      <h1>{t.common.somethingWentWrong}</h1>
+      <p className="text-muted-foreground">{t.shell.routeError.body}</p>
       <button
         type="button"
         className="mt-4 rounded-md border px-4 py-2 font-medium"
@@ -21,7 +21,7 @@ export function RouteError({ error, reset }: ErrorComponentProps) {
           window.location.reload()
         }}
       >
-        Refresh
+        {t.shell.routeError.refresh}
       </button>
     </main>
   )

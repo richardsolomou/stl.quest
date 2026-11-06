@@ -10,10 +10,13 @@ import { Spinner } from '@/components/ui/spinner'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, passwordLengthError } from '../../../core/security'
 import { setOwnPassword } from '../../../server/fns'
 import { authClient } from '../../authClient'
+import { useI18n } from '../../i18n'
 import { DialogProblem } from '../DialogProblem'
 import type { Notice } from '../SettingNotice'
 
 export function CreatePasswordForm({ onDone }: { onDone: () => void | Promise<void> }) {
+  const { t } = useI18n()
+  const copy = t.account.password
   const callSetPassword = useServerFn(setOwnPassword)
   const [password, setPassword] = useState('')
   const mutation = useMutation({
@@ -31,7 +34,7 @@ export function CreatePasswordForm({ onDone }: { onDone: () => void | Promise<vo
         minLength={PASSWORD_MIN_LENGTH}
         maxLength={PASSWORD_MAX_LENGTH}
         autoComplete="new-password"
-        placeholder="Create a password"
+        placeholder={copy.createPlaceholder}
         onChange={(event) => setPassword(event.target.value)}
       />
       <Button
@@ -41,18 +44,16 @@ export function CreatePasswordForm({ onDone }: { onDone: () => void | Promise<vo
         onClick={() => mutation.mutate({ data: { password } })}
       >
         {mutation.isPending && <Spinner />}
-        {mutation.isPending ? 'Creating…' : 'Create password'}
+        {mutation.isPending ? copy.creating : copy.create}
       </Button>
-      <DialogProblem
-        title="The password was not created"
-        hint={`Use at least ${PASSWORD_MIN_LENGTH} characters, then try again.`}
-        error={mutation.error?.message}
-      />
+      <DialogProblem title={copy.createFailedTitle} hint={copy.createFailedHint(PASSWORD_MIN_LENGTH)} error={mutation.error?.message} />
     </div>
   )
 }
 
 export function ChangePasswordForm({ onDone }: { onDone: (notice: Notice) => void }) {
+  const { t } = useI18n()
+  const copy = t.account.password
   const posthog = usePostHog()
   const [error, setError] = useState('')
   const form = useForm({
@@ -60,15 +61,14 @@ export function ChangePasswordForm({ onDone }: { onDone: (notice: Notice) => voi
     onSubmit: async ({ value }) => {
       setError('')
       const { error: failed } = await authClient.changePassword({ ...value, revokeOtherSessions: true })
-      if (failed)
-        setError(`Could not change your password. Check your current password and use at least ${PASSWORD_MIN_LENGTH} characters.`)
+      if (failed) setError(copy.changeFailed(PASSWORD_MIN_LENGTH))
       else {
         form.reset()
         posthog.capture('password_changed', { other_sessions_revoked: true })
         onDone({
           tone: 'success',
-          title: 'Password changed',
-          hint: 'Every other device has been signed out. Use the new password next time you sign in.',
+          title: copy.changedTitle,
+          hint: copy.changedHint,
         })
       }
     },
@@ -81,13 +81,11 @@ export function ChangePasswordForm({ onDone }: { onDone: (notice: Notice) => voi
       }}
       className="flex max-w-md flex-col gap-3"
     >
-      <FieldDescription>
-        Change the password used with your account email. Saving this also signs you out on every other device.
-      </FieldDescription>
+      <FieldDescription>{copy.changeDescription}</FieldDescription>
       <form.Field name="currentPassword">
         {(field) => (
           <Field>
-            <FieldLabel htmlFor="current-password">Current password</FieldLabel>
+            <FieldLabel htmlFor="current-password">{copy.current}</FieldLabel>
             <Input
               id="current-password"
               type="password"
@@ -100,10 +98,10 @@ export function ChangePasswordForm({ onDone }: { onDone: (notice: Notice) => voi
           </Field>
         )}
       </form.Field>
-      <form.Field name="newPassword" validators={{ onChange: ({ value }) => passwordLengthError(value) }}>
+      <form.Field name="newPassword" validators={{ onChange: ({ value }) => passwordLengthError(value, t) }}>
         {(field) => (
           <Field>
-            <FieldLabel htmlFor="new-password">New password</FieldLabel>
+            <FieldLabel htmlFor="new-password">{copy.new}</FieldLabel>
             <Input
               id="new-password"
               type="password"
@@ -117,16 +115,12 @@ export function ChangePasswordForm({ onDone }: { onDone: (notice: Notice) => voi
           </Field>
         )}
       </form.Field>
-      <DialogProblem
-        title="Your password was not changed"
-        hint="Your existing password still works and no devices were signed out."
-        error={error}
-      />
+      <DialogProblem title={copy.notChangedTitle} hint={copy.notChangedHint} error={error} />
       <form.Subscribe selector={(state) => state.isSubmitting}>
         {(busy) => (
           <Button type="submit" disabled={busy}>
             {busy && <Spinner />}
-            {busy ? 'Changing…' : 'Change password'}
+            {busy ? copy.changing : copy.change}
           </Button>
         )}
       </form.Subscribe>

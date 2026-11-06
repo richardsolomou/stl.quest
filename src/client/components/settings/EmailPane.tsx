@@ -8,9 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
 import type { PublicSmtpConfig } from '../../../core/auth'
+import type { Messages } from '../../../core/i18n'
 import {
   EMAIL_LOGO_TYPES,
-  emailPlaceholders,
   emailTemplateKinds,
   HOSTED_SMTP_PORTS,
   MAX_EMAIL_LOGO_BYTES,
@@ -39,12 +39,11 @@ import { SettingNotice, noticeDetail } from '../SettingNotice'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { SmtpDialog } from './SmtpIntegrationSettings'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
+import { useI18n } from '../../i18n'
 
-const EMAIL_DESCRIPTION = 'Choose how the invitations and print-ready emails from this workspace look and who they come from.'
-const PREVIEW_NAME = 'Maya'
-const PREVIEW_PRINTS = [
-  { name: 'Bracket', count: 2 },
-  { name: 'Cable clip', count: 1 },
+const previewPrints = (sample: Messages['settings']['email']['sample']) => [
+  { name: sample.firstPrint, count: 2 },
+  { name: sample.secondPrint, count: 1 },
 ]
 
 export function EmailPane({ workspaceName }: { workspaceName: string }) {
@@ -55,6 +54,8 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
   const hosted = useSuspenseQuery(sessionQuery()).data.hosted
   const input = useRef<HTMLInputElement>(null)
   const [tooLarge, setTooLarge] = useState(false)
+  const { t } = useI18n()
+  const copy = t.settings.email
   const mutation = useMutation({
     mutationFn: callSave,
     onSuccess: ({ logo }) =>
@@ -64,12 +65,12 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
   if (!query.data) {
     return (
       <SettingsPage>
-        <SettingsHeader title="Email" description={EMAIL_DESCRIPTION} />
+        <SettingsHeader title={copy.title} description={copy.description} />
         <QueryState
           loading={query.isPending}
           error={query.error}
-          loadingLabel="Loading email settings…"
-          errorTitle="Could not load email settings"
+          loadingLabel={copy.loading}
+          errorTitle={copy.loadError}
           onRetry={() => void query.refetch()}
         />
       </SettingsPage>
@@ -81,10 +82,11 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
   const from = fromHeader(senderDisplayName(sender.name, relayed), smtp.configured ? smtp.from : undefined)
   const logoSrc = logo ? emailLogoDataUrl(logo) : undefined
   const preview = printReadyEmail({
+    t: t.email,
     workspaceName,
     logoSrc,
-    name: PREVIEW_NAME,
-    prints: PREVIEW_PRINTS,
+    name: copy.sample.name,
+    prints: previewPrints(copy.sample),
     url: 'about:blank',
     template: smtp.configured ? templates['print-ready'] : undefined,
   })
@@ -97,17 +99,14 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
 
   return (
     <SettingsPage>
-      <SettingsHeader title="Email" description={EMAIL_DESCRIPTION} />
-      <SettingsSection
-        title="Logo"
-        description={`Shown at the top of every email instead of the workspace name. PNG, JPEG, or GIF up to ${MAX_EMAIL_LOGO_BYTES / 1024} KB; a wide logo about 96 pixels tall looks sharpest.`}
-      >
+      <SettingsHeader title={copy.title} description={copy.description} />
+      <SettingsSection title={copy.logo.title} description={copy.logo.description(MAX_EMAIL_LOGO_BYTES / 1024)}>
         <input
           ref={input}
           type="file"
           accept={EMAIL_LOGO_TYPES.join(',')}
           className="sr-only"
-          aria-label="Logo image"
+          aria-label={copy.logo.input}
           onChange={(event) => {
             const file = event.target.files?.[0]
             event.target.value = ''
@@ -118,13 +117,13 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
           {logo && (
             <img
               src={emailLogoDataUrl(logo)}
-              alt="Current logo"
+              alt={copy.logo.current}
               className="h-12 max-w-60 rounded-sm border border-border/70 bg-white object-contain p-1"
             />
           )}
           <Button type="button" variant="outline" disabled={mutation.isPending} onClick={() => input.current?.click()}>
             {mutation.isPending && <Spinner />}
-            {logo ? 'Replace logo' : 'Upload logo'}
+            {logo ? copy.logo.replace : copy.logo.upload}
           </Button>
           {logo && (
             <Button
@@ -136,7 +135,7 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
                 mutation.mutate({ data: { workspaceSlug, data: null } })
               }}
             >
-              Remove
+              {t.common.remove}
             </Button>
           )}
         </div>
@@ -144,8 +143,8 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
           <SettingNotice
             notice={{
               tone: 'error',
-              title: 'That image is too large',
-              hint: `Choose a logo of ${MAX_EMAIL_LOGO_BYTES / 1024} KB or less. Exporting it smaller or as a JPEG usually helps.`,
+              title: copy.logo.tooLarge,
+              hint: copy.logo.tooLargeHint(MAX_EMAIL_LOGO_BYTES / 1024),
             }}
           />
         )}
@@ -153,8 +152,8 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
           <SettingNotice
             notice={{
               tone: 'error',
-              title: 'The logo was not changed',
-              hint: 'Emails keep using the previous logo. Check the file is a PNG, JPEG, or GIF and try again.',
+              title: copy.logo.notSaved,
+              hint: copy.logo.notSavedHint,
               detail: noticeDetail(mutation.error),
             }}
           />
@@ -164,18 +163,18 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
       <MailServerSection smtp={smtp} hosted={hosted} />
       <TemplatesSection templates={templates} ownServer={smtp.configured} workspaceName={workspaceName} logoSrc={logoSrc} />
       <SettingsSection
-        title="Preview"
+        title={copy.preview.title}
         description={[
-          'What a requester sees when their prints are ready.',
-          from ? `From: ${from}.` : 'From: the server’s default sender.',
-          sender.replyTo && `Replies go to ${sender.replyTo}.`,
-          `Subject: “${preview.subject}”`,
+          copy.preview.intro,
+          from ? copy.preview.from(from) : copy.preview.defaultFrom,
+          sender.replyTo && copy.preview.replyTo(sender.replyTo),
+          copy.preview.subject(preview.subject),
         ]
           .filter(Boolean)
           .join(' ')}
       >
         <iframe
-          title="Print-ready email preview"
+          title={copy.preview.frameTitle}
           sandbox=""
           srcDoc={preview.html}
           className="h-[30rem] w-full rounded-sm border border-border/70 bg-white"
@@ -191,6 +190,8 @@ function SenderSection({ sender, relayed, ownServer }: { sender: EmailSender; re
   const queryClient = useQueryClient()
   const [name, setName] = useState(sender.name ?? '')
   const [replyTo, setReplyTo] = useState(sender.replyTo ?? '')
+  const { t } = useI18n()
+  const copy = t.settings.email.sender
   const mutation = useMutation({
     mutationFn: callSave,
     onSuccess: (saved) => {
@@ -201,7 +202,7 @@ function SenderSection({ sender, relayed, ownServer }: { sender: EmailSender; re
   })
   const dirty = name.trim() !== (sender.name ?? '') || replyTo.trim() !== (sender.replyTo ?? '')
   return (
-    <SettingsSection title="Sender" description="Leave both empty to keep the server’s default sender.">
+    <SettingsSection title={copy.title} description={copy.description}>
       <UnsavedChangesGuard dirty={dirty} />
       <form
         className="flex flex-col gap-4"
@@ -211,7 +212,7 @@ function SenderSection({ sender, relayed, ownServer }: { sender: EmailSender; re
         }}
       >
         <Field>
-          <FieldLabel htmlFor="email-sender-name">Sender name</FieldLabel>
+          <FieldLabel htmlFor="email-sender-name">{copy.nameLabel}</FieldLabel>
           <Input
             id="email-sender-name"
             value={name}
@@ -220,16 +221,10 @@ function SenderSection({ sender, relayed, ownServer }: { sender: EmailSender; re
             disabled={mutation.isPending}
             onChange={(event) => setName(event.target.value)}
           />
-          <FieldDescription>
-            {relayed
-              ? 'Shown as the sender, followed by “via STL Quest”. The sending address stays STL Quest’s so the email is not marked as spam.'
-              : ownServer
-                ? 'Shown as the sender, alongside the from address of your mail server.'
-                : 'Shown as the sender. The sending address stays the one this server is configured with so the email is not marked as spam.'}
-          </FieldDescription>
+          <FieldDescription>{relayed ? copy.nameRelayed : ownServer ? copy.nameOwnServer : copy.nameDefault}</FieldDescription>
         </Field>
         <Field>
-          <FieldLabel htmlFor="email-reply-to">Reply-to address</FieldLabel>
+          <FieldLabel htmlFor="email-reply-to">{copy.replyToLabel}</FieldLabel>
           <Input
             id="email-reply-to"
             type="email"
@@ -238,12 +233,12 @@ function SenderSection({ sender, relayed, ownServer }: { sender: EmailSender; re
             disabled={mutation.isPending}
             onChange={(event) => setReplyTo(event.target.value)}
           />
-          <FieldDescription>When someone replies to an email, it goes here.</FieldDescription>
+          <FieldDescription>{copy.replyToHint}</FieldDescription>
         </Field>
         <div>
           <Button type="submit" disabled={!dirty || mutation.isPending}>
             {mutation.isPending && <Spinner />}
-            Save
+            {t.common.save}
           </Button>
         </div>
       </form>
@@ -251,8 +246,8 @@ function SenderSection({ sender, relayed, ownServer }: { sender: EmailSender; re
         <SettingNotice
           notice={{
             tone: 'error',
-            title: 'The sender was not changed',
-            hint: 'Emails keep using the previous sender. Check the reply-to address is a valid email and try again.',
+            title: copy.notSaved,
+            hint: copy.notSavedHint,
             detail: noticeDetail(mutation.error),
           }}
         />
@@ -267,40 +262,29 @@ function MailServerSection({ smtp, hosted }: { smtp: PublicSmtpConfig; hosted: b
   const callSave = useServerFn(saveWorkspaceSmtp)
   const callRemove = useServerFn(removeWorkspaceSmtp)
   const [open, setOpen] = useState(false)
+  const { t } = useI18n()
+  const copy = t.settings.email.server
   const update = async (next: PublicSmtpConfig) => {
     queryClient.setQueryData(emailBrandingQuery(workspaceSlug).queryKey, (current) => current && { ...current, smtp: next })
     await invalidateQueries(queryClient, 'session')
   }
   return (
-    <SettingsSection
-      title="Mail server"
-      description={
-        hosted
-          ? 'Optional. Send from your own domain through your mail server instead of STL Quest’s address.'
-          : 'Optional. Send this workspace’s email through its own mail server instead of the one this server uses.'
-      }
-    >
+    <SettingsSection title={copy.title} description={hosted ? copy.descriptionHosted : copy.description}>
       <SettingRow
         icon={<AuthMethodIcon method="smtp" />}
-        name="Your mail server"
-        status={{ label: smtp.configured ? 'Sending' : 'Not set up', tone: smtp.configured ? 'on' : 'off' }}
-        detail={
-          smtp.configured
-            ? `Emails are sent from ${smtp.from} through ${smtp.host}.`
-            : hosted
-              ? 'Emails are sent from STL Quest’s address.'
-              : 'Emails use this server’s mail settings.'
-        }
+        name={copy.name}
+        status={{ label: smtp.configured ? copy.sending : copy.notSetUp, tone: smtp.configured ? 'on' : 'off' }}
+        detail={smtp.configured ? copy.sentThrough(smtp.from, smtp.host) : hosted ? copy.sentFromHosted : copy.sentFromServer}
         actions={
           <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
-            {smtp.configured ? 'Edit' : 'Connect'}
+            {smtp.configured ? t.common.edit : copy.connect}
           </Button>
         }
       />
       {open && (
         <SmtpDialog
           smtp={smtp}
-          hint={hosted ? `Use port ${HOSTED_SMTP_PORTS.join(', ')}.` : undefined}
+          hint={hosted ? copy.hostedPortHint(HOSTED_SMTP_PORTS.join(', ')) : undefined}
           save={async (values) => update(await callSave({ data: { workspaceSlug, ...values } }))}
           remove={async () => update(await callRemove({ data: { workspaceSlug } }))}
           onDone={() => setOpen(false)}
@@ -324,7 +308,9 @@ function TemplatesSection({
   const [kind, setKind] = useState<EmailTemplateKind>('print-ready')
   // Drafts outlive switching between emails, so comparing two templates never discards an edit.
   const [drafts, setDrafts] = useState<EmailTemplates>({})
-  const startingPoint = (option: EmailTemplateKind) => templates[option] ?? defaultEmailTemplate(option)
+  const { t } = useI18n()
+  const copy = t.settings.email.templates
+  const startingPoint = (option: EmailTemplateKind) => templates[option] ?? defaultEmailTemplate(option, t.email)
   const changed = (option: EmailTemplateKind) => {
     const draft = drafts[option]
     const start = startingPoint(option)
@@ -332,21 +318,15 @@ function TemplatesSection({
   }
   return (
     <SettingsSection
-      title="Templates"
-      description={
-        ownServer
-          ? 'Write the subject and HTML yourself. The plain-text version keeps the standard wording.'
-          : Object.keys(templates).length
-            ? 'Your saved templates are used again once you connect your own mail server.'
-            : 'Connect your own mail server to write your own email templates.'
-      }
+      title={copy.title}
+      description={ownServer ? copy.descriptionOwnServer : Object.keys(templates).length ? copy.descriptionSaved : copy.descriptionNone}
     >
       {ownServer && (
         <>
           <Field>
-            <FieldLabel htmlFor="email-template-kind">Email</FieldLabel>
+            <FieldLabel htmlFor="email-template-kind">{copy.kindLabel}</FieldLabel>
             <Select
-              items={emailTemplateKinds.map((option) => ({ value: option.id, label: option.name }))}
+              items={emailTemplateKinds.map((option) => ({ value: option.id, label: copy.kinds[option.id] }))}
               value={kind}
               onValueChange={(value) => setKind(value as EmailTemplateKind)}
             >
@@ -356,7 +336,7 @@ function TemplatesSection({
               <SelectContent>
                 {emailTemplateKinds.map((option) => (
                   <SelectItem key={option.id} value={option.id}>
-                    {option.name}
+                    {copy.kinds[option.id]}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -402,6 +382,9 @@ function TemplateEditor({
   const workspaceSlug = useWorkspaceSlug()
   const queryClient = useQueryClient()
   const callSave = useServerFn(saveEmailTemplate)
+  const { t } = useI18n()
+  const copy = t.settings.email.templates
+  const sample = t.settings.email.sample
   const mutation = useMutation({
     mutationFn: callSave,
     onSuccess: ({ templates }, { data }) => {
@@ -414,8 +397,16 @@ function TemplateEditor({
   const template = draft
   const preview =
     kind === 'invite'
-      ? inviteEmail({ workspaceName, logoSrc, url: 'about:blank', template })
-      : printReadyEmail({ workspaceName, logoSrc, name: PREVIEW_NAME, prints: PREVIEW_PRINTS, url: 'about:blank', template })
+      ? inviteEmail({ t: t.email, workspaceName, logoSrc, url: 'about:blank', template })
+      : printReadyEmail({
+          t: t.email,
+          workspaceName,
+          logoSrc,
+          name: sample.name,
+          prints: previewPrints(sample),
+          url: 'about:blank',
+          template,
+        })
   const placeholders = emailTemplateKinds.find((option) => option.id === kind)!.placeholders
   const placeholderCount = emailTemplatePlaceholderCount(draft)
   const tooManyPlaceholders = placeholderCount > MAX_EMAIL_TEMPLATE_PLACEHOLDERS
@@ -428,7 +419,7 @@ function TemplateEditor({
       }}
     >
       <Field>
-        <FieldLabel htmlFor="email-template-subject">Subject</FieldLabel>
+        <FieldLabel htmlFor="email-template-subject">{copy.subjectLabel}</FieldLabel>
         <Input
           id="email-template-subject"
           value={subject}
@@ -438,7 +429,7 @@ function TemplateEditor({
         />
       </Field>
       <Field>
-        <FieldLabel htmlFor="email-template-html">HTML</FieldLabel>
+        <FieldLabel htmlFor="email-template-html">{copy.htmlLabel}</FieldLabel>
         <Textarea
           id="email-template-html"
           value={html}
@@ -450,36 +441,30 @@ function TemplateEditor({
           onChange={(event) => onChange({ ...draft, html: event.target.value })}
         />
         <FieldDescription>
-          Placeholders:{' '}
+          {copy.placeholders}
           {placeholders.map((key, index) => (
             <span key={key}>
               {index > 0 && ', '}
-              <code className="font-mono text-foreground">{`{{${key}}}`}</code> {emailPlaceholders[key]}
+              <code className="font-mono text-foreground">{`{{${key}}}`}</code> {copy.placeholderDescriptions[key]}
             </span>
           ))}
           .
         </FieldDescription>
-        {tooManyPlaceholders && (
-          <FieldError>
-            Use at most {MAX_EMAIL_TEMPLATE_PLACEHOLDERS} placeholders across the subject and HTML; this template has {placeholderCount}.
-          </FieldError>
-        )}
+        {tooManyPlaceholders && <FieldError>{copy.tooManyPlaceholders(MAX_EMAIL_TEMPLATE_PLACEHOLDERS, placeholderCount)}</FieldError>}
       </Field>
       <Field>
         <iframe
-          title="Template preview"
+          title={copy.previewTitle}
           sandbox=""
           srcDoc={preview.html}
           className="h-[30rem] w-full rounded-sm border border-border/70 bg-white"
         />
-        <FieldDescription>
-          This preview cannot load images or fonts from other websites; the sent email keeps them as written.
-        </FieldDescription>
+        <FieldDescription>{copy.previewHint}</FieldDescription>
       </Field>
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={!dirty || !subject.trim() || !html.trim() || tooManyPlaceholders || mutation.isPending}>
           {mutation.isPending && <Spinner />}
-          Save template
+          {copy.save}
         </Button>
         {saved && (
           <Button
@@ -488,7 +473,7 @@ function TemplateEditor({
             disabled={mutation.isPending}
             onClick={() => mutation.mutate({ data: { workspaceSlug, kind, template: null } })}
           >
-            Use the standard email
+            {copy.useStandard}
           </Button>
         )}
       </div>
@@ -496,8 +481,8 @@ function TemplateEditor({
         <SettingNotice
           notice={{
             tone: 'error',
-            title: 'The template was not saved',
-            hint: 'Emails keep using the previous template. Try again in a moment.',
+            title: copy.notSaved,
+            hint: copy.notSavedHint,
             detail: noticeDetail(mutation.error),
           }}
         />

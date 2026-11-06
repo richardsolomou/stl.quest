@@ -11,6 +11,7 @@ import { MAX_USER_NAME_LENGTH, normalizeEmail } from '../../../core/identity'
 import { PASSWORD_MAX_LENGTH } from '../../../core/security'
 import { changeOwnEmail } from '../../../server/fns'
 import { authClient } from '../../authClient'
+import { useI18n } from '../../i18n'
 import { DialogProblem } from '../DialogProblem'
 import type { Notice } from '../SettingNotice'
 
@@ -27,6 +28,8 @@ export function AccountProfileForm({
   hasPassword: boolean
   onDone: (notice?: Notice) => void | Promise<void>
 }) {
+  const { t } = useI18n()
+  const copy = t.account.profile
   const posthog = usePostHog()
   const [error, setError] = useState('')
   const queryClient = useQueryClient()
@@ -38,13 +41,13 @@ export function AccountProfileForm({
       const nextName = value.name.trim()
       const nextEmail = normalizeEmail(value.email)
       if (!nextName) {
-        setError('Name is required.')
+        setError(copy.nameRequired)
         return
       }
       if (nextName !== name) {
         const { error: failed } = await authClient.updateUser({ name: nextName })
         if (failed) {
-          setError('Could not update your name.')
+          setError(copy.nameFailed)
           return
         }
         await queryClient.invalidateQueries({ queryKey: ['session'] })
@@ -53,13 +56,7 @@ export function AccountProfileForm({
         try {
           await changeEmail({ data: { email: nextEmail, password: value.currentPassword } })
         } catch {
-          setError(
-            !hasPassword
-              ? 'Create a password sign-in method before changing your email address.'
-              : emailConfigured
-                ? 'Could not change your email address. Check your current password.'
-                : 'Email verification must be configured to change this email address.',
-          )
+          setError(!hasPassword ? copy.emailNeedsPassword : emailConfigured ? copy.emailFailed : copy.emailNeedsVerification)
           return
         }
       }
@@ -69,8 +66,8 @@ export function AccountProfileForm({
           ? undefined
           : {
               tone: 'success',
-              title: 'Email change requested',
-              hint: `Check ${nextEmail} for a verification link. Your current address keeps working until you confirm.`,
+              title: copy.emailRequestedTitle,
+              hint: copy.emailRequestedHint(nextEmail),
             },
       )
     },
@@ -86,7 +83,7 @@ export function AccountProfileForm({
       <form.Field name="name">
         {(field) => (
           <Field>
-            <FieldLabel htmlFor="profile-name">Name</FieldLabel>
+            <FieldLabel htmlFor="profile-name">{copy.name}</FieldLabel>
             <Input
               id="profile-name"
               value={field.state.value}
@@ -100,7 +97,7 @@ export function AccountProfileForm({
       <form.Field name="email">
         {(field) => (
           <Field>
-            <FieldLabel htmlFor="profile-email">Email address</FieldLabel>
+            <FieldLabel htmlFor="profile-email">{copy.email}</FieldLabel>
             <Input
               id="profile-email"
               type="email"
@@ -109,7 +106,7 @@ export function AccountProfileForm({
               onChange={(event) => field.handleChange(event.target.value)}
               required
             />
-            {emailConfigured && <FieldDescription>A verification link may be sent to the new address.</FieldDescription>}
+            {emailConfigured && <FieldDescription>{copy.emailVerification}</FieldDescription>}
           </Field>
         )}
       </form.Field>
@@ -120,7 +117,7 @@ export function AccountProfileForm({
             <form.Field name="currentPassword">
               {(field) => (
                 <Field>
-                  <FieldLabel htmlFor="profile-current-password">Current password</FieldLabel>
+                  <FieldLabel htmlFor="profile-current-password">{copy.currentPassword}</FieldLabel>
                   <Input
                     id="profile-current-password"
                     type="password"
@@ -129,23 +126,19 @@ export function AccountProfileForm({
                     onChange={(event) => field.handleChange(event.target.value)}
                     required
                   />
-                  <FieldDescription>Confirm your password to change the account email.</FieldDescription>
+                  <FieldDescription>{copy.confirmPassword}</FieldDescription>
                 </Field>
               )}
             </form.Field>
           )
         }
       </form.Subscribe>
-      <DialogProblem
-        title="Your profile was not saved"
-        hint="Nothing has changed yet. Check the fields above and try again."
-        error={error}
-      />
+      <DialogProblem title={copy.notSavedTitle} hint={copy.notSavedHint} error={error} />
       <form.Subscribe selector={(state) => state.isSubmitting}>
         {(busy) => (
           <Button type="submit" disabled={busy}>
             {busy && <Spinner />}
-            {busy ? 'Saving…' : 'Save profile'}
+            {busy ? copy.saving : copy.save}
           </Button>
         )}
       </form.Subscribe>

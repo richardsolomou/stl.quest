@@ -1,8 +1,15 @@
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/client/i18n'
 
 function Spinner({ className, ...props }: React.ComponentProps<'output'>) {
+  const { t } = useI18n()
   return (
-    <output aria-label="Loading" data-slot="spinner" className={cn('inline-flex size-4 items-end gap-[2px]', className)} {...props}>
+    <output
+      aria-label={t.shell.ui.loading}
+      data-slot="spinner"
+      className={cn('inline-flex size-4 items-end gap-[2px]', className)}
+      {...props}
+    >
       {[0, 1, 2, 3].map((i) => (
         <span
           key={i}

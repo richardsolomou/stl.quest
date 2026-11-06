@@ -2,6 +2,7 @@ import { Spinner } from '@/components/ui/spinner'
 import type { PublicPrintRequest } from '../../core/types'
 import { formatEstimateMaterial, formatEstimateTime } from '../../core/printEstimates'
 import { DetailRow } from './DetailRow'
+import { useI18n, type I18n } from '../i18n'
 
 export function requestPrintEstimate(request: PublicPrintRequest) {
   if (!request.printType) return undefined
@@ -14,18 +15,20 @@ export function requestPrintEstimate(request: PublicPrintRequest) {
   }
 }
 
-function estimateParts(estimate: NonNullable<ReturnType<typeof requestPrintEstimate>>) {
+function estimateParts(estimate: NonNullable<ReturnType<typeof requestPrintEstimate>>, { t, locale }: I18n) {
   return [
     estimate.material === undefined
       ? undefined
-      : `${estimate.materialAdjusted ? '' : '≈'}${formatEstimateMaterial(estimate.material)} ${estimate.materialUnit}`,
-    estimate.minutes === undefined ? undefined : `${estimate.minutesAdjusted ? '' : '≈'}${formatEstimateTime(estimate.minutes)}`,
+      : `${estimate.materialAdjusted ? '' : '≈'}${formatEstimateMaterial(estimate.material, locale)} ${estimate.materialUnit}`,
+    estimate.minutes === undefined
+      ? undefined
+      : `${estimate.minutesAdjusted ? '' : '≈'}${formatEstimateTime(estimate.minutes, t.requests)}`,
   ].filter((part): part is string => part !== undefined)
 }
 
-export function printEstimateSummary(request: PublicPrintRequest) {
+export function printEstimateSummary(request: PublicPrintRequest, i18n: I18n) {
   const estimate = requestPrintEstimate(request)
-  const parts = estimate ? estimateParts(estimate) : []
+  const parts = estimate ? estimateParts(estimate, i18n) : []
   return parts.length ? parts.join(' · ') : undefined
 }
 
@@ -35,16 +38,18 @@ function estimatePending(request: PublicPrintRequest) {
 }
 
 export function PrintEstimateBadges({ request }: { request: PublicPrintRequest }) {
+  const i18n = useI18n()
+  const { t } = i18n
   const estimate = requestPrintEstimate(request)
   if (!estimate || (estimate.material === undefined && estimate.minutes === undefined)) {
     if (!estimatePending(request)) return null
     return (
       <span className="mt-0.5 block truncate font-mono text-xs text-ticket-muted/70 max-[620px]:whitespace-normal">
-        working out the estimate…
+        {t.requests.estimate.workingOutShort}
       </span>
     )
   }
-  const parts = estimateParts(estimate)
+  const parts = estimateParts(estimate, i18n)
   return (
     <span className="mt-0.5 block truncate font-mono text-xs text-ticket-muted/70 max-[620px]:whitespace-normal" title={parts.join(' · ')}>
       {parts.join(' · ')}
@@ -53,26 +58,26 @@ export function PrintEstimateBadges({ request }: { request: PublicPrintRequest }
 }
 
 export function PrintEstimateDetails({ request }: { request: PublicPrintRequest }) {
+  const i18n = useI18n()
+  const { t } = i18n
   const estimate = requestPrintEstimate(request)
   if (!estimate || (estimate.material === undefined && estimate.minutes === undefined)) {
     if (!estimatePending(request)) return null
     return (
-      <DetailRow label="Estimate">
-        <section aria-label="Estimate" className="flex items-center gap-2 text-muted-foreground">
-          <Spinner className="size-3.5" /> Working out the preview and estimate from the model…
+      <DetailRow label={t.requests.estimate.label}>
+        <section aria-label={t.requests.estimate.label} className="flex items-center gap-2 text-muted-foreground">
+          <Spinner className="size-3.5" /> {t.requests.estimate.workingOut}
         </section>
       </DetailRow>
     )
   }
-  const parts = estimateParts(estimate)
+  const parts = estimateParts(estimate, i18n)
   return (
-    <DetailRow label="Estimate">
-      <section aria-label="Estimate">
-        <strong>{parts.join(' · ')}</strong> <span className="text-muted-foreground">per copy</span>
+    <DetailRow label={t.requests.estimate.label}>
+      <section aria-label={t.requests.estimate.label}>
+        <strong>{parts.join(' · ')}</strong> <span className="text-muted-foreground">{t.requests.estimate.perCopy}</span>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          {estimate.materialAdjusted || estimate.minutesAdjusted
-            ? 'Adjusted values replace the automatic estimate.'
-            : 'Approximated from model geometry and typical print settings; slicing may differ.'}
+          {estimate.materialAdjusted || estimate.minutesAdjusted ? t.requests.estimate.adjusted : t.requests.estimate.approximated}
         </p>
       </section>
     </DetailRow>

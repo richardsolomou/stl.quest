@@ -6,6 +6,7 @@ import { ChevronRight, Folder } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { listStorageDirectories } from '../../server/fns'
 import { errorMessage } from '../../core/error'
+import { useI18n } from '../i18n'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
 
@@ -24,6 +25,8 @@ export function ServerFolderPicker({
   onSelect: (path: string) => void
   onClose: () => void
 }) {
+  const { t: messages } = useI18n()
+  const t = messages.storage.folderPicker
   const listDirectories = useServerFn(listStorageDirectories)
   const [selectedPath, setSelectedPath] = useState(initialPath)
   const [problem, setProblem] = useState<string>()
@@ -33,7 +36,7 @@ export function ServerFolderPicker({
     getItemName: (item) => item.getItemData().name,
     isItemFolder: () => true,
     dataLoader: {
-      getItem: (itemPath) => ({ path: itemPath, name: itemPath === '/' ? 'Server filesystem' : basename(itemPath) }),
+      getItem: (itemPath) => ({ path: itemPath, name: itemPath === '/' ? t.root : basename(itemPath) }),
       // A folder the server cannot read must say so; otherwise the row sits on "Loading…" forever.
       getChildren: async (itemPath) => {
         try {
@@ -41,12 +44,12 @@ export function ServerFolderPicker({
           setProblem(undefined)
           return directories.map((directory) => directory.path)
         } catch (error) {
-          setProblem(errorMessage(error, `${itemPath} could not be read.`))
+          setProblem(errorMessage(error, t.unreadable(itemPath)))
           return []
         }
       },
     },
-    createLoadingItemData: () => ({ path: '', name: 'Loading…' }),
+    createLoadingItemData: () => ({ path: '', name: messages.common.loading }),
     features: [asyncDataLoaderFeature, selectionFeature],
     initialState: { expandedItems, selectedItems: [initialPath] },
     onPrimaryAction: (item) => {
@@ -57,15 +60,9 @@ export function ServerFolderPicker({
   })
 
   return (
-    <DialogShell
-      open={open}
-      title="Choose a server folder"
-      description="These are folders visible inside the STL Quest server or container. Host folders must be mounted before they appear here."
-      className="sm:max-w-xl"
-      onClose={onClose}
-    >
+    <DialogShell open={open} title={t.title} description={t.description} className="sm:max-w-xl" onClose={onClose}>
       <div className="flex flex-col gap-3">
-        <div {...tree.getContainerProps('Server folders')} className="max-h-[50vh] overflow-auto rounded-lg border p-2 outline-none">
+        <div {...tree.getContainerProps(t.tree)} className="max-h-[50vh] overflow-auto rounded-lg border p-2 outline-none">
           {tree.getItems().map((item) => {
             const itemPath = item.getId()
             const itemProps = item.getProps()
@@ -94,14 +91,10 @@ export function ServerFolderPicker({
           })}
         </div>
         <code className="block break-all rounded-md bg-muted px-3 py-2 text-xs">{selectedPath}</code>
-        <DialogProblem
-          title="That folder could not be opened"
-          hint="The server may not have permission to read it, or it may not be mounted into the container."
-          error={problem}
-        />
+        <DialogProblem title={t.problemTitle} hint={t.problemHint} error={problem} />
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            {messages.common.cancel}
           </Button>
           <Button
             onClick={() => {
@@ -109,7 +102,7 @@ export function ServerFolderPicker({
               onClose()
             }}
           >
-            Select folder
+            {t.select}
           </Button>
         </div>
       </div>

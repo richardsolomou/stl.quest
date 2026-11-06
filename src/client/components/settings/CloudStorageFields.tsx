@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Spinner } from '@/components/ui/spinner'
 import type { PublicCloudConnection } from '../../../core/auth'
 import type { StorageConfig } from '../../../core/types'
-import { CLOUD_PROVIDER_HELP, cloudProviderLabel, type CloudProvider } from '../../storageProviders'
+import { cloudProviderLabel, type CloudProvider } from '../../storageProviders'
+import { useI18n } from '../../i18n'
 import { CloudProviderIcon } from '../CloudProviderIcon'
 import { ProtectedEmail } from '../ProtectedEmail'
 
@@ -44,17 +45,19 @@ export function CloudStorageFields({
   onConnect: (provider: CloudProvider) => void
   onDisconnect: (provider: CloudProvider) => void
 }) {
+  const { storage: t } = useI18n().t
   const connection = connections[provider]
+  const label = cloudProviderLabel(provider)
   return (
     <div className="flex flex-col gap-4">
       {!onboarding && (
         <Field>
-          <FieldLabel htmlFor="cloud-provider">Cloud provider</FieldLabel>
+          <FieldLabel htmlFor="cloud-provider">{t.cloud.provider}</FieldLabel>
           <Select items={providers} value={provider} onValueChange={(value) => onProviderChange(value as CloudProvider)}>
             <SelectTrigger className="w-full" id="cloud-provider">
               <SelectValue>
                 <CloudProviderIcon provider={provider} />
-                <span>{cloudProviderLabel(provider)}</span>
+                <span>{label}</span>
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -73,17 +76,17 @@ export function CloudStorageFields({
           <CloudProviderIcon provider={provider} className="mt-0.5 size-5 shrink-0" />
           <div className="min-w-0 flex-1">
             <p className="flex flex-wrap items-center gap-2 font-medium text-foreground">
-              {connection.connected ? cloudProviderLabel(provider) : `Connect ${cloudProviderLabel(provider)}`}
+              {connection.connected ? label : t.cloud.connectProvider(label)}
               {connection.connected && (
                 <Badge>
-                  <CheckCircle2 /> Connected
+                  <CheckCircle2 /> {t.cloud.connected}
                 </Badge>
               )}
             </p>
             <div className="mt-1 text-muted-foreground">
               {connection.connected ? (
                 <p className="flex flex-wrap items-center gap-x-1">
-                  <span>Signed in{connection.accountName ? ` as ${connection.accountName}` : ''}</span>
+                  <span>{t.cloud.signedIn(connection.accountName)}</span>
                   {connection.accountEmail ? (
                     <span className="inline-flex">
                       (<ProtectedEmail email={connection.accountEmail} />
@@ -94,16 +97,12 @@ export function CloudStorageFields({
                   )}
                 </p>
               ) : (
-                <p>{CLOUD_PROVIDER_HELP[provider].intro}</p>
+                <p>{t.cloudHelp[provider].intro}</p>
               )}
             </div>
             {!connection.connected && (
               <p className="mt-2 text-muted-foreground">
-                {connection.available
-                  ? `Sign in below and STL Quest writes this workspace's models into your own ${cloudProviderLabel(provider)}.`
-                  : superAdmin
-                    ? `${cloudProviderLabel(provider)} needs a one-time setup for this deployment. Do it once and every workspace, including this one, can connect its own account.`
-                    : `An administrator has to set ${cloudProviderLabel(provider)} up for this deployment before it can be connected.`}
+                {connection.available ? t.cloud.available(label) : superAdmin ? t.cloud.needsSetup(label) : t.cloud.needsAdmin(label)}
               </p>
             )}
           </div>
@@ -112,17 +111,14 @@ export function CloudStorageFields({
       {permissionProvider === provider && (
         <Alert variant="destructive">
           <CircleAlert />
-          <AlertTitle>{cloudProviderLabel(provider)} did not grant the access STL Quest needs</AlertTitle>
-          <AlertDescription>
-            The deployment’s {cloudProviderLabel(provider)} app is missing permissions. An administrator has to update it in Integrations,
-            then you can connect again.
-          </AlertDescription>
+          <AlertTitle>{t.cloud.missingPermissionsTitle(label)}</AlertTitle>
+          <AlertDescription>{t.cloud.missingPermissions(label)}</AlertDescription>
         </Alert>
       )}
       <div className="flex flex-wrap gap-2">
         {!connection.available && superAdmin && (
           <Button type="button" onClick={() => onSetUp(provider)}>
-            Set up the {cloudProviderLabel(provider)} app
+            {t.cloud.setUpApp(label)}
           </Button>
         )}
         <Button
@@ -134,8 +130,8 @@ export function CloudStorageFields({
         >
           {connectingProvider === provider && <Spinner />}
           {connectingProvider === provider
-            ? `Opening ${cloudProviderLabel(provider)}…`
-            : `${connection.connected ? 'Reconnect' : 'Connect'} my ${cloudProviderLabel(provider)}`}
+            ? t.cloud.opening(label)
+            : (connection.connected ? t.cloud.reconnectMine : t.cloud.connectMine)(label)}
         </Button>
         {connection.connected && currentAdapter !== provider && (
           <Button
@@ -145,7 +141,7 @@ export function CloudStorageFields({
             onClick={() => onDisconnect(provider)}
           >
             {disconnectingProvider === provider && <Spinner />}
-            {disconnectingProvider === provider ? 'Disconnecting…' : 'Disconnect'}
+            {disconnectingProvider === provider ? t.cloud.disconnecting : t.cloud.disconnect}
           </Button>
         )}
       </div>

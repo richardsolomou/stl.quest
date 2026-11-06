@@ -62,6 +62,8 @@ import { removeRequestFromQueries, restoreRequestQueries } from '../queries'
 import { RepeatRequestDialog } from './RepeatRequestDialog'
 import { TagPickerDialog } from './TagPickerDialog'
 import { StatusDot } from './StatusDot'
+import { statusText } from '../../core/i18n'
+import { useI18n } from '../i18n'
 
 type PendingMove = {
   requestId: string
@@ -101,6 +103,8 @@ export function Board({
   sort: BoardSort
   onOpenRequest: (requestId: string) => void
 }) {
+  const { t } = useI18n()
+  const b = t.board.board
   const workspaceSlug = useWorkspaceSlug()
   const posthog = usePostHog()
   const queryClient = useQueryClient()
@@ -136,7 +140,7 @@ export function Board({
     onError: (error, _variables, snapshots) => {
       if (snapshots) restoreRequestQueries(queryClient, snapshots)
       if (isReportableMutationError(error)) posthog.captureException(error, { action: 'archive_request_batch' })
-      toast.error(errorMessage(error, 'The print could not be archived.'))
+      toast.error(errorMessage(error, b.archiveFailed))
     },
   })
   const updateCopyTagsMutation = useMutation({ mutationFn: callUpdatePrintCopyTags, ...refreshAfterMutation })
@@ -315,9 +319,9 @@ export function Board({
       selection
         ? workflow.statuses
             .filter((status) => [...selectedStatuses].every((from) => canDropOnColumn(from, status.id)))
-            .map((status) => ({ id: status.id, label: status.label }))
+            .map((status) => ({ id: status.id, label: statusText(t, 'label', status.id) }))
         : [],
-    [selection, selectedStatuses, workflow.statuses],
+    [selection, selectedStatuses, t, workflow.statuses],
   )
 
   const moveSelected = async (destination: StatusId, counts: Record<string, number>) => {
@@ -351,7 +355,7 @@ export function Board({
         return next
       })
       if (isReportableMutationError(error)) posthog.captureException(error, { action: 'move_request_batch' })
-      setBatchError(errorMessage(error, 'The group could not be moved.'))
+      setBatchError(errorMessage(error, b.moveGroupFailed))
     }
   }
 
@@ -382,8 +386,8 @@ export function Board({
     const modelCount = new Set(ids).size
     // The browser only shows a download once the archive starts streaming, which takes a moment for large batches.
     if (targets.length > 1)
-      toast(`Zipping ${targets.length} ${targets.length > modelCount ? 'files' : 'models'}`, {
-        description: 'Your browser shows the download once it starts.',
+      toast(b.zipping(targets.length, targets.length > modelCount), {
+        description: b.zippingDescription,
       })
     const properties =
       ids.length === 1
@@ -503,15 +507,16 @@ export function Board({
     return (
       <main className="grid min-h-0 flex-1 place-items-center p-6 text-center">
         <div className="max-w-md rounded-xl border bg-card/40 p-7">
-          <h2 className="font-heading text-xl font-semibold">
-            {filtered ? 'No prints match these filters' : 'Your production queue is ready'}
-          </h2>
+          <h2 className="font-heading text-xl font-semibold">{filtered ? b.filteredEmptyTitle : b.emptyTitle}</h2>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             {filtered
-              ? 'Clear or adjust the filters to see resin and filament requests in the queue.'
+              ? b.filteredEmptyHint
               : uploadsEnabled
-                ? 'Upload a model or save a source link to start tracking copies from Queue through Ready.'
-                : 'Save a source link now, or configure storage when you are ready to upload model files.'}
+                ? b.emptyUploadHint(
+                    statusText(t, 'label', workflow.statuses[0].id),
+                    statusText(t, 'label', workflow.statuses.at(-1)?.id ?? workflow.statuses[0].id),
+                  )
+                : b.emptyLinkHint}
           </p>
         </div>
       </main>
@@ -532,6 +537,7 @@ export function Board({
         {workflow.statuses.map((definition) => {
           const status = definition.id
           const { entries, total } = statusEntries.get(status) ?? { entries: [], total: 0 }
+          const label = statusText(t, 'label', status)
           return (
             <button
               type="button"
@@ -540,7 +546,7 @@ export function Board({
               data-slot="column-header"
               className="flex min-w-[320px] flex-1 shrink-0 items-center gap-2 rounded-sm font-heading text-xs font-semibold tracking-[0.08em] text-foreground uppercase transition-colors enabled:cursor-pointer enabled:hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-[900px]:w-[82cqw] max-[900px]:min-w-0 max-[900px]:flex-none"
               disabled={entries.length === 0}
-              aria-label={`Select all in ${definition.label}`}
+              aria-label={b.selectAllIn(label)}
               onClick={() =>
                 setSelection(
                   selectBoardColumn(
@@ -551,10 +557,10 @@ export function Board({
               }
             >
               <StatusDot status={status} />
-              <span className="truncate">{definition.label}</span>
+              <span className="truncate">{label}</span>
               <span
                 className="ml-auto shrink-0 rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
-                title="Copies"
+                title={b.copies}
               >
                 {total}
               </span>
@@ -602,7 +608,7 @@ export function Board({
                         discoversActions: true,
                         destinations: workflow.statuses
                           .filter((candidate) => canDropOnColumn(from, candidate.id))
-                          .map((candidate) => ({ id: candidate.id, label: candidate.label })),
+                          .map((candidate) => ({ id: candidate.id, label: statusText(t, 'label', candidate.id) })),
                         max: count,
                         tagIds,
                       })
@@ -674,7 +680,7 @@ export function Board({
       {pendingMove && pendingRequest && (
         <MoveDialog
           requestName={pendingRequest.name}
-          toLabel={pendingMove.to ? (workflow.statuses.find((status) => status.id === pendingMove.to)?.label ?? pendingMove.to) : undefined}
+          toLabel={pendingMove.to ? statusText(t, 'label', pendingMove.to) : undefined}
           destinations={pendingMove.destinations}
           max={pendingMove.max}
           onConfirm={(count, selectedDestination) => {
@@ -691,7 +697,7 @@ export function Board({
           requestNames={repeatingRequests.map((request) => request.name)}
           quantity={repeatingRequests[0].quantity}
           pending={repeatMutation.isPending}
-          error={repeatMutation.error ? errorMessage(repeatMutation.error, 'The server did not create the request.') : undefined}
+          error={repeatMutation.error ? errorMessage(repeatMutation.error, b.repeatFailed) : undefined}
           onConfirm={(quantity) =>
             repeatMutation.mutate(
               { requests: repeatingRequests, quantity },
@@ -734,7 +740,7 @@ export function Board({
           entries={
             isAdmin ? boardSelectedCards(selectedEntries) : selectedRequests.map((request) => ({ request, count: request.quantity }))
           }
-          confirmLabel={isAdmin ? undefined : 'Delete requests'}
+          confirmLabel={isAdmin ? undefined : b.deleteRequests}
           pending={deleteMutation.isPending || deleteOwnedRequestMutation.isPending}
           error={batchError}
           onConfirm={async () => {
@@ -777,10 +783,10 @@ export function Board({
           ]}
           title={
             pendingDelete.wholeRequest
-              ? `Delete “${pendingDeleteRequest.name}”?`
-              : `Delete ${pendingDelete.count} ${pendingDelete.count === 1 ? 'copy' : 'copies'} of “${pendingDeleteRequest.name}”?`
+              ? b.deleteRequestTitle(pendingDeleteRequest.name)
+              : b.deleteCopiesTitle(pendingDelete.count, pendingDeleteRequest.name)
           }
-          confirmLabel={pendingDelete.wholeRequest ? 'Delete request' : undefined}
+          confirmLabel={pendingDelete.wholeRequest ? b.deleteRequest : undefined}
           pending={deleteMutation.isPending || deleteOwnedRequestMutation.isPending}
           error={batchError}
           onConfirm={async () => {
@@ -857,7 +863,7 @@ export function Board({
               })
               setPendingTags((current) => current && { entries: boardEditSelectionTags(current.entries, groupId, selected) })
             } catch (error) {
-              setBatchError(errorMessage(error, 'The tags could not be updated.'))
+              setBatchError(errorMessage(error, b.tagsUpdateFailed))
             }
           }}
           onCreate={async (name) => {
@@ -870,7 +876,7 @@ export function Board({
               signalProductTourProgress('actions')
               setPendingTags((current) => current && { entries: boardEditSelectionTags(current.entries, groupId, true) })
             } catch (error) {
-              setBatchError(errorMessage(error, 'The tag could not be created.'))
+              setBatchError(errorMessage(error, b.tagCreateFailed))
             }
           }}
           onCancel={() => {

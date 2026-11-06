@@ -5,6 +5,7 @@ import { FieldDescription } from '@/components/ui/field'
 import { Spinner } from '@/components/ui/spinner'
 import { socialProviderName, type SocialAuthProvider } from '../../../core/auth'
 import { unlinkOwnAccount } from '../../../server/fns'
+import { useI18n } from '../../i18n'
 import { AuthMethodIcon } from '../AuthMethodIcon'
 import { DialogProblem } from '../DialogProblem'
 import { SettingRow } from '../SettingRow'
@@ -18,20 +19,16 @@ export function RemoveMethodForm({
   oidcName?: string
   onDone: () => void | Promise<void>
 }) {
+  const { t } = useI18n()
+  const copy = t.account.methods
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const unlinkAccount = useServerFn(unlinkOwnAccount)
-  const label = method === 'credential' ? 'password sign-in' : socialProviderName(method, oidcName)
+  const provider = method === 'credential' ? undefined : socialProviderName(method, oidcName)
   return (
     <div className="flex flex-col gap-4">
-      <FieldDescription>
-        You will no longer be able to sign in with {label}. Your other linked sign-in methods will keep working.
-      </FieldDescription>
-      <DialogProblem
-        title="That sign-in method was not removed"
-        hint="You can still sign in with it. At least one other enabled method must stay linked."
-        error={error}
-      />
+      <FieldDescription>{provider ? copy.unlinkWarning(provider) : copy.removePasswordWarning}</FieldDescription>
+      <DialogProblem title={copy.removeFailedTitle} hint={copy.removeFailedHint} error={error} />
       <Button
         type="button"
         variant="destructive"
@@ -43,14 +40,14 @@ export function RemoveMethodForm({
             await unlinkAccount({ data: { provider: method } })
             await onDone()
           } catch {
-            setError('Could not remove this sign-in method. Make sure another enabled method is linked first.')
+            setError(copy.removeFailed)
           } finally {
             setBusy(false)
           }
         }}
       >
         {busy && <Spinner />}
-        {busy ? 'Removing…' : method === 'credential' ? 'Remove password' : `Unlink ${label}`}
+        {busy ? copy.removing : provider ? copy.unlink(provider) : copy.removePassword}
       </Button>
     </div>
   )
@@ -69,21 +66,17 @@ export function MethodRow({
   available: boolean
   action?: ReactNode
 }) {
+  const { t } = useI18n()
+  const copy = t.account.methods
   return (
     <SettingRow
       icon={<AuthMethodIcon method={method} />}
       name={name}
       status={{
-        label: linked ? 'Linked' : available ? 'Not linked' : 'Unavailable',
+        label: linked ? copy.linked : available ? copy.notLinked : copy.unavailable,
         tone: linked ? 'on' : available ? 'ready' : 'off',
       }}
-      detail={
-        linked
-          ? 'You can sign in to STL Quest with this.'
-          : available
-            ? 'Link this so you have another way into your account.'
-            : 'An administrator has turned this sign-in method off for the whole deployment.'
-      }
+      detail={linked ? copy.linkedDetail : available ? copy.availableDetail : copy.unavailableDetail}
       actions={action}
     />
   )

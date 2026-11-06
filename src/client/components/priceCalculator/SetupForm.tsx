@@ -1,4 +1,4 @@
-import type { FormEvent } from 'react'
+import { useMemo, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -13,24 +13,17 @@ import {
   type PriceCalculatorSettings,
 } from '../../../core/priceCalculator'
 import { getResinPreset, RESIN_PRESETS } from '../../../core/resinPresets'
+import { useI18n } from '../../i18n'
 import { FilterCombobox } from '../FilterCombobox'
 import { SettingsActions, SettingsSection } from '../settings/SettingsLayout'
 import { EquipmentSetup } from './EquipmentSetup'
 import { ModeSelector, NumberSetting, SetupGroup, type SetupMode } from './fields'
-import { countryFlag, currencyLabel, currencySymbol, electricitySourceLabel, formatEurosPerKwh, formatNumber } from './format'
+import { countryFlag, countryName, currencyLabel, currencySymbol, electricitySourceLabel, formatEurosPerKwh, formatNumber } from './format'
 
 const resinOptions = RESIN_PRESETS.map((preset) => ({
   value: preset.id,
   label: `${preset.brand} ${preset.name}`,
   type: preset.type,
-}))
-
-const currencyOptions = PRICE_CALCULATOR_CURRENCIES.map((currency) => ({ value: currency, label: currencyLabel(currency) }))
-
-const electricityOptions = ELECTRICITY_PRICE_PRESETS.map((preset) => ({
-  value: preset.countryCode,
-  label: `${countryFlag(preset.countryCode)} ${preset.countryName} · ${formatEurosPerKwh(preset.eurPerKwh)}`,
-  countryName: preset.countryName,
 }))
 
 export function SetupForm({
@@ -56,17 +49,14 @@ export function SetupForm({
   onElectricityModeChange: (mode: SetupMode) => void
   onSave: () => void
 }) {
+  const copy = useI18n().t.calculator.setup
   const save = (event: FormEvent) => {
     event.preventDefault()
     onSave()
   }
   return (
     <form className="lg:col-start-1 lg:row-start-2" onSubmit={save}>
-      <SettingsSection
-        title="Saved setup"
-        description="These defaults belong to this workspace and will be here next time. Job values above remain a disposable scratchpad."
-        disabled={saving}
-      >
+      <SettingsSection title={copy.title} description={copy.description} disabled={saving}>
         <div className="grid gap-4">
           <CurrencySetup
             settings={settings}
@@ -87,9 +77,9 @@ export function SetupForm({
         </div>
         <SettingsActions>
           <Button type="submit" disabled={saving || !dirty}>
-            {saving && <Spinner />} Save setup
+            {saving && <Spinner />} {copy.save}
           </Button>
-          {error != null && <FieldError>{error instanceof Error ? error.message : 'The setup could not be saved.'}</FieldError>}
+          {error != null && <FieldError>{error instanceof Error ? error.message : copy.saveError}</FieldError>}
         </SettingsActions>
       </SettingsSection>
     </form>
@@ -103,10 +93,16 @@ function CurrencySetup({
   settings: PriceCalculatorSettings
   onCurrencyChange: (currency: PriceCalculatorCurrency) => void
 }) {
+  const { t, locale } = useI18n()
+  const copy = t.calculator.currency
+  const currencyOptions = useMemo(
+    () => PRICE_CALCULATOR_CURRENCIES.map((currency) => ({ value: currency, label: currencyLabel(currency, locale) })),
+    [locale],
+  )
   return (
-    <SetupGroup title="Currency" description="Prices show in this currency. Changing it does not convert the amounts you entered.">
+    <SetupGroup title={copy.title} description={copy.description}>
       <Field>
-        <FieldLabel htmlFor="calculator-currency">Currency</FieldLabel>
+        <FieldLabel htmlFor="calculator-currency">{copy.label}</FieldLabel>
         <Select items={currencyOptions} value={settings.currency} onValueChange={(currency) => currency && onCurrencyChange(currency)}>
           <SelectTrigger className="w-full" id="calculator-currency">
             <SelectValue />
@@ -135,18 +131,18 @@ function MaterialSetup({
   onModeChange: (mode: SetupMode) => void
   onSettingsChange: (settings: PriceCalculatorSettings) => void
 }) {
+  const { t, locale } = useI18n()
+  const copy = t.calculator.material
   const selectedResin = getResinPreset(settings.resinPresetId)
-  const symbol = currencySymbol(settings.currency)
+  const symbol = currencySymbol(settings.currency, locale)
   return (
     <SetupGroup
-      title="Material"
-      description={
-        settings.printType === 'resin' ? 'Choose a sourced resin or enter its properties.' : 'Use the price of the filament spool.'
-      }
+      title={copy.title}
+      description={settings.printType === 'resin' ? copy.resinDescription : copy.filamentDescription}
       action={
         settings.printType === 'resin' ? (
           <ModeSelector
-            label="Resin"
+            legend={copy.modeLegend}
             value={mode}
             onChange={(next) => {
               onModeChange(next)
@@ -159,20 +155,20 @@ function MaterialSetup({
       <div className="grid gap-4 sm:grid-cols-2">
         {settings.printType === 'filament' ? (
           <NumberSetting
-            label={`Filament price (${symbol}/kg)`}
+            label={copy.filamentPrice(symbol)}
             value={settings.filamentPricePerKg}
             min={0.01}
             onChange={(filamentPricePerKg) => onSettingsChange({ ...settings, filamentPricePerKg })}
           />
         ) : mode === 'preset' ? (
           <Field className="sm:col-span-2">
-            <FieldLabel htmlFor="calculator-resin-preset">Resin preset</FieldLabel>
+            <FieldLabel htmlFor="calculator-resin-preset">{copy.resinPreset}</FieldLabel>
             <FilterCombobox
               id="calculator-resin-preset"
               value={settings.resinPresetId}
               options={resinOptions}
-              placeholder="Search resin presets…"
-              emptyLabel="No matching resin presets."
+              placeholder={copy.resinSearch}
+              emptyLabel={copy.resinEmpty}
               onChange={(resinPresetId) => {
                 const preset = getResinPreset(resinPresetId)
                 if (!preset) {
@@ -198,8 +194,8 @@ function MaterialSetup({
             <FieldDescription>
               {selectedResin ? (
                 <>
-                  {selectedResin.densityGramsPerMl && `${formatNumber(selectedResin.densityGramsPerMl)} g/mL · `}
-                  Sourced from{' '}
+                  {selectedResin.densityGramsPerMl && `${formatNumber(selectedResin.densityGramsPerMl, locale)} g/mL · `}
+                  {copy.sourcedFrom}{' '}
                   <a className="underline underline-offset-2" href={selectedResin.source.url} target="_blank" rel="noreferrer">
                     {selectedResin.source.id === 'prusaslicer' ? 'PrusaSlicer' : selectedResin.brand}
                   </a>
@@ -207,19 +203,19 @@ function MaterialSetup({
                     <>
                       {' · '}
                       <a className="underline underline-offset-2" href={selectedResin.densitySource.url} target="_blank" rel="noreferrer">
-                        View density source
+                        {copy.densitySource}
                       </a>
                     </>
                   )}
                 </>
               ) : (
-                `${RESIN_PRESETS.length} sourced presets available.`
+                copy.presetCount(RESIN_PRESETS.length)
               )}
             </FieldDescription>
           </Field>
         ) : (
           <NumberSetting
-            label="Resin density (g/mL)"
+            label={copy.resinDensity}
             value={settings.resinDensityGramsPerMl}
             min={0.01}
             onChange={(resinDensityGramsPerMl) => onSettingsChange({ ...settings, resinDensityGramsPerMl })}
@@ -227,7 +223,7 @@ function MaterialSetup({
         )}
         {settings.printType === 'resin' && (
           <NumberSetting
-            label={`Resin price (${symbol}/L)`}
+            label={copy.resinPrice(symbol)}
             value={settings.resinPricePerLitre}
             min={0.01}
             onChange={(resinPricePerLitre) => onSettingsChange({ ...settings, resinPricePerLitre })}
@@ -249,20 +245,30 @@ function ElectricitySetup({
   onModeChange: (mode: SetupMode) => void
   onSettingsChange: (settings: PriceCalculatorSettings) => void
 }) {
+  const { t, locale } = useI18n()
+  const copy = t.calculator.electricity
+  const electricityOptions = useMemo(
+    () =>
+      ELECTRICITY_PRICE_PRESETS.map((preset) => {
+        const name = countryName(preset, locale)
+        return {
+          value: preset.countryCode,
+          label: `${countryFlag(preset.countryCode)} ${name} · ${formatEurosPerKwh(preset.eurPerKwh, locale)}`,
+          countryName: name,
+        }
+      }),
+    [locale],
+  )
   const selected = getElectricityPricePreset(settings.electricityCountryCode)
   const presetsAvailable = electricityPresetsAvailable(settings.currency)
   return (
     <SetupGroup
-      title="Electricity"
-      description={
-        presetsAvailable
-          ? 'Use a country average or your own all-in tariff.'
-          : 'Use your own all-in tariff. The country averages are in euros, so they are available only for the euro currency.'
-      }
+      title={copy.title}
+      description={presetsAvailable ? copy.presetsDescription : copy.customDescription}
       action={
         presetsAvailable && (
           <ModeSelector
-            label="Electricity"
+            legend={copy.modeLegend}
             value={mode}
             onChange={(next) => {
               onModeChange(next)
@@ -274,13 +280,13 @@ function ElectricitySetup({
     >
       {presetsAvailable && mode === 'preset' ? (
         <Field>
-          <FieldLabel htmlFor="calculator-electricity-country">Country electricity preset</FieldLabel>
+          <FieldLabel htmlFor="calculator-electricity-country">{copy.countryPreset}</FieldLabel>
           <FilterCombobox
             id="calculator-electricity-country"
             value={settings.electricityCountryCode}
             options={electricityOptions}
-            placeholder="Search countries…"
-            emptyLabel="No matching country. Choose Custom to enter your tariff."
+            placeholder={copy.countrySearch}
+            emptyLabel={copy.countryEmpty}
             optionAriaLabel={(option) => option.countryName}
             onChange={(electricityCountryCode) => {
               const preset = getElectricityPricePreset(electricityCountryCode)
@@ -295,23 +301,23 @@ function ElectricitySetup({
           <FieldDescription>
             {selected ? (
               <>
-                {formatEurosPerKwh(selected.eurPerKwh)} · {electricitySourceLabel(selected)} ·{' '}
+                {formatEurosPerKwh(selected.eurPerKwh, locale)} · {electricitySourceLabel(selected, t.calculator)} ·{' '}
                 <a className="underline underline-offset-2" href={selected.source.url} target="_blank" rel="noreferrer">
-                  View source
+                  {copy.viewSource}
                 </a>
               </>
             ) : (
-              `${ELECTRICITY_PRICE_PRESETS.length} sourced country averages available.`
+              copy.presetCount(ELECTRICITY_PRICE_PRESETS.length)
             )}
           </FieldDescription>
         </Field>
       ) : (
         <NumberSetting
-          label={`Electricity (${currencySymbol(settings.currency)}/kWh)`}
+          label={copy.price(currencySymbol(settings.currency, locale))}
           value={settings.electricityPricePerKwh}
           min={0}
           onChange={(electricityPricePerKwh) => onSettingsChange({ ...settings, electricityPricePerKwh })}
-          description="Use the all-in rate from your bill when possible."
+          description={copy.priceHint}
         />
       )}
     </SetupGroup>
@@ -325,37 +331,39 @@ function PricingSetup({
   settings: PriceCalculatorSettings
   onSettingsChange: (settings: PriceCalculatorSettings) => void
 }) {
-  const symbol = currencySymbol(settings.currency)
+  const { t, locale } = useI18n()
+  const copy = t.calculator.pricing
+  const symbol = currencySymbol(settings.currency, locale)
   return (
-    <SetupGroup title="Pricing" description="Set wear, consumables, labour, allowances, and margin for every quote.">
+    <SetupGroup title={copy.title} description={copy.description}>
       <div className="grid gap-4 sm:grid-cols-2">
         <NumberSetting
-          label={`Equipment wear (${symbol}/h)`}
+          label={copy.equipmentWear(symbol)}
           value={settings.equipmentCostPerHour}
           min={0}
           onChange={(equipmentCostPerHour) => onSettingsChange({ ...settings, equipmentCostPerHour })}
         />
         <NumberSetting
-          label={`Consumables (${symbol}/plate)`}
+          label={copy.consumables(symbol)}
           value={settings.consumablesCostPerPlate}
           min={0}
           onChange={(consumablesCostPerPlate) => onSettingsChange({ ...settings, consumablesCostPerPlate })}
         />
         <NumberSetting
-          label={`Labour (${symbol}/h)`}
+          label={copy.labour(symbol)}
           value={settings.labourCostPerHour}
           min={0}
           onChange={(labourCostPerHour) => onSettingsChange({ ...settings, labourCostPerHour })}
         />
         <NumberSetting
-          label="Failure allowance (%)"
+          label={copy.failureAllowance}
           value={settings.failureAllowancePercent}
           min={0}
           max={100}
           onChange={(failureAllowancePercent) => onSettingsChange({ ...settings, failureAllowancePercent })}
         />
         <NumberSetting
-          label="Standard margin (%)"
+          label={copy.standardMargin}
           value={settings.standardMarginPercent}
           min={0}
           max={95}

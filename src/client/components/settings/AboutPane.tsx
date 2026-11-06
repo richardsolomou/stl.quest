@@ -4,23 +4,26 @@ import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } f
 import { SOURCE_CODE_URL } from '../../sourceCode'
 import { Brand } from '../Brand'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { useI18n } from '../../i18n'
 
 export function AboutPane() {
+  const { t } = useI18n()
+  const copy = t.settings.about
   return (
     <SettingsPage>
-      <SettingsHeader title="About" description="Project information, community links, and licensing." />
+      <SettingsHeader title={copy.title} description={copy.description} />
       <SettingsSection>
         <Brand className="text-2xl" />
-        <p className="mt-2 text-sm text-muted-foreground">Version {__APP_VERSION__}</p>
-        <p className="mt-1 text-muted-foreground">A private 3D-print request and production queue for resin and filament printers.</p>
+        <p className="mt-2 text-sm text-muted-foreground">{copy.version(__APP_VERSION__)}</p>
+        <p className="mt-1 text-muted-foreground">{copy.tagline}</p>
       </SettingsSection>
-      <SettingsSection title="Project links">
+      <SettingsSection title={copy.links}>
         <ItemGroup>
           <Item
             variant="outline"
             render={
               <a href="https://stl.quest" target="_blank" rel="noreferrer">
-                Website
+                {copy.website.link}
               </a>
             }
           >
@@ -29,14 +32,14 @@ export function AboutPane() {
             </ItemMedia>
             <ItemContent>
               <ItemTitle>stl.quest</ItemTitle>
-              <ItemDescription>Visit the official STL Quest website</ItemDescription>
+              <ItemDescription>{copy.website.description}</ItemDescription>
             </ItemContent>
           </Item>
           <Item
             variant="outline"
             render={
               <a href={SOURCE_CODE_URL} target="_blank" rel="noreferrer">
-                Source code
+                {copy.source.title}
               </a>
             }
           >
@@ -44,15 +47,15 @@ export function AboutPane() {
               <Code2 />
             </ItemMedia>
             <ItemContent>
-              <ItemTitle>Source code</ItemTitle>
-              <ItemDescription>Get the corresponding source code for this version</ItemDescription>
+              <ItemTitle>{copy.source.title}</ItemTitle>
+              <ItemDescription>{copy.source.description}</ItemDescription>
             </ItemContent>
           </Item>
           <Item
             variant="outline"
             render={
               <a href="https://github.com/richardsolomou/stl.quest/issues" target="_blank" rel="noreferrer">
-                Issues and ideas
+                {copy.issues.title}
               </a>
             }
           >
@@ -60,15 +63,15 @@ export function AboutPane() {
               <CircleDot />
             </ItemMedia>
             <ItemContent>
-              <ItemTitle>Issues and ideas</ItemTitle>
-              <ItemDescription>Report a bug or suggest an improvement</ItemDescription>
+              <ItemTitle>{copy.issues.title}</ItemTitle>
+              <ItemDescription>{copy.issues.description}</ItemDescription>
             </ItemContent>
           </Item>
           <Item
             variant="outline"
             render={
               <a href="https://github.com/richardsolomou/stl.quest/releases" target="_blank" rel="noreferrer">
-                Release notes
+                {copy.releases.title}
               </a>
             }
           >
@@ -76,16 +79,13 @@ export function AboutPane() {
               <Box />
             </ItemMedia>
             <ItemContent>
-              <ItemTitle>Release notes</ItemTitle>
-              <ItemDescription>See what changed between versions</ItemDescription>
+              <ItemTitle>{copy.releases.title}</ItemTitle>
+              <ItemDescription>{copy.releases.description}</ItemDescription>
             </ItemContent>
           </Item>
         </ItemGroup>
       </SettingsSection>
-      <FieldDescription>
-        STL Quest is open source under the GNU Affero General Public License v3.0. Hosted and self-hosted users can obtain the corresponding
-        source code above, and anonymous telemetry can be disabled at any time.
-      </FieldDescription>
+      <FieldDescription>{copy.license}</FieldDescription>
     </SettingsPage>
   )
 }

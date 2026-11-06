@@ -20,6 +20,7 @@ import type { PrintGroup, PrintGroupColor } from '../../core/types'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
 import { TagDot, TagTreeRow } from './TagBadge'
+import { useI18n } from '../i18n'
 
 type ExistingTagOption = { kind: 'tag'; value: string; label: string; depth: number; name: string; color: PrintGroupColor }
 type CreateTagOption = { kind: 'create'; value: string; label: string; name: string }
@@ -45,6 +46,8 @@ export function TagPickerDialog({
   onCreate: (name: string) => void
   onCancel: () => void
 }) {
+  const { t } = useI18n()
+  const p = t.board.tagPicker
   const anchor = useComboboxAnchor()
   const inputRef = useRef<HTMLInputElement>(null)
   const restoreFocusRef = useRef(false)
@@ -66,7 +69,7 @@ export function TagPickerDialog({
   const trimmed = query.trim()
   const canCreate = validPrintGroupName(trimmed) && !printGroupNameTaken(tags, trimmed)
   const options: TagOption[] = canCreate
-    ? [...tagOptions, { kind: 'create', value: `create:${trimmed}`, label: `Create “${trimmed}”`, name: trimmed }]
+    ? [...tagOptions, { kind: 'create', value: `create:${trimmed}`, label: p.create(trimmed), name: trimmed }]
     : tagOptions
   const selected = tagOptions.filter((option) => selectedTagIds.has(option.value))
 
@@ -87,15 +90,10 @@ export function TagPickerDialog({
   }, [pending, selectedTagIds])
 
   return (
-    <DialogShell
-      title="Tag prints"
-      description="Tags stay attached to these copies as they move between stages."
-      onClose={onCancel}
-      preventClose={pending}
-    >
+    <DialogShell title={p.title} description={p.description} onClose={onCancel} preventClose={pending}>
       <div className="space-y-4">
         <Field>
-          <FieldLabel htmlFor="tag-search">Tags</FieldLabel>
+          <FieldLabel htmlFor="tag-search">{p.label}</FieldLabel>
           <Combobox
             multiple
             items={options}
@@ -131,9 +129,9 @@ export function TagPickerDialog({
               <ComboboxChipsInput
                 ref={inputRef}
                 id="tag-search"
-                aria-label="Find or create tags"
+                aria-label={p.search}
                 maxLength={MAX_PRINT_GROUP_NAME_LENGTH}
-                placeholder="Find or create tags…"
+                placeholder={p.searchPlaceholder}
                 onKeyDown={(event) => {
                   if (event.key !== 'Enter' || highlightedRef.current || !trimmed) return
                   const exact = tagOptions.find((option) => option.name.trim().toLocaleLowerCase() === trimmed.toLocaleLowerCase())
@@ -148,7 +146,7 @@ export function TagPickerDialog({
               />
             </ComboboxChips>
             <ComboboxContent anchor={anchor}>
-              <ComboboxEmpty>No matching tags.</ComboboxEmpty>
+              <ComboboxEmpty>{p.empty}</ComboboxEmpty>
               <ComboboxList>
                 <ComboboxCollection>
                   {(option: TagOption) =>
@@ -161,7 +159,7 @@ export function TagPickerDialog({
                       <ComboboxItem
                         key={option.value}
                         value={option}
-                        aria-label={partialTagIds.has(option.value) ? `${option.label}, on some copies` : option.label}
+                        aria-label={partialTagIds.has(option.value) ? p.onSomeCopies(option.label) : option.label}
                       >
                         <TagTreeRow depth={option.depth} color={option.color} name={option.name} />
                         {partialTagIds.has(option.value) && (
@@ -175,11 +173,11 @@ export function TagPickerDialog({
             </ComboboxContent>
           </Combobox>
         </Field>
-        <DialogProblem title="The tags were not updated" hint="Nothing changed. Try again." error={error} />
+        <DialogProblem title={t.board.manageTags.problemTitle} hint={t.board.manageTags.problemHint} error={error} />
         <div className="flex justify-end">
           <Button type="button" disabled={pending} onClick={onCancel}>
             {pending && <Spinner />}
-            {pending ? 'Updating…' : 'Done'}
+            {pending ? p.updating : t.common.done}
           </Button>
         </div>
       </div>

@@ -239,6 +239,13 @@
       "when": 1791470489056,
       "tag": "0033_elite_lockheed",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1793971101227,
+      "tag": "0034_tiny_microchip",
+      "breakpoints": true
     }
   ]
 }

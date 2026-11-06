@@ -3,38 +3,44 @@ import { systemDiagnosticsQuery } from '../../queries'
 import { QueryState } from '../QueryState'
 import { formatBytes } from '../../../core/format'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { useI18n } from '../../i18n'
 
 export function SystemDiagnosticsPane({ embedded = false }: { embedded?: boolean }) {
   const query = useQuery(systemDiagnosticsQuery())
   const data = query.data
+  const { t, locale } = useI18n()
+  const copy = t.settings.systemDiagnostics
   const content = (
-    <SettingsSection title={embedded ? 'System health' : undefined}>
+    <SettingsSection title={embedded ? copy.embeddedTitle : undefined}>
       {!data && (
         <QueryState
           loading={query.isPending}
           error={query.error}
-          loadingLabel="Checking system health…"
-          errorTitle="Could not load system diagnostics"
+          loadingLabel={t.settings.diagnostics.loading}
+          errorTitle={copy.loadError}
           onRetry={() => void query.refetch()}
         />
       )}
       {data && (
         <dl className="grid grid-cols-[minmax(9rem,auto)_1fr] gap-x-4 gap-y-2.5 max-sm:grid-cols-1 [&_dt]:text-muted-foreground [&_dd]:m-0">
-          <dt>Version</dt>
+          <dt>{copy.version}</dt>
           <dd>{data.version}</dd>
-          <dt>Authentication</dt>
+          <dt>{copy.authentication}</dt>
           <dd>
-            {[data.authentication.password && 'password', ...data.authentication.socialProviders].filter(Boolean).join(', ') || 'none'}
+            {[data.authentication.password && copy.password, ...data.authentication.socialProviders].filter(Boolean).join(', ') ||
+              copy.none}
           </dd>
-          <dt>Email</dt>
-          <dd>{data.authentication.smtpConfigured ? 'configured' : 'not configured'}</dd>
-          <dt>Database</dt>
+          <dt>{copy.email}</dt>
+          <dd>{data.authentication.smtpConfigured ? copy.configured : copy.notConfigured}</dd>
+          <dt>{copy.database}</dt>
           <dd>
-            {data.database.location.kind === 'local' ? formatBytes(data.database.location.sizeBytes) : data.database.location.display} ·
-            integrity {data.database.integrity}
+            {data.database.location.kind === 'local'
+              ? formatBytes(data.database.location.sizeBytes, locale)
+              : data.database.location.display}{' '}
+            · {copy.integrity(data.database.integrity)}
           </dd>
-          <dt>Data disk free</dt>
-          <dd>{data.dataCapacity ? formatBytes(data.dataCapacity.freeBytes) : 'n/a'}</dd>
+          <dt>{copy.diskFree}</dt>
+          <dd>{data.dataCapacity ? formatBytes(data.dataCapacity.freeBytes, locale) : t.settings.diagnostics.notApplicable}</dd>
         </dl>
       )}
     </SettingsSection>
@@ -42,7 +48,7 @@ export function SystemDiagnosticsPane({ embedded = false }: { embedded?: boolean
   if (embedded) return content
   return (
     <SettingsPage>
-      <SettingsHeader title="System diagnostics" description="Inspect deployment, authentication, database, and data-disk health." />
+      <SettingsHeader title={copy.title} description={copy.description} />
       {content}
     </SettingsPage>
   )

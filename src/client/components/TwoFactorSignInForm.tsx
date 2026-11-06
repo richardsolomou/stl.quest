@@ -10,8 +10,11 @@ import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { authClient } from '../authClient'
+import { useI18n } from '../i18n'
 
 export function TwoFactorSignInForm({ onBack }: { onBack: () => void }) {
+  const { t } = useI18n()
+  const copy = t.auth.twoFactor
   const queryClient = useQueryClient()
   const router = useRouter()
   const posthog = usePostHog()
@@ -33,7 +36,7 @@ export function TwoFactorSignInForm({ onBack }: { onBack: () => void }) {
             ? await authClient.twoFactor.verifyBackupCode({ code, trustDevice })
             : await authClient.twoFactor.verifyTotp({ code: code.replace(/\s/g, ''), trustDevice })
           if (failed) {
-            setError(recovery ? 'Recovery code is invalid or has already been used.' : 'Authenticator code is invalid.')
+            setError(recovery ? copy.recoveryInvalid : copy.codeInvalid)
             return
           }
           posthog.capture('user_signed_in', {
@@ -48,7 +51,7 @@ export function TwoFactorSignInForm({ onBack }: { onBack: () => void }) {
       }}
     >
       <Field>
-        <FieldLabel htmlFor="two-factor-code">{recovery ? 'Recovery code' : 'Authenticator code'}</FieldLabel>
+        <FieldLabel htmlFor="two-factor-code">{recovery ? copy.recoveryCode : copy.authenticatorCode}</FieldLabel>
         <Input
           id="two-factor-code"
           value={code}
@@ -57,13 +60,11 @@ export function TwoFactorSignInForm({ onBack }: { onBack: () => void }) {
           autoComplete="one-time-code"
           required
         />
-        <FieldDescription>
-          {recovery ? 'Enter one of the one-time codes saved during setup.' : 'Enter the current 6-digit code from your authenticator app.'}
-        </FieldDescription>
+        <FieldDescription>{recovery ? copy.recoveryHint : copy.authenticatorHint}</FieldDescription>
       </Field>
       <Field orientation="horizontal">
         <Checkbox id="trust-device" checked={trustDevice} onCheckedChange={setTrustDevice} />
-        <FieldLabel htmlFor="trust-device">Trust this device for 30 days</FieldLabel>
+        <FieldLabel htmlFor="trust-device">{copy.trustDevice}</FieldLabel>
       </Field>
       {error && (
         <Alert variant="destructive">
@@ -73,7 +74,7 @@ export function TwoFactorSignInForm({ onBack }: { onBack: () => void }) {
       )}
       <Button type="submit" disabled={busy || !code.trim()}>
         {busy && <Spinner />}
-        {busy ? 'Verifying…' : 'Verify and sign in'}
+        {busy ? copy.verifying : copy.verify}
       </Button>
       <Button
         type="button"
@@ -86,7 +87,7 @@ export function TwoFactorSignInForm({ onBack }: { onBack: () => void }) {
           setError('')
         }}
       >
-        {recovery ? 'Use authenticator code' : 'Use a recovery code'}
+        {recovery ? copy.useAuthenticator : copy.useRecovery}
       </Button>
       <Button
         type="button"
@@ -99,7 +100,7 @@ export function TwoFactorSignInForm({ onBack }: { onBack: () => void }) {
           onBack()
         }}
       >
-        Back to sign in
+        {copy.back}
       </Button>
     </form>
   )

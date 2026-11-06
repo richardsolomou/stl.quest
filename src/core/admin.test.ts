@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { adminWorkspaceAttentionReasons, adminWorkspaceHealth, type AdminWorkspace } from './admin'
+import { messagesFor } from './i18n'
+
+const t = messagesFor('en').superAdmin
 
 function workspace(overrides: Partial<AdminWorkspace> = {}): AdminWorkspace {
   return {
@@ -23,7 +26,7 @@ function workspace(overrides: Partial<AdminWorkspace> = {}): AdminWorkspace {
 describe('admin workspace health', () => {
   it('marks an ordinary configured workspace as healthy', () => {
     expect(adminWorkspaceHealth(workspace())).toBe('healthy')
-    expect(adminWorkspaceAttentionReasons(workspace())).toEqual([])
+    expect(adminWorkspaceAttentionReasons(workspace(), t)).toEqual([])
   })
 
   it('reports actionable storage and processing problems', () => {
@@ -34,7 +37,7 @@ describe('admin workspace health', () => {
     })
 
     expect(adminWorkspaceHealth(result)).toBe('attention')
-    expect(adminWorkspaceAttentionReasons(result)).toEqual([
+    expect(adminWorkspaceAttentionReasons(result, t)).toEqual([
       'Storage is not configured',
       '2 failed background jobs',
       'Managed storage is over 90% full',
@@ -45,7 +48,14 @@ describe('admin workspace health', () => {
     expect(
       adminWorkspaceAttentionReasons(
         workspace({ managedStorage: { ownerId: 'owner', plan: 'free', usedBytes: 1_000_000_000, quotaBytes: 1_000_000_000 } }),
+        t,
       ),
     ).toEqual(['Managed storage is full'])
+  })
+
+  it('reports problems in the requested language', () => {
+    expect(adminWorkspaceAttentionReasons(workspace({ failedJobCount: 1 }), messagesFor('fr').superAdmin)).toEqual([
+      '1 tâche d’arrière-plan en échec',
+    ])
   })
 })

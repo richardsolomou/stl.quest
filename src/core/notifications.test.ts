@@ -9,6 +9,9 @@ import {
   printReadyEmail,
   readyPrintsByRequester,
 } from './notifications'
+import { messagesFor } from './i18n'
+
+const t = messagesFor('en').email
 
 describe('notification preferences', () => {
   it('enables print-ready emails by default', () => {
@@ -44,21 +47,21 @@ describe('ready prints by requester', () => {
 
 describe('print ready email', () => {
   it('lists each ready print with its copy count', () => {
-    const email = printReadyEmail({ workspaceName: 'Lab', prints: [{ name: 'Bracket', count: 2 }], url: 'https://print.example' })
+    const email = printReadyEmail({ t, workspaceName: 'Lab', prints: [{ name: 'Bracket', count: 2 }], url: 'https://print.example' })
     expect(email.text).toContain('- Bracket (2 copies)')
   })
 
   it('uses a singular subject for one copy', () => {
-    expect(printReadyEmail({ workspaceName: 'Lab', prints: [{ name: 'Bracket', count: 1 }] }).subject).toBe('Your print is ready in Lab')
+    expect(printReadyEmail({ t, workspaceName: 'Lab', prints: [{ name: 'Bracket', count: 1 }] }).subject).toBe('Your print is ready in Lab')
   })
 
   it('escapes request names in the HTML body', () => {
-    expect(printReadyEmail({ workspaceName: 'Lab', prints: [{ name: '<b>x</b>', count: 1 }] }).html).not.toContain('<b>x</b>')
+    expect(printReadyEmail({ t, workspaceName: 'Lab', prints: [{ name: '<b>x</b>', count: 1 }] }).html).not.toContain('<b>x</b>')
   })
 
   it('counts the prints past the listed limit instead of naming them', () => {
     const prints = Array.from({ length: MAX_EMAIL_LISTED_PRINTS + 2 }, (_, index) => ({ name: `Part ${index}`, count: 1 }))
-    expect(printReadyEmail({ workspaceName: 'Lab', prints }).text.split('\n').slice(-6, -4)).toEqual([
+    expect(printReadyEmail({ t, workspaceName: 'Lab', prints }).text.split('\n').slice(-6, -4)).toEqual([
       `- Part ${MAX_EMAIL_LISTED_PRINTS - 1} (1 copy)`,
       '- and 2 more requests',
     ])
@@ -67,6 +70,7 @@ describe('print ready email', () => {
   it('cuts an over-long requester name in a custom template', () => {
     const template = { subject: 'Ready', html: '{{name}}' }
     const email = printReadyEmail({
+      t,
       workspaceName: 'Lab',
       name: 'a'.repeat(MAX_USER_NAME_LENGTH + 1),
       prints: [{ name: 'Bracket', count: 1 }],
@@ -77,38 +81,58 @@ describe('print ready email', () => {
 
   it('names every print at the listed limit', () => {
     const prints = Array.from({ length: MAX_EMAIL_LISTED_PRINTS }, (_, index) => ({ name: `Part ${index}`, count: 1 }))
-    expect(printReadyEmail({ workspaceName: 'Lab', prints }).text).not.toContain('more request')
+    expect(printReadyEmail({ t, workspaceName: 'Lab', prints }).text).not.toContain('more request')
   })
 
   it('counts a single print past the listed limit', () => {
     const prints = Array.from({ length: MAX_EMAIL_LISTED_PRINTS + 1 }, (_, index) => ({ name: `Part ${index}`, count: 1 }))
-    expect(printReadyEmail({ workspaceName: 'Lab', prints }).text).toContain('- and 1 more request\n')
+    expect(printReadyEmail({ t, workspaceName: 'Lab', prints }).text).toContain('- and 1 more request\n')
   })
 
   it('still counts every ready copy past the listed limit', () => {
     const prints = Array.from({ length: MAX_EMAIL_LISTED_PRINTS + 2 }, (_, index) => ({ name: `Part ${index}`, count: 1 }))
-    expect(printReadyEmail({ workspaceName: 'Lab', prints }).text).toContain(`${MAX_EMAIL_LISTED_PRINTS + 2} copies of your requests`)
+    expect(printReadyEmail({ t, workspaceName: 'Lab', prints }).text).toContain(`${MAX_EMAIL_LISTED_PRINTS + 2} copies of your requests`)
   })
 
   it('links back to the requests in the HTML body', () => {
-    const email = printReadyEmail({ workspaceName: 'Lab', prints: [{ name: 'Bracket', count: 1 }], url: 'https://print.example' })
+    const email = printReadyEmail({ t, workspaceName: 'Lab', prints: [{ name: 'Bracket', count: 1 }], url: 'https://print.example' })
     expect(email.html).toContain('href="https://print.example"')
   })
 })
 
 describe('invite email', () => {
   it('names the workspace in the subject', () => {
-    expect(inviteEmail({ workspaceName: 'Lab', url: 'https://print.example/invite/t' }).subject).toBe('You are invited to Lab on STL Quest')
+    expect(inviteEmail({ t, workspaceName: 'Lab', url: 'https://print.example/invite/t' }).subject).toBe(
+      'You are invited to Lab on STL Quest',
+    )
   })
 
   it('includes the single-use link in the plain-text body', () => {
-    expect(inviteEmail({ workspaceName: 'Lab', url: 'https://print.example/invite/t' }).text).toContain('https://print.example/invite/t')
+    expect(inviteEmail({ t, workspaceName: 'Lab', url: 'https://print.example/invite/t' }).text).toContain('https://print.example/invite/t')
+  })
+})
+
+describe('French emails', () => {
+  const fr = messagesFor('fr').email
+
+  it('writes the print-ready subject in French', () => {
+    expect(printReadyEmail({ t: fr, workspaceName: 'Lab', prints: [{ name: 'Bracket', count: 2 }] }).subject).toBe(
+      'Vos impressions sont prêtes dans Lab',
+    )
+  })
+
+  it('treats a single copy as singular in French', () => {
+    expect(printReadyEmail({ t: fr, workspaceName: 'Lab', prints: [{ name: 'Bracket', count: 1 }] }).text).toContain('- Bracket (1 copie)')
+  })
+
+  it('writes the default template in French', () => {
+    expect(defaultEmailTemplate('invite', fr).subject).toBe('Vous êtes invité à rejoindre {{workspace}} sur STL Quest')
   })
 })
 
 describe('custom email templates', () => {
   const template = { subject: 'Hi {{name}}', html: '<p>{{prints}} at <a href="{{link}}">{{workspace}}</a></p>' }
-  const input = { workspaceName: 'Lab', name: 'Maya', prints: [{ name: 'Bracket', count: 2 }], url: 'https://print.example' }
+  const input = { t, workspaceName: 'Lab', name: 'Maya', prints: [{ name: 'Bracket', count: 2 }], url: 'https://print.example' }
 
   it('replaces the subject', () => {
     expect(printReadyEmail({ ...input, template }).subject).toBe('Hi Maya')
@@ -124,36 +148,36 @@ describe('custom email templates', () => {
 
   it('replaces the invitation subject', () => {
     const invite = { subject: 'Join {{workspace}}', html: '<a href="{{link}}">Join</a>' }
-    expect(inviteEmail({ workspaceName: 'Lab', url: 'https://print.example/invite/t', template: invite }).subject).toBe('Join Lab')
+    expect(inviteEmail({ t, workspaceName: 'Lab', url: 'https://print.example/invite/t', template: invite }).subject).toBe('Join Lab')
   })
 
   it('starts from a default that fills every print-ready placeholder', () => {
-    expect(printReadyEmail({ ...input, template: defaultEmailTemplate('print-ready') }).html).not.toMatch(/\{\{\w+\}\}/)
+    expect(printReadyEmail({ ...input, template: defaultEmailTemplate('print-ready', t) }).html).not.toMatch(/\{\{\w+\}\}/)
   })
 
   it('greets the requester by name in the default template', () => {
-    expect(printReadyEmail({ ...input, template: defaultEmailTemplate('print-ready') }).html).toContain('Hi Maya')
+    expect(printReadyEmail({ ...input, template: defaultEmailTemplate('print-ready', t) }).html).toContain('Hi Maya')
   })
 
   it.each(emailTemplateKinds.map((kind) => kind.id))('keeps the default %s template within the placeholder limit', (kind) => {
-    expect(emailTemplatePlaceholderCount(defaultEmailTemplate(kind))).toBeLessThanOrEqual(MAX_EMAIL_TEMPLATE_PLACEHOLDERS)
+    expect(emailTemplatePlaceholderCount(defaultEmailTemplate(kind, t))).toBeLessThanOrEqual(MAX_EMAIL_TEMPLATE_PLACEHOLDERS)
   })
 
   it('starts the invitation from the standard subject', () => {
-    expect(defaultEmailTemplate('invite').subject).toBe('You are invited to {{workspace}} on STL Quest')
+    expect(defaultEmailTemplate('invite', t).subject).toBe('You are invited to {{workspace}} on STL Quest')
   })
 
   it('links the invitation default template to the invite', () => {
-    expect(defaultEmailTemplate('invite').html).toContain('href="{{link}}"')
+    expect(defaultEmailTemplate('invite', t).html).toContain('href="{{link}}"')
   })
 
   it('starts from a default that fills every invitation placeholder', () => {
     expect(
-      inviteEmail({ workspaceName: 'Lab', url: 'https://print.example/invite/t', template: defaultEmailTemplate('invite') }).html,
+      inviteEmail({ t, workspaceName: 'Lab', url: 'https://print.example/invite/t', template: defaultEmailTemplate('invite', t) }).html,
     ).not.toMatch(/\{\{\w+\}\}/)
   })
 
   it('lists the ready prints in the default template', () => {
-    expect(printReadyEmail({ ...input, template: defaultEmailTemplate('print-ready') }).html).toContain('<li>Bracket (2 copies)</li>')
+    expect(printReadyEmail({ ...input, template: defaultEmailTemplate('print-ready', t) }).html).toContain('<li>Bracket (2 copies)</li>')
   })
 })

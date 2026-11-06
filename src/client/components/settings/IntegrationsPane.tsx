@@ -8,6 +8,7 @@ import { AuthenticationSettings, ProviderDialog } from './AuthenticationIntegrat
 import { SettingsHeader, SettingsPage } from './SettingsLayout'
 import { DeploymentSmtpDialog, SmtpSettings } from './SmtpIntegrationSettings'
 import { CloudStorageSettings } from './StorageIntegrationSettings'
+import { useI18n } from '../../i18n'
 
 export function IntegrationsPane() {
   const query = useQuery(integrationsQuery())
@@ -15,15 +16,16 @@ export function IntegrationsPane() {
   const [provider, setProvider] = useState<SocialAuthProvider | null>(null)
   const [cloudProvider, setCloudProvider] = useState<CloudStorageProvider | null>(null)
   const [smtpOpen, setSmtpOpen] = useState(false)
+  const copy = useI18n().t.settings.integrations
   if (!data) {
     return (
       <SettingsPage>
-        <SettingsHeader title="Integrations" description="Deployment-wide sign-in methods, cloud storage apps, and outbound email." />
+        <SettingsHeader title={copy.title} description={copy.loadingDescription} />
         <QueryState
           loading={query.isPending}
           error={query.error}
-          loadingLabel="Loading integration settings…"
-          errorTitle="Could not load integration settings"
+          loadingLabel={copy.loading}
+          errorTitle={copy.loadError}
           onRetry={() => void query.refetch()}
         />
       </SettingsPage>
@@ -31,10 +33,7 @@ export function IntegrationsPane() {
   }
   return (
     <SettingsPage>
-      <SettingsHeader
-        title="Integrations"
-        description="Deployment-wide sign-in methods, cloud storage apps, and outbound email. Workspace membership is always invite-only."
-      />
+      <SettingsHeader title={copy.title} description={copy.description} />
       <AuthenticationSettings data={data} onConfigure={setProvider} />
       <CloudStorageSettings data={data} onConfigure={setCloudProvider} />
       <SmtpSettings data={data} onConfigure={() => setSmtpOpen(true)} />

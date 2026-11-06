@@ -20,11 +20,7 @@ import { QueryState } from '../QueryState'
 import { SettingNotice, noticeDetail } from '../SettingNotice'
 import { CopyButtonLabel, useCopied } from '../useCopied'
 import { SettingsSection } from './SettingsLayout'
-
-const ROLE_OPTIONS = [
-  { value: 'requester', label: 'Requester' },
-  { value: 'admin', label: 'Admin' },
-] as const
+import { useI18n } from '../../i18n'
 
 export function InviteDialog({ smtpConfigured, onDone }: { smtpConfigured: boolean; onDone: () => void }) {
   const workspaceSlug = useWorkspaceSlug()
@@ -33,6 +29,12 @@ export function InviteDialog({ smtpConfigured, onDone }: { smtpConfigured: boole
   const [link, setLink] = useState('')
   const [emailedTo, setEmailedTo] = useState<string>()
   const { copied, copy } = useCopied()
+  const { t } = useI18n()
+  const text = t.settings.invites
+  const roleOptions = [
+    { value: 'requester', label: text.roles.requester },
+    { value: 'admin', label: text.roles.admin },
+  ] as const
   const mutation = useMutation({
     mutationFn: callCreateInvite,
     onSuccess: async ({ token, emailed }, variables) => {
@@ -52,28 +54,22 @@ export function InviteDialog({ smtpConfigured, onDone }: { smtpConfigured: boole
 
   if (link) {
     return (
-      <DialogShell title="Invite link" onClose={onDone}>
-        <p className="text-sm text-muted-foreground">Share this single-use link with one person. It expires in seven days.</p>
-        {emailedTo && (
-          <SettingNotice
-            notice={{ tone: 'success', title: 'Invitation emailed', hint: `Sent to ${emailedTo}. The link below is the same one.` }}
-          />
-        )}
+      <DialogShell title={text.link.title} onClose={onDone}>
+        <p className="text-sm text-muted-foreground">{text.link.description}</p>
+        {emailedTo && <SettingNotice notice={{ tone: 'success', title: text.link.emailed, hint: text.link.emailedHint(emailedTo) }} />}
         <Field>
-          <FieldLabel htmlFor="invite-link">Invite link — share it with one person; it works once and expires in 7 days</FieldLabel>
+          <FieldLabel htmlFor="invite-link">{text.link.label}</FieldLabel>
           <InputGroup>
             <InputGroupInput id="invite-link" readOnly value={link} onFocus={(event) => event.target.select()} />
             <InputGroupButton variant="ghost" onClick={() => copy(link)}>
               <CopyButtonLabel copied={copied} />
             </InputGroupButton>
           </InputGroup>
-          <FieldDescription>
-            This is the only time the link is shown. They can continue with a password, Google, or Discord.
-          </FieldDescription>
+          <FieldDescription>{text.link.shownOnce}</FieldDescription>
         </Field>
         <div className="flex justify-end">
           <Button type="button" variant="outline" onClick={onDone}>
-            Done
+            {t.common.done}
           </Button>
         </div>
       </DialogShell>
@@ -81,7 +77,7 @@ export function InviteDialog({ smtpConfigured, onDone }: { smtpConfigured: boole
   }
 
   return (
-    <DialogShell title="Create invite link" onClose={onDone}>
+    <DialogShell title={text.create.title} onClose={onDone}>
       <form
         onSubmit={(event) => {
           event.preventDefault()
@@ -93,16 +89,16 @@ export function InviteDialog({ smtpConfigured, onDone }: { smtpConfigured: boole
           <form.Field name="email">
             {(field) => (
               <Field>
-                <FieldLabel htmlFor="invite-email">Email invitation to (optional)</FieldLabel>
+                <FieldLabel htmlFor="invite-email">{text.create.emailLabel}</FieldLabel>
                 <Input
                   id="invite-email"
                   type="email"
                   value={field.state.value}
                   onChange={(event) => field.handleChange(event.target.value)}
                   maxLength={254}
-                  placeholder="person@example.com"
+                  placeholder={text.create.emailPlaceholder}
                 />
-                <FieldDescription>Leave blank to create a link without sending email.</FieldDescription>
+                <FieldDescription>{text.create.emailHint}</FieldDescription>
               </Field>
             )}
           </form.Field>
@@ -110,13 +106,13 @@ export function InviteDialog({ smtpConfigured, onDone }: { smtpConfigured: boole
         <form.Field name="label">
           {(field) => (
             <Field>
-              <FieldLabel htmlFor="invite-label">Who is this for? (optional note to yourself)</FieldLabel>
+              <FieldLabel htmlFor="invite-label">{text.create.labelLabel}</FieldLabel>
               <Input
                 id="invite-label"
                 value={field.state.value}
                 onChange={(event) => field.handleChange(event.target.value)}
                 maxLength={100}
-                placeholder="New team member"
+                placeholder={text.create.labelPlaceholder}
               />
             </Field>
           )}
@@ -124,9 +120,9 @@ export function InviteDialog({ smtpConfigured, onDone }: { smtpConfigured: boole
         <form.Field name="role">
           {(field) => (
             <Field>
-              <FieldLabel htmlFor="invite-role">Role</FieldLabel>
+              <FieldLabel htmlFor="invite-role">{text.create.roleLabel}</FieldLabel>
               <Select
-                items={ROLE_OPTIONS}
+                items={roleOptions}
                 value={field.state.value}
                 onValueChange={(value) => field.handleChange(value as 'requester' | 'admin')}
               >
@@ -134,7 +130,7 @@ export function InviteDialog({ smtpConfigured, onDone }: { smtpConfigured: boole
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {ROLE_OPTIONS.map((option) => (
+                  {roleOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>
@@ -145,19 +141,19 @@ export function InviteDialog({ smtpConfigured, onDone }: { smtpConfigured: boole
           )}
         </form.Field>
         <DialogProblem
-          title="The invite was not created"
-          hint="Check the email address if you entered one, then try again."
-          error={mutation.error ? (noticeDetail(mutation.error) ?? 'No further detail was returned.') : undefined}
+          title={text.create.notCreated}
+          hint={text.create.notCreatedHint}
+          error={mutation.error ? (noticeDetail(mutation.error) ?? text.create.noDetail) : undefined}
         />
         <form.Subscribe selector={(state) => state.isSubmitting}>
           {(busy) => (
             <div className="flex flex-wrap justify-end gap-2">
               <Button type="button" variant="outline" onClick={onDone}>
-                Cancel
+                {t.common.cancel}
               </Button>
               <Button type="submit" disabled={busy}>
                 {busy && <Spinner />}
-                {busy ? 'Creating…' : smtpConfigured ? 'Create invitation' : 'Create invite link'}
+                {busy ? text.create.creating : smtpConfigured ? text.create.submitEmail : text.create.title}
               </Button>
             </div>
           )}
@@ -174,14 +170,16 @@ export function PendingInvites() {
   const callRevoke = useServerFn(revokeInvite)
   const queryClient = useQueryClient()
   const mutation = useMutation({ mutationFn: callRevoke, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['invites'] }) })
+  const { t, locale } = useI18n()
+  const text = t.settings.invites.pending
   if (!invites) {
     return (
-      <SettingsSection title="Pending invites">
+      <SettingsSection title={text.title}>
         <QueryState
           loading={query.isPending}
           error={query.error}
-          loadingLabel="Loading pending invites…"
-          errorTitle="Could not load pending invites"
+          loadingLabel={text.loading}
+          errorTitle={text.loadError}
           onRetry={() => void query.refetch()}
         />
       </SettingsSection>
@@ -189,16 +187,16 @@ export function PendingInvites() {
   }
   if (!invites.length) return null
   return (
-    <SettingsSection title="Pending invites">
+    <SettingsSection title={text.title}>
       <ItemGroup>
         {invites.map((invite) => (
           <Item variant="outline" key={invite.id}>
             <ItemContent>
-              <ItemTitle>{invite.label || 'Unlabeled invite'}</ItemTitle>
-              <ItemDescription>Expires {new Date(invite.expiresAt).toLocaleDateString()}</ItemDescription>
+              <ItemTitle>{invite.label || text.unlabeled}</ItemTitle>
+              <ItemDescription>{text.expires(new Date(invite.expiresAt).toLocaleDateString(locale))}</ItemDescription>
             </ItemContent>
             <ItemActions>
-              <Badge variant="secondary">{invite.role}</Badge>
+              <Badge variant="secondary">{text.role[invite.role]}</Badge>
               <Button
                 type="button"
                 variant="outline"
@@ -206,7 +204,7 @@ export function PendingInvites() {
                 disabled={mutation.isPending && mutation.variables?.data.id === invite.id}
                 onClick={() => mutation.mutate({ data: { workspaceSlug, id: invite.id } })}
               >
-                Revoke
+                {text.revoke}
               </Button>
             </ItemActions>
           </Item>
@@ -216,8 +214,8 @@ export function PendingInvites() {
         <SettingNotice
           notice={{
             tone: 'error',
-            title: 'The invite was not revoked',
-            hint: 'It is still listed above and still usable. Try again in a moment.',
+            title: text.notRevoked,
+            hint: text.notRevokedHint,
             detail: noticeDetail(mutation.error),
           }}
         />

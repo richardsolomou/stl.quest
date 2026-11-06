@@ -16,7 +16,7 @@ import {
   availableOnboardingQuests,
   onboardingPoints,
   onboardingQuestVersion,
-  onboardingSections,
+  onboardingSectionIds,
   onboardingTaskIds,
   type OnboardingProgress,
   type OnboardingProgressOperation,
@@ -24,6 +24,7 @@ import {
   type OnboardingTaskId,
 } from '../../core/onboarding'
 import { updateOnboardingProgress } from '../../server/fns'
+import { useI18n } from '../i18n'
 import { onboardingQuery, requestsQuery } from '../queries'
 import {
   PRODUCT_QUEST_EVENT,
@@ -46,6 +47,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   const navigate = useNavigate()
   const workspaceSlug = useWorkspaceSlug()
   const posthog = usePostHog()
+  const { t } = useI18n()
   const queryClient = useQueryClient()
   const callUpdate = useServerFn(updateOnboardingProgress)
   const { data } = useQuery(onboardingQuery(workspaceSlug))
@@ -131,9 +133,9 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
       if (source === 'interaction' && !completesOnboarding) {
         const quest = applicable.find((item) => item.id === task)
         if (quest) {
-          toast.success(`${quest.title} complete`, {
-            description: `+${quest.points} XP earned`,
-            action: { label: 'View onboarding', onClick: () => setOpen(true) },
+          toast.success(t.shell.tour.questComplete(t.shell.onboarding.quests[quest.id].title), {
+            description: t.shell.tour.xpEarned(quest.points),
+            action: { label: t.shell.tour.viewOnboarding, onClick: () => setOpen(true) },
           })
         }
       }
@@ -148,7 +150,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     }
     window.addEventListener(PRODUCT_TOUR_PROGRESS_EVENT, complete)
     return () => window.removeEventListener(PRODUCT_TOUR_PROGRESS_EVENT, complete)
-  }, [applicable, data?.completedTasks, data?.skippedTasks, focusedTask, posthog, updateProgress])
+  }, [applicable, data?.completedTasks, data?.skippedTasks, focusedTask, posthog, t, updateProgress])
 
   useEffect(() => {
     if (!data || mutation.isPending || celebrating) return
@@ -186,8 +188,8 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     return {
       id: active.id,
       target: `[data-onboarding="${ui.target}"]`,
-      title: active.title,
-      content: active.description,
+      title: t.shell.onboarding.quests[active.id].title,
+      content: t.shell.onboarding.quests[active.id].description,
       placement: ui.placement,
       data: {
         quest: active,
@@ -198,7 +200,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
         },
       } satisfies QuestStepData,
     }
-  }, [active, posthog])
+  }, [active, posthog, t])
 
   useEffect(() => {
     const element = !open && active ? document.querySelector(`[data-onboarding="${PRODUCT_QUEST_UI[active.id].target}"]`) : undefined
@@ -233,10 +235,10 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     const announced = announcedQuests()
     const newTasks = visible.filter((quest) => !data.celebratedTasks.includes(quest.id) && !announced.has(onboardingQuestVersion(quest)))
     if (!newTasks.length) return
-    setNewQuestAnnouncement(`${newTasks.length} new STL Quest${newTasks.length === 1 ? '' : 's'} available.`)
+    setNewQuestAnnouncement(t.shell.tour.newQuestsAvailable(newTasks.length))
     for (const quest of newTasks) announced.add(onboardingQuestVersion(quest))
     localStorage.setItem(announcedQuestsKey, JSON.stringify([...announced]))
-  }, [data, newCount, visible])
+  }, [data, newCount, t, visible])
 
   return (
     <>
@@ -332,6 +334,7 @@ function QuestPopover({
   launch: (quest: OnboardingQuest) => void
   updateProgress: (operation: OnboardingProgressOperation) => void
 }) {
+  const { t } = useI18n()
   const complete = resolvedCount === applicable.length
   const completed = data ? applicable.filter((quest) => data.completedTasks.includes(quest.id)).length : 0
   const skipped = data ? applicable.filter((quest) => data.skippedTasks.includes(quest.id)).length : 0
@@ -352,7 +355,7 @@ function QuestPopover({
                     complete && 'invisible pointer-events-none',
                   )}
                   aria-hidden={complete || undefined}
-                  aria-label={`STL Quest, ${resolvedCount} of ${applicable.length} resolved, ${points} XP${newCount ? `, ${newCount} new` : ''}`}
+                  aria-label={t.shell.tour.triggerLabel(resolvedCount, applicable.length, points, newCount)}
                   tabIndex={complete ? -1 : undefined}
                 />
               }
@@ -363,7 +366,7 @@ function QuestPopover({
           {!complete && <span className="absolute top-0.5 right-0.5 size-2 rounded-full bg-primary ring-2 ring-background" />}
         </TooltipTrigger>
         <TooltipContent side="left">
-          {complete ? 'STL Quest complete' : newCount ? `${newCount} new quests` : 'Complete your STL Quest'}
+          {complete ? t.shell.tour.allComplete : newCount ? t.shell.tour.newQuests(newCount) : t.shell.tour.completeYourQuest}
         </TooltipContent>
       </Tooltip>
       <PopoverContent side="top" align="end" sideOffset={10} className="w-[min(22rem,calc(100vw-2rem))] gap-0 p-0">
@@ -371,12 +374,12 @@ function QuestPopover({
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="font-heading text-xs tracking-[0.08em] text-primary uppercase">
-                {complete ? 'STL Quest complete' : 'Complete your STL Quest'}
+                {complete ? t.shell.tour.allComplete : t.shell.tour.completeYourQuest}
               </p>
-              <h2 className="font-heading text-lg">{complete ? 'Ready for the next quest' : 'Learn by doing'}</h2>
+              <h2 className="font-heading text-lg">{complete ? t.shell.tour.readyForNext : t.shell.tour.learnByDoing}</h2>
             </div>
             <span className="shrink-0 rounded-full bg-primary/15 px-2.5 py-1 font-mono text-xs font-semibold text-primary">
-              {points} XP
+              {t.shell.tour.xp(points)}
             </span>
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
@@ -386,31 +389,29 @@ function QuestPopover({
             />
           </div>
           <p className="mt-1.5 text-xs text-muted-foreground">
-            {resolvedCount} of {applicable.length} quests resolved · {points} of {totalPoints} XP earned
+            {t.shell.tour.progress(resolvedCount, applicable.length, points, totalPoints)}
           </p>
           {complete && !reviewing && (
             <div className="mt-4 flex items-center justify-between gap-3 border-t border-dashed border-border pt-3">
-              <span className="text-sm text-muted-foreground">
-                {completed} completed · {skipped} skipped
-              </span>
+              <span className="text-sm text-muted-foreground">{t.shell.tour.summary(completed, skipped)}</span>
               <Button type="button" variant="outline" size="sm" onClick={() => setReviewing(true)}>
-                Review quests
+                {t.shell.tour.reviewQuests}
               </Button>
             </div>
           )}
         </header>
         {showList && (
           <div className="max-h-[min(28rem,var(--available-height))] overflow-y-auto p-1.5">
-            {onboardingSections.map((section) => {
-              const sectionQuests = visible.filter((quest) => quest.section === section.id)
+            {onboardingSectionIds.map((section) => {
+              const sectionQuests = visible.filter((quest) => quest.section === section)
               if (!sectionQuests.length) return null
               return (
-                <section key={section.id} className="not-first:mt-1" aria-labelledby={`quest-section-${section.id}`}>
+                <section key={section} className="not-first:mt-1" aria-labelledby={`quest-section-${section}`}>
                   <h3
-                    id={`quest-section-${section.id}`}
+                    id={`quest-section-${section}`}
                     className="px-2.5 pt-1.5 pb-0.5 font-heading text-[11px] tracking-[0.08em] text-muted-foreground uppercase"
                   >
-                    {section.title}
+                    {t.shell.onboarding.sections[section]}
                   </h3>
                   {sectionQuests.map((quest) => (
                     <QuestRow key={quest.id} quest={quest} data={data} busy={busy} launch={launch} updateProgress={updateProgress} />
@@ -438,6 +439,8 @@ function QuestRow({
   launch: (quest: OnboardingQuest) => void
   updateProgress: (operation: OnboardingProgressOperation) => void
 }) {
+  const { t } = useI18n()
+  const title = t.shell.onboarding.quests[quest.id].title
   const completed = data?.completedTasks.includes(quest.id) ?? false
   const skipped = data?.skippedTasks.includes(quest.id) ?? false
   const newQuest = !!data?.celebratedTasks.length && !data.celebratedTasks.includes(quest.id)
@@ -456,11 +459,9 @@ function QuestRow({
           <Flag className="size-4 shrink-0 text-primary" />
         )}
         <span className="min-w-0 flex-1">
-          <span className={cn('block text-sm font-medium', (completed || skipped) && 'text-muted-foreground line-through')}>
-            {quest.title}
-          </span>
+          <span className={cn('block text-sm font-medium', (completed || skipped) && 'text-muted-foreground line-through')}>{title}</span>
           <span className="block text-xs text-muted-foreground">
-            {completed ? 'Complete · Review' : skipped ? 'Skipped' : `${newQuest ? 'New · ' : ''}${quest.points} XP`}
+            {completed ? t.shell.tour.rowComplete : skipped ? t.shell.tour.rowSkipped : t.shell.tour.rowPoints(quest.points, newQuest)}
           </span>
         </span>
       </button>
@@ -470,7 +471,7 @@ function QuestRow({
           variant="ghost"
           size="icon-sm"
           disabled={busy}
-          aria-label={`Restore ${quest.title}`}
+          aria-label={t.shell.tour.restore(title)}
           onClick={() => updateProgress({ operation: 'restore', task: quest.id })}
         >
           <RotateCcw />
@@ -481,11 +482,11 @@ function QuestRow({
           variant="ghost"
           size="sm"
           className="text-xs text-muted-foreground"
-          aria-label={`Skip ${quest.title}`}
+          aria-label={t.shell.tour.skip(title)}
           disabled={busy}
           onClick={() => updateProgress({ operation: 'skip', task: quest.id })}
         >
-          Not for me
+          {t.shell.tour.notForMe}
         </Button>
       ) : null}
     </div>
@@ -493,24 +494,25 @@ function QuestRow({
 }
 
 function QuestTooltip({ closeProps, step, tooltipProps }: TooltipRenderProps) {
+  const { t } = useI18n()
   const { dismiss, quest } = step.data as QuestStepData
   return (
     <section
       {...tooltipProps}
       role="note"
       aria-live="polite"
-      aria-label="STL Quest"
+      aria-label={t.shell.tour.promptLabel}
       className="pointer-events-none w-[min(19rem,calc(100vw-2rem))] select-none rounded-lg border-2 border-blueprint/40 bg-background p-3 text-foreground shadow-xl"
     >
       <div className="flex items-center justify-between gap-3">
-        <span className="font-heading text-xs tracking-[0.08em] text-primary uppercase">STL Quest · +{quest.points} XP</span>
+        <span className="font-heading text-xs tracking-[0.08em] text-primary uppercase">{t.shell.tour.promptHeading(quest.points)}</span>
         <Button
           {...closeProps}
           type="button"
           variant="ghost"
           size="icon-sm"
           className="pointer-events-auto -mt-2 -mr-2"
-          aria-label="Close onboarding prompt"
+          aria-label={t.shell.tour.closePrompt}
           onClick={(event) => {
             closeProps.onClick(event)
             dismiss()

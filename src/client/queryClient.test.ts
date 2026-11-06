@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { toast } from 'sonner'
-import { createQueryClient } from './queryClient'
+import { messagesFor } from '../core/i18n'
+import { createQueryClient, mutationErrorMessage } from './queryClient'
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }))
 
@@ -37,5 +38,16 @@ describe('mutation errors', () => {
 
     await expect(mutation.execute(undefined)).rejects.toBeNull()
     expect(toast.error).toHaveBeenCalledWith('Something went wrong. Please try again.')
+  })
+})
+
+describe('mutationErrorMessage', () => {
+  it('translates the stale server function notice', () => {
+    const stale = new Error(messagesFor('en').shell.query.staleServerFunction)
+    expect(mutationErrorMessage(stale, messagesFor('de'))).toBe('STL Quest wurde aktualisiert. Laden Sie die Seite neu, um fortzufahren.')
+  })
+
+  it('keeps other server messages as they arrived', () => {
+    expect(mutationErrorMessage(new Error('workspace not found'), messagesFor('fr'))).toBe('workspace not found')
   })
 })

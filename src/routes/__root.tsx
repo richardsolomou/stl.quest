@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
-import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router'
+import { HeadContent, Outlet, Scripts, createRootRouteWithContext, useRouterState } from '@tanstack/react-router'
 import { useCallback } from 'react'
 import { postHogEnvironment } from 'ras-stack/posthog'
 import { PostHogBetterAuthIdentity, PostHogIntegration } from 'ras-stack/posthog/react'
@@ -25,6 +25,9 @@ import { dropDuplicateServerFunctionException, dropExpectedStorageProblems, drop
 import { themeScript } from '../client/theme'
 import { WorkspaceProvider } from '../client/workspace'
 import { faviconHref } from '../favicon'
+import { DEFAULT_LOCALE, messagesFor } from '../core/i18n'
+import { showsEnglishLandingPage } from '../client/landing/site'
+import { I18nProvider } from '../client/i18n'
 import appCss from '../styles.css?url'
 
 // What a shared link, such as an invitation, unfurls as in chat apps.
@@ -89,9 +92,11 @@ function PostHogIdentify() {
 }
 
 function RootComponent() {
-  const {
-    data: { identity, serverVersion, storageConfigured, telemetryEnabled },
-  } = useSuspenseQuery(sessionQuery())
+  const { data: session } = useSuspenseQuery(sessionQuery())
+  const { identity, serverVersion, storageConfigured, telemetryEnabled } = session
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const locale = showsEnglishLandingPage(session, pathname) ? DEFAULT_LOCALE : session.locale
+  const t = messagesFor(locale)
   const outlet = identity?.workspaceSlug ? (
     <WorkspaceProvider slug={identity.workspaceSlug}>
       <Outlet />
@@ -125,8 +130,8 @@ function RootComponent() {
       }}
       fallback={
         <main className="mx-auto mt-[15vh] p-6 text-center">
-          <h1>Something went wrong</h1>
-          <p className="text-muted-foreground">Refresh the page to try again.</p>
+          <h1>{t.common.somethingWentWrong}</h1>
+          <p className="text-muted-foreground">{t.common.refreshToRetry}</p>
         </main>
       }
     >
@@ -142,14 +147,16 @@ function RootComponent() {
   )
   return (
     // The theme script sets data-theme before hydration.
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body>
-        {observedContent}
-        <UpdateNotices serverVersion={serverVersion} />
-        <Toaster position="bottom-right" />
+        <I18nProvider locale={locale}>
+          {observedContent}
+          <UpdateNotices serverVersion={serverVersion} />
+          <Toaster position="bottom-right" />
+        </I18nProvider>
         <Scripts />
       </body>
     </html>

@@ -1,17 +1,13 @@
 import { useSyncExternalStore } from 'react'
 
-export const themePreferences = [
-  { value: 'system', label: 'Match system' },
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-] as const
+export const themePreferences = ['system', 'light', 'dark'] as const
 
-export type ThemePreference = (typeof themePreferences)[number]['value']
+export type ThemePreference = (typeof themePreferences)[number]
 type ResolvedTheme = Exclude<ThemePreference, 'system'>
 
 const storageKey = 'stlquest:theme'
 const changeEvent = 'stlquest:theme'
-const explicitThemes: readonly string[] = themePreferences.map((option) => option.value).filter((value) => value !== 'system')
+const explicitThemes: readonly string[] = themePreferences.filter((value) => value !== 'system')
 const isExplicit = (value: string | null): value is ResolvedTheme => value !== null && explicitThemes.includes(value)
 
 /**

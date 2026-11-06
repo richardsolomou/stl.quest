@@ -1,3 +1,4 @@
+import { DEFAULT_LOCALE, type Locale, type Messages } from './i18n'
 import type { PrintType } from './types'
 
 const FILAMENT_DENSITY_G_PER_CM3 = 1.24
@@ -77,15 +78,14 @@ export function effectivePrintEstimate(input: {
   }
 }
 
-export function formatEstimateMaterial(value: number) {
-  return value >= 100 ? Math.round(value).toString() : value >= 10 ? value.toFixed(1) : value.toFixed(2).replace(/\.?0+$/, '')
+export function formatEstimateMaterial(value: number, locale: Locale = DEFAULT_LOCALE) {
+  const [minimumFractionDigits, maximumFractionDigits] = value >= 100 ? [0, 0] : value >= 10 ? [1, 1] : [0, 2]
+  return new Intl.NumberFormat(locale, { minimumFractionDigits, maximumFractionDigits, useGrouping: false }).format(value)
 }
 
-export function formatEstimateTime(minutes: number) {
+export function formatEstimateTime(minutes: number, t: Messages['requests']) {
   const rounded = Math.max(1, Math.round(minutes))
-  const hours = Math.floor(rounded / 60)
-  const remaining = rounded % 60
-  return hours ? `${hours}h${remaining ? ` ${remaining}m` : ''}` : `${remaining}m`
+  return t.estimateTime(Math.floor(rounded / 60), rounded % 60)
 }
 
 function positive(value?: number): value is number {

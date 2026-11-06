@@ -1,36 +1,38 @@
 import { formatBytes } from '../../../core/format'
+import type { Locale, Messages } from '../../../core/i18n'
 import { storagePlans, type StoragePlan } from '../../../core/plans'
 import { subscriptionState, type SubscriptionFields } from '../../../core/subscription'
 
-const day = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+// English keeps day-month-year order.
+const dayFormat = (locale: Locale) =>
+  new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : locale, { day: 'numeric', month: 'long', year: 'numeric' })
 
 /**
  * What the plan section says about the subscription. Kept apart from the component so every state
  * is covered, including the ones no test environment can reach without a real Stripe subscription.
  */
-export function planSummary(subscription: SubscriptionFields | undefined, plan: StoragePlan): string {
+export function planSummary(subscription: SubscriptionFields | undefined, plan: StoragePlan, t: Messages, locale: Locale): string {
+  const copy = t.settings.plan.summary
   const price = storagePlans[plan].monthlyPrice
   const state = subscriptionState(subscription)
+  const day = dayFormat(locale)
   const on = (value?: Date) => (value ? day.format(new Date(value)) : undefined)
   switch (state.kind) {
     case 'active':
-      return on(state.renewsAt) ? `Renews ${on(state.renewsAt)} for $${price}.` : `Your ${storagePlans[plan].name} plan is active.`
+      return on(state.renewsAt) ? copy.renews(on(state.renewsAt)!, price) : copy.active(t.settings.plan.names[plan])
     case 'trialing':
-      return on(state.trialEndsAt) ? `Trial ends ${on(state.trialEndsAt)}, then $${price} a month.` : 'Your trial is running.'
+      return on(state.trialEndsAt) ? copy.trialEnds(on(state.trialEndsAt)!, price) : copy.trialing
     case 'ending':
-      return on(state.endsAt)
-        ? `Ends ${on(state.endsAt)}, then your storage drops to ${formatBytes(storagePlans.free.quotaBytes)}.`
-        : 'Your plan is set to end.'
+      return on(state.endsAt) ? copy.ends(on(state.endsAt)!, formatBytes(storagePlans.free.quotaBytes, locale)) : copy.ending
     case 'pastDue':
-      return 'The last payment failed. Update your payment details to keep this plan.'
+      return copy.pastDue
     case 'inactive':
-      return 'This plan is no longer active.'
+      return copy.inactive
     default:
-      return `The Free plan includes ${formatBytes(storagePlans.free.quotaBytes)} of managed storage.`
+      return copy.free(formatBytes(storagePlans.free.quotaBytes, locale))
   }
 }
 
-export function includedStorageOnboardingCopy(plan: StoragePlan): string {
-  const planName = plan === 'free' ? 'Your Free plan' : 'Your plan'
-  return `Hosted by STL Quest. ${planName} includes ${formatBytes(storagePlans[plan].quotaBytes)} total for models, previews, and thumbnails, shared across all your workspaces. Nothing else to configure.`
+export function includedStorageOnboardingCopy(plan: StoragePlan, t: Messages, locale: Locale): string {
+  return t.settings.plan.includedStorage(plan === 'free', formatBytes(storagePlans[plan].quotaBytes, locale))
 }

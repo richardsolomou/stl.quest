@@ -7,10 +7,13 @@ import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { authClient } from '../../authClient'
+import { useI18n } from '../../i18n'
 import { DialogProblem } from '../DialogProblem'
 import { useCopied } from '../useCopied'
 
 export function TwoFactorSetupForm({ onDone }: { onDone: () => void | Promise<void> }) {
+  const { t } = useI18n()
+  const text = t.account.twoFactor
   const posthog = usePostHog()
   const [password, setPassword] = useState('')
   const [code, setCode] = useState('')
@@ -30,9 +33,7 @@ export function TwoFactorSetupForm({ onDone }: { onDone: () => void | Promise<vo
   if (verified) {
     return (
       <div className="flex flex-col gap-4">
-        <FieldDescription>
-          Save these one-time recovery codes somewhere secure. Each code can be used once if your authenticator is unavailable.
-        </FieldDescription>
+        <FieldDescription>{text.saveCodes}</FieldDescription>
         <div className="grid grid-cols-2 gap-2 rounded-lg border bg-muted/40 p-3 font-mono text-sm">
           {backupCodes.map((backupCode) => (
             <span key={backupCode}>{backupCode}</span>
@@ -41,14 +42,14 @@ export function TwoFactorSetupForm({ onDone }: { onDone: () => void | Promise<vo
         <Button type="button" variant="outline" onClick={() => copy(backupCodes.join('\n'))}>
           {copied ? (
             <>
-              <Check /> Recovery codes copied
+              <Check /> {text.codesCopied}
             </>
           ) : (
-            'Copy recovery codes'
+            text.copyCodes
           )}
         </Button>
         <Button type="button" onClick={() => void onDone()}>
-          I saved my recovery codes
+          {text.savedCodes}
         </Button>
       </div>
     )
@@ -63,7 +64,7 @@ export function TwoFactorSetupForm({ onDone }: { onDone: () => void | Promise<vo
           setBusy(true)
           setError('')
           const { data, error: failed } = await authClient.twoFactor.enable({ method: 'totp', password })
-          if (failed || data?.method !== 'totp') setError('Could not start setup. Check your password and try again.')
+          if (failed || data?.method !== 'totp') setError(text.startFailed)
           else {
             setTotpURI(data.totpURI)
             setBackupCodes(data.backupCodes)
@@ -73,7 +74,7 @@ export function TwoFactorSetupForm({ onDone }: { onDone: () => void | Promise<vo
         }}
       >
         <Field>
-          <FieldLabel htmlFor="two-factor-password">Confirm your password</FieldLabel>
+          <FieldLabel htmlFor="two-factor-password">{text.confirmPassword}</FieldLabel>
           <Input
             id="two-factor-password"
             type="password"
@@ -83,10 +84,10 @@ export function TwoFactorSetupForm({ onDone }: { onDone: () => void | Promise<vo
             required
           />
         </Field>
-        <DialogProblem title="Setup could not start" hint="Two-factor authentication is still off. Check your password." error={error} />
+        <DialogProblem title={text.startFailedTitle} hint={text.startFailedHint} error={error} />
         <Button type="submit" disabled={busy || !password}>
           {busy && <Spinner />}
-          {busy ? 'Starting…' : 'Continue'}
+          {busy ? text.starting : t.common.continue}
         </Button>
       </form>
     )
@@ -100,7 +101,7 @@ export function TwoFactorSetupForm({ onDone }: { onDone: () => void | Promise<vo
         setBusy(true)
         setError('')
         const { error: failed } = await authClient.twoFactor.verifyTotp({ code: code.replace(/\s/g, '') })
-        if (failed) setError('That authenticator code is invalid. Check the app and try again.')
+        if (failed) setError(text.codeInvalid)
         else {
           setVerified(true)
           posthog.capture('two_factor_enabled')
@@ -108,14 +109,14 @@ export function TwoFactorSetupForm({ onDone }: { onDone: () => void | Promise<vo
         setBusy(false)
       }}
     >
-      <FieldDescription>Scan this QR code in your authenticator app, then enter its current code to finish setup.</FieldDescription>
-      {qrCode && <img src={qrCode} alt="Authenticator setup QR code" className="mx-auto size-60 rounded-lg border bg-white p-2" />}
+      <FieldDescription>{text.scan}</FieldDescription>
+      {qrCode && <img src={qrCode} alt={text.qrAlt} className="mx-auto size-60 rounded-lg border bg-white p-2" />}
       <details className="text-sm text-muted-foreground">
-        <summary className="cursor-pointer">Cannot scan the QR code?</summary>
+        <summary className="cursor-pointer">{text.cannotScan}</summary>
         <code className="mt-2 block break-all rounded bg-muted p-2 text-xs">{totpURI}</code>
       </details>
       <Field>
-        <FieldLabel htmlFor="two-factor-setup-code">Authenticator code</FieldLabel>
+        <FieldLabel htmlFor="two-factor-setup-code">{text.code}</FieldLabel>
         <Input
           id="two-factor-setup-code"
           value={code}
@@ -125,20 +126,18 @@ export function TwoFactorSetupForm({ onDone }: { onDone: () => void | Promise<vo
           required
         />
       </Field>
-      <DialogProblem
-        title="That code was not accepted"
-        hint="Codes expire every 30 seconds, so wait for the next one. Check your phone's clock is set automatically."
-        error={error}
-      />
+      <DialogProblem title={text.codeRejectedTitle} hint={text.codeRejectedHint} error={error} />
       <Button type="submit" disabled={busy || !code.trim()}>
         {busy && <Spinner />}
-        {busy ? 'Verifying…' : 'Verify and enable'}
+        {busy ? text.verifying : text.verify}
       </Button>
     </form>
   )
 }
 
 export function DisableTwoFactorForm({ onDone }: { onDone: () => void | Promise<void> }) {
+  const { t } = useI18n()
+  const copy = t.account.twoFactor
   const posthog = usePostHog()
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -151,7 +150,7 @@ export function DisableTwoFactorForm({ onDone }: { onDone: () => void | Promise<
         setBusy(true)
         setError('')
         const { error: failed } = await authClient.twoFactor.disable({ password })
-        if (failed) setError('Could not disable two-factor authentication. Check your password and try again.')
+        if (failed) setError(copy.disableFailed)
         else {
           posthog.capture('two_factor_disabled')
           await onDone()
@@ -159,12 +158,9 @@ export function DisableTwoFactorForm({ onDone }: { onDone: () => void | Promise<
         setBusy(false)
       }}
     >
-      <FieldDescription>
-        Your account returns to password-only sign-in and your unused recovery codes stop working. You can set up an authenticator again at
-        any time.
-      </FieldDescription>
+      <FieldDescription>{copy.disableDescription}</FieldDescription>
       <Field>
-        <FieldLabel htmlFor="disable-two-factor-password">Confirm your password</FieldLabel>
+        <FieldLabel htmlFor="disable-two-factor-password">{copy.confirmPassword}</FieldLabel>
         <Input
           id="disable-two-factor-password"
           type="password"
@@ -174,14 +170,10 @@ export function DisableTwoFactorForm({ onDone }: { onDone: () => void | Promise<
           required
         />
       </Field>
-      <DialogProblem
-        title="Two-factor authentication is still on"
-        hint="Nothing has changed. Check your password and try again."
-        error={error}
-      />
+      <DialogProblem title={copy.stillOnTitle} hint={copy.stillOnHint} error={error} />
       <Button type="submit" variant="destructive" disabled={busy || !password}>
         {busy && <Spinner />}
-        {busy ? 'Disabling…' : 'Disable two-factor authentication'}
+        {busy ? copy.disabling : copy.disable}
       </Button>
     </form>
   )

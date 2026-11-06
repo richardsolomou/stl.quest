@@ -601,6 +601,26 @@ describe('better-auth integration', () => {
     expect(messages[0].text).toContain('/reset-password/')
   })
 
+  it('writes the password reset message in the account’s chosen language', async () => {
+    const { repository } = await build()
+    cleanup = () => repository.close()
+    const messages: EmailMessage[] = []
+    const email = {
+      send: async (message: EmailMessage) => void messages.push(message),
+      verify: async () => undefined,
+    } as EmailDelivery
+    const auth = createAuth(repository.database, SECRET, { email })
+    const created = await auth.api.signUpEmail({ body: { email: 'user@example.com', password: 'password1234', name: 'User' } })
+    await repository.setUserLocale(created.user.id, 'fr')
+
+    await auth.api.requestPasswordReset({
+      body: { email: 'user@example.com', redirectTo: 'http://localhost/reset-password' },
+      headers: new Headers({ origin: 'http://localhost' }),
+    })
+
+    expect(messages[0]).toMatchObject({ subject: 'Réinitialisez votre mot de passe STL Quest' })
+  })
+
   it('uses the configured base URL for hosted password reset links', async () => {
     const { repository } = await build()
     cleanup = () => repository.close()

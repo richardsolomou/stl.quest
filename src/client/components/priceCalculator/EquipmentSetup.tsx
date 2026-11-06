@@ -21,6 +21,7 @@ import {
   type PriceCalculatorSettings,
 } from '../../../core/priceCalculator'
 import { getPrinterPreset, PRINTER_PRESETS, type PrinterPreset } from '../../../core/printerPresets'
+import { useI18n } from '../../i18n'
 import { FilterCombobox } from '../FilterCombobox'
 import { ModeSelector, NumberSetting, SetupGroup } from './fields'
 import { formatNumber, formatPowerProfiles, formatPrinterPower } from './format'
@@ -35,6 +36,7 @@ export function EquipmentSetup({
   settings: PriceCalculatorSettings
   onSettingsChange: (settings: PriceCalculatorSettings) => void
 }) {
+  const copy = useI18n().t.calculator.equipment
   const equipment = equipmentSettingsFor(settings)
   const activePresetIds = equipment.presetIds
   const printerPresetId = activePresetIds.find((id) => getPrinterPreset(id))
@@ -46,10 +48,14 @@ export function EquipmentSetup({
   const updateEquipment = (next: PriceCalculatorEquipmentSettings) => onSettingsChange(updateEquipmentSettings(settings, next))
   return (
     <SetupGroup
-      title="Equipment"
-      description="Choose your printer and accessories, or enter their power draw."
+      title={copy.title}
+      description={copy.description}
       action={
-        <ModeSelector label="Equipment" value={equipment.mode} onChange={(next) => onSettingsChange(selectEquipmentMode(settings, next))} />
+        <ModeSelector
+          legend={copy.modeLegend}
+          value={equipment.mode}
+          onChange={(next) => onSettingsChange(selectEquipmentMode(settings, next))}
+        />
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">
@@ -70,13 +76,13 @@ export function EquipmentSetup({
         ) : (
           <>
             <NumberSetting
-              label="Printing power incl. accessories (W)"
+              label={copy.printPower}
               value={equipment.printPowerWatts}
               min={0}
               onChange={(printPowerWatts) => updateEquipment({ ...equipment, printPowerWatts })}
             />
             <NumberSetting
-              label="Dry power (W)"
+              label={copy.dryPower}
               value={equipment.dryPowerWatts}
               min={0}
               onChange={(dryPowerWatts) => updateEquipment({ ...equipment, dryPowerWatts })}
@@ -84,13 +90,13 @@ export function EquipmentSetup({
             {settings.printType === 'resin' && (
               <>
                 <NumberSetting
-                  label="Wash power (W)"
+                  label={copy.washPower}
                   value={equipment.washPowerWatts}
                   min={0}
                   onChange={(washPowerWatts) => updateEquipment({ ...equipment, washPowerWatts })}
                 />
                 <NumberSetting
-                  label="Cure power (W)"
+                  label={copy.curePower}
                   value={equipment.curePowerWatts}
                   min={0}
                   onChange={(curePowerWatts) => updateEquipment({ ...equipment, curePowerWatts })}
@@ -101,21 +107,21 @@ export function EquipmentSetup({
         )}
         {settings.printType === 'resin' && (
           <NumberSetting
-            label="Wash time per plate (min)"
+            label={copy.washTime}
             value={equipment.washMinutesPerPlate}
             min={0}
             onChange={(washMinutesPerPlate) => updateEquipment({ ...equipment, washMinutesPerPlate })}
           />
         )}
         <NumberSetting
-          label={settings.printType === 'resin' ? 'Dry time per plate (min)' : 'Filament drying time (min)'}
+          label={settings.printType === 'resin' ? copy.dryTime : copy.filamentDryTime}
           value={equipment.dryMinutesPerPlate}
           min={0}
           onChange={(dryMinutesPerPlate) => updateEquipment({ ...equipment, dryMinutesPerPlate })}
         />
         {settings.printType === 'resin' && (
           <NumberSetting
-            label="Cure time per plate (min)"
+            label={copy.cureTime}
             value={equipment.cureMinutesPerPlate}
             min={0}
             onChange={(cureMinutesPerPlate) => updateEquipment({ ...equipment, cureMinutesPerPlate })}
@@ -133,18 +139,20 @@ function PowerSummary({
   printType: PriceCalculatorSettings['printType']
   equipment: PriceCalculatorEquipmentSettings
 }) {
+  const { t, locale } = useI18n()
+  const copy = t.calculator.equipment
   const totals = [
-    ['Printing', equipment.printPowerWatts],
-    ...(printType === 'resin' ? ([['Washing', equipment.washPowerWatts]] as const) : []),
-    ['Drying', equipment.dryPowerWatts],
-    ...(printType === 'resin' ? ([['Curing', equipment.curePowerWatts]] as const) : []),
+    ['printing', equipment.printPowerWatts],
+    ...(printType === 'resin' ? ([['washing', equipment.washPowerWatts]] as const) : []),
+    ['drying', equipment.dryPowerWatts],
+    ...(printType === 'resin' ? ([['curing', equipment.curePowerWatts]] as const) : []),
   ] as const
   return (
-    <div className="grid grid-cols-2 gap-2 sm:col-span-2 sm:grid-cols-4" aria-label="Equipment power totals">
-      {totals.map(([label, watts]) => (
-        <div key={label} className="rounded-md border border-border/60 bg-background/70 px-3 py-2">
-          <div className="text-[0.68rem] font-medium tracking-wide text-muted-foreground uppercase">{label}</div>
-          <div className="mt-0.5 font-mono text-sm font-medium tabular-nums">{formatNumber(watts)} W</div>
+    <div className="grid grid-cols-2 gap-2 sm:col-span-2 sm:grid-cols-4" aria-label={copy.powerTotals}>
+      {totals.map(([phase, watts]) => (
+        <div key={phase} className="rounded-md border border-border/60 bg-background/70 px-3 py-2">
+          <div className="text-[0.68rem] font-medium tracking-wide text-muted-foreground uppercase">{copy.phases[phase]}</div>
+          <div className="mt-0.5 font-mono text-sm font-medium tabular-nums">{formatNumber(watts, locale)} W</div>
         </div>
       ))}
     </div>
@@ -160,6 +168,8 @@ function PrinterPresetPicker({
   value?: string
   onChange: (value?: string) => void
 }) {
+  const { t, locale } = useI18n()
+  const copy = t.calculator.equipment
   const options: PrinterOption[] = PRINTER_PRESETS.filter((preset) => preset.printType === printType).map((preset) => ({
     value: preset.id,
     label: `${preset.brand} ${preset.model}`,
@@ -168,20 +178,20 @@ function PrinterPresetPicker({
   const selectedPower = value ? printerPowerProfile(value) : undefined
   return (
     <Field className="sm:col-span-2">
-      <FieldLabel htmlFor="calculator-printer-preset">Printer</FieldLabel>
+      <FieldLabel htmlFor="calculator-printer-preset">{copy.printer}</FieldLabel>
       <FilterCombobox
         id="calculator-printer-preset"
         value={value}
         onChange={onChange}
         options={options}
-        placeholder={`Search ${printType === 'resin' ? 'resin' : 'FDM'} printers…`}
-        emptyLabel="No matching printer preset."
-        renderOption={(option) => <PresetOption label={option.label} detail={formatPrinterPower(option.value)} />}
+        placeholder={printType === 'resin' ? copy.resinPrinterSearch : copy.filamentPrinterSearch}
+        emptyLabel={copy.printerEmpty}
+        renderOption={(option) => <PresetOption label={option.label} detail={formatPrinterPower(option.value, locale)} />}
       />
       <FieldDescription>
         {selectedPower
-          ? `${formatNumber(selectedPower.watts)} W · ${selectedPower.basis}`
-          : `${options.length} printers available from the main printer catalogue.`}
+          ? `${formatNumber(selectedPower.watts, locale)} W · ${selectedPower.basis ?? t.calculator.defaultPowerBasis}`
+          : copy.printerCount(options.length)}
       </FieldDescription>
     </Field>
   )
@@ -196,6 +206,7 @@ function AccessoryPresetPicker({
   value: string[]
   onChange: (value: string[]) => void
 }) {
+  const copy = useI18n().t.calculator
   const anchor = useComboboxAnchor()
   const options: EquipmentOption[] = EQUIPMENT_PRESETS.filter(
     (preset) => !preset.id.startsWith('printer-') && (preset.printType ?? 'resin') === printType,
@@ -203,7 +214,7 @@ function AccessoryPresetPicker({
   const selected = options.filter((option) => value.includes(option.value))
   return (
     <Field className="sm:col-span-2">
-      <FieldLabel htmlFor="calculator-accessory-presets">Accessories</FieldLabel>
+      <FieldLabel htmlFor="calculator-accessory-presets">{copy.equipment.accessories}</FieldLabel>
       <Combobox
         multiple
         items={options}
@@ -217,24 +228,22 @@ function AccessoryPresetPicker({
               {option.label}
             </ComboboxChip>
           ))}
-          <ComboboxChipsInput id="calculator-accessory-presets" placeholder="Add accessories…" />
+          <ComboboxChipsInput id="calculator-accessory-presets" placeholder={copy.equipment.accessorySearch} />
         </ComboboxChips>
         <ComboboxContent anchor={anchor}>
-          <ComboboxEmpty>No matching accessory preset.</ComboboxEmpty>
+          <ComboboxEmpty>{copy.equipment.accessoryEmpty}</ComboboxEmpty>
           <ComboboxList>
             <ComboboxCollection>
               {(option: EquipmentOption) => (
                 <ComboboxItem key={option.value} value={option} aria-label={option.label}>
-                  <PresetOption label={option.label} detail={formatPowerProfiles(option.preset)} />
+                  <PresetOption label={option.label} detail={formatPowerProfiles(option.preset, copy)} />
                 </ComboboxItem>
               )}
             </ComboboxCollection>
           </ComboboxList>
         </ComboboxContent>
       </Combobox>
-      {!selected.length && (
-        <FieldDescription>Optional powered accessories and post-processing equipment for this print type.</FieldDescription>
-      )}
+      {!selected.length && <FieldDescription>{copy.equipment.accessoriesHint}</FieldDescription>}
     </Field>
   )
 }

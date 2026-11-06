@@ -9,6 +9,9 @@ import {
   type EmailTemplateKind,
 } from './email'
 import { boundedUserName } from './identity'
+import type { Messages } from './i18n'
+
+type EmailMessages = Messages['email']
 
 export const notificationKinds = [
   {
@@ -58,22 +61,11 @@ function withTemplate<Kind extends EmailTemplateKind>(
   return template ? { ...rendered, ...fillEmailTemplate(template, placeholders) } : rendered
 }
 
-// The standard emails and the default templates share this wording, so a new template starts from what recipients already get.
-const printReadyCopy = { action: 'View your requests', note: 'You can turn these emails off from your STL Quest account settings.' }
-
-function inviteCopy(workspaceName: string) {
-  return {
-    subject: `You are invited to ${workspaceName} on STL Quest`,
-    intro: `You have been invited to send print requests to ${workspaceName} on STL Quest.`,
-    action: 'Create your account',
-    note: 'This single-use link expires in seven days.',
-  }
-}
-
 /** Keeps one email a readable size however many prints become ready at once; the rest are counted, not named. */
 export const MAX_EMAIL_LISTED_PRINTS = 50
 
 export function printReadyEmail(input: {
+  t: EmailMessages
   workspaceName: string
   logoSrc?: string
   name?: string
@@ -81,20 +73,20 @@ export function printReadyEmail(input: {
   url?: string
   template?: EmailTemplate
 }) {
+  const { t } = input
   const copies = input.prints.reduce((sum, print) => sum + print.count, 0)
-  const listed = input.prints
-    .slice(0, MAX_EMAIL_LISTED_PRINTS)
-    .map((print) => `${print.name} (${print.count} ${print.count === 1 ? 'copy' : 'copies'})`)
+  const listed = input.prints.slice(0, MAX_EMAIL_LISTED_PRINTS).map((print) => t.printReady.item(print.name, print.count))
   const unlisted = input.prints.length - listed.length
-  const items = unlisted > 0 ? [...listed, `and ${unlisted} more ${unlisted === 1 ? 'request' : 'requests'}`] : listed
+  const items = unlisted > 0 ? [...listed, t.printReady.more(unlisted)] : listed
   const rendered = renderEmail({
     workspaceName: input.workspaceName,
     logoSrc: input.logoSrc,
-    subject: copies === 1 ? `Your print is ready in ${input.workspaceName}` : `Your prints are ready in ${input.workspaceName}`,
-    intro: `${copies === 1 ? 'A copy' : `${copies} copies`} of your requests ${copies === 1 ? 'is' : 'are'} ready to collect in ${input.workspaceName}:`,
+    subject: t.printReady.subject(copies, input.workspaceName),
+    intro: t.printReady.intro(copies, input.workspaceName),
     items,
-    action: input.url ? { label: printReadyCopy.action, url: input.url } : undefined,
-    note: printReadyCopy.note,
+    action: input.url ? { label: t.printReady.action, url: input.url } : undefined,
+    note: t.printReady.note,
+    footer: t.footer(input.workspaceName),
   })
   return withTemplate<'print-ready'>(rendered, input.template, {
     // Names stored before the limit existed can be longer, and the template may repeat this one.
@@ -106,15 +98,16 @@ export function printReadyEmail(input: {
   })
 }
 
-export function inviteEmail(input: { workspaceName: string; logoSrc?: string; url: string; template?: EmailTemplate }) {
-  const copy = inviteCopy(input.workspaceName)
+export function inviteEmail(input: { t: EmailMessages; workspaceName: string; logoSrc?: string; url: string; template?: EmailTemplate }) {
+  const { t } = input
   const rendered = renderEmail({
     workspaceName: input.workspaceName,
     logoSrc: input.logoSrc,
-    subject: copy.subject,
-    intro: copy.intro,
-    action: { label: copy.action, url: input.url },
-    note: copy.note,
+    subject: t.invite.subject(input.workspaceName),
+    intro: t.invite.intro(input.workspaceName),
+    action: { label: t.invite.action, url: input.url },
+    note: t.invite.note,
+    footer: t.footer(input.workspaceName),
   })
   return withTemplate<'invite'>(rendered, input.template, {
     workspace: plainPlaceholder(input.workspaceName),
@@ -123,47 +116,53 @@ export function inviteEmail(input: { workspaceName: string; logoSrc?: string; ur
   })
 }
 
-/** The standard layout with placeholders in place and one tag per line, as a starting point for a custom template. */
-export function defaultEmailTemplate(kind: EmailTemplateKind): EmailTemplate {
-  const { subject, html } = defaultTemplateMarkup(kind)
+/**
+ * The standard layout with placeholders in place and one tag per line, as a starting point for a custom template.
+ * The standard emails and the default templates share their wording, so a new template starts from what recipients already get.
+ */
+export function defaultEmailTemplate(kind: EmailTemplateKind, t: EmailMessages): EmailTemplate {
+  const { subject, html } = defaultTemplateMarkup(kind, t)
   return { subject, html: html.replaceAll('><', '>\n<') }
 }
 
-function defaultTemplateMarkup(kind: EmailTemplateKind): EmailTemplate {
-  const layout = { workspaceName: '{{workspace}}', brandHtml: '{{logo}}' }
+function defaultTemplateMarkup(kind: EmailTemplateKind, t: EmailMessages): EmailTemplate {
+  const workspace = '{{workspace}}'
+  const layout = { workspaceName: workspace, brandHtml: '{{logo}}', footer: t.footer(workspace) }
   if (kind === 'invite') {
-    const copy = inviteCopy('{{workspace}}')
+    const subject = t.invite.subject(workspace)
     return {
-      subject: copy.subject,
+      subject,
       html: renderEmail({
         ...layout,
-        subject: copy.subject,
-        intro: copy.intro,
-        action: { label: copy.action, url: '{{link}}' },
-        note: copy.note,
+        subject,
+        intro: t.invite.intro(workspace),
+        action: { label: t.invite.action, url: '{{link}}' },
+        note: t.invite.note,
       }).html,
     }
   }
-  const subject = 'Your prints are ready in {{workspace}}'
+  const subject = t.printReady.templateSubject(workspace)
   return {
     subject,
     html: renderEmail({
       ...layout,
       subject,
-      intro: 'Hi {{name}}, your prints are ready to collect in {{workspace}}:',
+      intro: t.printReady.templateIntro('{{name}}', workspace),
       itemsHtml: '{{prints}}',
-      action: { label: printReadyCopy.action, url: '{{link}}' },
-      note: printReadyCopy.note,
+      action: { label: t.printReady.action, url: '{{link}}' },
+      note: t.printReady.note,
     }).html,
   }
 }
 
-export function mailServerTestEmail(input: { workspaceName: string; logoSrc?: string }) {
+export function mailServerTestEmail(input: { t: EmailMessages; workspaceName: string; logoSrc?: string }) {
+  const { t } = input
   return renderEmail({
     workspaceName: input.workspaceName,
     logoSrc: input.logoSrc,
-    subject: `${input.workspaceName} can send email from your mail server`,
-    intro: `STL Quest signed in to your mail server and sent this message, so invitations and print-ready emails from ${input.workspaceName} now come from it.`,
-    note: 'You can change or remove the mail server from the Email settings in STL Quest.',
+    subject: t.mailServerTest.subject(input.workspaceName),
+    intro: t.mailServerTest.intro(input.workspaceName),
+    note: t.mailServerTest.note,
+    footer: t.footer(input.workspaceName),
   })
 }

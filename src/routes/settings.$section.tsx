@@ -5,6 +5,7 @@ import { AppRail } from '../client/components/AppRail'
 import { SettingsPanes, isSettingsSection } from '../client/components/SettingsPanes'
 import { peopleQuery, requestsQuery, sessionQuery } from '../client/queries'
 import { useEscape } from '../client/useEscape'
+import { useI18n } from '../client/i18n'
 
 export const Route = createFileRoute('/settings/$section')({
   beforeLoad: ({ params }) => {
@@ -23,6 +24,7 @@ function SettingsPage() {
   const queryClient = useQueryClient()
   const [hydrated, setHydrated] = useState(false)
   const navigate = useNavigate()
+  const { t } = useI18n()
   useEscape(() => navigate({ to: '/' }))
   const identity = session.identity
   const workspaceSlug = identity?.workspaceSlug
@@ -48,7 +50,7 @@ function SettingsPage() {
           <SettingsPanes
             me={identity!}
             section={validSection!}
-            workspaceName={session.workspace?.name ?? 'Workspace'}
+            workspaceName={session.workspace?.name ?? t.settings.sections.workspaceFallback}
             workspaceCount={session.workspaces.length}
           />
         </div>

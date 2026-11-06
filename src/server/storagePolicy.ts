@@ -2,6 +2,7 @@ import { assertPublicEndpoint } from '../adapters/outbound'
 import { errorMessage } from '../core/error'
 import type { StorageConfig } from '../core/types'
 import { hostedDeployment } from './hosted'
+import { serverMessages } from './locale'
 import { managedStorageAvailable } from './managedStorage'
 
 type SettingsReader = { getSetting(key: string): Promise<unknown> }
@@ -19,16 +20,18 @@ export async function storageConfigured(repository: SettingsReader) {
 }
 
 export async function assertStorageAllowed(config: StorageConfig) {
+  const errors = serverMessages().storage.errors
   if (config.adapter === 'managed' && (!hostedDeployment() || !managedStorageAvailable()))
-    throw new Response('managed storage is not available on this deployment', { status: 403 })
-  if (hostedStorageRequiresRemote(config)) throw new Response('local storage is unavailable in this deployment mode', { status: 403 })
+    throw new Response(errors.managedUnavailable, { status: 403 })
+  if (hostedStorageRequiresRemote(config)) throw new Response(errors.localUnavailable, { status: 403 })
   if (hostedDeployment() && config.adapter === 'webdav' && new URL(config.endpoint).protocol !== 'https:')
-    throw new Response('hosted WebDAV storage must use HTTPS', { status: 400 })
+    throw new Response(errors.webdavHttps, { status: 400 })
   if (hostedDeployment() && (config.adapter === 'webdav' || config.adapter === 's3') && config.endpoint) {
     try {
       assertPublicEndpoint(config.endpoint)
     } catch (error) {
-      throw new Response(`storage endpoint ${errorMessage(error, 'is not allowed')}`, { status: 400 })
+      const reason = errorMessage(error, undefined)
+      throw new Response(reason ? errors.endpointRejected(reason) : errors.endpointNotAllowed, { status: 400 })
     }
   }
 }

@@ -20,6 +20,7 @@ export const user = pgTable('user', {
   banReason: text(),
   banExpires: isoDate(),
   color: text(),
+  locale: text(),
   twoFactorEnabled: integer().notNull().default(0),
   stripeCustomerId: text('stripe_customer_id'),
 })

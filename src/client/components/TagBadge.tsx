@@ -1,6 +1,7 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import type { PrintGroupColor } from '../../core/types'
+import { useI18n } from '../i18n'
 
 const MAX_VISIBLE_TAG_DOTS = 6
 
@@ -38,6 +39,7 @@ export function TagDotCluster({
   activeTagId?: string
   className?: string
 }) {
+  const { t } = useI18n()
   if (tags.length === 0) return null
   const visible = tags.slice(0, MAX_VISIBLE_TAG_DOTS)
   const overflow = tags.length - visible.length
@@ -49,7 +51,7 @@ export function TagDotCluster({
       {overflow > 0 && (
         <span
           className="rounded-full bg-foreground/70 px-1 font-mono text-[9px] leading-4 text-background"
-          title={`${overflow} more ${overflow === 1 ? 'tag' : 'tags'}`}
+          title={t.board.tagBadge.more(overflow)}
         >
           +{overflow}
         </span>
@@ -67,6 +69,7 @@ function DraggableTagDot({
   canDrag: boolean
   active: boolean
 }) {
+  const { t } = useI18n()
   return (
     <Tooltip>
       <TooltipTrigger
@@ -75,7 +78,7 @@ function DraggableTagDot({
             data-tag-dot={tag.path}
             data-tag-id={tag.id}
             data-tag-copy-count={tag.count}
-            aria-label={`${tag.path}, select all`}
+            aria-label={t.board.tagBadge.selectAllAria(tag.path)}
             className={cn(
               'inline-flex size-3 items-center justify-center rounded-full ring-2 ring-ticket transition-[background-color,box-shadow,transform]',
               canDrag && 'cursor-grab touch-manipulation',
@@ -87,7 +90,7 @@ function DraggableTagDot({
       >
         <TagDot color={tag.color} />
       </TooltipTrigger>
-      <TooltipContent>Select all from {tag.path}</TooltipContent>
+      <TooltipContent>{t.board.tagBadge.selectAllFrom(tag.path)}</TooltipContent>
     </Tooltip>
   )
 }

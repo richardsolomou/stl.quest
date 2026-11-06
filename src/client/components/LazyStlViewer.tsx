@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { RequestAssets } from '../boardDownload'
+import { useI18n } from '../i18n'
 
 const loadStlViewer = () => import('./StlViewer')
 const StlViewer = lazy(loadStlViewer)
@@ -12,11 +13,14 @@ export function preloadStlViewer() {
 }
 
 export function LazyStlViewer(viewerProps: Props) {
+  const { t } = useI18n()
   return (
     <Suspense
       fallback={
         <Skeleton className="viewer relative mb-3.5 aspect-4/3 w-full overflow-hidden rounded-lg border [background-image:var(--grid)]">
-          <div className="absolute inset-0 grid place-items-center font-mono text-xs text-muted-foreground">loading viewer…</div>
+          <div className="absolute inset-0 grid place-items-center font-mono text-xs text-muted-foreground">
+            {t.requests.viewer.loadingViewer}
+          </div>
         </Skeleton>
       }
     >

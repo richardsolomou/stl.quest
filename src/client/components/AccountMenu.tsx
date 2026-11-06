@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { MAX_WORKSPACE_NAME_LENGTH } from '../../core/workspaces'
 import { createWorkspace, switchWorkspace } from '../../server/fns'
 import { authClient } from '../authClient'
+import { useI18n } from '../i18n'
 import { sessionQuery } from '../queries'
 import { reloadAfterWorkspaceChange, useWorkspaceSlug, WORKSPACE_CHANGED_KEY } from '../workspace'
 import { DialogProblem } from './DialogProblem'
@@ -24,6 +25,8 @@ import { ProtectedEmail } from './ProtectedEmail'
 import { openProductQuest } from '../productTour'
 
 export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdmin?: boolean; side?: 'top' | 'bottom' }) {
+  const { t } = useI18n()
+  const copy = t.account.menu
   const workspaceSlug = useWorkspaceSlug()
   const { data } = useSuspenseQuery(sessionQuery(workspaceSlug))
   const identity = data.identity
@@ -65,9 +68,7 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
     <>
       <Popover open={menuOpen} onOpenChange={setMenuOpen}>
         <PopoverTrigger
-          render={
-            <Button type="button" variant="ghost" size="icon" className="cursor-pointer rounded-full" aria-label="Open account menu" />
-          }
+          render={<Button type="button" variant="ghost" size="icon" className="cursor-pointer rounded-full" aria-label={copy.open} />}
         >
           <UserAvatar name={identity.name} image={identity.image} />
         </PopoverTrigger>
@@ -86,7 +87,7 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
           </div>
           <Separator />
           <div className="px-2 pt-1 font-heading text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-            Workspaces
+            {copy.workspaces}
           </div>
           <div className="flex flex-col gap-0.5">
             {data.workspaces.map((workspace) => {
@@ -118,7 +119,7 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
               }}
             >
               <Plus />
-              {data.canCreateWorkspace ? 'Create workspace' : '3 workspace limit reached'}
+              {data.canCreateWorkspace ? copy.createWorkspace : copy.workspaceLimitReached}
             </Button>
           </div>
           <Separator />
@@ -129,7 +130,7 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
               onClick={() => setMenuOpen(false)}
             >
               <UserCog />
-              Account
+              {copy.account}
             </Link>
             <Button
               type="button"
@@ -141,7 +142,7 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
               }}
             >
               <CircleHelp />
-              Onboarding
+              {copy.onboarding}
             </Button>
             {data.billing?.available && (
               <Link
@@ -150,8 +151,8 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
                 onClick={() => setMenuOpen(false)}
               >
                 <CreditCard />
-                Plan
-                <span className="ml-auto text-xs font-medium text-muted-foreground">{data.billing.plans[data.billing.plan].name}</span>
+                {copy.plan}
+                <span className="ml-auto text-xs font-medium text-muted-foreground">{t.settings.plan.names[data.billing.plan]}</span>
               </Link>
             )}
           </div>
@@ -164,7 +165,7 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
               onClick={() => setMenuOpen(false)}
             >
               <Info className="size-3.5" />
-              About
+              {copy.about}
             </Link>
             {isSuperAdmin && (
               <Link
@@ -174,12 +175,9 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
                 onClick={() => setMenuOpen(false)}
               >
                 <ShieldCheck className="size-3.5" />
-                Admin
+                {copy.admin}
                 {releaseUpdate && (
-                  <span
-                    className="size-1.5 rounded-full bg-primary"
-                    aria-label={`STL Quest v${releaseUpdate.latestVersion} is available`}
-                  />
+                  <span className="size-1.5 rounded-full bg-primary" aria-label={copy.updateAvailable(releaseUpdate.latestVersion)} />
                 )}
               </Link>
             )}
@@ -196,7 +194,7 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
               }}
             >
               <LogOut className="size-3.5" />
-              Sign out
+              {copy.signOut}
             </button>
           </div>
         </PopoverContent>
@@ -204,33 +202,25 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
       {dialogOpen && (
         <DialogShell
           open
-          title="Create workspace"
-          description={
-            data.billing?.available
-              ? 'A workspace has its own board, members, and printers. Workspaces using included storage share your account’s plan allowance.'
-              : 'A workspace has its own board, members, and printers.'
-          }
+          title={copy.createWorkspace}
+          description={data.billing?.available ? copy.createDescriptionBilling : copy.createDescription}
           onClose={() => setDialogOpen(false)}
         >
           <div className="flex flex-col gap-4">
             <Field>
-              <FieldLabel htmlFor="new-workspace-name">Workspace name</FieldLabel>
+              <FieldLabel htmlFor="new-workspace-name">{copy.workspaceName}</FieldLabel>
               <Input
                 id="new-workspace-name"
                 value={name}
                 maxLength={MAX_WORKSPACE_NAME_LENGTH}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="Design studio"
+                placeholder={copy.workspaceNamePlaceholder}
               />
             </Field>
-            <DialogProblem
-              title="Workspace was not created"
-              hint="Check the name is not already in use, then try again."
-              error={createMutation.error?.message}
-            />
+            <DialogProblem title={copy.createFailedTitle} hint={copy.createFailedHint} error={createMutation.error?.message} />
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancel
+                {t.common.cancel}
               </Button>
               <Button
                 type="button"
@@ -238,7 +228,7 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
                 onClick={() => createMutation.mutate({ data: { name: name.trim() } })}
               >
                 {createMutation.isPending && <Spinner />}
-                {createMutation.isPending ? 'Creating…' : 'Create workspace'}
+                {createMutation.isPending ? copy.creating : copy.createWorkspace}
               </Button>
             </div>
           </div>

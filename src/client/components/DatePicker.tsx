@@ -1,11 +1,13 @@
 import { CalendarIcon, XIcon } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { Button } from '@/components/ui/button'
-import { Calendar } from '@/components/ui/calendar'
+import { Calendar, dayPickerLocales } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
+import { useI18n } from '../i18n'
 
 export function DatePicker({ value, onChange, label }: { value?: string; onChange: (value?: string) => void; label: string }) {
+  const { t, locale } = useI18n()
   const selected = value ? parseISO(value) : undefined
   return (
     <Popover>
@@ -23,7 +25,7 @@ export function DatePicker({ value, onChange, label }: { value?: string; onChang
         }
       >
         <CalendarIcon />
-        {selected ? format(selected, 'PPP') : label}
+        {selected ? format(selected, 'PPP', { locale: dayPickerLocales[locale] }) : label}
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar mode="single" selected={selected} onSelect={(date) => onChange(date ? format(date, 'yyyy-MM-dd') : undefined)} />
@@ -31,7 +33,7 @@ export function DatePicker({ value, onChange, label }: { value?: string; onChang
           <div className="border-t p-2">
             <Button type="button" variant="ghost" size="sm" className="w-full" onClick={() => onChange(undefined)}>
               <XIcon />
-              Clear date
+              {t.shell.datePicker.clearDate}
             </Button>
           </div>
         )}

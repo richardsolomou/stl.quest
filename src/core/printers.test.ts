@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { messagesFor } from './i18n'
 import type { PrinterProfile } from './types'
 import {
   automaticallyAssignedPrinter,
@@ -34,7 +35,7 @@ describe('printer profiles', () => {
   })
 
   it('rejects printer names that only differ by case', () => {
-    expect(printerProfilesValidationError([small, { ...large, name: 'small' }])).toBe('Printer names must be unique.')
+    expect(printerProfilesValidationError([small, { ...large, name: 'small' }], messagesFor('en'))).toBe('Printer names must be unique.')
   })
 
   it('summarizes printer configuration changes', () => {

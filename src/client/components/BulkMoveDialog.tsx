@@ -9,6 +9,7 @@ import { BulkRequestRow } from './BulkRequestRow'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
 import { MoveDestinationField, type MoveDestination } from './MoveDestinationField'
+import { useI18n } from '../i18n'
 
 type Entry = { request: PublicPrintRequest; max: number }
 
@@ -31,6 +32,8 @@ export function BulkMoveDialog({
   onConfirm: (counts: Record<string, number>, destination: StatusId) => void
   onCancel: () => void
 }) {
+  const { t } = useI18n()
+  const m = t.board.bulkMove
   const [counts, setCounts] = useState(() => Object.fromEntries(entries.map(({ request, max }) => [request.id, String(max)])))
   const [selectedDestination, setSelectedDestination] = useState(destination ?? destinations?.[0]?.id ?? '')
   const invalid = useMemo(
@@ -43,12 +46,7 @@ export function BulkMoveDialog({
   )
 
   return (
-    <DialogShell
-      onClose={onCancel}
-      title={`Move ${requestCount} selected request${requestCount === 1 ? '' : 's'}`}
-      className="sm:max-w-[620px]"
-      preventClose={pending}
-    >
+    <DialogShell onClose={onCancel} title={m.title(requestCount)} className="sm:max-w-[620px]" preventClose={pending}>
       <form
         className="flex min-h-full flex-col"
         onSubmit={(event) => {
@@ -70,15 +68,15 @@ export function BulkMoveDialog({
             <BulkRequestRow
               key={request.id}
               request={request}
-              detail={`Quantity here: ${max}`}
+              detail={m.quantityHere(max)}
               action={
                 <Field className="w-24 shrink-0">
                   <FieldLabel htmlFor={`batch-move-${request.id}`} className="sr-only">
-                    Instances of {request.name} to move
+                    {m.instancesToMove(request.name)}
                   </FieldLabel>
                   <Input
                     id={`batch-move-${request.id}`}
-                    aria-label={`Instances of ${request.name} to move`}
+                    aria-label={m.instancesToMove(request.name)}
                     type="number"
                     inputMode="numeric"
                     min={1}
@@ -91,7 +89,7 @@ export function BulkMoveDialog({
             />
           ))}
         </div>
-        <DialogProblem title="Nothing was moved" hint="The prints are still in their current stage. Try again." error={error} />
+        <DialogProblem title={m.problemTitle} hint={m.problemHint} error={error} />
         <div className="sticky bottom-0 mt-auto flex justify-end gap-2 bg-popover pt-4">
           <Button
             type="button"
@@ -99,14 +97,14 @@ export function BulkMoveDialog({
             disabled={pending || !selectedDestination}
             onClick={() => onConfirm(Object.fromEntries(entries.map(({ request, max }) => [request.id, max])), selectedDestination)}
           >
-            Move all
+            {m.moveAll}
           </Button>
           <Button type="button" variant="outline" disabled={pending} onClick={onCancel}>
-            Cancel
+            {t.common.cancel}
           </Button>
           <Button type="submit" disabled={pending || invalid || !selectedDestination}>
             {pending && <Spinner />}
-            {pending ? 'Moving…' : 'Move'}
+            {pending ? t.board.move.moving : t.board.move.move}
           </Button>
         </div>
       </form>

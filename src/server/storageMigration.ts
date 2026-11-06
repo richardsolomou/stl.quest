@@ -4,10 +4,11 @@ import pRetry from 'p-retry'
 import { httpStatus, isRetryableStorageError } from '../adapters/retryableError'
 import { formatBytes } from '../core/format'
 import { requestAssetPaths } from '../core/request'
-import { STORAGE_UNUSABLE_PROBLEM } from '../core/storageProblems'
-import type { AssetStore, Repository, StorageConfig, StorageMigration, Telemetry } from '../core/types'
+import { messagesFor } from '../core/i18n'
+import type { AssetStore, Repository, StorageConfig, StorageMigration, StorageMigrationFailure, Telemetry } from '../core/types'
 import type { AssetGenerationQueue } from './assets/queue'
 import { encryptSetting } from './integrations'
+import { serverMessages } from './locale'
 import { logger } from './logger'
 import { acquireWorkLease, type WorkLease, type WorkLocker, WorkLeaseLost } from './workLock'
 
@@ -39,6 +40,7 @@ export async function completeManagedStorageCleanup(repository: Repository, stor
         ...migration,
         state: 'cancelled',
         error: undefined,
+        failure: undefined,
         currentPath: undefined,
         updatedAt: finishedAt,
         finishedAt,
@@ -65,7 +67,14 @@ class MigrationCancelled extends Error {}
 // migration to `failed` with an actionable message, but they are not application bugs — so they are
 // logged without an `err` field to keep them out of error tracking (see the level-50 exception hook
 // in logger.ts).
-class ExpectedMigrationFailure extends Error {}
+class ExpectedMigrationFailure extends Error {
+  constructor(
+    readonly failure: StorageMigrationFailure,
+    options?: ErrorOptions,
+  ) {
+    super(messagesFor('en').storage.migrationFailures[failure.kind](failure.path, formatBytes(failure.bytes)), options)
+  }
+}
 type DistributedMigrationOptions = { workLocker: WorkLocker; lockId: string }
 type MigrationLease = WorkLease & { ownerId: string }
 
@@ -123,7 +132,7 @@ export class StorageMigrationCoordinator {
   async withAssetsLocked<T>(callback: () => Promise<T>) {
     const migration = await this.status()
     if (this.assetsLocked || migration?.state === 'running')
-      throw new Response('a storage migration is already in progress', { status: 409 })
+      throw new Response(serverMessages().storage.errors.migrationInProgress, { status: 409 })
     this.assetsLocked = true
     try {
       return await callback()
@@ -133,7 +142,7 @@ export class StorageMigrationCoordinator {
   }
 
   async assertAssetsMutable() {
-    if (await this.active()) throw new Response('storage migration is in progress; file changes are temporarily paused', { status: 423 })
+    if (await this.active()) throw new Response(serverMessages().storage.errors.assetsPaused, { status: 423 })
   }
 
   async start(destination: StorageConfig, clearDestination = false) {
@@ -205,7 +214,7 @@ export class StorageMigrationCoordinator {
 
   private assertDestinationChanged(destination: StorageConfig) {
     if (JSON.stringify(destination) === JSON.stringify(this.sourceConfig))
-      throw new Response('choose a different storage location', { status: 400 })
+      throw new Response(serverMessages().storage.errors.sameDestination, { status: 400 })
   }
 
   async retry() {
@@ -213,7 +222,8 @@ export class StorageMigrationCoordinator {
     try {
       return await this.withAssetsLocked(async () => {
         const migration = await this.status()
-        if (!migration || migration.state !== 'failed') throw new Response('there is no failed storage migration to retry', { status: 409 })
+        if (!migration || migration.state !== 'failed')
+          throw new Response(serverMessages().storage.errors.noFailedMigration, { status: 409 })
         await this.assertReadyToStart()
         if (migration.destination.adapter === 'managed') await this.repository.deleteSetting(MANAGED_STORAGE_CLEANUP_SETTING)
         const destination = await this.buildStore(migration.destination)
@@ -223,6 +233,7 @@ export class StorageMigrationCoordinator {
           state: 'running',
           phase: migration.phase ?? 'copying',
           error: undefined,
+          failure: undefined,
           finishedAt: undefined,
           cancelRequestedAt: undefined,
         })
@@ -243,7 +254,7 @@ export class StorageMigrationCoordinator {
         return await this.withAssetsLocked(async () => {
           const current = await this.status()
           if (!current || current.id !== migration.id || current.state !== 'failed') {
-            throw new Response('the failed storage migration changed; reload and try again', { status: 409 })
+            throw new Response(serverMessages().storage.errors.failedMigrationChanged, { status: 409 })
           }
           await this.repository.setSetting(MANAGED_STORAGE_CLEANUP_SETTING, {
             purpose: 'abandon-migration',
@@ -262,7 +273,7 @@ export class StorageMigrationCoordinator {
         await lease?.release()
       }
     }
-    if (!migration || migration.state !== 'running') throw new Response('there is no running storage migration to cancel', { status: 409 })
+    if (!migration || migration.state !== 'running') throw new Response(serverMessages().storage.errors.noRunningMigration, { status: 409 })
     if (migration.cancelRequestedAt) return migration
     return await this.update({ ...migration, cancelRequestedAt: Date.now() })
   }
@@ -303,6 +314,7 @@ export class StorageMigrationCoordinator {
           state: 'failed',
           currentPath: undefined,
           error: message(error),
+          failure: error instanceof ExpectedMigrationFailure ? error.failure : undefined,
           updatedAt: Date.now(),
           finishedAt: Date.now(),
         }
@@ -402,17 +414,12 @@ export class StorageMigrationCoordinator {
         if (error instanceof MigrationCancelled) return await this.finishCancelled(migration)
         if (httpStatus(error) === 413) {
           if (migration.destination.adapter === 'managed') {
-            throw new ExpectedMigrationFailure(
-              `Managed storage rejected ${relativePath} (${formatBytes(size)}) because copying it would exceed your storage quota. Free up space or raise the quota, then retry the migration.`,
-              { cause: error },
-            )
+            throw new ExpectedMigrationFailure({ kind: 'quota', path: relativePath, bytes: size }, { cause: error })
           }
           if (migration.destination.adapter === 'webdav') {
             const cloudflare = (error as { cloudflare?: boolean }).cloudflare === true
             throw new ExpectedMigrationFailure(
-              cloudflare
-                ? `Cloudflare rejected ${relativePath} (${formatBytes(size)}) because it exceeds the plan upload limit. Switch the WebDAV endpoint to Tailscale Funnel using the WebDAV setup guide, then retry the migration.`
-                : `WebDAV rejected ${relativePath} (${formatBytes(size)}) because it exceeds the server or proxy upload limit. Increase the limit or use a direct endpoint such as Tailscale Funnel, then retry the migration.`,
+              { kind: cloudflare ? 'cloudflareUploadLimit' : 'webdavUploadLimit', path: relativePath, bytes: size },
               { cause: error },
             )
           }
@@ -436,6 +443,7 @@ export class StorageMigrationCoordinator {
       copiedBytes: totalBytes,
       currentPath: undefined,
       error: undefined,
+      failure: undefined,
       updatedAt: finishedAt,
       finishedAt,
     }
@@ -495,6 +503,7 @@ export class StorageMigrationCoordinator {
       state: 'cancelled',
       currentPath: undefined,
       error: undefined,
+      failure: undefined,
       updatedAt: finishedAt,
       finishedAt,
     }
@@ -518,7 +527,7 @@ export class StorageMigrationCoordinator {
 
   private async assertReadyToStart() {
     if ((await this.repository.listOperations()).length > 0 || (await this.repository.activeUploadIds(Date.now())).size > 0) {
-      throw new Response('wait for current file operations and uploads to finish before migrating storage', { status: 409 })
+      throw new Response(serverMessages().storage.errors.operationsActive, { status: 409 })
     }
   }
 
@@ -529,7 +538,7 @@ export class StorageMigrationCoordinator {
       await destination.writable()
       return destination
     } catch (error) {
-      throw new Response(`${STORAGE_UNUSABLE_PROBLEM}: ${message(error)}`, { status: 400 })
+      throw new Response(serverMessages().storage.problems.unusable(message(error)), { status: 400 })
     }
   }
 
@@ -579,7 +588,7 @@ export class StorageMigrationCoordinator {
     const ownerId = crypto.randomUUID()
     const lease = await acquireWorkLease(this.distributed.workLocker, `storage-migration:${this.distributed.lockId}`, false)
     if (!lease) {
-      if (required) throw new Response('a storage migration is already running on another replica', { status: 409 })
+      if (required) throw new Response(serverMessages().storage.errors.migrationElsewhere, { status: 409 })
       return undefined
     }
     return { ...lease, ownerId, release: async () => await lease.release().catch(() => undefined) }

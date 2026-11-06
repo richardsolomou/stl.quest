@@ -38,6 +38,7 @@ import type { PublicPrintRequest } from '../core/types'
 import { printGroupBranchIds } from '../core/printGroups'
 import { createPrintGroup, deletePrintGroup, updatePrintGroup } from '../server/fns'
 import { errorMessage } from '../core/error'
+import { useI18n } from '../client/i18n'
 export const Route = createFileRoute('/')({
   validateSearch: validateRequestSearch,
   beforeLoad: async ({ context, search }) => {
@@ -57,6 +58,7 @@ function Home() {
   const search = Route.useSearch()
   const { data: session } = useSuspenseQuery(sessionQuery())
   const [reopenedStorage, setReopenedStorage] = useState(false)
+  const { t } = useI18n()
   if (showsLanding(session)) return <HomePage />
   if (!session.identity) {
     return <AuthScreen setupRequired={session.setupRequired} hosted={session.hosted} auth={session.auth} creatingAccount={search.signup} />
@@ -77,7 +79,9 @@ function Home() {
                 </div>
                 {session.workspace && (
                   <p className="text-sm text-muted-foreground">
-                    Setting up <span className="font-medium text-foreground">{session.workspace.name}</span>
+                    {t.board.page.settingUp.before}
+                    <span className="font-medium text-foreground">{session.workspace.name}</span>
+                    {t.board.page.settingUp.after}
                   </p>
                 )}
                 <OnboardingProgress step={showStorage ? 1 : 2} />
@@ -112,6 +116,8 @@ function Home() {
 function AuthenticatedHome() {
   const queryClient = useQueryClient()
   const workspaceSlug = useWorkspaceSlug()
+  const { t } = useI18n()
+  const page = t.board.page
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const {
@@ -235,7 +241,7 @@ function AuthenticatedHome() {
               facets={facets}
               tags={tags}
               onManageTags={isAdmin ? () => setManageTags(true) : undefined}
-              prioritySortLabel={isAdmin ? 'Requester priorities' : 'My priority'}
+              prioritySortLabel={isAdmin ? undefined : t.board.sort.myPriority}
               showRoundRobin={isWorkspaceOwner}
               presence={<BoardPresence workspaceSlug={workspaceSlug} visible={!hideRequester} />}
               action={
@@ -251,7 +257,7 @@ function AuthenticatedHome() {
                     }}
                   >
                     <Plus />
-                    <span className="max-sm:sr-only">Add a print</span>
+                    <span className="max-sm:sr-only">{page.addPrint}</span>
                   </Button>
                 </>
               }
@@ -284,7 +290,7 @@ function AuthenticatedHome() {
                       data: { workspaceSlug, name, parentId, status: workflow.statuses[0].id, items: [] },
                     })
                   } catch (error) {
-                    setTagError(errorMessage(error, 'The tag could not be created.'))
+                    setTagError(errorMessage(error, page.tagCreateFailed))
                   }
                 }}
                 onSave={async (id, fields) => {
@@ -293,7 +299,7 @@ function AuthenticatedHome() {
                     await updateTagMutation.mutateAsync({ data: { workspaceSlug, id, ...fields } })
                     return true
                   } catch (error) {
-                    setTagError(errorMessage(error, 'The tag could not be updated.'))
+                    setTagError(errorMessage(error, page.tagUpdateFailed))
                     return false
                   }
                 }}
@@ -302,7 +308,7 @@ function AuthenticatedHome() {
                   try {
                     await deleteTagMutation.mutateAsync({ data: { workspaceSlug, id: tag.id } })
                   } catch (error) {
-                    setTagError(errorMessage(error, 'The tag could not be deleted.'))
+                    setTagError(errorMessage(error, page.tagDeleteFailed))
                   }
                 }}
                 onCancel={() => {
@@ -319,8 +325,8 @@ function AuthenticatedHome() {
             <QueryState
               loading={requestsResult.isPending}
               error={requestsResult.error}
-              loadingLabel="Loading board…"
-              errorTitle="Could not load the board"
+              loadingLabel={page.loading}
+              errorTitle={page.loadError}
               onRetry={() => void retryQueries(requestsResult.refetch)}
               className="w-full max-w-xl"
             />
@@ -335,11 +341,7 @@ function AuthenticatedHome() {
             modelDropTarget ? 'z-60' : 'z-9',
           )}
         >
-          {modelDropTarget
-            ? selectedRequest?.hasFile
-              ? 'Drop a model to replace this one'
-              : 'Drop a model to attach it'
-            : 'Drop models to add prints'}
+          {modelDropTarget ? (selectedRequest?.hasFile ? page.dropToReplace : page.dropToAttach) : page.dropToAdd}
         </div>
       )}
       {uploadOpen && (
@@ -382,14 +384,14 @@ function WorkspaceSetupNotice({
   storageReady: boolean
   printersConfigured: boolean
 }) {
+  const { t } = useI18n()
+  const n = t.board.setupNotice
   if (!isAdmin) {
     return (
       <Alert className="m-3 mb-0">
         <CircleAlert />
-        <AlertTitle>Uploads are temporarily unavailable</AlertTitle>
-        <AlertDescription>
-          A workspace admin needs to configure storage before files can be uploaded. Linked prints can still be added.
-        </AlertDescription>
+        <AlertTitle>{n.uploadsUnavailableTitle}</AlertTitle>
+        <AlertDescription>{n.uploadsUnavailableBody}</AlertDescription>
       </Alert>
     )
   }
@@ -398,11 +400,11 @@ function WorkspaceSetupNotice({
     return (
       <Alert className="m-3 mb-0" variant="destructive">
         <CircleAlert />
-        <AlertTitle>Storage unavailable</AlertTitle>
+        <AlertTitle>{n.storageUnavailableTitle}</AlertTitle>
         <AlertDescription>
-          STL Quest could not access the configured storage, so file uploads are disabled. Linked prints can still be added.{' '}
+          {n.storageUnavailableBody}{' '}
           <Link to="/settings/$section" params={{ section: 'storage' }}>
-            Review storage
+            {n.reviewStorage}
           </Link>
           .
         </AlertDescription>
@@ -413,21 +415,21 @@ function WorkspaceSetupNotice({
   return (
     <Alert className="m-3 mb-0">
       <CircleAlert />
-      <AlertTitle>Finish setting up your workspace when you’re ready</AlertTitle>
+      <AlertTitle>{n.finishTitle}</AlertTitle>
       <AlertDescription>
-        You can explore STL Quest now and finish setup later.{' '}
+        {n.finishBody}{' '}
         {(!storageConfigured || !storageReady) && (
           <>
             <Link to="/settings/$section" params={{ section: 'storage' }}>
-              {storageReady ? 'Review storage' : 'Configure storage'}
+              {storageReady ? n.reviewStorage : n.configureStorage}
             </Link>
-            {!storageReady && ' to enable uploads'}
-            {!printersConfigured && ', or '}
+            {!storageReady && n.toEnableUploads}
+            {!printersConfigured && n.or}
           </>
         )}
         {!printersConfigured && (
           <Link to="/settings/$section" params={{ section: 'printers' }}>
-            add printers
+            {n.addPrinters}
           </Link>
         )}
         .

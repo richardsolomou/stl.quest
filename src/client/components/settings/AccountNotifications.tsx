@@ -4,6 +4,7 @@ import { Field, FieldContent, FieldDescription, FieldLabel } from '@/components/
 import { Switch } from '@/components/ui/switch'
 import { notificationKinds } from '../../../core/notifications'
 import { updateNotificationPreference } from '../../../server/fns'
+import { useI18n } from '../../i18n'
 import { notificationPreferencesQuery } from '../../queries'
 import { QueryState } from '../QueryState'
 import { SettingNotice, noticeDetail } from '../SettingNotice'
@@ -18,6 +19,8 @@ export function AccountNotifications({
   workspaceName: string
   emailConfigured: boolean
 }) {
+  const { t } = useI18n()
+  const copy = t.account.notifications
   const query = useQuery(notificationPreferencesQuery(workspaceSlug))
   const callUpdate = useServerFn(updateNotificationPreference)
   const queryClient = useQueryClient()
@@ -28,28 +31,21 @@ export function AccountNotifications({
   })
   const preferences = query.data
   return (
-    <SettingsSection
-      title="Email notifications"
-      description={
-        emailConfigured
-          ? `Choose which emails you receive from ${workspaceName}.`
-          : `Email delivery is not set up on this server yet. Your choices for ${workspaceName} apply once it is.`
-      }
-    >
+    <SettingsSection title={copy.title} description={emailConfigured ? copy.description(workspaceName) : copy.notConfigured(workspaceName)}>
       {!preferences ? (
         <QueryState
           loading={query.isPending}
           error={query.error}
-          loadingLabel="Loading notification settings…"
-          errorTitle="Could not load notification settings"
+          loadingLabel={copy.loading}
+          errorTitle={copy.loadFailed}
           onRetry={() => void query.refetch()}
         />
       ) : (
         notificationKinds.map((kind) => (
           <Field key={kind.id} orientation="horizontal">
             <FieldContent>
-              <FieldLabel htmlFor={`notification-${kind.id}`}>{kind.name}</FieldLabel>
-              <FieldDescription>{kind.description}</FieldDescription>
+              <FieldLabel htmlFor={`notification-${kind.id}`}>{copy.kinds[kind.id].name}</FieldLabel>
+              <FieldDescription>{copy.kinds[kind.id].description}</FieldDescription>
             </FieldContent>
             <Switch
               id={`notification-${kind.id}`}
@@ -64,8 +60,8 @@ export function AccountNotifications({
         <SettingNotice
           notice={{
             tone: 'error',
-            title: 'That preference was not saved',
-            hint: 'Your notifications are still set the way they were before. Try again in a moment.',
+            title: copy.saveFailedTitle,
+            hint: copy.saveFailedHint,
             detail: noticeDetail(mutation.error),
           }}
         />

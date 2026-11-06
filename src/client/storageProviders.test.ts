@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { CLOUD_PROVIDER_HELP, cloudflareAccountId, inferS3Provider, s3Endpoint } from './storageProviders'
+import { messagesFor } from '../core/i18n'
+import { cloudflareAccountId, inferS3Provider, s3Endpoint, storageRecoveryHint } from './storageProviders'
 
 describe('storage provider presets', () => {
   it('uses the current Microsoft Entra account type in OneDrive setup', () => {
-    expect(CLOUD_PROVIDER_HELP.onedrive.credentials).toContain('Any Entra ID Tenant + Personal Microsoft accounts')
+    expect(messagesFor('en').storage.cloudHelp.onedrive.credentials).toContain('Any Entra ID Tenant + Personal Microsoft accounts')
+  })
+
+  it('shares one recovery hint across the cloud providers', () => {
+    const { storage } = messagesFor('fr')
+    expect(storageRecoveryHint(storage, 'box')).toBe(storage.recoveryHint.cloud)
   })
 
   it('builds provider endpoints from the guided fields', () => {

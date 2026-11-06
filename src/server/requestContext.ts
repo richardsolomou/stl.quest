@@ -2,6 +2,7 @@ import crypto from 'node:crypto'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { postHogRequestContext } from 'ras-stack/posthog'
 import type { Identity } from '../core/types'
+import { withRequestLocale } from './locale'
 import { logger } from './logger'
 
 type LogContext = {
@@ -40,34 +41,36 @@ export async function withRequestContext(request: Request, handler: () => Promis
   const { sessionId } = postHogRequestContext(request)
   const startedAt = performance.now()
   const path = new URL(request.url).pathname
-  return storage.run({ request, log: { request_id: requestId, sessionId } }, async () => {
-    let response: Response
-    let unexpectedError: unknown
-    try {
-      response = await handler()
-    } catch (error) {
-      if (error instanceof Response) response = error
-      else {
-        unexpectedError = error
-        response = Response.json({ error: 'internal server error' }, { status: 500 })
+  return withRequestLocale(request, () =>
+    storage.run({ request, log: { request_id: requestId, sessionId } }, async () => {
+      let response: Response
+      let unexpectedError: unknown
+      try {
+        response = await handler()
+      } catch (error) {
+        if (error instanceof Response) response = error
+        else {
+          unexpectedError = error
+          response = Response.json({ error: 'internal server error' }, { status: 500 })
+        }
       }
-    }
-    const headers = new Headers(response.headers)
-    headers.set('x-request-id', requestId)
-    if (path !== '/api/health') {
-      const context = {
-        event: 'http_request',
-        outcome: response.status >= 500 ? 'error' : response.status >= 400 ? 'rejected' : 'success',
-        method: request.method,
-        path,
-        status: response.status,
-        duration_ms: Math.round(performance.now() - startedAt),
+      const headers = new Headers(response.headers)
+      headers.set('x-request-id', requestId)
+      if (path !== '/api/health') {
+        const context = {
+          event: 'http_request',
+          outcome: response.status >= 500 ? 'error' : response.status >= 400 ? 'rejected' : 'success',
+          method: request.method,
+          path,
+          status: response.status,
+          duration_ms: Math.round(performance.now() - startedAt),
+        }
+        if (response.status >= 500)
+          logger.error({ ...context, ...(unexpectedError === undefined ? {} : { err: unexpectedError }) }, 'request completed')
+        else if (request.method !== 'GET' || context.duration_ms >= 1_000) logger.info(context, 'request completed')
+        else logger.debug(context, 'request completed')
       }
-      if (response.status >= 500)
-        logger.error({ ...context, ...(unexpectedError === undefined ? {} : { err: unexpectedError }) }, 'request completed')
-      else if (request.method !== 'GET' || context.duration_ms >= 1_000) logger.info(context, 'request completed')
-      else logger.debug(context, 'request completed')
-    }
-    return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
-  })
+      return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
+    }),
+  )
 }

@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import type { StorageConfig } from '../../../core/types'
 import { LATEST_DOCUMENTATION_URL } from '../../sourceCode'
 import type { StorageConfigFormApi } from '../../storageForm'
+import { useI18n } from '../../i18n'
 
 export function WebDAVStorageFields({
   form,
@@ -13,20 +14,20 @@ export function WebDAVStorageFields({
   form: StorageConfigFormApi
   current?: Extract<StorageConfig, { adapter: 'webdav' }>
 }) {
+  const t = useI18n().t.storage.webdav
   return (
     <div className="flex flex-col gap-4">
       <Alert>
-        <AlertTitle>A normal folder on hardware you control</AlertTitle>
+        <AlertTitle>{t.introTitle}</AlertTitle>
         <AlertDescription>
-          Run a WebDAV server for the folder, then expose it through a stable HTTPS address. Cloudflare Tunnel or Tailscale Funnel can
-          provide the encrypted connection without opening a router port. Files remain visible and movable on your machine.{' '}
+          {t.intro}{' '}
           <a
             className="inline-flex items-center gap-1 font-medium text-foreground underline underline-offset-3"
             href={`${LATEST_DOCUMENTATION_URL}/webdav.md`}
             target="_blank"
             rel="noreferrer"
           >
-            Set up remote WebDAV
+            {t.setupLink}
             <ExternalLink className="size-3.5" />
           </a>
         </AlertDescription>
@@ -34,7 +35,7 @@ export function WebDAVStorageFields({
       <form.Field name="endpoint">
         {(field) => (
           <Field>
-            <FieldLabel htmlFor="webdav-endpoint">WebDAV endpoint</FieldLabel>
+            <FieldLabel htmlFor="webdav-endpoint">{t.endpoint}</FieldLabel>
             <Input
               id="webdav-endpoint"
               type="url"
@@ -43,32 +44,32 @@ export function WebDAVStorageFields({
               placeholder="https://storage.example.com/dav"
               required
             />
-            <FieldDescription>Hosted STL Quest requires HTTPS and must be able to reach this address.</FieldDescription>
+            <FieldDescription>{t.endpointDescription}</FieldDescription>
           </Field>
         )}
       </form.Field>
       <form.Field name="root">
         {(field) => (
           <Field>
-            <FieldLabel htmlFor="webdav-root">Folder</FieldLabel>
+            <FieldLabel htmlFor="webdav-root">{t.folder}</FieldLabel>
             <Input
               id="webdav-root"
               value={field.state.value}
               onChange={(event) => field.handleChange(event.target.value)}
               placeholder="stlquest"
             />
-            <FieldDescription>STL Quest adds a private workspace directory below this folder.</FieldDescription>
+            <FieldDescription>{t.folderDescription}</FieldDescription>
           </Field>
         )}
       </form.Field>
       <FieldSet>
-        <FieldLegend>Credentials</FieldLegend>
-        <FieldDescription>Use a login dedicated to STL Quest rather than the account that administers the server.</FieldDescription>
+        <FieldLegend>{t.credentials}</FieldLegend>
+        <FieldDescription>{t.credentialsDescription}</FieldDescription>
         <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
           <form.Field name="username">
             {(field) => (
               <Field>
-                <FieldLabel htmlFor="webdav-username">Username</FieldLabel>
+                <FieldLabel htmlFor="webdav-username">{t.username}</FieldLabel>
                 <Input
                   id="webdav-username"
                   value={field.state.value}
@@ -82,13 +83,13 @@ export function WebDAVStorageFields({
           <form.Field name="password">
             {(field) => (
               <Field>
-                <FieldLabel htmlFor="webdav-password">Password</FieldLabel>
+                <FieldLabel htmlFor="webdav-password">{t.password}</FieldLabel>
                 <Input
                   id="webdav-password"
                   type="password"
                   value={field.state.value}
                   onChange={(event) => field.handleChange(event.target.value)}
-                  placeholder={current ? 'leave blank to keep current' : ''}
+                  placeholder={current ? t.keepPassword : ''}
                   autoComplete="current-password"
                   required={!current}
                 />

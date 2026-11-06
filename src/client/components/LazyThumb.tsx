@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import type { PublicPrintRequest } from '../../core/types'
 import { requestThumbnailHref, type RequestAssets } from '../boardDownload'
 import { ModelFormatLabel } from './ModelFormatLabel'
+import { useI18n } from '../i18n'
 
 // The thumbnail route answers 503 while a storage read is briefly unavailable, so a failed load
 // tries again before the card settles on the placeholder.
@@ -17,6 +18,7 @@ export function LazyThumb({ request, className }: { request: ThumbRequest; class
 }
 
 function ThumbImage({ request, className }: { request: ThumbRequest; className?: string }) {
+  const { t } = useI18n()
   const [attempt, setAttempt] = useState(0)
   const [failed, setFailed] = useState(false)
   const [loaded, setLoaded] = useState(false)
@@ -33,7 +35,7 @@ function ThumbImage({ request, className }: { request: ThumbRequest; className?:
         <ModelFormatLabel format={request.modelFormat} />
       ) : (
         <>
-          {!loaded && <Spinner className="absolute text-muted-foreground" aria-label="Loading thumbnail" />}
+          {!loaded && <Spinner className="absolute text-muted-foreground" aria-label={t.requests.thumb.loadingThumbnail} />}
           <img
             className={`absolute inset-0 size-full object-contain select-none ${loaded ? '' : 'invisible'}`}
             loading="lazy"

@@ -5,6 +5,7 @@ import type { SignInCapabilities } from '../../core/auth'
 import { AuthenticationMethods } from './AuthenticationMethods'
 import { AuthIntroduction, AuthSourceOffer } from './AuthIntroduction'
 import { AuthBrand } from './Brand'
+import { useI18n } from '../i18n'
 import { authCapabilitiesQuery } from '../queries'
 
 export function AuthScreen({
@@ -18,6 +19,7 @@ export function AuthScreen({
   auth: SignInCapabilities
   creatingAccount?: boolean
 }) {
+  const { t } = useI18n()
   const { data: currentAuth } = useQuery({ ...authCapabilitiesQuery(), initialData: auth })
   const [hydrated, setHydrated] = useState(false)
   const [showIntroduction, setShowIntroduction] = useState(setupRequired)
@@ -36,14 +38,8 @@ export function AuthScreen({
         <AuthBrand />
         <Card className="w-full shadow-xl shadow-black/10">
           <CardHeader>
-            <CardTitle>{initialAdmin ? 'Welcome' : signingUp ? 'Create account' : 'Sign in'}</CardTitle>
-            {setupRequired && (
-              <CardDescription>
-                {initialAdmin
-                  ? 'Create the admin account to get started. The admin runs the print queue and manages access for everyone else.'
-                  : 'Create your account to get a private workspace for your print queue, members, and settings.'}
-              </CardDescription>
-            )}
+            <CardTitle>{initialAdmin ? t.auth.screen.welcome : signingUp ? t.auth.createAccount : t.auth.signIn}</CardTitle>
+            {setupRequired && <CardDescription>{initialAdmin ? t.auth.screen.adminSetup : t.auth.screen.accountSetup}</CardDescription>}
           </CardHeader>
           <AuthenticationMethods
             auth={currentAuth}

@@ -3,9 +3,11 @@ import { RefreshCw } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { ButtonLink } from '@/components/ui/button'
 import { chunkLoadFailureNoticeId } from '../chunkRecovery'
+import { useI18n } from '../i18n'
 import { clientNeedsRefresh } from '../updateNotices'
 
 export function UpdateNotices({ serverVersion }: { serverVersion: string }) {
+  const { t } = useI18n()
   const [chunkLoadFailed, setChunkLoadFailed] = useState(false)
   useEffect(() => {
     const showNotice = () => setChunkLoadFailed(true)
@@ -16,13 +18,14 @@ export function UpdateNotices({ serverVersion }: { serverVersion: string }) {
   return (
     <>
       {/* Revealed by the inline chunk recovery script when the app cannot hydrate. */}
-      <RefreshNotice id={chunkLoadFailureNoticeId} hidden message="STL Quest couldn’t finish loading." />
-      {(chunkLoadFailed || clientNeedsRefresh(serverVersion, __APP_VERSION__)) && <RefreshNotice message="STL Quest has been updated." />}
+      <RefreshNotice id={chunkLoadFailureNoticeId} hidden message={t.shell.updates.couldNotLoad} />
+      {(chunkLoadFailed || clientNeedsRefresh(serverVersion, __APP_VERSION__)) && <RefreshNotice message={t.shell.updates.updated} />}
     </>
   )
 }
 
 function RefreshNotice({ id, hidden, message }: { id?: string; hidden?: boolean; message: string }) {
+  const { t } = useI18n()
   // A plain link works before hydration; dropping the fragment makes it reload rather than scroll.
   const currentPage = useLocation({ select: (location) => location.pathname + location.searchStr })
   return (
@@ -34,7 +37,7 @@ function RefreshNotice({ id, hidden, message }: { id?: string; hidden?: boolean;
       <span className="whitespace-nowrap px-2 text-sm font-medium">{message}</span>
       <ButtonLink size="sm" href={currentPage}>
         <RefreshCw />
-        Refresh
+        {t.shell.updates.refresh}
       </ButtonLink>
     </div>
   )

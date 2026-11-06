@@ -27,6 +27,7 @@ import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
 import { TagDot } from './TagBadge'
 import { TagParentSelect } from './TagParentSelect'
+import { useI18n } from '../i18n'
 
 type View = { mode: 'list' } | { mode: 'create' } | { mode: 'edit'; id: string }
 
@@ -50,6 +51,8 @@ export function ManageTagsDialog({
   onDelete: (tag: PrintGroup) => void
   onCancel: () => void
 }) {
+  const { t } = useI18n()
+  const m = t.board.manageTags
   const rows = useMemo(() => printGroupRows(tags), [tags])
   const [view, setView] = useState<View>({ mode: 'list' })
   const [deleting, setDeleting] = useState<PrintGroup | null>(null)
@@ -68,18 +71,13 @@ export function ManageTagsDialog({
 
   return (
     <>
-      <DialogShell
-        title="Manage tags"
-        description="Tags apply across every stage, so renaming or moving one updates it everywhere. Drag a tag next to another to move it there, or further right to nest it underneath."
-        onClose={onCancel}
-        preventClose={pending}
-      >
+      <DialogShell title={m.title} description={m.description} onClose={onCancel} preventClose={pending}>
         {view.mode === 'create' ? (
           <TagForm
             rows={rows}
             pending={pending}
             error={error}
-            submitLabel="Create tag"
+            submitLabel={m.createTag}
             onSubmit={async ({ name, parentId }) => {
               const id = await onCreate(name, parentId || undefined)
               if (id) setView({ mode: 'list' })
@@ -93,7 +91,7 @@ export function ManageTagsDialog({
             tag={editing.group}
             pending={pending}
             error={error}
-            submitLabel="Save tag"
+            submitLabel={m.saveTag}
             onSubmit={async ({ name, color, parentId }) => {
               const saved = await onSave(editing.group.id, { name, color, parentId: parentId || null })
               if (saved) onCancel()
@@ -108,13 +106,13 @@ export function ManageTagsDialog({
                   <EmptyMedia variant="icon">
                     <Tags />
                   </EmptyMedia>
-                  <EmptyTitle>No tags yet</EmptyTitle>
-                  <EmptyDescription>Tags group prints across stages, such as a build plate or a customer order.</EmptyDescription>
+                  <EmptyTitle>{m.emptyTitle}</EmptyTitle>
+                  <EmptyDescription>{m.emptyDescription}</EmptyDescription>
                 </EmptyHeader>
                 <EmptyContent>
                   <Button type="button" onClick={() => setView({ mode: 'create' })}>
                     <Plus />
-                    New tag
+                    {m.newTag}
                   </Button>
                 </EmptyContent>
               </Empty>
@@ -133,15 +131,15 @@ export function ManageTagsDialog({
                 ))}
               </ItemGroup>
             )}
-            <DialogProblem title="The tags were not updated" hint="Nothing changed. Try again." error={error} />
+            <DialogProblem title={m.problemTitle} hint={m.problemHint} error={error} />
             {rows.length > 0 && (
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" disabled={pending} onClick={() => setView({ mode: 'create' })}>
                   <Plus />
-                  New tag
+                  {m.newTag}
                 </Button>
                 <Button type="button" disabled={pending} onClick={onCancel}>
-                  Done
+                  {t.common.done}
                 </Button>
               </div>
             )}
@@ -150,13 +148,9 @@ export function ManageTagsDialog({
       </DialogShell>
       <ConfirmDialog
         open={deleting !== null}
-        title={`Delete “${deleting?.name ?? ''}”?`}
-        description={
-          deletingBranch > 0
-            ? `This also deletes ${deletingBranch} nested ${deletingBranch === 1 ? 'tag' : 'tags'}. Every print keeps its place on the board.`
-            : 'Prints lose this tag but keep their place on the board.'
-        }
-        confirmLabel="Delete tag"
+        title={m.deleteTitle(deleting?.name ?? '')}
+        description={deletingBranch > 0 ? m.deleteNested(deletingBranch) : m.deleteDescription}
+        confirmLabel={m.deleteTag}
         destructive
         pending={pending}
         onConfirm={() => {
@@ -191,6 +185,8 @@ function TagRow({
   onEdit: () => void
   onDelete: () => void
 }) {
+  const { t } = useI18n()
+  const m = t.board.manageTags
   const ref = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState(false)
   const [nesting, setNesting] = useState(false)
@@ -267,7 +263,7 @@ function TagRow({
       <ItemMedia
         className={cn(pending ? 'cursor-not-allowed text-muted-foreground/40' : 'cursor-grab text-muted-foreground')}
         aria-hidden="true"
-        title="Drag to reorder, or further right to nest under another tag"
+        title={m.dragHint}
       >
         <GripVertical />
       </ItemMedia>
@@ -281,12 +277,12 @@ function TagRow({
         <Tooltip>
           <TooltipTrigger
             render={
-              <Button type="button" variant="ghost" size="icon-sm" aria-label={`Edit ${row.path}`} disabled={pending} onClick={onEdit} />
+              <Button type="button" variant="ghost" size="icon-sm" aria-label={m.editAria(row.path)} disabled={pending} onClick={onEdit} />
             }
           >
             <Pencil />
           </TooltipTrigger>
-          <TooltipContent>Edit tag</TooltipContent>
+          <TooltipContent>{m.editTag}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger
@@ -295,7 +291,7 @@ function TagRow({
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                aria-label={`Delete ${row.path}`}
+                aria-label={m.deleteAria(row.path)}
                 disabled={pending}
                 onClick={onDelete}
               />
@@ -303,7 +299,7 @@ function TagRow({
           >
             <Trash2 />
           </TooltipTrigger>
-          <TooltipContent>Delete tag</TooltipContent>
+          <TooltipContent>{m.deleteTag}</TooltipContent>
         </Tooltip>
       </ItemActions>
     </Item>
@@ -327,6 +323,8 @@ function TagForm({
   onSubmit: (fields: { name: string; color: PrintGroupColor; parentId: string }) => void | Promise<void>
   onBack: () => void
 }) {
+  const { t } = useI18n()
+  const m = t.board.manageTags
   const [name, setName] = useState(tag?.name ?? '')
   const [color, setColor] = useState<PrintGroupColor>(tag?.color ?? 'blue')
   const [parentId, setParentId] = useState(tag?.parentId ?? '')
@@ -348,26 +346,26 @@ function TagForm({
       }}
     >
       <Field data-invalid={nameTaken || undefined}>
-        <FieldLabel htmlFor="tag-name">Name</FieldLabel>
+        <FieldLabel htmlFor="tag-name">{m.name}</FieldLabel>
         <Input
           id="tag-name"
           maxLength={MAX_PRINT_GROUP_NAME_LENGTH}
           value={name}
-          placeholder="e.g. Plate 14"
+          placeholder={m.namePlaceholder}
           aria-invalid={nameTaken || undefined}
           onChange={(event) => setName(event.target.value)}
         />
-        {nameTaken && <FieldError>Another tag already uses this name.</FieldError>}
+        {nameTaken && <FieldError>{m.nameTaken}</FieldError>}
       </Field>
       {!tag && (
         <Field>
-          <FieldLabel htmlFor="tag-parent">Parent</FieldLabel>
+          <FieldLabel htmlFor="tag-parent">{m.parent}</FieldLabel>
           <TagParentSelect
             id="tag-parent"
             value={parentId}
             rows={rows}
             disabled={pending}
-            ariaLabel="Parent"
+            ariaLabel={m.parent}
             className="w-full"
             onChange={setParentId}
           />
@@ -375,14 +373,14 @@ function TagForm({
       )}
       {tag && (
         <Field>
-          <FieldLabel htmlFor="tag-color">Color</FieldLabel>
+          <FieldLabel htmlFor="tag-color">{m.color}</FieldLabel>
           <Select
-            items={printGroupColors.map((value) => ({ value, label: value }))}
+            items={printGroupColors.map((value) => ({ value, label: m.colors[value] }))}
             value={color}
             disabled={pending}
             onValueChange={(next: PrintGroupColor | null) => next && setColor(next)}
           >
-            <SelectTrigger id="tag-color" aria-label="Color" className="w-full capitalize">
+            <SelectTrigger id="tag-color" aria-label={m.color} className="w-full capitalize">
               <TagDot color={color} />
               <SelectValue />
             </SelectTrigger>
@@ -390,22 +388,22 @@ function TagForm({
               {printGroupColors.map((candidate) => (
                 <SelectItem key={candidate} value={candidate} className="capitalize">
                   <TagDot color={candidate} />
-                  {candidate}
+                  {m.colors[candidate]}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </Field>
       )}
-      <DialogProblem title="The tag was not saved" hint="Nothing changed. Try again." error={error} />
+      <DialogProblem title={m.saveProblemTitle} hint={m.problemHint} error={error} />
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" disabled={pending} onClick={onBack}>
           <ArrowLeft />
-          Back
+          {t.common.back}
         </Button>
         <Button type="submit" disabled={pending || !trimmed || nameTaken}>
           {pending && <Spinner />}
-          {pending ? 'Saving…' : submitLabel}
+          {pending ? t.common.saving : submitLabel}
         </Button>
       </div>
     </form>

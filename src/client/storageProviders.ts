@@ -1,5 +1,6 @@
 import type { StorageConfig } from '../core/types'
 import { CLOUD_STORAGE_PROVIDERS, CLOUD_STORAGE_PROVIDER_NAMES, type CloudStorageProvider } from '../core/auth'
+import type { Messages } from '../core/i18n'
 
 export type CloudProvider = CloudStorageProvider
 
@@ -13,113 +14,41 @@ export function isCloudAdapter(adapter: string): adapter is CloudProvider {
   return (CLOUD_STORAGE_PROVIDERS as readonly string[]).includes(adapter)
 }
 
-export function storageRecoveryHint(adapter: StorageConfig['adapter']) {
-  if (adapter === 'managed') return 'Try again, or contact the hosted service operator if included storage remains unavailable.'
-  if (adapter === 'local') return 'Check that the folder exists on the server and that STL Quest can write to it, usually a mounted volume.'
-  if (adapter === 'webdav')
-    return 'Check the address is reachable over HTTPS from this server, and that the username and password belong to that folder.'
-  if (adapter === 's3')
-    return 'Check the bucket name, region, and keys, and that the key is allowed to list, read, and write objects in the bucket.'
-  return 'Reconnect the account below; the app may have lost the permissions STL Quest needs.'
+export type StorageMessages = Messages['storage']
+
+export function storageRecoveryHint(t: StorageMessages, adapter: StorageConfig['adapter']) {
+  return adapter === 'managed' || adapter === 'local' || adapter === 'webdav' || adapter === 's3'
+    ? t.recoveryHint[adapter]
+    : t.recoveryHint.cloud
 }
 
-export const CLOUD_PROVIDER_HELP: Record<
-  CloudProvider,
-  { consoleUrl: string; credentials: string; intro: string; permissions: string; secret: string }
-> = {
-  dropbox: {
-    consoleUrl: 'https://www.dropbox.com/developers/apps',
-    credentials: 'Create a scoped app with App folder access, then add the redirect URI below.',
-    intro: 'Dropbox stores files inside its dedicated app folder.',
-    permissions: 'Enable account_info.read, files.metadata.read, files.content.read, and files.content.write.',
-    secret: 'App secret',
-  },
-  'google-drive': {
-    consoleUrl: 'https://console.cloud.google.com/apis/credentials',
-    credentials: 'Enable the Google Drive API and create an OAuth client for a web application.',
-    intro: 'Google Drive stores this workspace in a folder STL Quest creates using the limited drive.file permission.',
-    permissions: 'Add the redirect URI below to the OAuth client’s authorized redirect URIs.',
-    secret: 'Client secret',
-  },
-  onedrive: {
-    consoleUrl: 'https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade',
-    credentials:
-      'Register an application, choose “Any Entra ID Tenant + Personal Microsoft accounts”, then select Web under Redirect URI and paste the OAuth redirect URI shown below.',
-    intro: 'OneDrive stores files inside the application’s dedicated Apps folder.',
-    permissions:
-      'After registering, copy the Application (client) ID, create a client secret, and add delegated Microsoft Graph permissions for User.Read, Files.ReadWrite, and offline_access.',
-    secret: 'Client secret',
-  },
-  box: {
-    consoleUrl: 'https://app.box.com/developers/console',
-    credentials: 'Create a Custom App using OAuth 2.0, then add the redirect URI below.',
-    intro: 'Box stores this workspace in a folder STL Quest creates.',
-    permissions: 'Enable Read and write all files and folders stored in Box, then submit the app configuration.',
-    secret: 'Client secret',
-  },
+export const CLOUD_PROVIDER_CONSOLES: Record<CloudProvider, string> = {
+  dropbox: 'https://www.dropbox.com/developers/apps',
+  'google-drive': 'https://console.cloud.google.com/apis/credentials',
+  onedrive: 'https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade',
+  box: 'https://app.box.com/developers/console',
 }
 
-export function storageLabel(config: StorageConfig, managedLabel = 'Included storage') {
-  if (config.adapter === 'managed') return managedLabel
+export function storageLabel(config: StorageConfig, t: StorageMessages) {
+  if (config.adapter === 'managed') return t.label.managed
   if (config.adapter === 'dropbox' || config.adapter === 'google-drive' || config.adapter === 'onedrive' || config.adapter === 'box')
     return cloudProviderLabel(config.adapter)
-  if (config.adapter === 'local') return config.root || 'Local storage'
+  if (config.adapter === 'local') return config.root || t.label.local
   if (config.adapter === 'webdav') return [config.endpoint.replace(/\/$/, ''), config.root].filter(Boolean).join('/')
   return `${config.endpoint}/${config.bucket}${config.prefix ? `/${config.prefix}` : ''}`
 }
 
 export type S3Provider = 'aws' | 'backblaze' | 'cloudflare' | 'digitalocean' | 'google-cloud' | 'custom'
 
-export const S3_PROVIDERS: { value: S3Provider; label: string }[] = [
-  { value: 'aws', label: 'Amazon S3' },
-  { value: 'backblaze', label: 'Backblaze B2' },
-  { value: 'cloudflare', label: 'Cloudflare R2' },
-  { value: 'digitalocean', label: 'DigitalOcean Spaces' },
-  { value: 'google-cloud', label: 'Google Cloud Storage' },
-  { value: 'custom', label: 'Custom S3-compatible' },
-]
+export const S3_PROVIDERS: S3Provider[] = ['aws', 'backblaze', 'cloudflare', 'digitalocean', 'google-cloud', 'custom']
 
-export function s3ProviderLabel(provider: S3Provider) {
-  return S3_PROVIDERS.find((candidate) => candidate.value === provider)!.label
-}
-
-export const S3_PROVIDER_HELP: Record<S3Provider, { description: string; docs: string; accessKey: string; secretKey: string }> = {
-  aws: {
-    description: 'Use an IAM access key with permission to read and write the selected bucket.',
-    docs: 'https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-iam.html',
-    accessKey: 'Access key ID',
-    secretKey: 'Secret access key',
-  },
-  backblaze: {
-    description: 'Create an application key for the bucket and copy its S3 endpoint region.',
-    docs: 'https://www.backblaze.com/docs/cloud-storage-s3-compatible-api',
-    accessKey: 'Application key ID',
-    secretKey: 'Application key',
-  },
-  cloudflare: {
-    description: 'Create an R2 API token with Object Read & Write permission and copy your account ID.',
-    docs: 'https://developers.cloudflare.com/r2/api/s3/tokens/',
-    accessKey: 'Access key ID',
-    secretKey: 'Secret access key',
-  },
-  digitalocean: {
-    description: 'Create a Spaces access key and choose the datacenter region containing your Space.',
-    docs: 'https://docs.digitalocean.com/products/spaces/how-to/manage-access/',
-    accessKey: 'Spaces access key',
-    secretKey: 'Spaces secret key',
-  },
-  'google-cloud': {
-    description: 'Create an HMAC key for a service account with access to the selected bucket.',
-    docs: 'https://cloud.google.com/storage/docs/authentication/hmackeys',
-    accessKey: 'HMAC access ID',
-    secretKey: 'HMAC secret',
-  },
-  custom: {
-    description: 'Use the endpoint and credentials supplied by MinIO, Wasabi, your NAS, or another S3-compatible service.',
-    docs: 'https://docs.aws.amazon.com/sdkref/latest/guide/feature-ss-endpoints.html',
-    accessKey: 'Access key ID',
-    secretKey: 'Secret access key',
-  },
+export const S3_PROVIDER_DOCS: Record<S3Provider, string> = {
+  aws: 'https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-iam.html',
+  backblaze: 'https://www.backblaze.com/docs/cloud-storage-s3-compatible-api',
+  cloudflare: 'https://developers.cloudflare.com/r2/api/s3/tokens/',
+  digitalocean: 'https://docs.digitalocean.com/products/spaces/how-to/manage-access/',
+  'google-cloud': 'https://cloud.google.com/storage/docs/authentication/hmackeys',
+  custom: 'https://docs.aws.amazon.com/sdkref/latest/guide/feature-ss-endpoints.html',
 }
 
 export function inferS3Provider(endpoint = ''): S3Provider {

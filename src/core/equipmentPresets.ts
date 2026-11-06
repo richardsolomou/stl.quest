@@ -2,7 +2,8 @@ import catalog from '../../catalogs/equipment/catalog.json'
 import { getPrinterPreset, type PrinterPreset } from './printerPresets'
 
 export type EquipmentPhase = 'printing' | 'washing' | 'drying' | 'curing'
-export type EquipmentPowerProfile = { phase: EquipmentPhase; watts: number; basis: string }
+/** `basis` cites where the figure comes from; a profile without one is STL Quest's own default estimate. */
+export type EquipmentPowerProfile = { phase: EquipmentPhase; watts: number; basis?: string }
 export type EquipmentPreset = Omit<(typeof catalog.presets)[number], 'powerProfiles' | 'printType'> & {
   printType?: 'resin' | 'filament'
   powerProfiles: EquipmentPowerProfile[]
@@ -23,7 +24,6 @@ export function printerPowerProfile(id: string): EquipmentPowerProfile | undefin
     matchingPrinterPowerPreset(printer)?.powerProfiles.find((profile) => profile.phase === 'printing') ?? {
       phase: 'printing',
       watts: DEFAULT_PRINTER_POWER_WATTS[printer.printType],
-      basis: 'default estimate; enter measured power in Custom mode for a closer quote',
     }
   )
 }

@@ -15,11 +15,13 @@ export const onboardingTaskIds = [
 ] as const
 
 export type OnboardingTaskId = (typeof onboardingTaskIds)[number]
-export type OnboardingSectionId = 'getting-started' | 'managing-queue' | 'workspace-setup'
+
+export const onboardingSectionIds = ['getting-started', 'managing-queue', 'workspace-setup'] as const
+
+export type OnboardingSectionId = (typeof onboardingSectionIds)[number]
+
 export type OnboardingQuest = {
   id: OnboardingTaskId
-  title: string
-  description: string
   version: number
   points: number
   scope: 'user' | 'workspace'
@@ -32,8 +34,6 @@ export type OnboardingQuest = {
 export const onboardingQuests: readonly OnboardingQuest[] = [
   {
     id: 'upload',
-    title: 'Add your first print',
-    description: 'Upload a model or save a source link when you are ready to put work into the queue.',
     version: 1,
     points: 20,
     scope: 'user',
@@ -42,8 +42,6 @@ export const onboardingQuests: readonly OnboardingQuest[] = [
   },
   {
     id: 'move',
-    title: 'Move work through the queue',
-    description: 'Drag a print card between columns to update its stage.',
     version: 1,
     points: 20,
     scope: 'user',
@@ -54,8 +52,6 @@ export const onboardingQuests: readonly OnboardingQuest[] = [
   },
   {
     id: 'inspect',
-    title: 'Inspect a print',
-    description: 'Open a print card to review its model, notes, copies, and assignment.',
     version: 1,
     points: 10,
     scope: 'user',
@@ -65,8 +61,6 @@ export const onboardingQuests: readonly OnboardingQuest[] = [
   },
   {
     id: 'download',
-    title: 'Download a model',
-    description: 'Download an STL from a print card or its detail view.',
     version: 1,
     points: 10,
     scope: 'user',
@@ -76,8 +70,6 @@ export const onboardingQuests: readonly OnboardingQuest[] = [
   },
   {
     id: 'actions',
-    title: 'Discover print actions',
-    description: 'Use a print card action to select, group, move, or delete work.',
     version: 1,
     points: 10,
     scope: 'user',
@@ -88,8 +80,6 @@ export const onboardingQuests: readonly OnboardingQuest[] = [
   },
   {
     id: 'sort',
-    title: 'Choose your queue view',
-    description: 'Sort by requester priority, submission time, name, or recent activity.',
     version: 1,
     points: 10,
     scope: 'user',
@@ -99,8 +89,6 @@ export const onboardingQuests: readonly OnboardingQuest[] = [
   },
   {
     id: 'filter',
-    title: 'Find work with filters',
-    description: 'Apply a filter to focus the queue by print type, requester, dates, files, or another useful field.',
     version: 1,
     points: 10,
     scope: 'user',
@@ -110,8 +98,6 @@ export const onboardingQuests: readonly OnboardingQuest[] = [
   },
   {
     id: 'printers',
-    title: 'Assemble your printer fleet',
-    description: 'Add and save a printer profile to help match requests to compatible machines.',
     version: 1,
     points: 20,
     scope: 'workspace',
@@ -121,8 +107,6 @@ export const onboardingQuests: readonly OnboardingQuest[] = [
   },
   {
     id: 'storage',
-    title: 'Inspect model storage',
-    description: 'Review the active storage provider and the options for moving models later.',
     version: 1,
     points: 10,
     scope: 'workspace',
@@ -132,8 +116,6 @@ export const onboardingQuests: readonly OnboardingQuest[] = [
   },
   {
     id: 'visibility',
-    title: 'Choose request visibility',
-    description: 'Choose whether requesters see the shared queue or only their own work.',
     version: 1,
     points: 10,
     scope: 'workspace',
@@ -143,8 +125,6 @@ export const onboardingQuests: readonly OnboardingQuest[] = [
   },
   {
     id: 'invite',
-    title: 'Invite a teammate',
-    description: 'Create a single-use invite for a requester or another admin.',
     version: 1,
     points: 20,
     scope: 'workspace',
@@ -152,12 +132,6 @@ export const onboardingQuests: readonly OnboardingQuest[] = [
     prerequisites: [],
     admin: true,
   },
-]
-
-export const onboardingSections: { id: OnboardingSectionId; title: string }[] = [
-  { id: 'getting-started', title: 'Getting started' },
-  { id: 'managing-queue', title: 'Managing the queue' },
-  { id: 'workspace-setup', title: 'Configuring your workspace' },
 ]
 
 export type OnboardingProgress = {

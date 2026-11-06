@@ -3,6 +3,7 @@ import { uploadErrorMessage, uploadPrint } from './components/uploadTransport'
 import type { UploadEntry } from './components/uploadTypes'
 import { UNCHANGED_MODEL, stagedModelIncomplete, stagedModelState, type StagedModel } from './requestEditor'
 import { useWorkspaceSlug } from './workspace'
+import { useI18n } from './i18n'
 import type { PrintType, PublicPrintRequest } from '../core/types'
 
 export type ModelAttachment = ReturnType<typeof useModelAttachment>
@@ -12,6 +13,7 @@ export type ModelAttachment = ReturnType<typeof useModelAttachment>
  * handler, so clearing a model and picking a new one is as reversible as any other field in the form.
  */
 export function useModelAttachment(request: PublicPrintRequest) {
+  const { t } = useI18n()
   const workspaceSlug = useWorkspaceSlug()
   const [staged, setStaged] = useState<StagedModel>(UNCHANGED_MODEL)
   const [progress, setProgress] = useState<number>()
@@ -47,7 +49,7 @@ export function useModelAttachment(request: PublicPrintRequest) {
         await uploadPrint(workspaceSlug, entry, (sent, total) => setProgress(total ? Math.round((sent / total) * 100) : 0))
         return undefined
       } catch (failure) {
-        return uploadErrorMessage(failure)
+        return uploadErrorMessage(failure, t.requests)
       } finally {
         setProgress(undefined)
       }

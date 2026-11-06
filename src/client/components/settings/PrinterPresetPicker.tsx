@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { filterPrinterPresets, PRINTER_PRESETS, type PrinterPreset } from '../../../core/printerPresets'
 import { DialogShell } from '../DialogShell'
 import { PrinterPresetImage } from './PrinterPresetImage'
+import { useI18n } from '../../i18n'
 
 export function PrinterPresetPicker({
   disabled,
@@ -22,6 +23,8 @@ export function PrinterPresetPicker({
   onCustom: () => void
 }) {
   const [open, setOpen] = useState(false)
+  const { t } = useI18n()
+  const copy = t.settings.printerPicker
   const [search, setSearch] = useState('')
   const [expandedBrand, setExpandedBrand] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -45,12 +48,12 @@ export function PrinterPresetPicker({
   return (
     <>
       <Button type="button" variant={variant} className="justify-self-start" onClick={() => setOpen(true)} disabled={disabled}>
-        <Plus /> Add printer
+        <Plus /> {copy.add}
       </Button>
       {open && (
         <DialogShell
-          title="Choose a printer"
-          description="Select a known model or add a custom printer."
+          title={copy.title}
+          description={copy.description}
           className="sm:max-h-[min(44rem,calc(100dvh-2.5rem))] sm:max-w-2xl"
           // The result list owns the scrolling here, so the shell must not scroll as well.
           contentClassName="flex min-h-0 flex-col gap-3 overflow-y-hidden"
@@ -63,8 +66,8 @@ export function PrinterPresetPicker({
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              aria-label="Search printers"
-              placeholder="Search by brand, model, or print type"
+              aria-label={copy.searchLabel}
+              placeholder={copy.searchPlaceholder}
               value={search}
               className="pl-9"
               onChange={(event) => setSearch(event.target.value)}
@@ -100,7 +103,7 @@ export function PrinterPresetPicker({
                   })}
                 </div>
               ) : (
-                <p className="py-10 text-center text-sm text-muted-foreground">No predefined printers match “{search.trim()}”.</p>
+                <p className="py-10 text-center text-sm text-muted-foreground">{copy.noMatch(search.trim())}</p>
               )
             ) : (
               <div className="grid gap-3 pb-1">
@@ -113,8 +116,8 @@ export function PrinterPresetPicker({
                     <Settings2 className="size-6" />
                   </span>
                   <span>
-                    <span className="block font-medium">Custom printer</span>
-                    <span className="block text-sm text-muted-foreground">Enter a printer name and print type manually.</span>
+                    <span className="block font-medium">{copy.custom}</span>
+                    <span className="block text-sm text-muted-foreground">{copy.customDescription}</span>
                   </span>
                 </button>
                 <div className="grid gap-2">
@@ -170,11 +173,13 @@ function PresetButton({
   onClick: () => void
   showBrand?: boolean
 }) {
+  const { t } = useI18n()
+  const copy = t.settings.printerPicker
   return (
     <button
       type="button"
       className="flex h-full w-full min-w-0 items-center gap-3 rounded-lg border bg-background p-2.5 text-left transition-colors hover:bg-muted/60 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-      aria-label={`Add ${preset.brand} ${preset.model}`}
+      aria-label={copy.addPreset(`${preset.brand} ${preset.model}`)}
       onClick={onClick}
     >
       <PrinterPresetImage printer={preset} />
@@ -182,15 +187,15 @@ function PresetButton({
         <span className="flex min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap">
           <span className="min-w-0 font-medium sm:truncate">{showBrand ? `${preset.brand} ${preset.model}` : preset.model}</span>
           <Badge variant="outline" className="shrink-0 text-[0.65rem]">
-            {preset.printType === 'resin' ? 'Resin' : 'Filament'}
+            {t.settings.printers.printTypes[preset.printType]}
           </Badge>
           {added && (
             <Badge variant="secondary" className="shrink-0 text-[0.65rem]">
-              <Check /> Added
+              <Check /> {copy.added}
             </Badge>
           )}
         </span>
-        <span className="mt-1 block text-xs text-muted-foreground">Add this model to your printer list.</span>
+        <span className="mt-1 block text-xs text-muted-foreground">{copy.presetHint}</span>
       </span>
     </button>
   )

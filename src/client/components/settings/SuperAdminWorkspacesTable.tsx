@@ -7,19 +7,27 @@ import type { DataTableFeatures } from '@/components/ui/data-table'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { formatBytes } from '../../../core/format'
 import { adminWorkspaceHealth, type AdminWorkspace } from '../../../core/admin'
+import type { Locale, Messages } from '../../../core/i18n'
 
 const columnHelper = createColumnHelper<DataTableFeatures, AdminWorkspace>()
 const secondaryColumn = { className: '@max-3xl:hidden' }
 
-export const adminWorkspaceHealthOptions = [
-  { value: 'attention', label: 'Needs attention' },
-  { value: 'healthy', label: 'Healthy' },
-] as const
+export const adminWorkspaceHealthOptions = (t: Messages) =>
+  (['attention', 'healthy'] as const).map((value) => ({ value, label: t.superAdmin.health[value] }))
 
-export function superAdminWorkspaceColumns({ onDelete }: { onDelete: (workspace: AdminWorkspace) => void }) {
+export function superAdminWorkspaceColumns({
+  t,
+  locale,
+  onDelete,
+}: {
+  t: Messages
+  locale: Locale
+  onDelete: (workspace: AdminWorkspace) => void
+}) {
+  const copy = t.superAdmin
   return columnHelper.columns([
     columnHelper.accessor('name', {
-      header: 'Workspace',
+      header: copy.columns.workspace,
       cell: ({ row }) => (
         <div className="min-w-0">
           <p className="truncate font-medium" title={row.original.name}>
@@ -32,7 +40,7 @@ export function superAdminWorkspaceColumns({ onDelete }: { onDelete: (workspace:
     }),
     columnHelper.accessor((workspace) => workspace.owners.map((owner) => owner.name).join(', '), {
       id: 'owners',
-      header: 'Owner',
+      header: copy.columns.owner,
       cell: ({ getValue }) => {
         const owners = getValue()
         return owners ? (
@@ -40,39 +48,39 @@ export function superAdminWorkspaceColumns({ onDelete }: { onDelete: (workspace:
             {owners}
           </span>
         ) : (
-          <span className="text-muted-foreground">None</span>
+          <span className="text-muted-foreground">{copy.workspaces.none}</span>
         )
       },
       meta: { className: '@max-xl:hidden' },
     }),
-    columnHelper.accessor('memberCount', { header: 'Members', meta: secondaryColumn }),
-    columnHelper.accessor('requestCount', { header: 'Requests', meta: secondaryColumn }),
-    columnHelper.accessor('copyCount', { header: 'Copies', meta: secondaryColumn }),
-    columnHelper.accessor('printerCount', { header: 'Printers', meta: secondaryColumn }),
+    columnHelper.accessor('memberCount', { header: copy.columns.members, meta: secondaryColumn }),
+    columnHelper.accessor('requestCount', { header: copy.columns.requests, meta: secondaryColumn }),
+    columnHelper.accessor('copyCount', { header: copy.columns.copies, meta: secondaryColumn }),
+    columnHelper.accessor('printerCount', { header: copy.columns.printers, meta: secondaryColumn }),
     columnHelper.accessor('createdAt', {
-      header: 'Created',
-      cell: ({ getValue }) => <DateCell value={getValue()} />,
+      header: copy.columns.created,
+      cell: ({ getValue }) => <DateCell value={getValue()} locale={locale} />,
       meta: secondaryColumn,
     }),
     columnHelper.accessor('lastRequestAt', {
-      header: 'Last request change',
+      header: copy.columns.lastRequestChange,
       cell: ({ getValue }) => {
         const value = getValue()
-        return value ? <DateCell value={value} /> : <span className="text-muted-foreground">No requests</span>
+        return value ? <DateCell value={value} locale={locale} /> : <span className="text-muted-foreground">{copy.noRequests}</span>
       },
       sortUndefined: 'last',
       meta: secondaryColumn,
     }),
     columnHelper.display({
       id: 'storage',
-      header: 'Storage',
+      header: copy.columns.storage,
       cell: ({ row }) => {
         const workspace = row.original
-        if (!workspace.storageConfigured) return <span className="text-muted-foreground">Not configured</span>
-        if (!workspace.managedStorage) return 'Configured'
+        if (!workspace.storageConfigured) return <span className="text-muted-foreground">{copy.notConfigured}</span>
+        if (!workspace.managedStorage) return copy.configured
         return (
           <span className="whitespace-nowrap">
-            {formatBytes(workspace.managedStorage.usedBytes)} · {workspace.managedStorage.plan}
+            {formatBytes(workspace.managedStorage.usedBytes, locale)} · {workspace.managedStorage.plan}
           </span>
         )
       },
@@ -80,31 +88,49 @@ export function superAdminWorkspaceColumns({ onDelete }: { onDelete: (workspace:
     }),
     columnHelper.accessor(adminWorkspaceHealth, {
       id: 'health',
-      header: 'Health',
+      header: copy.columns.health,
       cell: ({ getValue }) =>
-        getValue() === 'attention' ? <Badge variant="destructive">Needs attention</Badge> : <Badge variant="outline">Healthy</Badge>,
+        getValue() === 'attention' ? (
+          <Badge variant="destructive">{copy.health.attention}</Badge>
+        ) : (
+          <Badge variant="outline">{copy.health.healthy}</Badge>
+        ),
       meta: { className: '@max-sm:hidden' },
     }),
     columnHelper.display({
       id: 'actions',
       enableHiding: false,
-      header: 'Actions',
+      header: copy.columns.actions,
       cell: ({ row }) => (
         <div className="flex justify-end">
-          <WorkspaceActions workspace={row.original} onDelete={onDelete} />
+          <WorkspaceActions t={t} workspace={row.original} onDelete={onDelete} />
         </div>
       ),
     }),
   ])
 }
 
-function WorkspaceActions({ workspace, onDelete }: { workspace: AdminWorkspace; onDelete: (workspace: AdminWorkspace) => void }) {
+function WorkspaceActions({
+  t,
+  workspace,
+  onDelete,
+}: {
+  t: Messages
+  workspace: AdminWorkspace
+  onDelete: (workspace: AdminWorkspace) => void
+}) {
   const [open, setOpen] = useState(false)
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         render={
-          <Button type="button" variant="ghost" size="icon-sm" className="ph-no-capture" aria-label={`Actions for ${workspace.name}`} />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="ph-no-capture"
+            aria-label={t.superAdmin.actionsFor(workspace.name)}
+          />
         }
       >
         <Ellipsis />
@@ -120,13 +146,13 @@ function WorkspaceActions({ workspace, onDelete }: { workspace: AdminWorkspace; 
           }}
         >
           <Trash2 />
-          Delete workspace
+          {t.superAdmin.workspaces.delete}
         </Button>
       </PopoverContent>
     </Popover>
   )
 }
 
-function DateCell({ value }: { value: number }) {
-  return <time dateTime={new Date(value).toISOString()}>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(value)}</time>
+function DateCell({ value, locale }: { value: number; locale: Locale }) {
+  return <time dateTime={new Date(value).toISOString()}>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(value)}</time>
 }

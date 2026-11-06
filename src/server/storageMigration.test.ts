@@ -531,6 +531,8 @@ describe('StorageMigrationCoordinator', () => {
     expect((await coordinator.status())?.error).toBe(
       'Managed storage rejected todo/model.stl (5 B) because copying it would exceed your storage quota. Free up space or raise the quota, then retry the migration.',
     )
+    // The browser rewords this in the viewer's language, so the record keeps what failed as data.
+    expect((await coordinator.status())?.failure).toEqual({ kind: 'quota', path: 'todo/model.stl', bytes: 5 })
   })
 
   it('keeps retrying transient copy failures thrown as a Response until the copy succeeds', async () => {

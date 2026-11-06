@@ -5,28 +5,26 @@ import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import type { StorageConfig } from '../../../core/types'
 import type { StoragePlan } from '../../../core/plans'
-import { storageLabel, type CloudProvider } from '../../storageProviders'
+import { storageLabel, type CloudProvider, type StorageMessages } from '../../storageProviders'
+import { useI18n } from '../../i18n'
 import { CloudProviderIcon } from '../CloudProviderIcon'
 import { StorageAdapterIcon } from '../StorageAdapterIcon'
 import { ManagedStorageUsage, type ManagedStorageUsageValue } from './ManagedStorageUsage'
 import { includedStorageOnboardingCopy } from './planCopy'
 
 function storageDescription(
+  t: StorageMessages,
   inUse: StorageConfig | undefined,
   settings: boolean,
   serverFolder: string | undefined,
   managedStorage: boolean,
 ) {
-  if (inUse?.adapter === 'managed' && settings)
-    return 'Keep using the storage hosted for you, or switch to storage you manage. STL Quest copies and verifies your files before switching.'
-  if (inUse && settings)
-    return 'Keep using the active location, edit its connection, or choose somewhere new. STL Quest copies and verifies your files before switching.'
-  if (inUse)
-    return 'Nothing has been uploaded yet, so switching now costs nothing. Pick a different location, or keep the one you already set up.'
-  if (serverFolder)
-    return 'Uploads are written straight into storage you own, and STL Quest never keeps a second copy. Connect one location and the board is ready for prints.'
-  if (managedStorage) return 'STL Quest can host your models for you, or connect to storage you already manage.'
-  return 'Hosted workspaces require remote storage before the board is ready for prints.'
+  if (inUse?.adapter === 'managed' && settings) return t.picker.descriptionManagedInUse
+  if (inUse && settings) return t.picker.descriptionInUse
+  if (inUse) return t.picker.descriptionUnused
+  if (serverFolder) return t.picker.descriptionServerFolder
+  if (managedStorage) return t.picker.descriptionManaged
+  return t.picker.descriptionRemoteRequired
 }
 
 export function StorageProviderPicker({
@@ -42,7 +40,7 @@ export function StorageProviderPicker({
   onUseServerFolder,
   onUseManagedStorage,
   onKeepCurrent,
-  currentActionLabel = 'Keep this and continue',
+  currentActionLabel,
   settings = false,
   onChoose,
 }: {
@@ -62,35 +60,37 @@ export function StorageProviderPicker({
   settings?: boolean
   onChoose: (adapter: StorageConfig['adapter']) => void
 }) {
+  const { t: messages, locale } = useI18n()
+  const t = messages.storage
   const options: { value: StorageConfig['adapter']; label: string; requires: string; icon: ReactNode }[] = [
     ...(inUse && serverFolder
       ? [
           {
             value: 'local' as const,
-            label: 'A folder on this server',
-            requires: `Writes to a folder on the machine running STL Quest, such as ${serverFolder}.`,
+            label: t.picker.localLabel,
+            requires: t.picker.localRequires(serverFolder),
             icon: <StorageAdapterIcon adapter="local" className="size-5" />,
           },
         ]
       : []),
     {
       value: 's3',
-      label: 'S3-compatible bucket',
-      requires: 'Needs a bucket and access keys from Amazon S3, Cloudflare R2, Backblaze, MinIO, or a similar provider.',
+      label: t.picker.s3Label,
+      requires: t.picker.s3Requires,
       icon: <StorageAdapterIcon adapter="s3" className="size-5" />,
     },
     {
       value: 'webdav',
-      label: 'Remote folder over WebDAV',
-      requires: 'Needs a WebDAV server on your own machine or NAS, reachable over HTTPS.',
+      label: t.picker.webdavLabel,
+      requires: t.picker.webdavRequires,
       icon: <StorageAdapterIcon adapter="webdav" className="size-5" />,
     },
   ]
-  const description = storageDescription(inUse, settings, serverFolder, managedStorage)
+  const description = storageDescription(t, inUse, settings, serverFolder, managedStorage)
   return (
     <div className="flex flex-col gap-5">
       <div className="space-y-2">
-        <h3 className="font-heading text-xl font-semibold">{inUse ? 'Change where your models live' : 'Choose where your models live'}</h3>
+        <h3 className="font-heading text-xl font-semibold">{inUse ? t.picker.changeTitle : t.picker.chooseTitle}</h3>
         <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
       </div>
       {inUse && (
@@ -100,15 +100,17 @@ export function StorageProviderPicker({
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">Storage is set up</span>
-              <Badge>In use</Badge>
+              <span className="font-medium">{t.picker.setUp}</span>
+              <Badge>{t.picker.inUse}</Badge>
             </div>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               {inUse.adapter === 'managed' ? (
-                'Hosted by STL Quest. Your account’s storage is shared across every workspace using it.'
+                t.picker.managedInUse
               ) : (
                 <>
-                  Models go to <code className="break-all">{storageLabel(inUse)}</code>.
+                  {t.picker.modelsGoTo.before}
+                  <code className="break-all">{storageLabel(inUse, t)}</code>
+                  {t.picker.modelsGoTo.after}
                 </>
               )}
             </p>
@@ -118,7 +120,7 @@ export function StorageProviderPicker({
             {onKeepCurrent && (
               <div className="mt-3">
                 <Button type="button" disabled={preparing} onClick={onKeepCurrent}>
-                  {currentActionLabel}
+                  {currentActionLabel ?? t.picker.keepAndContinue}
                 </Button>
               </div>
             )}
@@ -132,19 +134,21 @@ export function StorageProviderPicker({
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">This server’s own disk</span>
-              <Badge>Recommended</Badge>
+              <span className="font-medium">{t.picker.serverDisk}</span>
+              <Badge>{t.picker.recommended}</Badge>
             </div>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Models are written to <code className="break-all">{serverFolder}</code>. Nothing to sign up for, no keys to copy.
+              {t.picker.serverDiskBody.before}
+              <code className="break-all">{serverFolder}</code>
+              {t.picker.serverDiskBody.after}
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2 max-sm:flex-col max-sm:items-stretch">
               <Button type="button" disabled={preparing} onClick={onUseServerFolder}>
                 {preparing && <Spinner />}
-                {preparing ? 'Preparing storage…' : 'Use this folder'}
+                {preparing ? t.picker.preparing : t.picker.useFolder}
               </Button>
               <Button type="button" variant="ghost" size="sm" disabled={preparing} onClick={() => onChoose('local')}>
-                Pick another folder
+                {t.picker.pickAnother}
               </Button>
             </div>
           </div>
@@ -157,18 +161,16 @@ export function StorageProviderPicker({
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">Included storage</span>
-              <Badge>Recommended</Badge>
+              <span className="font-medium">{t.picker.included}</span>
+              <Badge>{t.picker.recommended}</Badge>
             </div>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              {settings
-                ? 'Hosted by STL Quest. Your account’s storage is shared across every workspace using it. Nothing else to configure.'
-                : includedStorageOnboardingCopy(managedStoragePlan)}
+              {settings ? t.picker.includedSettings : includedStorageOnboardingCopy(managedStoragePlan, messages, locale)}
             </p>
             <div className="mt-3">
               <Button type="button" disabled={preparing} onClick={onUseManagedStorage}>
                 {preparing && <Spinner />}
-                {preparing ? 'Preparing storage…' : 'Use included storage'}
+                {preparing ? t.picker.preparing : t.picker.useIncluded}
               </Button>
             </div>
           </div>
@@ -176,20 +178,20 @@ export function StorageProviderPicker({
       )}
       {!inUse && managedStorageUnavailableReason && (
         <p className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
-          {managedStorageUnavailableReason} Connect S3, WebDAV, or a cloud account for this workspace instead.
+          {managedStorageUnavailableReason} {t.picker.connectInstead}
         </p>
       )}
       <div className="flex flex-col gap-2">
         <h4 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
           {inUse?.adapter === 'managed'
-            ? 'Use your own storage instead'
+            ? t.picker.ownInstead
             : inUse
-              ? 'Switch to something else'
+              ? t.picker.switchElse
               : managedStorage
-                ? 'Or use your own storage'
+                ? t.picker.orOwn
                 : serverFolder
-                  ? 'Or connect storage you already use'
-                  : 'Connect storage you already use'}
+                  ? t.picker.orConnect
+                  : t.picker.connect}
         </h4>
         {options.map((option) => (
           <button
@@ -213,13 +215,13 @@ export function StorageProviderPicker({
         ))}
         {cloudProviders.length > 0 && (
           <div className="rounded-lg border bg-card p-3">
-            <span className="font-medium">Consumer cloud storage</span>
+            <span className="font-medium">{t.picker.consumerCloud}</span>
             <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
               {cloudProviders.every((provider) => provider.available)
-                ? 'Sign in with your own account. Models go to your storage, not a shared one.'
+                ? t.picker.cloudReady
                 : canSetUpCloud
-                  ? 'Each provider takes a one-time setup for this deployment, then any workspace can connect its own account.'
-                  : 'Each provider needs its own app created in a developer console before STL Quest can connect.'}
+                  ? t.picker.cloudSetUp
+                  : t.picker.cloudNeedsApp}
             </p>
             <div className="mt-2.5 flex flex-wrap gap-2 max-sm:flex-col">
               {cloudProviders.map((provider) => (
@@ -232,9 +234,7 @@ export function StorageProviderPicker({
           </div>
         )}
       </div>
-      <p className="text-xs leading-relaxed text-muted-foreground">
-        Storage can move later from Settings. STL Quest copies and verifies every file before switching, and leaves the original untouched.
-      </p>
+      <p className="text-xs leading-relaxed text-muted-foreground">{t.picker.footer}</p>
     </div>
   )
 }

@@ -31,12 +31,14 @@ import {
   storageLabel,
   storageRecoveryHint,
   type CloudProvider,
+  type StorageMessages,
 } from '../../storageProviders'
 import { rootForStorageAdapter, storageConfigFromForm, storageFormValues, useStorageConfigForm } from '../../storageForm'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { QueryState } from '../QueryState'
 import { ServerFolderPicker } from '../ServerFolderPicker'
 import { useWorkspaceSlug } from '../../workspace'
+import { useI18n } from '../../i18n'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { SettingNotice, noticeDetail, type Notice } from '../SettingNotice'
 import { CloudStorageAppDialog } from './CloudStorageAppDialog'
@@ -53,12 +55,8 @@ type CloudConnections = Record<CloudProvider, PublicCloudConnection>
 
 const refreshStorageSettings = (queryClient: ReturnType<typeof useQueryClient>) => invalidateQueries(queryClient, 'storage', 'session')
 
-function connectFirstNotice(provider: CloudProvider): Notice {
-  return {
-    tone: 'error',
-    title: `${cloudProviderLabel(provider)} is not connected yet`,
-    hint: 'Add the app credentials above and connect the account, then it can be used for storage.',
-  }
+function connectFirstNotice(t: StorageMessages, provider: CloudProvider): Notice {
+  return { tone: 'error', title: t.notice.notConnectedTitle(cloudProviderLabel(provider)), hint: t.notice.notConnectedHint }
 }
 
 export function StoragePane({
@@ -66,6 +64,7 @@ export function StoragePane({
   onSaved,
   onKeepCurrent,
 }: { onboarding?: boolean; onSaved?: () => void; onKeepCurrent?: () => void } = {}) {
+  const t = useI18n().t.storage
   const workspaceSlug = useWorkspaceSlug()
   const storageResult = useQuery(storageQuery(workspaceSlug))
   const migrationResult = useQuery(storageMigrationQuery(workspaceSlug))
@@ -80,18 +79,15 @@ export function StoragePane({
       <QueryState
         loading={storageResult.isPending || migrationResult.isPending || connectionsResult.isPending || sessionResult.isPending}
         error={storageResult.error ?? migrationResult.error ?? connectionsResult.error ?? sessionResult.error}
-        loadingLabel="Loading storage settings…"
-        errorTitle="Could not load storage settings"
+        loadingLabel={t.pane.loading}
+        errorTitle={t.pane.loadError}
         onRetry={() => void retryQueries(storageResult.refetch, migrationResult.refetch, connectionsResult.refetch, sessionResult.refetch)}
       />
     )
     if (onboarding) return state
     return (
       <SettingsPage>
-        <SettingsHeader
-          title="Storage"
-          description="Move finished print files between local folders, S3-compatible providers, and connected cloud storage."
-        />
+        <SettingsHeader title={t.pane.title} description={t.pane.loadingDescription} />
         {state}
       </SettingsPage>
     )
@@ -151,6 +147,10 @@ function StorageForm({
   onSaved?: () => void
   onKeepCurrent?: () => void
 }) {
+  const {
+    t: { storage: t },
+    locale,
+  } = useI18n()
   const workspaceSlug = useWorkspaceSlug()
   const callUpdate = useServerFn(updateStorageSettings)
   const callTestConnection = useServerFn(testStorageConnection)
@@ -189,19 +189,21 @@ function StorageForm({
   const cloudProviders = CLOUD_PROVIDERS.filter(
     (provider) => superAdmin || cloudConnections[provider.value].available || current.adapter === provider.value,
   ).map((provider) => ({ ...provider, available: cloudConnections[provider.value].available }))
-  const storageChoices = joinChoices([
-    managedStorageAvailable || current.adapter === 'managed' ? 'included storage' : undefined,
-    localStorageAllowed ? 'a local folder' : undefined,
-    'a remote WebDAV folder',
-    'S3-compatible storage',
-    cloudProviders.length ? 'connected cloud storage' : undefined,
-  ])
+  const storageChoices = new Intl.ListFormat(locale, { type: 'disjunction' }).format(
+    [
+      managedStorageAvailable || current.adapter === 'managed' ? t.pane.choices.managed : undefined,
+      localStorageAllowed ? t.pane.choices.local : undefined,
+      t.pane.choices.webdav,
+      t.pane.choices.s3,
+      cloudProviders.length ? t.pane.choices.cloud : undefined,
+    ].filter((choice): choice is string => !!choice),
+  )
   const defaultValues = storageFormValues(current, localStorageAllowed)
   const form = useStorageConfigForm(defaultValues, async (value) => {
     const config = storageConfigFromForm(value)
     setNotice(undefined)
     if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
-      setNotice(connectFirstNotice(config.adapter))
+      setNotice(connectFirstNotice(t, config.adapter))
       return
     }
     try {
@@ -218,7 +220,7 @@ function StorageForm({
       onSaved?.()
     } catch (error) {
       setStorageChoice(config.adapter)
-      setNotice({ tone: 'error', title: 'Storage was not changed', hint: storageRecoveryHint(config.adapter), detail: noticeDetail(error) })
+      setNotice({ tone: 'error', title: t.notice.notChanged, hint: storageRecoveryHint(t, config.adapter), detail: noticeDetail(error) })
     }
   })
 
@@ -227,7 +229,7 @@ function StorageForm({
     const configSnapshot = JSON.stringify(config)
     setNotice(undefined)
     if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
-      setNotice(connectFirstNotice(config.adapter))
+      setNotice(connectFirstNotice(t, config.adapter))
       return
     }
     setTesting(true)
@@ -239,8 +241,8 @@ function StorageForm({
       setTestedConfig(undefined)
       setNotice({
         tone: 'error',
-        title: 'STL Quest could not use that location',
-        hint: storageRecoveryHint(config.adapter),
+        title: t.notice.unusableLocation,
+        hint: storageRecoveryHint(t, config.adapter),
         detail: noticeDetail(error),
       })
     } finally {
@@ -272,17 +274,16 @@ function StorageForm({
     form.setFieldValue('adapter', provider)
     form.setFieldValue('root', rootForStorageAdapter(provider, current))
     const label = cloudProviderLabel(provider)
-    if (outcome === 'connected')
-      setNotice({ tone: 'success', title: `${label} is connected`, hint: 'Save storage to create this workspace’s folder.' })
+    if (outcome === 'connected') setNotice({ tone: 'success', title: t.notice.connectedTitle(label), hint: t.notice.connectedHint })
     else if (outcome === 'missing-permissions') setPermissionProvider(provider)
     else
       setNotice({
         tone: 'error',
-        title: `${label} could not be connected`,
-        hint: 'Check that the client ID, secret, and redirect URI match the app in the provider console, then connect again.',
+        title: t.notice.connectFailedTitle(label),
+        hint: t.notice.connectFailedHint,
       })
     window.history.replaceState({}, '', window.location.pathname)
-  }, [current, form])
+  }, [current, form, t])
 
   const connectCloud = async (provider: CloudProvider) => {
     setPermissionProvider(undefined)
@@ -295,8 +296,8 @@ function StorageForm({
     } catch (error) {
       setNotice({
         tone: 'error',
-        title: `Could not open ${cloudProviderLabel(provider)}`,
-        hint: 'Check the client ID and secret, then try connecting again.',
+        title: t.notice.openFailedTitle(cloudProviderLabel(provider)),
+        hint: t.notice.openFailedHint,
         detail: noticeDetail(error),
       })
       setConnectingProvider(undefined)
@@ -310,8 +311,8 @@ function StorageForm({
       .catch((error: unknown) =>
         setNotice({
           tone: 'error',
-          title: `Could not disconnect ${cloudProviderLabel(provider)}`,
-          hint: 'Try again in a moment.',
+          title: t.notice.disconnectFailedTitle(cloudProviderLabel(provider)),
+          hint: t.notice.disconnectFailedHint,
           detail: noticeDetail(error),
         }),
       )
@@ -342,8 +343,8 @@ function StorageForm({
       setPendingChange(change)
       setNotice({
         tone: 'error',
-        title: 'Storage was not changed',
-        hint: storageRecoveryHint(change.config.adapter),
+        title: t.notice.notChanged,
+        hint: storageRecoveryHint(t, change.config.adapter),
         detail: noticeDetail(error),
       })
     }
@@ -399,7 +400,7 @@ function StorageForm({
             ? undefined
             : () => chooseStorage(current.adapter)
       }
-      currentActionLabel={onboarding ? undefined : 'Edit current storage'}
+      currentActionLabel={onboarding ? undefined : t.pane.editCurrent}
       settings={!onboarding}
       onChoose={chooseStorage}
     />
@@ -420,8 +421,8 @@ function StorageForm({
           .catch((error: unknown) =>
             setNotice({
               tone: 'error',
-              title: 'Could not retry the move',
-              hint: 'The new location may have become unreachable.',
+              title: t.notice.retryFailedTitle,
+              hint: t.notice.retryFailedHint,
               detail: noticeDetail(error),
             }),
           )
@@ -439,10 +440,7 @@ function StorageForm({
   if (!onboarding && !storageChoice && !pickerBlockedByMigration) {
     return (
       <SettingsPage>
-        <SettingsHeader
-          title="Storage"
-          description={`Move finished print files between ${storageChoices}. STL Quest copies and verifies every file before switching, and leaves the source untouched as a fallback.`}
-        />
+        <SettingsHeader title={t.pane.title} description={t.pane.description(storageChoices)} />
         {migrationBanner && <SettingsSection>{migrationBanner}</SettingsSection>}
         <SettingsSection>{providerPicker}</SettingsSection>
       </SettingsPage>
@@ -470,13 +468,9 @@ function StorageForm({
       />
       <ConfirmDialog
         open={cancelMigrationOpen}
-        title={migration?.state === 'failed' ? 'Abandon failed migration?' : 'Stop moving files?'}
-        description={
-          migration?.state === 'failed'
-            ? 'STL Quest deletes partial managed-storage copies and releases the included allowance. Your current storage stays active.'
-            : 'STL Quest finishes the file it is copying, then stops. Your current storage stays active, and copies already made are left in the new location.'
-        }
-        confirmLabel={migration?.state === 'failed' ? 'Delete partial copies' : 'Stop the move'}
+        title={migration?.state === 'failed' ? t.cancelMigration.abandonTitle : t.cancelMigration.stopTitle}
+        description={migration?.state === 'failed' ? t.cancelMigration.abandonDescription : t.cancelMigration.stopDescription}
+        confirmLabel={migration?.state === 'failed' ? t.cancelMigration.abandonConfirm : t.cancelMigration.stopConfirm}
         destructive
         onCancel={() => setCancelMigrationOpen(false)}
         onConfirm={() => {
@@ -489,8 +483,8 @@ function StorageForm({
             .catch((error: unknown) =>
               setNotice({
                 tone: 'error',
-                title: 'Could not stop the move',
-                hint: 'The move may have already finished.',
+                title: t.notice.stopFailedTitle,
+                hint: t.notice.stopFailedHint,
                 detail: noticeDetail(error),
               }),
             )
@@ -512,14 +506,14 @@ function StorageForm({
       {storageChoice && (
         <div className="flex flex-col gap-2">
           <Button type="button" variant="ghost" size="sm" className="-ml-2 self-start text-muted-foreground" onClick={showStorageOptions}>
-            <ArrowLeft /> All storage options
+            <ArrowLeft /> {t.pane.allOptions}
           </Button>
           <h3 className="font-heading text-xl font-semibold">
-            {onboarding ? 'Set up' : current.adapter === storageChoice ? 'Edit' : 'Switch to'} {onboardingLabel(storageChoice)}
+            {(onboarding ? t.pane.setUpHeading : current.adapter === storageChoice ? t.pane.editHeading : t.pane.switchHeading)(
+              storageTarget(t, storageChoice),
+            )}
           </h3>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Fill in the details below, then test the connection so mistakes surface here instead of on your first upload.
-          </p>
+          <p className="text-sm leading-relaxed text-muted-foreground">{t.pane.formIntro}</p>
         </div>
       )}
       {!onboarding && (
@@ -530,16 +524,15 @@ function StorageForm({
         {(adapter) =>
           adapter === 'managed' ? (
             <Alert>
-              <AlertTitle>{formatBytes(managedStorageQuotaBytes)} of included storage</AlertTitle>
+              <AlertTitle>{t.pane.managedTitle(formatBytes(managedStorageQuotaBytes, locale))}</AlertTitle>
               <AlertDescription>
-                Hosted by STL Quest and shared across your workspaces. Models, previews, thumbnails, optimized assets, and recoverable trash
-                count toward this allowance. Delete files to release space, or switch to storage you own for a larger library.
+                {t.pane.managedBody}
                 {managedStorageUsage && <ManagedStorageUsage usage={managedStorageUsage} className="mt-3 space-y-2" />}
               </AlertDescription>
             </Alert>
           ) : adapter === 'local' ? (
             <Field>
-              <FieldLabel htmlFor="storage-root">Folder</FieldLabel>
+              <FieldLabel htmlFor="storage-root">{t.pane.folder}</FieldLabel>
               <form.Field name="root">
                 {(field) => (
                   <>
@@ -552,7 +545,7 @@ function StorageForm({
                         required
                       />
                       <Button type="button" variant="outline" onClick={() => setFolderPickerOpen(true)}>
-                        Browse
+                        {t.pane.browse}
                       </Button>
                     </div>
                     <ServerFolderPicker
@@ -565,9 +558,7 @@ function StorageForm({
                   </>
                 )}
               </form.Field>
-              <FieldDescription>
-                Must be writable by the STL Quest process, so usually a mounted volume. A private workspace directory is created below it.
-              </FieldDescription>
+              <FieldDescription>{t.pane.folderDescription}</FieldDescription>
             </Field>
           ) : adapter === 'webdav' ? (
             <WebDAVStorageFields form={form} current={webdav} />
@@ -619,37 +610,35 @@ function StorageForm({
                   onClick={() => void testConnection()}
                 >
                   {testing && <Spinner />}
-                  {testing ? 'Testing…' : 'Test connection'}
+                  {testing ? t.pane.testing : t.pane.testConnection}
                 </Button>
                 <Button type="submit" disabled={busy || (!onboarding && configured && !dirty) || migrationInProgress || unavailable}>
                   {busy && <Spinner />}
                   {busy
-                    ? 'Checking storage…'
+                    ? t.pane.checking
                     : onboarding
                       ? unavailable
-                        ? `Connect ${cloudProviderLabel(adapter)} first`
-                        : 'Save and continue'
+                        ? t.pane.connectFirst(cloudProviderLabel(adapter))
+                        : t.pane.saveAndContinue
                       : !configured
-                        ? 'Save storage'
+                        ? t.pane.save
                         : migrationInProgress
-                          ? 'Migration in progress'
+                          ? t.pane.migrationInProgress
                           : unavailable
-                            ? `Connect ${cloudProviderLabel(adapter)} first`
+                            ? t.pane.connectFirst(cloudProviderLabel(adapter))
                             : dirty
-                              ? 'Save storage'
-                              : 'No storage changes'}
+                              ? t.pane.save
+                              : t.pane.noChanges}
                 </Button>
                 {connectionTested && (
                   <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <CheckCircle2 className="size-4 text-emerald-600" /> Connection verified
+                    <CheckCircle2 className="size-4 text-emerald-600" /> {t.pane.verified}
                   </span>
                 )}
               </div>
               {onboarding && (
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  {connectionTested
-                    ? 'Storage is reachable and writable. Printers come next, and you can skip them.'
-                    : 'Nothing is uploaded yet. STL Quest writes a temporary file to confirm the location is writable.'}
+                  {connectionTested ? t.pane.verifiedOnboarding : t.pane.untestedOnboarding}
                 </p>
               )}
             </div>
@@ -671,10 +660,7 @@ function StorageForm({
 
   return (
     <SettingsPage>
-      <SettingsHeader
-        title="Storage"
-        description={`Move finished print files between ${storageChoices}. STL Quest copies and verifies every file before switching, and leaves the source untouched as a fallback.`}
-      />
+      <SettingsHeader title={t.pane.title} description={t.pane.description(storageChoices)} />
       <SettingsSection>{formContent}</SettingsSection>
     </SettingsPage>
   )
@@ -682,24 +668,19 @@ function StorageForm({
 
 // Only worth showing where the destination is assembled from several fields; a local folder already reads back from its own input.
 function StorageDestination({ config }: { config: StorageConfig }) {
+  const t = useI18n().t.storage
   if (config.adapter === 'local') return null
   if (config.adapter === 's3' ? !config.bucket : config.adapter === 'webdav' && !config.endpoint) return null
   return (
     <p className="text-sm leading-relaxed text-muted-foreground">
-      Models will be written to a private workspace folder below <code className="break-all text-foreground">{storageLabel(config)}</code>.
+      {t.pane.destination.before}
+      <code className="break-all text-foreground">{storageLabel(config, t)}</code>
+      {t.pane.destination.after}
     </p>
   )
 }
 
-function onboardingLabel(adapter: StorageConfig['adapter']) {
-  if (adapter === 'managed') return 'included storage'
+function storageTarget(t: StorageMessages, adapter: StorageConfig['adapter']) {
   if (isCloudAdapter(adapter)) return cloudProviderLabel(adapter)
-  if (adapter === 'local') return 'a folder on this server'
-  if (adapter === 'webdav') return 'a remote folder'
-  return 'an S3-compatible bucket'
-}
-
-function joinChoices(choices: Array<string | undefined>) {
-  const available = choices.filter((choice): choice is string => !!choice)
-  return available.length === 1 ? available[0] : `${available.slice(0, -1).join(', ')}, or ${available.at(-1)}`
+  return t.pane.target[adapter]
 }

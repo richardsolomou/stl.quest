@@ -8,17 +8,21 @@ import { Spinner } from '@/components/ui/spinner'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, passwordLengthError } from '../../../core/security'
 import type { AccountRole } from '../../../core/types'
 import { authClient } from '../../authClient'
+import { useI18n } from '../../i18n'
 import { DialogProblem } from '../DialogProblem'
 import { DialogShell } from '../DialogShell'
 import { accountRoleOptions } from './SuperAdminUsersTable'
 import { MAX_USER_NAME_LENGTH } from '../../../core/identity'
 
 export function CreateUserDialog({ passwordEnabled, onDone }: { passwordEnabled: boolean; onDone: () => void }) {
+  const { t } = useI18n()
+  const copy = t.superAdmin.createUser
+  const roleOptions = accountRoleOptions(t)
   const queryClient = useQueryClient()
   const mutation = useMutation({
     mutationFn: async (value: { email: string; name: string; password?: string; role: AccountRole }) => {
       const { error } = await authClient.admin.createUser(value)
-      if (error) throw new Error('Could not create this user. Check the fields and email address.')
+      if (error) throw new Error(copy.failed)
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['accounts'] })
@@ -36,7 +40,7 @@ export function CreateUserDialog({ passwordEnabled, onDone }: { passwordEnabled:
       }),
   })
   return (
-    <DialogShell title="Create user" onClose={onDone} preventClose={mutation.isPending}>
+    <DialogShell title={copy.title} onClose={onDone} preventClose={mutation.isPending}>
       <form
         onSubmit={(event) => {
           event.preventDefault()
@@ -47,7 +51,7 @@ export function CreateUserDialog({ passwordEnabled, onDone }: { passwordEnabled:
         <form.Field name="name">
           {(field) => (
             <Field>
-              <FieldLabel htmlFor="user-name">Name</FieldLabel>
+              <FieldLabel htmlFor="user-name">{copy.name}</FieldLabel>
               <Input
                 id="user-name"
                 value={field.state.value}
@@ -61,7 +65,7 @@ export function CreateUserDialog({ passwordEnabled, onDone }: { passwordEnabled:
         <form.Field name="email">
           {(field) => (
             <Field>
-              <FieldLabel htmlFor="user-email">Email</FieldLabel>
+              <FieldLabel htmlFor="user-email">{copy.email}</FieldLabel>
               <Input
                 id="user-email"
                 type="email"
@@ -74,10 +78,10 @@ export function CreateUserDialog({ passwordEnabled, onDone }: { passwordEnabled:
           )}
         </form.Field>
         {passwordEnabled ? (
-          <form.Field name="password" validators={{ onChange: ({ value }) => passwordLengthError(value) }}>
+          <form.Field name="password" validators={{ onChange: ({ value }) => passwordLengthError(value, t) }}>
             {(field) => (
               <Field>
-                <FieldLabel htmlFor="user-password">Initial password</FieldLabel>
+                <FieldLabel htmlFor="user-password">{copy.initialPassword}</FieldLabel>
                 <Input
                   id="user-password"
                   type="password"
@@ -91,24 +95,18 @@ export function CreateUserDialog({ passwordEnabled, onDone }: { passwordEnabled:
             )}
           </form.Field>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            The user signs in through a configured social provider matching this email address.
-          </p>
+          <p className="text-sm text-muted-foreground">{copy.socialOnly}</p>
         )}
         <form.Field name="role">
           {(field) => (
             <Field>
-              <FieldLabel htmlFor="user-role">Role</FieldLabel>
-              <Select
-                items={accountRoleOptions}
-                value={field.state.value}
-                onValueChange={(value) => field.handleChange(value as AccountRole)}
-              >
+              <FieldLabel htmlFor="user-role">{copy.role}</FieldLabel>
+              <Select items={roleOptions} value={field.state.value} onValueChange={(value) => field.handleChange(value as AccountRole)}>
                 <SelectTrigger className="w-full" id="user-role">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {accountRoleOptions.map((option) => (
+                  {roleOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>
@@ -118,20 +116,16 @@ export function CreateUserDialog({ passwordEnabled, onDone }: { passwordEnabled:
             </Field>
           )}
         </form.Field>
-        <DialogProblem
-          title="The account was not created"
-          hint="Check the email address is valid and not already registered."
-          error={mutation.error?.message}
-        />
+        <DialogProblem title={copy.problemTitle} hint={copy.problemHint} error={mutation.error?.message} />
         <form.Subscribe selector={(state) => state.isSubmitting}>
           {(busy) => (
             <div className="flex flex-wrap justify-end gap-2">
               <Button type="button" variant="outline" onClick={onDone} disabled={busy}>
-                Cancel
+                {t.common.cancel}
               </Button>
               <Button type="submit" disabled={busy}>
                 {busy && <Spinner />}
-                {busy ? 'Creating…' : 'Create user'}
+                {busy ? copy.creating : copy.confirm}
               </Button>
             </div>
           )}

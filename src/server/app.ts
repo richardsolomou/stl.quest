@@ -64,6 +64,8 @@ import {
 } from './storageMigration'
 import { organization } from '../db/schema'
 import { currentRequest, setRequestIdentity } from './requestContext'
+import { serverMessages, setRequestLocale } from './locale'
+import { isLocale } from '../core/i18n/locales'
 import { pendingAssetMigrations, runAssetMigrations } from './assetMigrations'
 import { assertDistributedWorkspaceReadiness, resolveDistributedConfig } from './distributed'
 import { createDistributedRuntime, type DistributedRuntime } from './distributedRuntime'
@@ -326,12 +328,15 @@ async function createApp() {
         superAdmin: user.role === 'super_admin',
         twoFactorEnabled: user.twoFactorEnabled ?? false,
         impersonatedBy: session.session.impersonatedBy ?? undefined,
+        locale: isLocale(user.locale) ? user.locale : undefined,
       }
     }
 
     const identity = async (headers: Headers): Promise<Identity | undefined> => {
       const session = await auth.api.getSession({ headers: normalizeAuthHeaders(headers) })
-      return session ? sessionIdentity(session) : undefined
+      const found = session ? sessionIdentity(session) : undefined
+      setRequestLocale(found?.locale)
+      return found
     }
 
     const auth = createAuth(repository.database, await resolveAuthSecret(repository), {
@@ -373,8 +378,8 @@ async function createApp() {
 
     const requireIdentity = async (headers: Headers) => {
       const found = await identity(headers)
-      if (!found) throw new Response('unauthenticated', { status: 401 })
-      await repository!.ensurePersonalWorkspace(found)
+      if (!found) throw new Response(serverMessages().server.access.unauthenticated, { status: 401 })
+      await repository!.ensurePersonalWorkspace(found, serverMessages().common)
       setRequestIdentity(found)
       return found
     }
@@ -432,18 +437,18 @@ async function createApp() {
     const workspaceMembership = async (headers: Headers, workspaceSlug?: string) => {
       headers = normalizeAuthHeaders(headers)
       const session = await auth.api.getSession({ headers })
-      if (!session) throw new Response('unauthenticated', { status: 401 })
+      if (!session) throw new Response(serverMessages().server.access.unauthenticated, { status: 401 })
       const baseIdentity = sessionIdentity(session)
-      const personalWorkspace = await repository!.ensurePersonalWorkspace(baseIdentity)
+      const personalWorkspace = await repository!.ensurePersonalWorkspace(baseIdentity, serverMessages().common)
       const workspaces = await repository!.listWorkspacesForUser(baseIdentity.id)
       if (workspaceSlug) {
         const membership = workspaces.find((candidate) => candidate.slug === workspaceSlug)
-        if (!membership) throw new Response('workspace not found', { status: 404 })
+        if (!membership) throw new Response(serverMessages().server.workspace.notFound, { status: 404 })
         return { baseIdentity, membership }
       }
       const membership =
         workspaces.find((candidate) => candidate.id === session.session.activeOrganizationId) ?? personalWorkspace ?? workspaces[0]
-      if (!membership) throw new Response('workspace not found', { status: 404 })
+      if (!membership) throw new Response(serverMessages().server.workspace.notFound, { status: 404 })
       if (session.session.activeOrganizationId !== membership.id) {
         await auth.api.setActiveOrganization({ body: { organizationId: membership.id }, headers })
       }
@@ -481,7 +486,7 @@ async function createApp() {
       headers = normalizeAuthHeaders(headers)
       const baseIdentity = await requireIdentity(headers)
       const membership = (await repository!.listWorkspacesForUser(baseIdentity.id)).find((candidate) => candidate.id === workspaceId)
-      if (!membership) throw new Response('workspace not found', { status: 404 })
+      if (!membership) throw new Response(serverMessages().server.workspace.notFound, { status: 404 })
       await auth.api.setActiveOrganization({ body: { organizationId: membership.id }, headers })
       return membership
     }
@@ -501,10 +506,10 @@ async function createApp() {
 
     const deleteWorkspace = async (headers: Headers, workspaceSlug: string, confirmation: string) => {
       const { baseIdentity, membership } = await workspaceMembership(headers, workspaceSlug)
-      if (membership.role !== 'owner') throw new Response('you cannot delete this workspace', { status: 403 })
-      if (confirmation !== membership.name) throw new Response('workspace name does not match', { status: 400 })
+      if (membership.role !== 'owner') throw new Response(serverMessages().server.workspace.cannotDelete, { status: 403 })
+      if (confirmation !== membership.name) throw new Response(serverMessages().server.workspace.nameMismatch, { status: 400 })
       const workspaces = await repository!.listWorkspacesForUser(baseIdentity.id)
-      if (workspaces.length <= 1) throw new Response('you cannot delete your only workspace', { status: 409 })
+      if (workspaces.length <= 1) throw new Response(serverMessages().server.workspace.cannotDeleteOnly, { status: 409 })
       await (await runtime(membership)).assertAssetsMutable()
       const nextWorkspace = workspaces.find((candidate) => candidate.id !== membership.id)!
       const personalSuccessor = await personalWorkspaceSuccessor(baseIdentity.id, membership.id)
@@ -519,10 +524,10 @@ async function createApp() {
 
     const deleteWorkspaceAsSuperAdmin = async (headers: Headers, workspaceId: string, confirmation: string) => {
       const actor = await requireIdentity(headers)
-      if (!actor.superAdmin) throw new Response('forbidden', { status: 403 })
+      if (!actor.superAdmin) throw new Response(serverMessages().server.access.forbidden, { status: 403 })
       const target = await repository!.workspaceById(workspaceId)
-      if (!target) throw new Response('workspace not found', { status: 404 })
-      if (confirmation !== target.name) throw new Response('workspace name does not match', { status: 400 })
+      if (!target) throw new Response(serverMessages().server.workspace.notFound, { status: 404 })
+      if (confirmation !== target.name) throw new Response(serverMessages().server.workspace.nameMismatch, { status: 400 })
       await (await runtime(target)).assertAssetsMutable()
       const owners = (await (await repository!.scoped(workspaceId)).listUsers()).filter((member) => member.workspaceRole === 'owner')
       const personalSuccessors = await Promise.all(
@@ -560,21 +565,18 @@ async function createApp() {
 
     // Better Auth deletes sessions before onUserDeleting runs, so every check that can refuse the deletion lives here and runs first.
     const accountDeletionPlan = async (userId: string) => {
-      const { conflict, removed } = accountDeletionWorkspaces(await repository!.listOwnedWorkspaces(userId))
-      if (conflict) throw new Response(conflict, { status: 409 })
+      const { blocking, removed } = accountDeletionWorkspaces(await repository!.listOwnedWorkspaces(userId))
+      if (blocking.length > 0) throw new Response(serverMessages().server.soleWorkspaceOwner(blocking), { status: 409 })
       const stranded = await repository!.managedStorageHandoverBlockers(
         userId,
         removed.map(({ id }) => id),
         HOSTED_OWNED_WORKSPACE_LIMIT,
       )
       if (stranded.length > 0) {
-        throw new Response(
-          `the other owners of ${stranded.join(', ')} already use included storage for ${HOSTED_OWNED_WORKSPACE_LIMIT} workspaces. Move ${stranded.length === 1 ? 'that workspace' : 'those workspaces'} to other storage first`,
-          { status: 409 },
-        )
+        throw new Response(serverMessages().server.account.includedStorageFull(stranded, HOSTED_OWNED_WORKSPACE_LIMIT), { status: 409 })
       }
       if (await repository!.hasBillableSubscription(userId)) {
-        throw new Response('this user has an active subscription. Cancel it in Stripe first', { status: 409 })
+        throw new Response(serverMessages().server.account.activeSubscription, { status: 409 })
       }
       for (const record of await repository!.listWorkspaces()) await (await runtime(record)).assertAssetsMutable()
       return removed
@@ -588,7 +590,7 @@ async function createApp() {
 
     const publicWorkspace = async (slug: string) => {
       const found = await repository!.workspaceBySlug(slug)
-      if (!found) throw new Response('workspace not found', { status: 404 })
+      if (!found) throw new Response(serverMessages().server.workspace.notFound, { status: 404 })
       return runtime(found)
     }
 
@@ -753,6 +755,7 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
       workspaceId: workspace.id,
       workspaceName: async () => (await rootRepository.workspaceById(workspace.id))?.name ?? workspace.name,
       branding: () => readEmailBranding(repository),
+      recipientLocale: (userId) => repository.userLocale(userId),
     })
   const service = new STLQuestService(
     repository,
@@ -763,6 +766,7 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
     tusUploads,
     () => assertAssetsMutable(),
     notifier,
+    serverMessages,
   )
   let storageReady = false
   let storageError: string | undefined

@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { messagesFor } from '../../core/i18n'
 import type { UploadEntry } from './uploadTypes'
 import { isUploadCancelled, uploadErrorMessage, uploadFingerprint, uploadMetadata, uploadPrint, uploadRejection } from './uploadTransport'
+
+const t = messagesFor('en').requests
 
 const tus = vi.hoisted(() => ({ start: vi.fn() }))
 vi.mock('ras-stack/uploads', () => ({
@@ -90,7 +93,7 @@ describe('uploadErrorMessage', () => {
       },
     })
 
-    expect(uploadErrorMessage(error)).toBe('Uploads are paused while storage is moving. Wait for the migration to finish.')
+    expect(uploadErrorMessage(error, t)).toBe('Uploads are paused while storage is moving. Wait for the migration to finish.')
   })
 
   it('explains that too many unfinished uploads are open', () => {
@@ -98,19 +101,21 @@ describe('uploadErrorMessage', () => {
       originalResponse: { getStatus: () => 429, getBody: () => 'too many incomplete uploads' },
     })
 
-    expect(uploadErrorMessage(error)).toBe('Too many uploads are still in progress. Wait for one to finish, then try again.')
+    expect(uploadErrorMessage(error, t)).toBe('Too many uploads are still in progress. Wait for one to finish, then try again.')
   })
 
   it('keeps unexpected upload errors available for diagnosis', () => {
-    expect(uploadErrorMessage(new Error('Connection lost'))).toBe('Connection lost')
+    expect(uploadErrorMessage(new Error('Connection lost'), t)).toBe('Connection lost')
   })
 
   it('distinguishes a model larger than the whole allowance', () => {
-    expect(uploadErrorMessage(quotaError('managed storage quota exceeded'))).toBe('This model is larger than your whole storage allowance.')
+    expect(uploadErrorMessage(quotaError('managed storage quota exceeded'), t)).toBe(
+      'This model is larger than your whole storage allowance.',
+    )
   })
 
   it('explains when the remaining allowance is too small', () => {
-    expect(uploadErrorMessage(quotaError('managed storage is full'))).toBe('Not enough storage left for this model.')
+    expect(uploadErrorMessage(quotaError('managed storage is full'), t)).toBe('Not enough storage left for this model.')
   })
 })
 
@@ -119,7 +124,7 @@ describe('uploadRejection', () => {
     const error = tusError(403, '<!DOCTYPE html>\n<html lang="en"><head><title>Ban</title></head></html>')
 
     expect(uploadRejection(error)).toBe('proxy_blocked')
-    expect(uploadErrorMessage(error)).toBe(
+    expect(uploadErrorMessage(error, t)).toBe(
       'A proxy or firewall in front of STL Quest blocked this upload (HTTP 403). Ask your server admin to allow upload requests to /api/upload.',
     )
   })
@@ -128,7 +133,7 @@ describe('uploadRejection', () => {
     const error = tusError(502, '<html><body>Bad gateway</body></html>')
 
     expect(uploadRejection(error)).toBe('proxy_unavailable')
-    expect(uploadErrorMessage(error)).toBe('STL Quest did not answer through its proxy (HTTP 502). Try again in a moment.')
+    expect(uploadErrorMessage(error, t)).toBe('STL Quest did not answer through its proxy (HTTP 502). Try again in a moment.')
   })
 
   it('does not mistake a proxy body-size page for the storage allowance', () => {

@@ -13,6 +13,7 @@ import type {
 } from '../core/auth'
 import { environmentFlag } from '../adapters/environment'
 import { CLOUD_STORAGE_APP_KEYS, CLOUD_STORAGE_PROVIDERS, oidcDiscoveryUrl, oidcIssuerMatches, SOCIAL_AUTH_PROVIDERS } from '../core/auth'
+import { serverMessages } from './locale'
 
 const SETTING_KEY = 'integrations'
 const KEY_BYTES = 32
@@ -113,10 +114,10 @@ export async function oidcDiscoveryProblem(issuer: string, timeoutMs = OIDC_DISC
     !discovery ||
     !['issuer', 'authorization_endpoint', 'token_endpoint', 'jwks_uri'].every((field) => typeof discovery[field] === 'string')
   ) {
-    return 'could not load the OpenID Connect discovery document from the issuer'
+    return serverMessages().server.auth.oidcDiscoveryUnavailable
   }
   if (!oidcIssuerMatches(issuer, discovery.issuer)) {
-    return `the OpenID Connect discovery document names the issuer ${String(discovery.issuer).slice(0, 500)} instead of ${issuer}`
+    return serverMessages().server.auth.oidcIssuerMismatch(String(discovery.issuer).slice(0, 500), issuer)
   }
   return undefined
 }

@@ -7,19 +7,21 @@ import { formatBytes } from '../../core/format'
 import { nextStoragePlan, storagePlans } from '../../core/plans'
 import { sessionQuery } from '../queries'
 import { useWorkspaceSlug } from '../workspace'
+import { useI18n } from '../i18n'
 
 // Only the account whose plan governs the workspace can raise the allowance, so everyone else
 // gets pointed at a person rather than a dead button.
 export function StorageUpgradeAction({ className, onNavigate }: { className?: string; onNavigate?: () => void }) {
+  const { t: messages, locale } = useI18n()
+  const t = messages.storage.upgrade
+  const planNames = messages.settings.plan.names
   const workspaceSlug = useWorkspaceSlug()
   const { data } = useSuspenseQuery(sessionQuery(workspaceSlug))
   const billing = data.billing
   if (!billing?.available) return null
 
   if (!billing.canUpgrade) {
-    return (
-      <p className={cn('text-sm text-muted-foreground', className)}>Ask a workspace administrator to upgrade the plan for more storage.</p>
-    )
+    return <p className={cn('text-sm text-muted-foreground', className)}>{t.askAdmin}</p>
   }
 
   const upgrade = nextStoragePlan(billing.workspacePlan)
@@ -30,10 +32,10 @@ export function StorageUpgradeAction({ className, onNavigate }: { className?: st
       to="/plan"
       className={cn(buttonVariants({ size: 'sm' }), className)}
       onClick={onNavigate}
-      aria-label={`Upgrade to ${storagePlans[upgrade].name} for ${formatBytes(storagePlans[upgrade].quotaBytes)} of storage`}
+      aria-label={t.label(planNames[upgrade], formatBytes(storagePlans[upgrade].quotaBytes, locale))}
     >
       <ArrowUpCircle />
-      Upgrade to {storagePlans[upgrade].name}
+      {t.action(planNames[upgrade])}
     </Link>
   )
 }

@@ -28,13 +28,7 @@ import { QueryState } from '../QueryState'
 import { SettingNotice, noticeDetail } from '../SettingNotice'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
-
-const BOARD_DESCRIPTION = 'Control how requests are shared between admins and requesters, and when finished prints leave the board.'
-
-const VISIBILITY_OPTIONS = [
-  { value: 'shared', label: 'Shared — everyone sees every request' },
-  { value: 'private', label: 'Private — requesters see only their own' },
-] as const
+import { useI18n } from '../../i18n'
 
 export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity; workspaceName: string; workspaceCount: number }) {
   const workspaceSlug = useWorkspaceSlug()
@@ -43,6 +37,12 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
   const callUpdate = useServerFn(updateBoardSettings)
   const callDelete = useServerFn(deleteWorkspace)
   const queryClient = useQueryClient()
+  const { t } = useI18n()
+  const copy = t.settings.board
+  const visibilityOptions = [
+    { value: 'shared', label: copy.visibility.shared },
+    { value: 'private', label: copy.visibility.private },
+  ] as const
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [confirmation, setConfirmation] = useState('')
   // The selected option is the confirmation that it saved; only a failure needs saying out loud.
@@ -63,12 +63,12 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
   if (!current) {
     return (
       <SettingsPage>
-        <SettingsHeader title="Board" description={BOARD_DESCRIPTION} />
+        <SettingsHeader title={copy.title} description={copy.description} />
         <QueryState
           loading={query.isPending}
           error={query.error}
-          loadingLabel="Loading board settings…"
-          errorTitle="Could not load board settings"
+          loadingLabel={copy.loading}
+          errorTitle={copy.loadError}
           onRetry={() => void query.refetch()}
         />
       </SettingsPage>
@@ -77,12 +77,12 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
 
   return (
     <SettingsPage>
-      <SettingsHeader title="Board" description={BOARD_DESCRIPTION} />
+      <SettingsHeader title={copy.title} description={copy.description} />
       <SettingsSection>
         <Field>
-          <FieldLabel htmlFor="board-visibility">Request visibility</FieldLabel>
+          <FieldLabel htmlFor="board-visibility">{copy.visibility.label}</FieldLabel>
           <Select
-            items={VISIBILITY_OPTIONS}
+            items={visibilityOptions}
             value={current.privateRequests ? 'private' : 'shared'}
             disabled={mutation.isPending}
             onValueChange={(value) => mutation.mutate({ data: { workspaceSlug, privateRequests: value === 'private' } })}
@@ -91,7 +91,7 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {VISIBILITY_OPTIONS.map((option) => (
+              {visibilityOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>
@@ -99,20 +99,20 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
             </SelectContent>
           </Select>
           <FieldDescription>
-            Private suits print farms and paid work: requesters see, reorder, and withdraw only their own requests. Admins always see
-            everything. This is the default for every member; give someone a narrower or wider view from{' '}
+            {copy.visibility.help.before}
             <Link to="/settings/$section" params={{ section: 'users' }} className="underline underline-offset-2">
-              Members
+              {copy.visibility.help.link}
             </Link>
-            .{overrideCount > 0 && ` ${overrideCount} ${overrideCount === 1 ? 'member has' : 'members have'} their own setting.`}
+            {copy.visibility.help.after}
+            {overrideCount > 0 && ` ${copy.visibility.overrides(overrideCount)}`}
           </FieldDescription>
         </Field>
         {mutation.error && (
           <SettingNotice
             notice={{
               tone: 'error',
-              title: 'Visibility was not changed',
-              hint: 'The board is still using the previous setting. Try again in a moment.',
+              title: copy.visibility.notSaved,
+              hint: copy.previousSettingKept,
               detail: noticeDetail(mutation.error),
             }}
           />
@@ -120,20 +120,14 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
       </SettingsSection>
       <AutoArchiveSection autoArchiveDays={current.autoArchiveDays} />
       {canDeleteWorkspace && (
-        <SettingsSection
-          tone="danger"
-          title="Danger zone"
-          description="Permanently remove this workspace, its requests, settings, members, and locally stored workspace files. Connected cloud storage may retain files."
-        >
+        <SettingsSection tone="danger" title={copy.danger.title} description={copy.danger.description}>
           <div className="flex items-center justify-between gap-4 max-sm:flex-col max-sm:items-start">
             <div>
-              <h3 className="font-medium">Delete {workspaceName}</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {onlyWorkspace ? 'Create another workspace before deleting this one.' : 'This cannot be undone.'}
-              </p>
+              <h3 className="font-medium">{copy.danger.heading(workspaceName)}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{onlyWorkspace ? copy.danger.onlyWorkspace : copy.danger.irreversible}</p>
             </div>
             <Button type="button" variant="destructive" disabled={onlyWorkspace} onClick={() => setDeleteOpen(true)}>
-              Delete workspace
+              {copy.danger.action}
             </Button>
           </div>
         </SettingsSection>
@@ -149,13 +143,11 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete {workspaceName}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This permanently deletes the workspace and its STL Quest data. Type the workspace name to confirm.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{copy.danger.dialogTitle(workspaceName)}</AlertDialogTitle>
+            <AlertDialogDescription>{copy.danger.dialogDescription}</AlertDialogDescription>
           </AlertDialogHeader>
           <Field>
-            <FieldLabel htmlFor="delete-workspace-confirmation">Workspace name</FieldLabel>
+            <FieldLabel htmlFor="delete-workspace-confirmation">{copy.danger.nameLabel}</FieldLabel>
             <Input
               id="delete-workspace-confirmation"
               value={confirmation}
@@ -163,18 +155,18 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
               autoComplete="off"
               onChange={(event) => setConfirmation(event.target.value)}
             />
-            <FieldDescription>Enter {workspaceName} exactly.</FieldDescription>
+            <FieldDescription>{copy.danger.nameHint(workspaceName)}</FieldDescription>
             <FieldError>{deleteMutation.error?.message}</FieldError>
           </Field>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>{t.common.cancel}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               disabled={confirmation !== workspaceName || deleteMutation.isPending}
               onClick={() => deleteMutation.mutate({ data: { workspaceSlug, confirmation } })}
             >
               {deleteMutation.isPending && <Spinner />}
-              {deleteMutation.isPending ? 'Deleting…' : 'Delete workspace'}
+              {deleteMutation.isPending ? copy.danger.deleting : copy.danger.action}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -187,6 +179,8 @@ function AutoArchiveSection({ autoArchiveDays }: { autoArchiveDays?: number }) {
   const workspaceSlug = useWorkspaceSlug()
   const callUpdate = useServerFn(updateBoardSettings)
   const queryClient = useQueryClient()
+  const { t } = useI18n()
+  const copy = t.settings.board
   const [draft, setDraft] = useState(String(autoArchiveDays ?? DEFAULT_AUTO_ARCHIVE_DAYS))
   const mutation = useMutation({
     mutationFn: callUpdate,
@@ -201,12 +195,12 @@ function AutoArchiveSection({ autoArchiveDays }: { autoArchiveDays?: number }) {
   const dirty = enabled && draft !== String(autoArchiveDays)
   const save = (next: number | null) => mutation.mutate({ data: { workspaceSlug, autoArchiveDays: next } })
   return (
-    <SettingsSection title="Archive">
+    <SettingsSection title={copy.archive.title}>
       <UnsavedChangesGuard dirty={dirty} />
       <Field orientation="horizontal">
         <FieldContent>
-          <FieldLabel htmlFor="auto-archive-enabled">Archive Ready prints automatically</FieldLabel>
-          <FieldDescription>Move a print to the archive once every copy has been Ready for a set number of days.</FieldDescription>
+          <FieldLabel htmlFor="auto-archive-enabled">{copy.archive.label}</FieldLabel>
+          <FieldDescription>{copy.archive.description}</FieldDescription>
         </FieldContent>
         <Switch
           id="auto-archive-enabled"
@@ -224,7 +218,7 @@ function AutoArchiveSection({ autoArchiveDays }: { autoArchiveDays?: number }) {
           }}
         >
           <Field className="w-40" data-invalid={!valid || undefined}>
-            <FieldLabel htmlFor="auto-archive-days">Days after Ready</FieldLabel>
+            <FieldLabel htmlFor="auto-archive-days">{copy.archive.daysLabel}</FieldLabel>
             <Input
               id="auto-archive-days"
               type="number"
@@ -240,17 +234,17 @@ function AutoArchiveSection({ autoArchiveDays }: { autoArchiveDays?: number }) {
           </Field>
           <Button type="submit" disabled={!valid || !dirty || mutation.isPending}>
             {mutation.isPending && <Spinner />}
-            Save
+            {t.common.save}
           </Button>
         </form>
       )}
-      {enabled && !valid && <FieldError>Enter a whole number of days from 1 to {MAX_AUTO_ARCHIVE_DAYS}.</FieldError>}
+      {enabled && !valid && <FieldError>{copy.archive.invalidDays(MAX_AUTO_ARCHIVE_DAYS)}</FieldError>}
       {mutation.error && (
         <SettingNotice
           notice={{
             tone: 'error',
-            title: 'Automatic archiving was not changed',
-            hint: 'The board is still using the previous setting. Try again in a moment.',
+            title: copy.archive.notSaved,
+            hint: copy.previousSettingKept,
             detail: noticeDetail(mutation.error),
           }}
         />
