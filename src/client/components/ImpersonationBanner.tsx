@@ -3,13 +3,16 @@ import { LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Identity } from '../../core/types'
 import { authClient } from '../authClient'
+import { useI18n } from '../i18n'
 import { ProtectedEmail } from './ProtectedEmail'
 
 export function ImpersonationBanner({ identity }: { identity: Identity }) {
+  const { t } = useI18n()
+  const copy = t.account.impersonation
   const mutation = useMutation({
     mutationFn: async () => {
       const { error } = await authClient.admin.stopImpersonating()
-      if (error) throw new Error('Could not exit impersonation.')
+      if (error) throw new Error(copy.exitFailed)
     },
     onSuccess: () => window.location.assign('/'),
   })
@@ -22,12 +25,12 @@ export function ImpersonationBanner({ identity }: { identity: Identity }) {
       />
       <div className="flex items-center gap-3 p-3">
         <div className="min-w-0 flex-1">
-          <p className="ph-no-capture text-sm font-medium">Viewing as {identity.name}</p>
+          <p className="ph-no-capture text-sm font-medium">{copy.viewingAs(identity.name)}</p>
           <ProtectedEmail email={identity.email} className="block text-xs text-muted-foreground" />
         </div>
         <Button type="button" size="sm" variant="outline" disabled={mutation.isPending} onClick={() => mutation.mutate()}>
           <LogOut />
-          {mutation.isPending ? 'Exiting…' : 'Exit impersonation'}
+          {mutation.isPending ? copy.exiting : copy.exit}
         </Button>
       </div>
     </div>

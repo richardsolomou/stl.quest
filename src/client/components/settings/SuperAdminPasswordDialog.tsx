@@ -7,17 +7,21 @@ import { Spinner } from '@/components/ui/spinner'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, passwordLengthError } from '../../../core/security'
 import type { Account } from '../../../core/types'
 import { authClient } from '../../authClient'
+import { useI18n } from '../../i18n'
 import { DialogProblem } from '../DialogProblem'
 import { DialogShell } from '../DialogShell'
 import { UserSummary } from '../UserSummary'
+import { roleLabel } from './SuperAdminAccessDialogs'
 
 export function SetPasswordDialog({ user, onDone, onSaved }: { user: Account; onDone: () => void; onSaved: (user: Account) => void }) {
+  const { t } = useI18n()
+  const copy = t.superAdmin.setPassword
   const mutation = useMutation({
     mutationFn: async (password: string) => {
       const { error } = await authClient.admin.setUserPassword({ userId: user.id, newPassword: password })
-      if (error) throw new Error(`Could not set the password. Use at least ${PASSWORD_MIN_LENGTH} characters.`)
+      if (error) throw new Error(copy.failed(PASSWORD_MIN_LENGTH))
       const { error: revokeError } = await authClient.admin.revokeUserSessions({ userId: user.id })
-      if (revokeError) throw new Error('Password changed, but existing sessions could not be revoked.')
+      if (revokeError) throw new Error(copy.revokeFailed)
     },
     onSuccess: () => {
       onSaved(user)
@@ -26,9 +30,9 @@ export function SetPasswordDialog({ user, onDone, onSaved }: { user: Account; on
   })
   const form = useForm({ defaultValues: { password: '' }, onSubmit: ({ value }) => mutation.mutateAsync(value.password) })
   return (
-    <DialogShell title="Set password" onClose={onDone} preventClose={mutation.isPending}>
-      <UserSummary user={user} role={user.role === 'super_admin' ? 'Super admin' : 'User'} />
-      <p className="text-sm text-muted-foreground">Setting a new password signs this user out everywhere.</p>
+    <DialogShell title={copy.title} onClose={onDone} preventClose={mutation.isPending}>
+      <UserSummary user={user} role={roleLabel(user, t)} />
+      <p className="text-sm text-muted-foreground">{copy.description}</p>
       <form
         onSubmit={(event) => {
           event.preventDefault()
@@ -36,10 +40,10 @@ export function SetPasswordDialog({ user, onDone, onSaved }: { user: Account; on
         }}
         className="flex flex-col gap-3"
       >
-        <form.Field name="password" validators={{ onChange: ({ value }) => passwordLengthError(value) }}>
+        <form.Field name="password" validators={{ onChange: ({ value }) => passwordLengthError(value, t) }}>
           {(field) => (
             <Field>
-              <FieldLabel htmlFor="set-password">New password</FieldLabel>
+              <FieldLabel htmlFor="set-password">{copy.newPassword}</FieldLabel>
               <Input
                 id="set-password"
                 type="password"
@@ -53,20 +57,16 @@ export function SetPasswordDialog({ user, onDone, onSaved }: { user: Account; on
             </Field>
           )}
         </form.Field>
-        <DialogProblem
-          title="The password was not changed"
-          hint={`Their current password still works. Use at least ${PASSWORD_MIN_LENGTH} characters and try again.`}
-          error={mutation.error?.message}
-        />
+        <DialogProblem title={copy.problemTitle} hint={copy.problemHint(PASSWORD_MIN_LENGTH)} error={mutation.error?.message} />
         <form.Subscribe selector={(state) => state.isSubmitting}>
           {(busy) => (
             <div className="flex flex-wrap justify-end gap-2">
               <Button type="button" variant="outline" onClick={onDone} disabled={busy}>
-                Cancel
+                {t.common.cancel}
               </Button>
               <Button type="submit" disabled={busy}>
                 {busy && <Spinner />}
-                {busy ? 'Setting…' : 'Set password'}
+                {busy ? copy.setting : copy.confirm}
               </Button>
             </div>
           )}

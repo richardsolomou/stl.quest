@@ -11,6 +11,7 @@ import type { DrizzleRepository } from '../db/repository'
 import { deploymentSettings, resolveStorageConfig } from './app'
 import { decryptSetting, encryptSetting, getStoredIntegrationConfig, setStoredIntegrationConfig, type SettingStore } from './integrations'
 import type { EncryptedSetting } from './integrations'
+import { serverMessages } from './locale'
 import { logger } from './logger'
 
 export const CLOUD_STORAGE_SETTING = 'cloudStorageEncrypted'
@@ -31,7 +32,7 @@ export async function enabledCloudStorageApp(deployment: SettingStore, provider:
 
 export async function requireCloudStorageApp(deployment: SettingStore, provider: CloudStorageProvider) {
   const app = await enabledCloudStorageApp(deployment, provider)
-  if (!app) throw new Response(`${cloudStorageProviderName(provider)} is not set up for this deployment`, { status: 409 })
+  if (!app) throw new Response(serverMessages().storage.errors.cloudAppMissing(cloudStorageProviderName(provider)), { status: 409 })
   return app
 }
 

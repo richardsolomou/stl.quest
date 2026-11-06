@@ -16,6 +16,7 @@ import { AuthBrand } from '../client/components/Brand'
 import { AuthMethodIcon } from '../client/components/AuthMethodIcon'
 import { PasswordAuthDivider } from '../client/components/PasswordAuthDivider'
 import { authClient } from '../client/authClient'
+import { useI18n } from '../client/i18n'
 import { errorMessage } from '../core/error'
 import { socialProviderName, type SocialAuthProvider } from '../core/auth'
 import { authCapabilitiesQuery } from '../client/queries'
@@ -31,6 +32,8 @@ export const Route = createFileRoute('/invite/$token')({
 })
 
 function InvitePage() {
+  const { t } = useI18n()
+  const copy = t.auth.invite
   const { valid, signedIn, auth: loadedAuth } = Route.useLoaderData()
   const { data: auth } = useQuery({ ...authCapabilitiesQuery(), initialData: loadedAuth })
   const { token } = Route.useParams()
@@ -60,9 +63,9 @@ function InvitePage() {
         errorCallbackURL: `/invite/${token}`,
         requestSignUp: true,
       })
-      if (failed) setError(`Could not continue with ${socialProviderName(provider, auth.oidcName)}.`)
+      if (failed) setError(t.auth.continueFailed(socialProviderName(provider, auth.oidcName)))
     } catch (err) {
-      setError(errorMessage(err, 'Could not continue with this provider.'))
+      setError(errorMessage(err, copy.providerFailed))
     } finally {
       setProviderBusy(null)
     }
@@ -76,7 +79,7 @@ function InvitePage() {
         if (signingIn) {
           const { error: failed } = await authClient.signIn.email({ email: value.email, password: value.password })
           if (failed) {
-            setError('Email or password is incorrect.')
+            setError(t.auth.signInFailure.invalidCredentials)
             return
           }
           await joinWorkspace()
@@ -86,7 +89,7 @@ function InvitePage() {
           window.location.href = '/'
         }
       } catch (err) {
-        setError(errorMessage(err, 'Could not accept this invitation.'))
+        setError(errorMessage(err, copy.acceptFailed))
       }
     },
   })
@@ -98,13 +101,9 @@ function InvitePage() {
         {valid ? (
           <Card className="w-full shadow-xl shadow-black/10">
             <CardHeader>
-              <CardTitle>You're invited</CardTitle>
+              <CardTitle>{copy.title}</CardTitle>
               <CardDescription>
-                {signedIn
-                  ? 'Join this workspace with your signed-in account.'
-                  : signingIn
-                    ? 'Sign in to add this workspace to your account.'
-                    : 'Create your account to get a personal workspace and join this one. This link works once.'}
+                {signedIn ? copy.signedInDescription : signingIn ? copy.signInDescription : copy.createDescription}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
@@ -116,11 +115,11 @@ function InvitePage() {
                     try {
                       await joinWorkspace()
                     } catch (err) {
-                      setError(errorMessage(err, 'Could not join this workspace.'))
+                      setError(errorMessage(err, copy.joinFailed))
                     }
                   }}
                 >
-                  Join workspace
+                  {copy.join}
                 </Button>
               )}
               {!signedIn && auth.socialProviders.length > 0 && (
@@ -135,7 +134,7 @@ function InvitePage() {
                     >
                       {providerBusy === provider && <Spinner />}
                       {!providerBusy && <AuthMethodIcon method={provider} />}
-                      Continue with {socialProviderName(provider, auth.oidcName)}
+                      {t.auth.continueWith(socialProviderName(provider, auth.oidcName))}
                     </Button>
                   ))}
                   {auth.password && <PasswordAuthDivider />}
@@ -151,10 +150,10 @@ function InvitePage() {
                   }}
                 >
                   {!signingIn && (
-                    <form.Field name="name" validators={{ onChange: ({ value }) => (value.trim() ? undefined : 'Name is required') }}>
+                    <form.Field name="name" validators={{ onChange: ({ value }) => (value.trim() ? undefined : copy.nameRequired) }}>
                       {(field) => (
                         <Field>
-                          <FieldLabel htmlFor="invite-name">Name</FieldLabel>
+                          <FieldLabel htmlFor="invite-name">{t.auth.name}</FieldLabel>
                           <Input
                             id="invite-name"
                             value={field.state.value}
@@ -168,11 +167,11 @@ function InvitePage() {
                   )}
                   <form.Field
                     name="email"
-                    validators={{ onChange: ({ value }) => (/^\S+@\S+\.\S+$/.test(value) ? undefined : 'Use a valid email') }}
+                    validators={{ onChange: ({ value }) => (/^\S+@\S+\.\S+$/.test(value) ? undefined : copy.invalidEmail) }}
                   >
                     {(field) => (
                       <Field>
-                        <FieldLabel htmlFor="invite-email">Email</FieldLabel>
+                        <FieldLabel htmlFor="invite-email">{t.auth.email}</FieldLabel>
                         <Input
                           id="invite-email"
                           type="email"
@@ -184,10 +183,10 @@ function InvitePage() {
                       </Field>
                     )}
                   </form.Field>
-                  <form.Field name="password" validators={{ onChange: ({ value }) => passwordLengthError(value) }}>
+                  <form.Field name="password" validators={{ onChange: ({ value }) => passwordLengthError(value, t) }}>
                     {(field) => (
                       <Field>
-                        <FieldLabel htmlFor="invite-password">Password</FieldLabel>
+                        <FieldLabel htmlFor="invite-password">{t.auth.password}</FieldLabel>
                         <Input
                           id="invite-password"
                           type="password"
@@ -205,7 +204,7 @@ function InvitePage() {
                     {(busy) => (
                       <Button type="submit" disabled={busy}>
                         {busy && <Spinner />}
-                        {busy ? 'Working…' : signingIn ? 'Sign in and join' : 'Create account and join'}
+                        {busy ? t.auth.working : signingIn ? copy.signInAndJoin : copy.createAndJoin}
                       </Button>
                     )}
                   </form.Subscribe>
@@ -218,7 +217,7 @@ function InvitePage() {
                       setError('')
                     }}
                   >
-                    {signingIn ? 'Need an account? Create one' : 'Already have an account? Sign in'}
+                    {signingIn ? copy.needAccount : t.auth.haveAccount}
                   </Button>
                 </form>
               )}
@@ -233,10 +232,8 @@ function InvitePage() {
         ) : (
           <Card className="w-full shadow-xl shadow-black/10">
             <CardHeader>
-              <CardTitle>Invite not valid</CardTitle>
-              <CardDescription>
-                This invite link has been used, revoked, or has expired. Ask the person who runs this STL Quest for a new one.
-              </CardDescription>
+              <CardTitle>{copy.invalidTitle}</CardTitle>
+              <CardDescription>{copy.invalidDescription}</CardDescription>
             </CardHeader>
           </Card>
         )}

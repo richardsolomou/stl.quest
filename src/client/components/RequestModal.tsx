@@ -40,6 +40,8 @@ import { useModelAttachment } from '../modelAttachment'
 import { workflow } from '../../core/workflow'
 import { formatEstimateMaterial, formatEstimateTime } from '../../core/printEstimates'
 import { RequestModelField } from './RequestModelField'
+import { useI18n } from '../i18n'
+import { statusText, type Messages } from '../../core/i18n'
 
 export function RequestModal({
   request,
@@ -62,6 +64,7 @@ export function RequestModal({
   onDroppedModelHandled: () => void
   onClose: () => void
 }) {
+  const { t, locale } = useI18n()
   const workspaceSlug = useWorkspaceSlug()
   const editFormId = useId()
   // Requesters may adjust their own request until any copy starts.
@@ -151,19 +154,19 @@ export function RequestModal({
     setError('')
     setSaveFailure('')
     if (attachment.incomplete) {
-      setError('Choose the model that replaces the one you removed.')
+      setError(t.requests.validation.replacementMissing)
       return
     }
     const data = requestUpdateData(workspaceSlug, request, values, isAdmin)
     if (!data) {
-      setError('Choose resin or filament.')
+      setError(t.requests.validation.choosePrintType)
       return
     }
     if (requestEditorDirty(request, values)) {
       try {
         await updateMutation.mutateAsync({ data })
       } catch (failure) {
-        setSaveFailure(errorMessage(failure, 'The server did not accept the change.'))
+        setSaveFailure(errorMessage(failure, t.requests.modal.saveRejected))
         return
       }
     }
@@ -185,7 +188,7 @@ export function RequestModal({
 
   const moveAction = isAdmin && queuedCopies > 0 && (
     <Button type="button" variant="outline" disabled={busy} onClick={() => setMoveOpen(true)}>
-      Move
+      {t.requests.actions.move}
     </Button>
   )
   // Distinct keys stop React reusing the Edit button as the submit button, which would submit the form on the same click.
@@ -195,7 +198,7 @@ export function RequestModal({
       {moveAction}
       {canEdit && (
         <Button type="button" onClick={() => setEditing(true)}>
-          <Pencil /> Edit
+          <Pencil /> {t.common.edit}
         </Button>
       )}
     </Fragment>
@@ -204,13 +207,17 @@ export function RequestModal({
     <Fragment key="edit">
       {request.canDelete && (
         <Button type="button" variant="destructive" onClick={remove} disabled={busy}>
-          Delete
+          {t.common.delete}
         </Button>
       )}
       {moveAction}
       <Button type="submit" form={editFormId} disabled={busy}>
         {busy && <Spinner />}
-        {attachment.uploading ? `Uploading model… ${attachment.progress}%` : busy ? 'Saving…' : 'Save changes'}
+        {attachment.uploading
+          ? t.requests.modal.uploadingModel(attachment.progress)
+          : busy
+            ? t.common.saving
+            : t.requests.modal.saveChanges}
       </Button>
     </Fragment>
   )
@@ -236,7 +243,7 @@ export function RequestModal({
           <form id={editFormId} className="min-w-0 space-y-3" onSubmit={save}>
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_5.5rem] [&>[data-slot=field]]:min-w-0">
               <Field>
-                <FieldLabel htmlFor="request-name">Name</FieldLabel>
+                <FieldLabel htmlFor="request-name">{t.requests.fields.name}</FieldLabel>
                 <Input
                   id="request-name"
                   value={values.name}
@@ -245,7 +252,7 @@ export function RequestModal({
                 />
               </Field>
               <Field>
-                <FieldLabel htmlFor="request-qty">Copies</FieldLabel>
+                <FieldLabel htmlFor="request-qty">{t.requests.fields.copies}</FieldLabel>
                 <Input
                   id="request-qty"
                   type="number"
@@ -259,9 +266,9 @@ export function RequestModal({
             </div>
             <div className="grid gap-3 sm:grid-cols-2 [&>[data-slot=field]]:min-w-0">
               <Field>
-                <FieldLabel htmlFor="request-print-type">Print type</FieldLabel>
+                <FieldLabel htmlFor="request-print-type">{t.requests.fields.printType}</FieldLabel>
                 <Select
-                  items={printTypes.map((value) => ({ value, label: printTypeLabel(value) }))}
+                  items={printTypes.map((value) => ({ value, label: printTypeLabel(t, value) }))}
                   value={values.printType}
                   onValueChange={(value) => {
                     patchValues({ printType: value ?? '', printerId: '' })
@@ -273,7 +280,7 @@ export function RequestModal({
                   <SelectContent>
                     {printTypes.map((value) => (
                       <SelectItem key={value} value={value}>
-                        {printTypeLabel(value)}
+                        {printTypeLabel(t, value)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -281,7 +288,7 @@ export function RequestModal({
               </Field>
               {isAdmin && (
                 <Field>
-                  <FieldLabel htmlFor="request-printer">Printer</FieldLabel>
+                  <FieldLabel htmlFor="request-printer">{t.requests.fields.printer}</FieldLabel>
                   <Select
                     value={values.printerId || null}
                     onValueChange={(value) => {
@@ -292,13 +299,13 @@ export function RequestModal({
                       })
                     }}
                   >
-                    <SelectTrigger id="request-printer" className="w-full" aria-label="Printer">
+                    <SelectTrigger id="request-printer" className="w-full" aria-label={t.requests.fields.printer}>
                       <SelectValue>
                         {selectedPrinter
                           ? selectedPrinter.name
                           : request.fitState === 'none'
-                            ? 'No compatible printer'
-                            : 'Best available printer'}
+                            ? t.requests.modal.noCompatiblePrinter
+                            : t.requests.modal.bestAvailablePrinter}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
@@ -315,7 +322,7 @@ export function RequestModal({
             <div className="grid gap-3 sm:grid-cols-2 [&>[data-slot=field]]:min-w-0">
               <Field>
                 <FieldLabel htmlFor="request-material-estimate">
-                  Material ({automaticEstimate?.materialUnit ?? (values.printType === 'resin' ? 'ml' : 'g')})
+                  {t.requests.modal.material(automaticEstimate?.materialUnit ?? (values.printType === 'resin' ? 'ml' : 'g'))}
                 </FieldLabel>
                 <Input
                   id="request-material-estimate"
@@ -326,14 +333,14 @@ export function RequestModal({
                   value={values.estimatedMaterial}
                   placeholder={
                     automaticEstimate?.material === undefined
-                      ? estimatePlaceholder(request.estimateGeometryStatus)
-                      : `≈${formatEstimateMaterial(automaticEstimate.material)}`
+                      ? estimatePlaceholder(t, request.estimateGeometryStatus)
+                      : `≈${formatEstimateMaterial(automaticEstimate.material, locale)}`
                   }
                   onChange={(event) => patchValues({ estimatedMaterial: event.target.value })}
                 />
               </Field>
               <Field>
-                <FieldLabel htmlFor="request-time-estimate">Print time (minutes)</FieldLabel>
+                <FieldLabel htmlFor="request-time-estimate">{t.requests.modal.printTimeMinutes}</FieldLabel>
                 <Input
                   id="request-time-estimate"
                   type="number"
@@ -343,37 +350,37 @@ export function RequestModal({
                   value={values.estimatedMinutes}
                   placeholder={
                     automaticEstimate?.minutes === undefined
-                      ? estimatePlaceholder(request.estimateGeometryStatus)
-                      : `≈${formatEstimateTime(automaticEstimate.minutes)}`
+                      ? estimatePlaceholder(t, request.estimateGeometryStatus)
+                      : `≈${formatEstimateTime(automaticEstimate.minutes, t.requests)}`
                   }
                   onChange={(event) => patchValues({ estimatedMinutes: event.target.value })}
                 />
               </Field>
-              <p className="text-xs text-muted-foreground sm:col-span-2">Leave either empty to use the automatic estimate.</p>
+              <p className="text-xs text-muted-foreground sm:col-span-2">{t.requests.modal.estimateHint}</p>
             </div>
             {notesOpen && (
               <RemovableField
-                removeLabel="Remove note"
+                removeLabel={t.requests.fields.removeNote}
                 onRemove={() => {
                   setNotesOpen(false)
                   patchValues({ notes: '' })
                 }}
               >
                 <Field className="min-w-0 flex-1">
-                  <FieldLabel htmlFor="request-notes">Notes</FieldLabel>
+                  <FieldLabel htmlFor="request-notes">{t.requests.fields.notes}</FieldLabel>
                   <Textarea
                     id="request-notes"
                     rows={3}
                     value={values.notes}
                     onChange={(event) => patchValues({ notes: event.target.value })}
-                    placeholder="scale, supports, colour — anything the printer should know"
+                    placeholder={t.requests.fields.notesPlaceholder}
                   />
                 </Field>
               </RemovableField>
             )}
             {sourceOpen && (
               <RemovableField
-                removeLabel="Remove link"
+                removeLabel={t.requests.fields.removeLink}
                 onRemove={
                   request.hasFile
                     ? () => {
@@ -384,14 +391,14 @@ export function RequestModal({
                 }
               >
                 <Field className="min-w-0 flex-1">
-                  <FieldLabel htmlFor="request-source">Source link</FieldLabel>
+                  <FieldLabel htmlFor="request-source">{t.requests.fields.sourceLink}</FieldLabel>
                   <Input
                     id="request-source"
                     type="url"
                     inputMode="url"
                     value={values.sourceUrl}
                     onChange={(event) => patchValues({ sourceUrl: event.target.value })}
-                    placeholder="https://… where this model came from"
+                    placeholder={t.requests.fields.sourcePlaceholder}
                     maxLength={MAX_REQUEST_SOURCE_URL_LENGTH}
                   />
                 </Field>
@@ -399,22 +406,22 @@ export function RequestModal({
             )}
             {(!notesOpen || !sourceOpen) && (
               <div className="grid gap-1 sm:flex sm:flex-wrap sm:gap-x-3">
-                {!notesOpen && <AddOptionalFieldButton label="Add note" onClick={() => setNotesOpen(true)} />}
-                {!sourceOpen && <AddOptionalFieldButton label="Add link" onClick={() => setSourceOpen(true)} />}
+                {!notesOpen && <AddOptionalFieldButton label={t.requests.fields.addNote} onClick={() => setNotesOpen(true)} />}
+                {!sourceOpen && <AddOptionalFieldButton label={t.requests.fields.addLink} onClick={() => setSourceOpen(true)} />}
               </div>
             )}
             <FieldError>{error}</FieldError>
-            <DialogProblem title="The save did not finish" hint="Check your connection and try again." error={saveFailure} />
+            <DialogProblem title={t.requests.modal.saveFailedTitle} hint={t.requests.modal.saveFailedHint} error={saveFailure} />
           </form>
         )}
       </DialogShell>
       {moveOpen && (
         <MoveDialog
           requestName={request.name}
-          destinations={workflow.statuses.slice(1).map(({ id, label }) => ({ id, label }))}
+          destinations={workflow.statuses.slice(1).map(({ id }) => ({ id, label: statusText(t, 'label', id) }))}
           max={queuedCopies}
           pending={moveMutation.isPending}
-          error={moveMutation.error ? errorMessage(moveMutation.error, 'The server did not accept the move.') : undefined}
+          error={moveMutation.error ? errorMessage(moveMutation.error, t.requests.modal.moveRejected) : undefined}
           onCancel={() => setMoveOpen(false)}
           onConfirm={(count, destination) => {
             if (!destination) return
@@ -424,15 +431,15 @@ export function RequestModal({
       )}
       <ConfirmDialog
         open={confirmation !== null}
-        title={confirmation === 'delete' ? `Delete “${request.name}”?` : 'Discard changes?'}
+        title={confirmation === 'delete' ? t.requests.modal.deleteTitle(request.name) : t.requests.modal.discardTitle}
         description={
           confirmation === 'delete'
             ? request.hasFile
-              ? 'This also deletes the model from storage.'
-              : 'This removes the linked print from the queue.'
-            : 'Your unsaved edits will be lost.'
+              ? t.requests.modal.deleteWithModel
+              : t.requests.modal.deleteLinked
+            : t.requests.modal.discardDescription
         }
-        confirmLabel={confirmation === 'delete' ? 'Delete request' : 'Discard'}
+        confirmLabel={confirmation === 'delete' ? t.requests.modal.deleteConfirm : t.requests.modal.discard}
         destructive
         pending={deleteMutation.isPending}
         onCancel={() => setConfirmation(null)}
@@ -442,6 +449,6 @@ export function RequestModal({
   )
 }
 
-function estimatePlaceholder(status: PublicPrintRequest['estimateGeometryStatus']) {
-  return status === 'pending' || status === 'running' ? 'Calculating…' : 'Not available'
+function estimatePlaceholder(t: Messages, status: PublicPrintRequest['estimateGeometryStatus']) {
+  return status === 'pending' || status === 'running' ? t.requests.modal.calculating : t.requests.modal.notAvailable
 }

@@ -28,6 +28,8 @@ export type EmailContent = {
   items?: string[]
   action?: { label: string; url: string }
   note: string
+  /** The closing line naming who sent the email, in the recipient's language. */
+  footer: string
   /** Raw markup for the header and list, used only to lay out the default custom template around its placeholders. */
   brandHtml?: string
   itemsHtml?: string
@@ -95,7 +97,7 @@ function emailText(content: EmailContent) {
     '',
     content.note,
     '',
-    `Sent by ${content.workspaceName} through STL Quest.`,
+    content.footer,
   ].join('\n')
 }
 
@@ -133,7 +135,6 @@ export function fillEmailTemplate(template: EmailTemplate, placeholders: Partial
 }
 
 function emailHtml(content: EmailContent) {
-  const name = escapeHtml(content.workspaceName)
   const brand = content.brandHtml ?? brandHtml(content.workspaceName, content.logoSrc)
   const items = content.itemsHtml ?? itemsHtml(content.items ?? [])
   const action = content.action
@@ -152,7 +153,7 @@ function emailHtml(content: EmailContent) {
     action,
     `<p style="margin:0 0 16px;${font};font-size:13px;line-height:20px;color:#5f645c">${escapeHtml(content.note)}</p>`,
     '</td></tr></table>',
-    `<p style="margin:16px 0 0;${font};font-size:12px;line-height:18px;color:#8a8e86">Sent by ${name} through STL Quest.</p>`,
+    `<p style="margin:16px 0 0;${font};font-size:12px;line-height:18px;color:#8a8e86">${escapeHtml(content.footer)}</p>`,
     '</td></tr></table></body></html>',
   ].join('')
 }

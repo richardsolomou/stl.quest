@@ -10,6 +10,7 @@ import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import {
+  authErrorMessage,
   signInFailureMessage,
   signInFailureReason,
   socialProviderName,
@@ -18,7 +19,7 @@ import {
 } from '../../core/auth'
 import { PASSWORD_MIN_LENGTH } from '../../core/security'
 import { authClient } from '../authClient'
-import { errorMessage } from '../../core/error'
+import { useI18n } from '../i18n'
 import { AuthMethodIcon } from './AuthMethodIcon'
 import { PasswordAuthDivider } from './PasswordAuthDivider'
 import { TwoFactorSignInForm } from './TwoFactorSignInForm'
@@ -40,6 +41,7 @@ export function AuthenticationMethods({
   creatingAccount: boolean
   setCreatingAccount: Dispatch<SetStateAction<boolean>>
 }) {
+  const { t } = useI18n()
   const queryClient = useQueryClient()
   const router = useRouter()
   const posthog = usePostHog()
@@ -60,7 +62,7 @@ export function AuthenticationMethods({
       requestSignUp: signingUp,
     })
     if (failed) {
-      setError(`Could not continue with ${socialProviderName(provider, auth.oidcName)}.`)
+      setError(t.auth.continueFailed(socialProviderName(provider, auth.oidcName)))
       setBusy(false)
     }
   }
@@ -72,7 +74,7 @@ export function AuthenticationMethods({
           {auth.socialProviders.map((provider) => (
             <Button key={provider} type="button" variant="outline" disabled={busy} onClick={() => void signInWithProvider(provider)}>
               <AuthMethodIcon method={provider} />
-              Continue with {socialProviderName(provider, auth.oidcName)}
+              {t.auth.continueWith(socialProviderName(provider, auth.oidcName))}
             </Button>
           ))}
           {auth.password && <PasswordAuthDivider />}
@@ -92,9 +94,9 @@ export function AuthenticationMethods({
                 : await authClient.signIn.email({ email: values.email, password: values.password })
               if (failed) {
                 if (signingUp) {
-                  setError(errorMessage(failed, 'Could not create account.'))
+                  setError(authErrorMessage(t.auth, failed, t.auth.methods.createAccountFailed))
                 } else {
-                  setError(signInFailureMessage(failed))
+                  setError(signInFailureMessage(t.auth, failed))
                   posthog.capture('user_sign_in_failed', { reason: signInFailureReason(failed) })
                 }
                 return
@@ -116,7 +118,7 @@ export function AuthenticationMethods({
         >
           {signingUp && (
             <Field>
-              <FieldLabel htmlFor="auth-name">Name</FieldLabel>
+              <FieldLabel htmlFor="auth-name">{t.auth.name}</FieldLabel>
               <Input
                 id="auth-name"
                 value={values.name}
@@ -126,7 +128,7 @@ export function AuthenticationMethods({
             </Field>
           )}
           <Field>
-            <FieldLabel htmlFor="auth-email">Email</FieldLabel>
+            <FieldLabel htmlFor="auth-email">{t.auth.email}</FieldLabel>
             <Input
               id="auth-email"
               type="email"
@@ -137,7 +139,7 @@ export function AuthenticationMethods({
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor="auth-password">Password</FieldLabel>
+            <FieldLabel htmlFor="auth-password">{t.auth.password}</FieldLabel>
             <Input
               id="auth-password"
               type="password"
@@ -156,7 +158,7 @@ export function AuthenticationMethods({
           )}
           <Button type="submit" disabled={busy || !hydrated}>
             {busy && <Spinner />}
-            {busy ? 'Working…' : initialAdmin ? 'Create super admin' : signingUp ? 'Create account' : 'Sign in'}
+            {busy ? t.auth.working : initialAdmin ? t.auth.methods.createSuperAdmin : signingUp ? t.auth.createAccount : t.auth.signIn}
           </Button>
           {!signingUp && auth.passwordReset && (
             <Button
@@ -172,7 +174,7 @@ export function AuthenticationMethods({
                   email: values.email,
                   redirectTo: '/reset-password',
                 })
-                if (failed) setError('Could not send a password reset email.')
+                if (failed) setError(t.auth.methods.resetEmailFailed)
                 else {
                   setResetSent(true)
                   posthog.capture('password_reset_requested')
@@ -180,13 +182,11 @@ export function AuthenticationMethods({
                 setBusy(false)
               }}
             >
-              Forgot password?
+              {t.auth.methods.forgotPassword}
             </Button>
           )}
-          {!signingUp && !auth.passwordReset && (
-            <p className="text-sm text-muted-foreground">Forgot your password? Ask your administrator to reset it for you.</p>
-          )}
-          {resetSent && <p className="text-sm text-muted-foreground">If that account exists, a reset link has been sent.</p>}
+          {!signingUp && !auth.passwordReset && <p className="text-sm text-muted-foreground">{t.auth.methods.askAdministrator}</p>}
+          {resetSent && <p className="text-sm text-muted-foreground">{t.auth.methods.resetSent}</p>}
           {!setupRequired && auth.selfSignup && (
             <Button
               type="button"
@@ -199,7 +199,7 @@ export function AuthenticationMethods({
                 setResetSent(false)
               }}
             >
-              {creatingAccount ? 'Already have an account? Sign in' : 'New to STL Quest? Create an account'}
+              {creatingAccount ? t.auth.haveAccount : t.auth.methods.newAccount}
             </Button>
           )}
         </form>

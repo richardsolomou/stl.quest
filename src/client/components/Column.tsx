@@ -13,6 +13,8 @@ import type { BoardRequestEntry } from '../boardEntries'
 import { boardCardSelection, type BoardSelection } from '../boardSelection'
 import { RequestCard } from './RequestCard'
 import { VirtualRow } from './VirtualRow'
+import { statusText } from '../../core/i18n'
+import { useI18n } from '../i18n'
 
 export function Column({
   status,
@@ -109,6 +111,7 @@ export function Column({
   ) => void
   onArchiveRequest?: (requestId: string, status: StatusId, groupId?: string, cohortId?: string) => void
 }) {
+  const { t } = useI18n()
   const laneRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const [isOver, setIsOver] = useState(false)
@@ -164,7 +167,7 @@ export function Column({
       >
         {entries.length === 0 && (
           <Empty className="border-0 py-6">
-            <EmptyDescription>{filtered ? 'No matching prints in this stage.' : definition.empty}</EmptyDescription>
+            <EmptyDescription>{filtered ? t.board.column.filteredEmpty : statusText(t, 'empty', definition.id)}</EmptyDescription>
           </Empty>
         )}
         <div className="virtual-list relative w-full" style={{ height: virtualizer.getTotalSize() }}>

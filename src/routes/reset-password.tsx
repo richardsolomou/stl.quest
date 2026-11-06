@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { AuthBrand } from '../client/components/Brand'
 import { authClient } from '../client/authClient'
+import { useI18n } from '../client/i18n'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../core/security'
 
 export const Route = createFileRoute('/reset-password')({
@@ -24,8 +25,10 @@ function ResetPasswordPage() {
   const { token, error: tokenError } = Route.useSearch()
   const navigate = useNavigate()
   const [password, setPassword] = useState('')
-  const action = useAuthAction({ failureMessage: () => 'Could not reset the password. Request a new reset link and try again.' })
-  const error = tokenError ? 'This password reset link is invalid or has expired.' : action.error
+  const { t } = useI18n()
+  const copy = t.auth.resetPassword
+  const action = useAuthAction({ failureMessage: () => copy.failed })
+  const error = tokenError ? copy.linkInvalid : action.error
 
   return (
     <main className="grid min-h-dvh place-items-center p-6 [background-image:var(--grid)] [background-size:24px_24px]">
@@ -33,8 +36,8 @@ function ResetPasswordPage() {
         <AuthBrand />
         <Card>
           <CardHeader>
-            <CardTitle>Reset password</CardTitle>
-            <CardDescription>Choose a new password for your STL Quest account.</CardDescription>
+            <CardTitle>{copy.title}</CardTitle>
+            <CardDescription>{copy.description}</CardDescription>
           </CardHeader>
           <CardContent>
             <form
@@ -49,7 +52,7 @@ function ResetPasswordPage() {
               }}
             >
               <Field>
-                <FieldLabel htmlFor="reset-password">New password</FieldLabel>
+                <FieldLabel htmlFor="reset-password">{copy.newPassword}</FieldLabel>
                 <Input
                   id="reset-password"
                   type="password"
@@ -70,7 +73,7 @@ function ResetPasswordPage() {
               )}
               <Button type="submit" disabled={action.busy || !token}>
                 {action.busy && <Spinner />}
-                {action.busy ? 'Resetting…' : 'Reset password'}
+                {action.busy ? copy.resetting : copy.title}
               </Button>
             </form>
           </CardContent>

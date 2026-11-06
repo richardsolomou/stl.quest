@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Check } from 'lucide-react'
+import { useI18n } from '../i18n'
 
 // Copies `value` to the clipboard, returning whether it succeeded. The async Clipboard API is only
 // available in secure contexts, so on a plain-HTTP self-hosted install (e.g. a LAN IP) the browser
@@ -53,10 +54,11 @@ export function useCopied(resetAfterMs = 2000) {
 }
 
 export function CopyButtonLabel({ copied }: { copied: boolean }) {
-  if (!copied) return 'Copy'
+  const { t } = useI18n()
+  if (!copied) return t.common.copy
   return (
     <>
-      <Check /> Copied
+      <Check /> {t.common.copied}
     </>
   )
 }

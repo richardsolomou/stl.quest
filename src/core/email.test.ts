@@ -11,7 +11,13 @@ import {
   senderDisplayName,
 } from './email'
 
-const content = { workspaceName: 'Lab', subject: 'Ready', intro: 'Your print is ready.', note: 'Turn these off in settings.' }
+const content = {
+  workspaceName: 'Lab',
+  subject: 'Ready',
+  intro: 'Your print is ready.',
+  note: 'Turn these off in settings.',
+  footer: 'Sent by Lab through STL Quest.',
+}
 
 describe('email layout', () => {
   it('shows the workspace name when there is no logo', () => {

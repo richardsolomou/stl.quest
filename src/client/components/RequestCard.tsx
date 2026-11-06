@@ -20,6 +20,7 @@ import { TagDotCluster } from './TagBadge'
 import { UserAvatar } from './UserAvatar'
 import { PrintEstimateBadges } from './PrintEstimate'
 import { RequestThumb } from './RequestThumb'
+import { useI18n } from '../i18n'
 
 export function RequestCard({
   request,
@@ -82,6 +83,7 @@ export function RequestCard({
   onArchive?: () => void
   onManageTags?: () => void
 }) {
+  const { t } = useI18n()
   const ref = useRef<HTMLButtonElement>(null)
   const draggedTagRef = useRef<{ id: string; count: number } | undefined>(undefined)
   const [dragging, setDragging] = useState(false)
@@ -258,25 +260,27 @@ export function RequestCard({
                   render={
                     <span
                       className="ph-no-capture rounded-full max-[620px]:hidden"
-                      aria-label={`Requested by ${requesterLabel(request)}`}
+                      aria-label={t.requests.card.requestedBy(requesterLabel(request, t.requests.requesterFallback))}
                     />
                   }
                 >
-                  <UserAvatar name={requesterLabel(request)} image={request.requesterImage} size="sm" />
+                  <UserAvatar name={requesterLabel(request, t.requests.requesterFallback)} image={request.requesterImage} size="sm" />
                 </TooltipTrigger>
-                <TooltipContent className="ph-no-capture">Requested by {requesterLabel(request)}</TooltipContent>
+                <TooltipContent className="ph-no-capture">
+                  {t.requests.card.requestedBy(requesterLabel(request, t.requests.requesterFallback))}
+                </TooltipContent>
               </Tooltip>
             )}
           </div>
           <div className="mt-0.5 flex min-w-0 flex-wrap items-baseline gap-x-2 text-xs text-ticket-muted">
             {(showPrintType || showPrinter) && request.printType && (
               <span className="min-w-0 flex-1 truncate" title={showPrinter ? request.printer?.name : undefined}>
-                {printTypeLabel(request.printType)}
+                {printTypeLabel(t, request.printType)}
                 {showPrinter && request.printer && ` · ${request.printer.name}`}
               </span>
             )}
             <span className="ml-auto shrink-0 font-mono">
-              {count === request.quantity ? `×${count}` : `×${count} of ${request.quantity}`}
+              {count === request.quantity ? `×${count}` : t.requests.card.partialCount(count, request.quantity)}
             </span>
           </div>
           <PrintEstimateBadges request={request} />
@@ -304,37 +308,43 @@ export function RequestCard({
                 }}
               >
                 <Check />
-                {selectionMode ? (selected ? 'Remove from selection' : 'Add to selection') : 'Select'}
+                {selectionMode
+                  ? selected
+                    ? t.requests.actions.removeFromSelection
+                    : t.requests.actions.addToSelection
+                  : t.requests.actions.select}
               </ContextMenuItem>
             )}
             {onManageTags && (
               <ContextMenuItem onClick={onManageTags}>
                 <Layers3 />
-                Manage tags
+                {t.requests.actions.manageTags}
               </ContextMenuItem>
             )}
             {onDownload && (
               <ContextMenuItem onClick={() => onDownload(false)}>
                 <Download />
-                Download model{selectedRequestIds && selectedRequestIds.length > 1 ? 's' : ''}
+                {t.requests.actions.downloadModels(selectedRequestIds?.length ?? 1)}
               </ContextMenuItem>
             )}
             {onDownload && copyDownloadCount !== undefined && (
               <ContextMenuItem onClick={() => onDownload(true)}>
                 <Copy />
-                {selectedRequestIds && selectedRequestIds.length > 1 ? 'Download all copies' : `Download ${copyDownloadCount} copies`}
+                {selectedRequestIds && selectedRequestIds.length > 1
+                  ? t.requests.actions.downloadAllCopies
+                  : t.requests.actions.downloadCopies(copyDownloadCount)}
               </ContextMenuItem>
             )}
             {onRepeat && (
               <ContextMenuItem onClick={onRepeat}>
                 <RotateCcw />
-                Print again…
+                {t.requests.actions.printAgain}
               </ContextMenuItem>
             )}
             {onMove && (
               <ContextMenuItem onClick={onMove}>
                 <Move />
-                Move
+                {t.requests.actions.move}
               </ContextMenuItem>
             )}
             {onArchive && (
@@ -342,7 +352,7 @@ export function RequestCard({
                 <ContextMenuSeparator />
                 <ContextMenuItem onClick={onArchive}>
                   <Archive />
-                  Archive
+                  {t.requests.actions.archive}
                 </ContextMenuItem>
               </>
             )}
@@ -351,7 +361,7 @@ export function RequestCard({
                 <ContextMenuSeparator />
                 <ContextMenuItem variant="destructive" onClick={onDelete}>
                   <Trash2 />
-                  Delete
+                  {t.common.delete}
                 </ContextMenuItem>
               </>
             )}

@@ -1,3 +1,4 @@
+import type { Messages } from '../core/i18n'
 import type { PrinterSummary, PrintType } from '../core/types'
 
 export function fleetPrintTypes(printers: PrinterSummary[]) {
@@ -14,6 +15,6 @@ export function availablePrintTypes(printers?: PrinterSummary[]) {
   return configured.length ? configured : (['resin', 'filament'] as const)
 }
 
-export function printTypeLabel(printType: PrintType) {
-  return printType === 'resin' ? 'Resin' : 'Filament'
+export function printTypeLabel(t: Messages, printType: PrintType) {
+  return t.board.printType[printType]
 }

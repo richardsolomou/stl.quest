@@ -1,14 +1,15 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
+import { messagesFor } from '../core/i18n'
 import { invalidateQueries, queryErrorMessage, queryStateKind, retryQueries } from './queryState'
 
 describe('query state', () => {
   it('preserves a useful query error', () => {
-    expect(queryErrorMessage(new Error('Network unavailable'))).toBe('Network unavailable')
+    expect(queryErrorMessage(new Error('Network unavailable'), messagesFor('en'))).toBe('Network unavailable')
   })
 
   it('provides a fallback for rejected non-error values', () => {
-    expect(queryErrorMessage(null)).toBe('The request failed. Check your connection and try again.')
+    expect(queryErrorMessage(null, messagesFor('en'))).toBe('The request failed. Check your connection and try again.')
   })
 
   it('shows a rejection while another required query is still pending', () => {

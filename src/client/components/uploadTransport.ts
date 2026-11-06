@@ -2,6 +2,7 @@ import { createTusUpload, startTusUpload } from 'ras-stack/uploads'
 import type { UploadEntry } from './uploadTypes'
 import { normalizeRequestQuantity } from '../../core/request'
 import { errorMessage } from '../../core/error'
+import type { Messages } from '../../core/i18n'
 
 const CHUNK_BYTES = 32 * 1024 * 1024
 
@@ -81,23 +82,23 @@ export function uploadRejection(error: unknown): UploadRejection | undefined {
   return undefined
 }
 
-export function uploadErrorMessage(error: unknown) {
+export function uploadErrorMessage(error: unknown, t: Messages['requests']) {
   const response = uploadResponse(error)
   switch (uploadRejection(error)) {
     case 'proxy_blocked':
-      return `A proxy or firewall in front of STL Quest blocked this upload (HTTP ${response?.getStatus()}). Ask your server admin to allow upload requests to /api/upload.`
+      return t.transport.proxyBlocked(response?.getStatus())
     case 'proxy_unavailable':
-      return `STL Quest did not answer through its proxy (HTTP ${response?.getStatus()}). Try again in a moment.`
+      return t.transport.proxyUnavailable(response?.getStatus())
     case 'storage_paused':
-      return 'Uploads are paused while storage is moving. Wait for the migration to finish.'
+      return t.transport.storagePaused
     case 'upload_limit':
-      return 'Too many uploads are still in progress. Wait for one to finish, then try again.'
+      return t.transport.uploadLimit
     case 'storage_quota':
       return responseError(response?.getBody() ?? '') === 'managed storage quota exceeded'
-        ? 'This model is larger than your whole storage allowance.'
-        : 'Not enough storage left for this model.'
+        ? t.transport.largerThanAllowance
+        : t.transport.notEnoughStorage
   }
-  return errorMessage(error, 'Upload failed.')
+  return errorMessage(error, t.transport.failed)
 }
 
 function uploadResponse(error: unknown) {

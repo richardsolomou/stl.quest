@@ -109,6 +109,12 @@
     @apply min-h-full bg-background text-foreground;
   }
 
+  /* Long compounds in languages such as German would otherwise overflow narrow cards and headings. */
+  html:not(:lang(en)) body {
+    hyphens: auto;
+    overflow-wrap: break-word;
+  }
+
   [data-base-ui-inert][inert] {
     pointer-events: none;
   }

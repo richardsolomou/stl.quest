@@ -6,13 +6,14 @@ import { Spinner } from '@/components/ui/spinner'
 import { MAX_PRINT_GROUP_NAME_LENGTH } from '../../core/printGroups'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
+import { useI18n } from '../i18n'
 
 export function RenameGroupDialog({
   pending,
   error,
-  title = 'Rename tag',
+  title,
   initialName = '',
-  submitLabel = 'Rename tag',
+  submitLabel,
   onConfirm,
   onCancel,
 }: {
@@ -24,9 +25,11 @@ export function RenameGroupDialog({
   onConfirm: (name: string) => void
   onCancel: () => void
 }) {
+  const { t } = useI18n()
+  const r = t.board.renameTag
   const [name, setName] = useState(initialName)
   return (
-    <DialogShell title={title} onClose={onCancel} preventClose={pending}>
+    <DialogShell title={title ?? r.title} onClose={onCancel} preventClose={pending}>
       <form
         onSubmit={(event) => {
           event.preventDefault()
@@ -34,23 +37,23 @@ export function RenameGroupDialog({
         }}
       >
         <Field>
-          <FieldLabel htmlFor="print-group-name">Tag name</FieldLabel>
+          <FieldLabel htmlFor="print-group-name">{r.name}</FieldLabel>
           <Input
             id="print-group-name"
             maxLength={MAX_PRINT_GROUP_NAME_LENGTH}
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="e.g. Plate 14"
+            placeholder={t.board.manageTags.namePlaceholder}
           />
         </Field>
-        <DialogProblem title="The tag was not renamed" hint="It still has its previous name. Try again." error={error} />
+        <DialogProblem title={r.problemTitle} hint={r.problemHint} error={error} />
         <div className="mt-4 flex justify-end gap-2">
           <Button type="button" variant="outline" disabled={pending} onClick={onCancel}>
-            Cancel
+            {t.common.cancel}
           </Button>
           <Button type="submit" disabled={pending || !name.trim()}>
             {pending && <Spinner />}
-            {pending ? 'Saving…' : submitLabel}
+            {pending ? t.common.saving : (submitLabel ?? r.title)}
           </Button>
         </div>
       </form>

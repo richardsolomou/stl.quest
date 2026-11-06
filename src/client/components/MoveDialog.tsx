@@ -6,6 +6,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { DialogShell } from './DialogShell'
 import { DialogProblem } from './DialogProblem'
 import { MoveDestinationField, type MoveDestination } from './MoveDestinationField'
+import { useI18n } from '../i18n'
 
 export function MoveDialog({
   requestName,
@@ -26,25 +27,25 @@ export function MoveDialog({
   onConfirm: (count: number, destination?: string) => void
   onCancel: () => void
 }) {
+  const { t } = useI18n()
+  const m = t.board.move
   const [count, setCount] = useState(String(max))
   const [destination, setDestination] = useState(destinations?.[0]?.id ?? '')
 
   return (
-    <DialogShell onClose={onCancel} title="Move copies" className="sm:max-w-[360px]" preventClose={pending}>
+    <DialogShell onClose={onCancel} title={m.title} className="sm:max-w-[360px]" preventClose={pending}>
       <form
         onSubmit={(e) => {
           e.preventDefault()
           onConfirm(Math.min(max, Math.max(1, Math.round(Number(count) || 1))), destination || undefined)
         }}
       >
-        <p className="mb-3 text-sm text-muted-foreground">
-          {toLabel ? `How many copies of “${requestName}” to ${toLabel}?` : `Move copies of “${requestName}” to another stage.`}
-        </p>
+        <p className="mb-3 text-sm text-muted-foreground">{toLabel ? m.howMany(requestName, toLabel) : m.toAnotherStage(requestName)}</p>
         {destinations && (
           <MoveDestinationField id="move-destination" value={destination} destinations={destinations} onChange={setDestination} />
         )}
         <Field>
-          <FieldLabel htmlFor="move-count">Copies (of {max})</FieldLabel>
+          <FieldLabel htmlFor="move-count">{m.copiesOf(max)}</FieldLabel>
           <Input
             id="move-count"
             type="number"
@@ -55,14 +56,14 @@ export function MoveDialog({
             onChange={(e) => setCount(e.target.value)}
           />
         </Field>
-        <DialogProblem title="The print was not moved" hint="It is still in the queue. Try again." error={error} />
+        <DialogProblem title={m.problemTitle} hint={m.problemHint} error={error} />
         <div className="mt-2 flex justify-end gap-2.5">
           <Button type="button" variant="outline" disabled={pending} onClick={onCancel}>
-            Cancel
+            {t.common.cancel}
           </Button>
           <Button type="submit" disabled={pending}>
             {pending && <Spinner />}
-            {pending ? 'Moving…' : 'Move'}
+            {pending ? m.moving : m.move}
           </Button>
         </div>
       </form>

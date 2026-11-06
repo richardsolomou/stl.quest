@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils'
 import type { StorageConfig, StorageInventory } from '../../../core/types'
 import { formatBytes } from '../../../core/format'
 import { storageLabel } from '../../storageProviders'
+import { useI18n } from '../../i18n'
 
 export type DestinationAction = 'preserve' | 'clear-all'
 
@@ -39,9 +40,11 @@ export function StorageChangeDialog({
   onConfirm: () => void
   onCancel: () => void
 }) {
+  const { t: messages, locale } = useI18n()
+  const t = messages.storage.change
   const inventory = change?.inventory
   const occupied = !!inventory && (inventory.files > 0 || inventory.folders > 0)
-  const destination = change ? storageName(change.config) : 'the new location'
+  const kind = change?.config.adapter === 's3' ? 'bucket' : 'folder'
   const deleting = occupied && action === 'clear-all'
   return (
     <AlertDialog
@@ -52,24 +55,24 @@ export function StorageChangeDialog({
     >
       <AlertDialogContent size="lg" className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <AlertDialogHeader>
-          <AlertDialogTitle>{occupied ? `That ${destination} is not empty` : 'Move your files to the new location?'}</AlertDialogTitle>
+          <AlertDialogTitle>{occupied ? t.notEmptyTitle(kind) : t.moveTitle}</AlertDialogTitle>
           <AlertDialogDescription>
             {occupied && inventory
-              ? `${countLabel(inventory)} already sit there. Choose what happens to them before STL Quest starts using it.`
-              : 'STL Quest copies and verifies every file into the new location before it goes live.'}
+              ? t.occupiedDescription(inventory.files, inventory.folders, formatBytes(inventory.bytes, locale))
+              : t.moveDescription}
           </AlertDialogDescription>
         </AlertDialogHeader>
         {change && (
           <div className="flex flex-col gap-3">
             <div className="rounded-lg border bg-muted/30 p-3 text-sm">
               <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5">
-                <span className="text-muted-foreground">From</span>
-                <code className="truncate" title={storageLabel(current)}>
-                  {storageLabel(current)}
+                <span className="text-muted-foreground">{t.from}</span>
+                <code className="truncate" title={storageLabel(current, messages.storage)}>
+                  {storageLabel(current, messages.storage)}
                 </code>
-                <span className="text-muted-foreground">To</span>
-                <code className="truncate" title={storageLabel(change.config)}>
-                  {storageLabel(change.config)}
+                <span className="text-muted-foreground">{t.to}</span>
+                <code className="truncate" title={storageLabel(change.config, messages.storage)}>
+                  {storageLabel(change.config, messages.storage)}
                 </code>
               </div>
             </div>
@@ -77,30 +80,32 @@ export function StorageChangeDialog({
               <>
                 {inventory.entries.length > 0 && (
                   <details className="text-sm">
-                    <summary className="cursor-pointer text-muted-foreground">See what is already there</summary>
+                    <summary className="cursor-pointer text-muted-foreground">{t.seeContents}</summary>
                     <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto border-t pt-2 font-mono text-xs">
                       {inventory.entries.map((entry) => (
                         <li key={`${entry.type}:${entry.path}`} className="flex justify-between gap-3">
                           <span className="min-w-0 break-all">{entry.type === 'folder' ? `${entry.path}/` : entry.path}</span>
-                          {entry.bytes !== undefined && <span className="shrink-0 text-muted-foreground">{formatBytes(entry.bytes)}</span>}
+                          {entry.bytes !== undefined && (
+                            <span className="shrink-0 text-muted-foreground">{formatBytes(entry.bytes, locale)}</span>
+                          )}
                         </li>
                       ))}
                     </ul>
-                    {inventory.truncated && <p className="mt-2 text-xs text-muted-foreground">Showing the first 100 items.</p>}
+                    {inventory.truncated && <p className="mt-2 text-xs text-muted-foreground">{t.truncated}</p>}
                   </details>
                 )}
                 <div className="flex flex-col gap-2">
                   <DestinationChoice
                     selected={action === 'preserve'}
-                    title="Leave them alone"
-                    description={`STL Quest adds its own workspace folder next to what is already in the ${destination}. Nothing existing is read, moved, or deleted.`}
+                    title={t.preserveTitle}
+                    description={t.preserveDescription(kind)}
                     onSelect={() => onAction('preserve')}
                   />
                   <DestinationChoice
                     selected={action === 'clear-all'}
                     destructive
-                    title="Delete everything there first"
-                    description={`Permanently removes ${countLabel(inventory)}, including files belonging to other STL Quest workspaces. This cannot be undone.`}
+                    title={t.clearTitle}
+                    description={t.clearDescription(inventory.files, inventory.folders, formatBytes(inventory.bytes, locale))}
                     onSelect={() => onAction('clear-all')}
                   />
                 </div>
@@ -110,21 +115,17 @@ export function StorageChangeDialog({
               <Field orientation="horizontal" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3">
                 <Checkbox id="storage-clear-acknowledged" checked={acknowledged} onCheckedChange={onAcknowledge} />
                 <FieldLabel htmlFor="storage-clear-acknowledged" className="text-sm font-normal">
-                  I understand everything currently in that {destination} is deleted for good.
+                  {t.acknowledge(kind)}
                 </FieldLabel>
               </Field>
             )}
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              {migrationWillRun
-                ? 'Your current storage keeps serving the board until copying and verification finish, so nothing is lost if the move fails.'
-                : 'The new location starts being used as soon as you confirm.'}
-            </p>
+            <p className="text-xs leading-relaxed text-muted-foreground">{migrationWillRun ? t.migrationNote : t.immediateNote}</p>
           </div>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>{messages.common.cancel}</AlertDialogCancel>
           <AlertDialogAction variant={deleting ? 'destructive' : 'default'} disabled={deleting && !acknowledged} onClick={onConfirm}>
-            {deleting ? 'Delete and switch' : migrationWillRun ? 'Copy files and switch' : 'Start using it'}
+            {deleting ? t.deleteAndSwitch : migrationWillRun ? t.copyAndSwitch : t.startUsing}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -171,17 +172,4 @@ function DestinationChoice({
       </span>
     </button>
   )
-}
-
-function countLabel({ files, folders, bytes }: StorageInventory) {
-  const parts = [plural(files, 'file'), ...(folders ? [plural(folders, 'folder')] : [])]
-  return `${parts.join(' and ')} (${formatBytes(bytes)})`
-}
-
-function plural(count: number, noun: string) {
-  return `${count} ${noun}${count === 1 ? '' : 's'}`
-}
-
-function storageName(config: StorageConfig) {
-  return config.adapter === 's3' ? 'bucket' : 'folder'
 }

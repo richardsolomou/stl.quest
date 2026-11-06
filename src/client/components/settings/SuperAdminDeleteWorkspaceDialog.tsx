@@ -5,6 +5,7 @@ import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import type { AdminWorkspace } from '../../../core/admin'
 import { deleteAdminWorkspace } from '../../../server/fns'
+import { useI18n } from '../../i18n'
 import { invalidateQueries } from '../../queryState'
 import { ConfirmDialog } from '../ConfirmDialog'
 
@@ -17,6 +18,8 @@ export function DeleteWorkspaceDialog({
   onDone: () => void
   onDeleted: (workspace: AdminWorkspace) => void
 }) {
+  const { t } = useI18n()
+  const copy = t.superAdmin.deleteWorkspace
   const queryClient = useQueryClient()
   const callDelete = useServerFn(deleteAdminWorkspace)
   const [confirmation, setConfirmation] = useState('')
@@ -31,11 +34,11 @@ export function DeleteWorkspaceDialog({
   return (
     <ConfirmDialog
       open
-      title="Delete workspace"
-      description="This permanently deletes the workspace with its print requests, models, settings, and invitations. Members using it are moved to another of their workspaces, or to a new empty one if they have none. Connected cloud storage may keep its files. You cannot undo this."
+      title={copy.title}
+      description={copy.description}
       details={
         <Field>
-          <FieldLabel htmlFor="admin-delete-workspace-confirmation">Workspace name</FieldLabel>
+          <FieldLabel htmlFor="admin-delete-workspace-confirmation">{copy.nameLabel}</FieldLabel>
           <Input
             id="admin-delete-workspace-confirmation"
             className="ph-no-capture"
@@ -45,20 +48,22 @@ export function DeleteWorkspaceDialog({
             onChange={(event) => setConfirmation(event.target.value)}
           />
           <FieldDescription>
-            Enter <span className="ph-no-capture font-medium break-all text-foreground">{workspace.name}</span> exactly.
+            {copy.enterExactly.before}
+            <span className="ph-no-capture font-medium break-all text-foreground">{workspace.name}</span>
+            {copy.enterExactly.after}
           </FieldDescription>
         </Field>
       }
-      confirmLabel="Delete workspace"
-      pendingLabel="Deleting…"
+      confirmLabel={copy.title}
+      pendingLabel={copy.deleting}
       destructive
       pending={mutation.isPending}
       confirmDisabled={confirmation !== workspace.name}
       problem={
         mutation.error
           ? {
-              title: 'The workspace was not deleted',
-              hint: 'Nothing was deleted and its members can keep working. Resolve the problem below, then try again.',
+              title: copy.problemTitle,
+              hint: copy.problemHint,
               error: mutation.error.message,
             }
           : undefined

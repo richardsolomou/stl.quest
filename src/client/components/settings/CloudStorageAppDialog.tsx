@@ -9,7 +9,8 @@ import { Spinner } from '@/components/ui/spinner'
 import type { CloudStorageProvider, PublicCloudStorageApp } from '../../../core/auth'
 import { removeCloudStorageApp, saveCloudStorageApp } from '../../../server/fns'
 import { invalidateQueries } from '../../queryState'
-import { CLOUD_PROVIDER_HELP, cloudProviderLabel } from '../../storageProviders'
+import { CLOUD_PROVIDER_CONSOLES, cloudProviderLabel } from '../../storageProviders'
+import { useI18n } from '../../i18n'
 import { CopyableValue } from '../CopyableValue'
 import { DialogProblem } from '../DialogProblem'
 import { DialogShell } from '../DialogShell'
@@ -24,6 +25,8 @@ export function CloudStorageAppDialog({
   current: PublicCloudStorageApp
   onDone: () => void
 }) {
+  const { t: messages } = useI18n()
+  const t = messages.storage
   const queryClient = useQueryClient()
   const [clientId, setClientId] = useState(current.clientId)
   const [clientSecret, setClientSecret] = useState('')
@@ -33,32 +36,33 @@ export function CloudStorageAppDialog({
   }
   const mutation = useMutation({ mutationFn: useServerFn(saveCloudStorageApp), onSuccess: refresh })
   const removeMutation = useMutation({ mutationFn: useServerFn(removeCloudStorageApp), onSuccess: refresh })
-  const help = CLOUD_PROVIDER_HELP[provider]
+  const help = t.cloudHelp[provider]
+  const label = cloudProviderLabel(provider)
   return (
-    <DialogShell open title={`Set up the ${cloudProviderLabel(provider)} app`} className="sm:max-w-[640px]" onClose={onDone}>
+    <DialogShell open title={t.cloud.setUpApp(label)} className="sm:max-w-[640px]" onClose={onDone}>
       <div className="space-y-5 pr-1">
         <section className="space-y-3 text-sm text-muted-foreground">
           <a
             className="inline-flex items-center gap-1 font-medium text-foreground underline underline-offset-3"
-            href={help.consoleUrl}
+            href={CLOUD_PROVIDER_CONSOLES[provider]}
             target="_blank"
             rel="noreferrer"
           >
-            Open {cloudProviderLabel(provider)} developer console
+            {t.appDialog.openConsole(label)}
             <ExternalLink className="size-3.5" />
           </a>
           <ol className="list-decimal space-y-1 pl-5">
             <li>{help.credentials}</li>
             <li>{help.permissions}</li>
-            <li>Copy the credentials below. Every workspace then connects its own account from Settings → Storage.</li>
+            <li>{t.appDialog.copyCredentials}</li>
           </ol>
-          <CopyableValue label="OAuth redirect URI" value={current.callbackUrl} />
+          <CopyableValue label={t.appDialog.redirectUri} value={current.callbackUrl} />
         </section>
         <FieldSet>
-          <FieldLegend>App credentials</FieldLegend>
+          <FieldLegend>{t.appDialog.credentials}</FieldLegend>
           <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
             <Field>
-              <FieldLabel htmlFor="cloud-client-id">{provider === 'dropbox' ? 'App key' : 'Client ID'}</FieldLabel>
+              <FieldLabel htmlFor="cloud-client-id">{help.clientId}</FieldLabel>
               <Input id="cloud-client-id" value={clientId} autoComplete="off" onChange={(event) => setClientId(event.target.value)} />
             </Field>
             <Field>
@@ -69,35 +73,35 @@ export function CloudStorageAppDialog({
                 value={clientSecret}
                 autoComplete="off"
                 onChange={(event) => setClientSecret(event.target.value)}
-                placeholder={current.secretConfigured ? 'Leave blank to keep the current secret' : ''}
+                placeholder={current.secretConfigured ? t.appDialog.keepSecret : ''}
               />
             </Field>
           </div>
         </FieldSet>
         <DialogProblem
-          title={`${cloudProviderLabel(provider)} was not saved`}
-          hint={`Check that the credentials match the app in the ${cloudProviderLabel(provider)} console.`}
+          title={t.appDialog.notSavedTitle(label)}
+          hint={t.appDialog.notSavedHint(label)}
           error={mutation.error?.message ?? removeMutation.error?.message}
         />
         <div className="flex flex-wrap justify-between gap-2">
           {current.configured ? (
             <Button variant="destructive" disabled={removeMutation.isPending} onClick={() => removeMutation.mutate({ data: { provider } })}>
               {removeMutation.isPending && <Spinner />}
-              Remove app
+              {t.appDialog.remove}
             </Button>
           ) : (
             <span />
           )}
           <div className="flex gap-2">
             <Button variant="outline" onClick={onDone}>
-              Cancel
+              {messages.common.cancel}
             </Button>
             <Button
               disabled={!clientId || (!current.secretConfigured && !clientSecret) || mutation.isPending}
               onClick={() => mutation.mutate({ data: { provider, clientId, clientSecret } })}
             >
               {mutation.isPending && <Spinner />}
-              {mutation.isPending ? 'Saving…' : 'Save'}
+              {mutation.isPending ? messages.common.saving : messages.common.save}
             </Button>
           </div>
         </div>

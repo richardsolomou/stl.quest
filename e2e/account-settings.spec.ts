@@ -101,6 +101,17 @@ test('manages profile details through the protected account surface', async ({ p
   await page.reload()
   await expect(html).toHaveAttribute('data-theme', 'light')
 
+  await page.getByRole('combobox', { name: 'Interface language' }).click()
+  await page.getByRole('option', { name: 'Français' }).click()
+  await expect(page.getByRole('heading', { name: 'Compte' })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Compte' })).toBeVisible()
+  await expect(page.locator('html')).toHaveAttribute('lang', 'fr')
+  if (captureScreenshots) await page.screenshot({ path: path.join(screenshots, 'account-language-french.png'), fullPage: true })
+  await page.getByRole('combobox', { name: 'Langue de l’interface' }).click()
+  await page.getByRole('option', { name: /^Langue du navigateur/ }).click()
+  await expect(page.getByRole('heading', { name: 'Account' })).toBeVisible()
+
   // A tab opened before a release keeps calling server functions by id, including ones the release removed.
   await page.route('**/_serverFn/*', (route) =>
     route.request().method() === 'POST'

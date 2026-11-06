@@ -1,6 +1,7 @@
 import path from 'node:path'
 import type { StorageConfig } from '../core/types'
 import { hasTraversalSegment } from '../core/storagePath'
+import { serverMessages } from './locale'
 
 export function resolveStorageInput(data: StorageConfig, current: StorageConfig): StorageConfig {
   if (data.adapter === 'managed') return data
@@ -10,19 +11,19 @@ export function resolveStorageInput(data: StorageConfig, current: StorageConfig)
   }
   if (data.adapter === 'webdav') {
     const password = data.password || (current.adapter === 'webdav' ? current.password : '')
-    if (!password) throw new Response('missing WebDAV password', { status: 400 })
+    if (!password) throw new Response(serverMessages().storage.errors.missingWebdavPassword, { status: 400 })
     return {
       adapter: 'webdav',
       endpoint: data.endpoint,
-      root: normalizedFolder(data.root.trim(), 'invalid WebDAV folder'),
+      root: normalizedFolder(data.root.trim(), serverMessages().storage.errors.invalidWebdavFolder),
       username: data.username,
       password,
     }
   }
   const secretAccessKey = data.secretAccessKey || (current.adapter === 's3' ? current.secretAccessKey : '')
-  if (!secretAccessKey) throw new Response('missing secret access key', { status: 400 })
+  if (!secretAccessKey) throw new Response(serverMessages().storage.errors.missingSecretAccessKey, { status: 400 })
   const prefix = data.prefix?.trim().replace(/^\/+|\/+$/g, '') ?? ''
-  if (prefix.length > 200 || hasTraversalSegment(prefix)) throw new Response('invalid prefix', { status: 400 })
+  if (prefix.length > 200 || hasTraversalSegment(prefix)) throw new Response(serverMessages().storage.errors.invalidPrefix, { status: 400 })
   return {
     adapter: 's3',
     endpoint: data.endpoint,

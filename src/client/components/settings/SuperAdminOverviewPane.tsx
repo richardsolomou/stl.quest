@@ -8,6 +8,7 @@ import { formatBytes } from '../../../core/format'
 import { storagePlans, type StoragePlan } from '../../../core/plans'
 import type { Account } from '../../../core/types'
 import { adminWorkspaceAttentionReasons, type AdminWorkspace } from '../../../core/admin'
+import { useI18n } from '../../i18n'
 import { accountsQuery, adminWorkspacesQuery } from '../../queries'
 import { QueryState } from '../QueryState'
 import { SettingsHeader, SettingsPage } from './SettingsLayout'
@@ -16,6 +17,8 @@ import { SuperAdminWorkspaceDialog } from './SuperAdminWorkspaceDialog'
 const DAY = 24 * 60 * 60 * 1_000
 
 export function SuperAdminOverviewPane({ hosted }: { hosted: boolean }) {
+  const { t } = useI18n()
+  const copy = t.superAdmin.overview
   const accountsResult = useQuery(accountsQuery())
   const workspacesResult = useQuery(adminWorkspacesQuery())
   const [selected, setSelected] = useState<AdminWorkspace>()
@@ -25,12 +28,12 @@ export function SuperAdminOverviewPane({ hosted }: { hosted: boolean }) {
   if (!accounts || !workspaces) {
     return (
       <SettingsPage>
-        <SettingsHeader title="Overview" description="See deployment growth, production usage, and workspaces that need attention." />
+        <SettingsHeader title={copy.title} description={copy.description} />
         <QueryState
           loading={accountsResult.isPending || workspacesResult.isPending}
           error={accountsResult.error ?? workspacesResult.error}
-          loadingLabel="Loading deployment overview…"
-          errorTitle="Could not load deployment overview"
+          loadingLabel={copy.loading}
+          errorTitle={copy.loadError}
           onRetry={() => void Promise.all([accountsResult.refetch(), workspacesResult.refetch()])}
         />
       </SettingsPage>
@@ -45,23 +48,23 @@ export function SuperAdminOverviewPane({ hosted }: { hosted: boolean }) {
   const requests = workspaces.reduce((total, workspace) => total + workspace.requestCount, 0)
   const copies = workspaces.reduce((total, workspace) => total + workspace.copyCount, 0)
   const attention = workspaces
-    .map((workspace) => ({ workspace, reasons: adminWorkspaceAttentionReasons(workspace) }))
+    .map((workspace) => ({ workspace, reasons: adminWorkspaceAttentionReasons(workspace, t.superAdmin) }))
     .filter(({ reasons }) => reasons.length)
     .sort((left, right) => right.reasons.length - left.reasons.length || left.workspace.name.localeCompare(right.workspace.name))
 
   return (
     <SettingsPage>
-      <SettingsHeader title="Overview" description="See deployment growth, production usage, and workspaces that need attention." />
+      <SettingsHeader title={copy.title} description={copy.description} />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <SummaryCard label="Users" value={accounts.length} detail={`${newAccounts} new in the last 30 days`} />
-        <SummaryCard label="Active users" value={activeAccounts} detail="Approximate, from sessions in the last 30 days" />
-        <SummaryCard label="Workspaces" value={workspaces.length} detail={`${newWorkspaces} new in the last 30 days`} />
-        <SummaryCard label="Print requests" value={requests} detail="Current requests across all workspaces" />
-        <SummaryCard label="Print copies" value={copies} detail="Current copies across all workflow stages" />
+        <SummaryCard label={copy.users} value={accounts.length} detail={copy.newInLast30Days(newAccounts)} />
+        <SummaryCard label={copy.activeUsers} value={activeAccounts} detail={copy.activeUsersDetail} />
+        <SummaryCard label={copy.workspaces} value={workspaces.length} detail={copy.newInLast30Days(newWorkspaces)} />
+        <SummaryCard label={copy.printRequests} value={requests} detail={copy.printRequestsDetail} />
+        <SummaryCard label={copy.printCopies} value={copies} detail={copy.printCopiesDetail} />
         <SummaryCard
-          label="Needs attention"
+          label={copy.needsAttention}
           value={attention.length}
-          detail={attention.length ? 'Storage or background processing needs review' : 'No known workspace problems'}
+          detail={attention.length ? copy.needsAttentionDetail : copy.noProblems}
         />
       </div>
 
@@ -69,10 +72,8 @@ export function SuperAdminOverviewPane({ hosted }: { hosted: boolean }) {
 
       <section className="overflow-hidden rounded-sm border-2 border-border/70 bg-card/40">
         <header className="space-y-1 border-b-2 border-dashed border-blueprint/25 px-5 py-4">
-          <h3 className="font-heading text-base font-semibold tracking-tight">Needs attention</h3>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Read-only checks for missing storage, failed background jobs, and included-storage capacity.
-          </p>
+          <h3 className="font-heading text-base font-semibold tracking-tight">{copy.needsAttention}</h3>
+          <p className="text-sm leading-relaxed text-muted-foreground">{copy.attentionDescription}</p>
         </header>
         {attention.length ? (
           <div className="divide-y">
@@ -88,7 +89,7 @@ export function SuperAdminOverviewPane({ hosted }: { hosted: boolean }) {
                   <span className="block truncate font-medium">{workspace.name}</span>
                   <span className="block truncate text-xs font-normal text-muted-foreground">{reasons.join(' · ')}</span>
                 </span>
-                <Badge variant="destructive">Review</Badge>
+                <Badge variant="destructive">{copy.review}</Badge>
               </Button>
             ))}
           </div>
@@ -98,8 +99,8 @@ export function SuperAdminOverviewPane({ hosted }: { hosted: boolean }) {
               <CircleCheck />
             </EmptyMedia>
             <EmptyHeader>
-              <EmptyTitle>All workspaces look healthy</EmptyTitle>
-              <EmptyDescription>Every workspace passes the available checks.</EmptyDescription>
+              <EmptyTitle>{copy.healthyTitle}</EmptyTitle>
+              <EmptyDescription>{copy.healthyDescription}</EmptyDescription>
             </EmptyHeader>
           </Empty>
         )}
@@ -110,6 +111,9 @@ export function SuperAdminOverviewPane({ hosted }: { hosted: boolean }) {
 }
 
 function HostedStorageValue({ accounts }: { accounts: Account[] }) {
+  const { t, locale } = useI18n()
+  const copy = t.superAdmin.hostedStorage
+  const planNames = t.settings.plan.names
   const plans = Object.keys(storagePlans) as StoragePlan[]
   const customerAccounts = accounts.filter((account) => account.role !== 'super_admin')
   const usingStorage = customerAccounts.filter((account) => (account.managedStorageWorkspaceCount ?? 0) > 0)
@@ -119,23 +123,17 @@ function HostedStorageValue({ accounts }: { accounts: Account[] }) {
   return (
     <section className="overflow-hidden rounded-sm border-2 border-border/70 bg-card/40">
       <header className="space-y-1 border-b-2 border-dashed border-blueprint/25 px-5 py-4">
-        <h3 className="font-heading text-base font-semibold tracking-tight">Hosted storage value</h3>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          See who has adopted included storage, who is actively storing data, and how usage differs by plan.
-        </p>
+        <h3 className="font-heading text-base font-semibold tracking-tight">{copy.title}</h3>
+        <p className="text-sm leading-relaxed text-muted-foreground">{copy.description}</p>
       </header>
       <div className="grid gap-px bg-border/70 sm:grid-cols-2 lg:grid-cols-4">
-        <ValueStat
-          label="Using included storage"
-          value={usingStorage.length}
-          detail={`of ${customerAccounts.length} customer ${customerAccounts.length === 1 ? 'account' : 'accounts'}`}
-        />
-        <ValueStat label="Storing data" value={storingData.length} detail="accounts with stored models or generated assets" />
-        <ValueStat label="Paid plans" value={paidAccounts.length} detail="active Supporter or Pro accounts" />
-        <ValueStat label="Data stored" value={formatBytes(storedBytes)} detail="across customer accounts" />
+        <ValueStat label={copy.using} value={usingStorage.length} detail={copy.ofCustomerAccounts(customerAccounts.length)} />
+        <ValueStat label={copy.storingData} value={storingData.length} detail={copy.storingDataDetail} />
+        <ValueStat label={copy.paidPlans} value={paidAccounts.length} detail={copy.paidPlansDetail} />
+        <ValueStat label={copy.dataStored} value={formatBytes(storedBytes, locale)} detail={copy.dataStoredDetail} />
       </div>
       <div className="border-t-2 border-dashed border-blueprint/25 px-5 py-4">
-        <h4 className="mb-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">Plan mix</h4>
+        <h4 className="mb-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">{copy.planMix}</h4>
         <div className="grid gap-3 sm:grid-cols-3">
           {plans.map((plan) => {
             const planAccounts = customerAccounts.filter((account) => (account.plan ?? 'free') === plan)
@@ -144,12 +142,10 @@ function HostedStorageValue({ accounts }: { accounts: Account[] }) {
             return (
               <div key={plan} className="rounded-sm border border-border/70 bg-background/40 p-3">
                 <div className="flex items-baseline justify-between gap-3">
-                  <p className="font-medium">{storagePlans[plan].name}</p>
+                  <p className="font-medium">{planNames[plan]}</p>
                   <p className="font-heading text-xl font-semibold tabular-nums">{planAccounts.length}</p>
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {planUsingStorage} using storage · {formatBytes(planBytes)} stored
-                </p>
+                <p className="mt-1 text-xs text-muted-foreground">{copy.planUsage(planUsingStorage, formatBytes(planBytes, locale))}</p>
               </div>
             )
           })}

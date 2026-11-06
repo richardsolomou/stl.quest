@@ -12,4 +12,4 @@ Workflow:
 1. Put the scenario in the main journey or an isolated spec as described in the guide.
 2. Wait for visible behavior, not fixed timing.
 3. Run the focused test while iterating.
-4. Finish with `pnpm test:e2e`, or use `pnpm test:e2e:screenshots` instead for UI changes and inspect the results.
+4. Finish with `just e2e`, or use `just e2e-screenshots` instead for UI changes and inspect the results. Both rebuild the `stlquest-e2e` image; `just e2e-run` and `scripts/runE2e.sh` reuse the existing image, so after changing application code they test the previous build and can pass without covering the change.

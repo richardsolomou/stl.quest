@@ -43,6 +43,7 @@ import { automaticPrintEstimate } from './printEstimates'
 import { printGroupCohortKey, printGroupNameTaken, validPrintGroupName } from './printGroups'
 import { autoArchiveDue } from './autoArchive'
 import { normalizeBoardConfig } from './visibility'
+import { messagesFor, type Messages } from './i18n'
 
 export type NewRequestInput = Omit<NewPrintRequest, 'ownerUserId'> & { fileName: string; filePath: string }
 export type NewUploadedRequestInput = Omit<NewPrintRequest, 'ownerUserId' | 'filePath' | 'previewPath' | 'thumbnailPath'> & {
@@ -64,7 +65,13 @@ export class STLQuestService {
     private uploads: UploadStore,
     private assertAssetsMutable: () => Promise<void> = async () => undefined,
     private notifier?: Notifier,
+    /** Messages in the current request's language; English outside a request. */
+    private messages: () => Messages = () => messagesFor(),
   ) {}
+
+  private get text() {
+    return this.messages().server
+  }
 
   async listRequests(identity: Identity, ownRequestsOnly = false, filters: RequestFilters = {}): Promise<PublicRequestQueryResult> {
     const admin = identity.role === 'admin'
@@ -206,7 +213,7 @@ export class STLQuestService {
       (notes?.length ?? 0) > MAX_REQUEST_NOTES_LENGTH ||
       !validSourceUrl(sourceUrl)
     ) {
-      throw new Response('invalid linked request', { status: 400 })
+      throw new Response(this.text.request.invalidLinkedRequest, { status: 400 })
     }
     const target = await this.resolveTarget(input.requestedPrintType, input.printerId)
     const id = await this.repository.createRequest({
@@ -280,7 +287,7 @@ export class STLQuestService {
     const request = await this.requiredRequest(requestId)
     if (identity.role !== 'admin') {
       const started = workflow.statuses.slice(1).some((status) => request.counts[status.id] > 0)
-      if (request.ownerUserId !== identity.id || started) throw new Response('forbidden', { status: 403 })
+      if (request.ownerUserId !== identity.id || started) throw new Response(this.text.access.forbidden, { status: 403 })
     }
     const printType = await this.requestPrintType(request)
     const operationId = crypto.randomUUID()
@@ -303,7 +310,7 @@ export class STLQuestService {
       const result = await this.repository.getCompletedUpload(uploadId, identity.id)
       if (result) return result
       // A request carries at most one uncommitted operation, so a move or delete in flight blocks the attach.
-      throw new Response('another change to this print is still finishing', { status: 409 })
+      throw new Response(this.text.request.changeStillFinishing, { status: 409 })
     }
     const id = await this.resumeOperation(pending)
     this.changed('request.updated')
@@ -321,9 +328,9 @@ export class STLQuestService {
   }
 
   async repeatRequest(id: string, quantity: number, identity: Identity) {
-    if (!validRequestUpdate({ quantity })) throw new Response('invalid quantity', { status: 400 })
+    if (!validRequestUpdate({ quantity })) throw new Response(this.text.request.invalidQuantity, { status: 400 })
     const source = await this.requiredRequest(id)
-    if (identity.role !== 'admin' && source.ownerUserId !== identity.id) throw new Response('forbidden', { status: 403 })
+    if (identity.role !== 'admin' && source.ownerUserId !== identity.id) throw new Response(this.text.access.forbidden, { status: 403 })
     if (!source.fileName || !source.filePath) {
       const repeatedId = await this.repository.createRequest({
         name: source.name,
@@ -380,8 +387,8 @@ export class STLQuestService {
 
   async moveCopies(input: CopyMoveInput, identity: Identity) {
     this.requireAdmin(identity)
-    this.assertUniqueCards([{ id: input.id, status: input.from, tagIds: input.tagIds }], 'invalid move')
-    const request = await this.planCopyMove(input, 'invalid move')
+    this.assertUniqueCards([{ id: input.id, status: input.from, tagIds: input.tagIds }], this.text.request.invalidMove)
+    const request = await this.planCopyMove(input, this.text.request.invalidMove)
     if (request.filePath) await this.assertAssetsMutable()
     const movedAt = Date.now()
     await this.repository.moveCopies({ ...input, filePath: request.filePath, movedAt })
@@ -401,11 +408,13 @@ export class STLQuestService {
     this.requireAdmin(identity)
     this.assertUniqueCards(
       inputs.map(({ id, from, tagIds }) => ({ id, status: from, tagIds })),
-      'invalid group move',
+      this.text.request.invalidGroupMove,
     )
 
     const movedAt = Date.now()
-    const plans = await Promise.all(inputs.map(async (input) => ({ input, request: await this.planCopyMove(input, 'invalid group move') })))
+    const plans = await Promise.all(
+      inputs.map(async (input) => ({ input, request: await this.planCopyMove(input, this.text.request.invalidGroupMove) })),
+    )
     if (plans.some(({ request }) => request.filePath)) await this.assertAssetsMutable()
     await this.repository.moveCopiesBatch(plans.map(({ input, request }) => ({ ...input, filePath: request.filePath, movedAt })))
     await this.completeOnboardingTask(identity.id, 'move')
@@ -445,12 +454,12 @@ export class STLQuestService {
       (requestedName !== undefined && !validPrintGroupName(requestedName)) ||
       new Set(input.items.map((item) => item.requestId)).size !== input.items.length
     ) {
-      throw new Response('invalid group', { status: 400 })
+      throw new Response(this.text.request.invalidGroup, { status: 400 })
     }
     for (const item of input.items) {
       const request = await this.requiredRequest(item.requestId)
       if (!Number.isInteger(item.count) || item.count < 1 || (request.counts[input.status] ?? 0) < item.count) {
-        throw new Response('invalid group', { status: 409 })
+        throw new Response(this.text.request.invalidGroup, { status: 409 })
       }
     }
     const { name, color } = await this.newTag(requestedName)
@@ -478,8 +487,8 @@ export class STLQuestService {
   async renameGroup(id: string, name: string, identity: Identity) {
     this.requireAdmin(identity)
     const normalized = name.trim()
-    if (!validPrintGroupName(normalized)) throw new Response('invalid group', { status: 400 })
-    if (!(await this.repository.getGroup(id))) throw new Response('group not found', { status: 404 })
+    if (!validPrintGroupName(normalized)) throw new Response(this.text.request.invalidGroup, { status: 400 })
+    if (!(await this.repository.getGroup(id))) throw new Response(this.text.request.groupNotFound, { status: 404 })
     await this.repository.renameGroup(id, normalized)
     this.changed('board.changed')
     this.capture(identity.id, 'print_group_renamed')
@@ -493,8 +502,9 @@ export class STLQuestService {
     this.requireAdmin(identity)
     const groups = await this.repository.listGroups()
     const group = groups.find((candidate) => candidate.id === id)
-    if (!group) throw new Response('tag not found', { status: 404 })
-    if (fields.name !== undefined && !validPrintGroupName(fields.name.trim())) throw new Response('invalid tag', { status: 400 })
+    if (!group) throw new Response(this.text.request.tagNotFound, { status: 404 })
+    if (fields.name !== undefined && !validPrintGroupName(fields.name.trim()))
+      throw new Response(this.text.request.invalidTag, { status: 400 })
     await this.repository.updateGroup(id, { ...fields, name: fields.name?.trim() })
     this.changed('board.changed')
   }
@@ -512,13 +522,13 @@ export class STLQuestService {
       new Set(tagIds).size !== tagIds.length ||
       new Set(items.map((item) => `${item.requestId}:${item.status}`)).size !== items.length
     ) {
-      throw new Response('invalid tag assignment', { status: 400 })
+      throw new Response(this.text.request.invalidTagAssignment, { status: 400 })
     }
     for (const item of items) {
       statusById(item.status)
       const request = await this.requiredRequest(item.requestId)
       if (!Number.isInteger(item.count) || item.count < 1 || (request.counts[item.status] ?? 0) < item.count) {
-        throw new Response('invalid tag assignment', { status: 409 })
+        throw new Response(this.text.request.invalidTagAssignment, { status: 409 })
       }
     }
     const createTag = createTagName === undefined ? undefined : await this.newTag(createTagName)
@@ -537,7 +547,7 @@ export class STLQuestService {
   async deleteGroup(id: string, identity: Identity) {
     this.requireAdmin(identity)
     const group = await this.repository.getGroup(id)
-    if (!group) throw new Response('group not found', { status: 404 })
+    if (!group) throw new Response(this.text.request.groupNotFound, { status: 404 })
     await this.repository.deleteGroup(id)
     this.changed('board.changed')
     this.capture(identity.id, 'print_group_deleted', {
@@ -557,13 +567,13 @@ export class STLQuestService {
     this.requireAdmin(identity)
     statusById(status)
     const group = await this.repository.getGroup(groupId)
-    if (!group) throw new Response('group not found', { status: 404 })
+    if (!group) throw new Response(this.text.request.groupNotFound, { status: 404 })
     if (
       requestId === targetRequestId ||
       !group.items.some((item) => item.status === status && item.requestId === requestId) ||
       !group.items.some((item) => item.status === status && item.requestId === targetRequestId)
     ) {
-      throw new Response('invalid group item reorder', { status: 409 })
+      throw new Response(this.text.request.invalidGroupItemReorder, { status: 409 })
     }
     await this.repository.reorderGroupItem(groupId, status, requestId, targetRequestId, edge)
     this.changed('board.changed')
@@ -574,15 +584,15 @@ export class STLQuestService {
     statusById(from)
     statusById(to)
     const group = await this.repository.getGroup(id)
-    if (!group) throw new Response('group not found', { status: 404 })
-    if (from === to) throw new Response('invalid group move', { status: 409 })
+    if (!group) throw new Response(this.text.request.groupNotFound, { status: 404 })
+    if (from === to) throw new Response(this.text.request.invalidGroupMove, { status: 409 })
     const items = group.items.filter((item) => item.status === from)
-    if (items.length === 0) throw new Response('invalid group move', { status: 409 })
+    if (items.length === 0) throw new Response(this.text.request.invalidGroupMove, { status: 409 })
     const movedAt = Date.now()
     const plans = await Promise.all(
       items.map(async (item) => {
         const request = await this.requiredRequest(item.requestId)
-        if ((request.counts[from] ?? 0) < item.count) throw new Response('invalid group move', { status: 409 })
+        if ((request.counts[from] ?? 0) < item.count) throw new Response(this.text.request.invalidGroupMove, { status: 409 })
         return { request, input: { id: item.requestId, from, to, count: item.count } }
       }),
     )
@@ -634,10 +644,10 @@ export class STLQuestService {
 
   async reorder(id: string, status: string, order: number, identity: Identity) {
     statusById(status)
-    if (status !== initialStatus().id) throw new Response('invalid status', { status: 400 })
+    if (status !== initialStatus().id) throw new Response(this.text.request.invalidStatus, { status: 400 })
     if (!Number.isFinite(order)) throw new Error('invalid order')
     const request = await this.requiredRequest(id)
-    if (request.ownerUserId !== identity.id) throw new Response('forbidden', { status: 403 })
+    if (request.ownerUserId !== identity.id) throw new Response(this.text.access.forbidden, { status: 403 })
     await this.repository.reorderRequest(id, order)
     this.changed('request.reordered')
     this.capture(identity.id, 'request_reordered', { status })
@@ -645,14 +655,14 @@ export class STLQuestService {
 
   async update(id: string, fields: RequestUpdateFields, identity: Identity) {
     if (typeof id !== 'string' || id.length > 100 || !validRequestUpdate(fields)) {
-      throw new Response('invalid update', { status: 400 })
+      throw new Response(this.text.request.invalidUpdate, { status: 400 })
     }
     const request = await this.requiredRequest(id)
     if (!request.filePath && fields.sourceUrl !== undefined && !fields.sourceUrl.trim()) {
-      throw new Response('linked requests require a source URL', { status: 400 })
+      throw new Response(this.text.request.sourceUrlRequired, { status: 400 })
     }
     if (identity.role !== 'admin' && fields.printerId !== undefined) {
-      throw new Response('forbidden', { status: 403 })
+      throw new Response(this.text.access.forbidden, { status: 403 })
     }
     const previousPrintType = await this.requestPrintType(request)
     let printerId = request.printerId
@@ -671,7 +681,7 @@ export class STLQuestService {
     const printTypeChanged = printType !== previousPrintType
     if (identity.role !== 'admin') {
       const started = workflow.statuses.slice(1).some((status) => request.counts[status.id] > 0)
-      if (request.ownerUserId !== identity.id || started) throw new Response('forbidden', { status: 403 })
+      if (request.ownerUserId !== identity.id || started) throw new Response(this.text.access.forbidden, { status: 403 })
       fields = {
         name: fields.name,
         quantity: fields.quantity,
@@ -739,17 +749,17 @@ export class STLQuestService {
   private async setArchived(ids: string[], archive: boolean, identity: Identity) {
     const uniqueIds = unique(ids)
     if (uniqueIds.length === 0 || uniqueIds.length > 100 || uniqueIds.some((id) => typeof id !== 'string' || id.length > 100)) {
-      throw new Response('invalid archive', { status: 400 })
+      throw new Response(this.text.request.invalidArchive, { status: 400 })
     }
     const targets = []
     for (const id of uniqueIds) {
       const request = await this.repository.getRequest(id)
       if (!request) continue
       if (identity.role !== 'admin') {
-        if (request.ownerUserId !== identity.id) throw new Response('forbidden', { status: 403 })
+        if (request.ownerUserId !== identity.id) throw new Response(this.text.access.forbidden, { status: 403 })
         // Like deletion, requesters may not hide a request once a copy starts — active work stays visible to operators.
         const started = archive && workflow.statuses.slice(1).some((status) => (request.counts[status.id] ?? 0) > 0)
-        if (started) throw new Response('forbidden', { status: 403 })
+        if (started) throw new Response(this.text.access.forbidden, { status: 403 })
       }
       if (archive === (request.archivedAt !== undefined)) continue
       targets.push(request)
@@ -788,7 +798,7 @@ export class STLQuestService {
     if (identity.role !== 'admin') {
       // Requesters may withdraw their own request until a copy starts.
       const started = workflow.statuses.slice(1).some((status) => request.counts[status.id] > 0)
-      if (request.ownerUserId !== identity.id || started) throw new Response('forbidden', { status: 403 })
+      if (request.ownerUserId !== identity.id || started) throw new Response(this.text.access.forbidden, { status: 403 })
     }
     await this.removeRequest(request)
     this.changed('request.deleted')
@@ -809,11 +819,11 @@ export class STLQuestService {
     this.requireAdmin(identity)
     this.assertUniqueCards(
       inputs.map(({ id, status, tagIds = [] }) => ({ id, status, tagIds })),
-      'invalid group delete',
+      this.text.request.invalidGroupDelete,
     )
     for (const input of inputs) {
       statusById(input.status)
-      if (!Number.isInteger(input.count) || input.count < 1) throw new Response('invalid group delete', { status: 409 })
+      if (!Number.isInteger(input.count) || input.count < 1) throw new Response(this.text.request.invalidGroupDelete, { status: 409 })
     }
     const plans = await Promise.all(
       unique(inputs.map(({ id }) => id)).map(async (id) => {
@@ -823,7 +833,8 @@ export class STLQuestService {
           status,
           count: deletions.filter((deletion) => deletion.status === status).reduce((sum, deletion) => sum + deletion.count, 0),
         }))
-        if (stages.some(({ status, count }) => request.counts[status] < count)) throw new Response('invalid group delete', { status: 409 })
+        if (stages.some(({ status, count }) => request.counts[status] < count))
+          throw new Response(this.text.request.invalidGroupDelete, { status: 409 })
         const count = stages.reduce((sum, stage) => sum + stage.count, 0)
         return { request, deletions, stages, count, deleteRequest: count === request.quantity }
       }),
@@ -1049,7 +1060,8 @@ export class STLQuestService {
       if (operation.state === 'prepared') {
         try {
           const source = await this.assets.read(operation.payload.sourcePath).catch((error) => {
-            if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new Response('source STL not found', { status: 404 })
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT')
+              throw new Response(this.text.request.sourceModelNotFound, { status: 404 })
             throw error
           })
           const existing = await this.assets.stat(operation.payload.destinationPath)
@@ -1089,7 +1101,7 @@ export class STLQuestService {
 
   private async requiredRequest(id: string) {
     const request = await this.repository.getRequest(id)
-    if (!request) throw new Response('not found', { status: 404 })
+    if (!request) throw new Response(this.text.access.notFound, { status: 404 })
     return request
   }
 
@@ -1123,7 +1135,7 @@ export class STLQuestService {
   }
 
   private requireAdmin(identity: Identity) {
-    if (identity.role !== 'admin') throw new Response('forbidden', { status: 403 })
+    if (identity.role !== 'admin') throw new Response(this.text.access.forbidden, { status: 403 })
   }
 
   private async printer(id: string) {
@@ -1154,11 +1166,11 @@ export class STLQuestService {
   }
 
   private async validateTarget(requestedPrintType?: PrintType | null, printerId?: string | null) {
-    if (requestedPrintType && printerId) throw new Response('choose a printer or print type, not both', { status: 400 })
+    if (requestedPrintType && printerId) throw new Response(this.text.request.printerOrPrintType, { status: 400 })
     if (!printerId) return
     const printer = await this.printer(printerId)
-    if (!printer) throw new Response('unknown printer', { status: 400 })
-    if (printer.archived) throw new Response('printer is archived', { status: 400 })
+    if (!printer) throw new Response(this.text.request.unknownPrinter, { status: 400 })
+    if (printer.archived) throw new Response(this.text.request.printerArchived, { status: 400 })
   }
 
   private async requestPrintType(request: { requestedPrintType?: PrintType; printerId?: string }) {
@@ -1168,12 +1180,12 @@ export class STLQuestService {
 
   async notificationPreferences(identity: Identity): Promise<NotificationPreferences> {
     const preferences = await this.repository.notificationPreferences(identity.id)
-    if (!preferences) throw new Response('forbidden', { status: 403 })
+    if (!preferences) throw new Response(this.text.access.forbidden, { status: 403 })
     return preferences
   }
 
   async setNotificationPreference(kind: NotificationKind, enabled: boolean, identity: Identity) {
-    if (!(await this.repository.notificationPreferences(identity.id))) throw new Response('forbidden', { status: 403 })
+    if (!(await this.repository.notificationPreferences(identity.id))) throw new Response(this.text.access.forbidden, { status: 403 })
     await this.repository.setNotificationPreference(identity.id, kind, enabled)
     this.changed('settings.changed')
     this.capture(identity.id, 'notification_preference_changed', { kind, enabled })

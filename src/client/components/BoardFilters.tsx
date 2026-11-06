@@ -19,63 +19,27 @@ import { activeBoardFilters, BOARD_METADATA_FILTERS } from '../boardFilterState'
 import { availablePrintTypes, printTypeLabel } from '../fleet'
 import { signalProductTourProgress } from '../productTour'
 import { printGroupRows } from '../../core/printGroups'
+import type { Messages } from '../../core/i18n'
+import { useI18n } from '../i18n'
 
-export type SortGroup = { label: string; options: { value: BoardSort; label: string; description: string }[] }
+export type SortGroup = { id: keyof Messages['board']['sort']['groups']; options: (keyof Messages['board']['sort']['options'])[] }
 
 export const DEFAULT_SORT_GROUPS: SortGroup[] = [
+  { id: 'strategy', options: ['fair', 'round-robin'] },
+  { id: 'submitted', options: ['created-asc', 'created-desc'] },
   {
-    label: 'Queue strategy',
-    options: [
-      {
-        value: 'fair',
-        label: 'Requester priorities',
-        description: "Group requests by requester and preserve each person's chosen order.",
-      },
-      {
-        value: 'round-robin',
-        label: 'Round robin',
-        description: "Take each requester's highest-priority print in turn.",
-      },
-    ],
-  },
-  {
-    label: 'Submission time',
-    options: [
-      { value: 'created-asc', label: 'Oldest first', description: 'Start with requests submitted earliest.' },
-      { value: 'created-desc', label: 'Newest first', description: 'Start with the most recently submitted requests.' },
-    ],
-  },
-  {
-    label: 'Request details',
-    options: [
-      { value: 'name-asc', label: 'Name A–Z', description: 'Sort alphabetically by request name.' },
-      { value: 'name-desc', label: 'Name Z–A', description: 'Sort reverse-alphabetically by request name.' },
-      { value: 'updated-desc', label: 'Recently updated', description: 'Show requests changed most recently first.' },
-      { value: 'updated-asc', label: 'Least recently updated', description: 'Show requests waiting longest without changes first.' },
-      { value: 'material-asc', label: 'Least material', description: 'Start with requests using the least material per copy.' },
-      { value: 'material-desc', label: 'Most material', description: 'Start with requests using the most material per copy.' },
-      { value: 'time-asc', label: 'Shortest print', description: 'Start with requests estimated to finish fastest.' },
-      { value: 'time-desc', label: 'Longest print', description: 'Start with requests estimated to take longest.' },
-    ],
+    id: 'details',
+    options: ['name-asc', 'name-desc', 'updated-desc', 'updated-asc', 'material-asc', 'material-desc', 'time-asc', 'time-desc'],
   },
 ]
 
 export const ARCHIVE_SORT_GROUPS: SortGroup[] = [
-  {
-    label: 'Archived',
-    options: [
-      { value: 'archived-desc', label: 'Recently archived', description: 'Show requests archived most recently first.' },
-      { value: 'archived-asc', label: 'Oldest archived', description: 'Show requests archived longest ago first.' },
-    ],
-  },
-  ...DEFAULT_SORT_GROUPS.filter((group) => group.label !== 'Queue strategy'),
+  { id: 'archived', options: ['archived-desc', 'archived-asc'] },
+  ...DEFAULT_SORT_GROUPS.filter((group) => group.id !== 'strategy'),
 ]
 
-const AVAILABILITY = [
-  { value: '', label: 'Any' },
-  { value: 'yes', label: 'Available' },
-  { value: 'no', label: 'Missing' },
-] as const
+const AVAILABILITY = ['', 'yes', 'no'] as const
+const AVAILABILITY_KEY = { '': 'any', yes: 'yes', no: 'no' } as const
 const EMPTY_TAGS: PrintGroup[] = []
 
 export function BoardFilters({
@@ -85,11 +49,11 @@ export function BoardFilters({
   presence,
   action,
   defaultSort = 'fair',
-  ariaLabel = 'Board filters',
-  description = 'Combine any fields to narrow the board.',
+  ariaLabel,
+  description,
   showSort = true,
   sortGroups: sortGroupsProp = DEFAULT_SORT_GROUPS,
-  prioritySortLabel = 'Requester priorities',
+  prioritySortLabel,
   showRoundRobin = false,
   className,
   tags = EMPTY_TAGS,
@@ -105,12 +69,15 @@ export function BoardFilters({
   description?: string
   showSort?: boolean
   sortGroups?: SortGroup[]
-  prioritySortLabel?: 'My priority' | 'Requester priorities'
+  /** Overrides the label of the requester-priority sort, e.g. for a requester sorting their own prints. */
+  prioritySortLabel?: string
   showRoundRobin?: boolean
   className?: string
   tags?: PrintGroup[]
   onManageTags?: () => void
 }) {
+  const { t } = useI18n()
+  const f = t.board.filters
   const queryTimer = useRef<number | undefined>(undefined)
   const [hydrated, setHydrated] = useState(false)
   const [expanded, setExpanded] = useState(false)
@@ -118,11 +85,16 @@ export function BoardFilters({
   const printTypes = availablePrintTypes()
   const showPrintType = true
   const sortGroups = sortGroupsProp.map((group) => ({
-    ...group,
+    id: group.id,
+    label: t.board.sort.groups[group.id],
     options: group.options
-      .filter((sort) => showRoundRobin || sort.value !== 'round-robin')
-      .map((sort) => (sort.value === 'fair' ? { ...sort, label: prioritySortLabel } : sort)),
+      .filter((value) => showRoundRobin || value !== 'round-robin')
+      .map((value) => {
+        const text = t.board.sort.options[value]
+        return { value, description: text.description, label: (value === 'fair' && prioritySortLabel) || text.label }
+      }),
   }))
+  const availability = AVAILABILITY.map((value) => ({ value, label: f.availability[AVAILABILITY_KEY[value]] }))
   const sorts = sortGroups.flatMap((group) => group.options)
   const activeSort = sorts.find((sort) => sort.value === (search.sort ?? defaultSort)) ?? sorts[0]
 
@@ -141,7 +113,7 @@ export function BoardFilters({
       })),
     [tags],
   )
-  const active = activeBoardFilters(search, facets, tagOptions.find((option) => option.value === search.tag)?.label)
+  const active = activeBoardFilters(t, search, facets, tagOptions.find((option) => option.value === search.tag)?.label)
   const advanced = active.length
   const previousAdvanced = useRef(advanced)
 
@@ -189,25 +161,29 @@ export function BoardFilters({
   }, [advanced])
 
   return (
-    <section className={cn('relative z-5 bg-background px-3 pt-2.5', className)} aria-label={ariaLabel} data-hydrated={hydrated}>
+    <section
+      className={cn('relative z-5 bg-background px-3 pt-2.5', className)}
+      aria-label={ariaLabel ?? f.ariaLabel}
+      data-hydrated={hydrated}
+    >
       <div className="flex min-h-9.5 items-center gap-2 max-[900px]:flex-wrap">
         <InputGroup className="w-[clamp(190px,24vw,340px)] bg-card max-[900px]:w-full">
           <InputGroupAddon>
             <Search aria-hidden="true" />
           </InputGroupAddon>
           <InputGroupInput
-            aria-label="Search requests"
+            aria-label={f.searchAria}
             value={query}
             onChange={(event) => updateQuery(event.target.value)}
-            placeholder="Search prints…"
+            placeholder={f.searchPlaceholder}
           />
           {query && (
             <InputGroupAddon align="inline-end">
               <Tooltip>
-                <TooltipTrigger render={<InputGroupButton size="icon-xs" aria-label="Clear search" onClick={clearQuery} />}>
+                <TooltipTrigger render={<InputGroupButton size="icon-xs" aria-label={f.clearSearch} onClick={clearQuery} />}>
                   <X />
                 </TooltipTrigger>
-                <TooltipContent>Clear search</TooltipContent>
+                <TooltipContent>{f.clearSearch}</TooltipContent>
               </Tooltip>
             </InputGroupAddon>
           )}
@@ -216,13 +192,13 @@ export function BoardFilters({
         {showSort && (
           <Menu>
             <MenuTrigger
-              render={<Button type="button" variant="outline" aria-label={`Sort requests: ${activeSort.label}`} data-onboarding="sort" />}
+              render={<Button type="button" variant="outline" aria-label={f.sortAria(activeSort.label)} data-onboarding="sort" />}
             >
               <ArrowUpDown />
-              <span>Sort</span>
+              <span>{f.sort}</span>
             </MenuTrigger>
             <MenuContent
-              aria-label="Sort requests"
+              aria-label={f.sortMenuAria}
               align="start"
               sideOffset={8}
               className="max-h-[min(24rem,var(--available-height))] w-72"
@@ -235,7 +211,7 @@ export function BoardFilters({
                 }}
               >
                 {sortGroups.map((group) => (
-                  <MenuGroup key={group.label} className="p-0.5">
+                  <MenuGroup key={group.id} className="p-0.5">
                     <MenuGroupLabel>{group.label}</MenuGroupLabel>
                     {group.options.map((sort) => {
                       const selected = sort.value === activeSort.value
@@ -256,7 +232,7 @@ export function BoardFilters({
         <Popover open={expanded} onOpenChange={setExpanded}>
           <PopoverTrigger render={<Button type="button" variant="outline" data-onboarding="filters" />}>
             <SlidersHorizontal />
-            Filters
+            {f.filters}
             {advanced > 0 && (
               <span className="rounded-full bg-primary px-1.5 font-mono text-[10px] text-primary-foreground">{advanced}</span>
             )}
@@ -268,40 +244,38 @@ export function BoardFilters({
           >
             <header className="flex shrink-0 items-start justify-between border-b-2 border-dashed border-blueprint/25 p-3">
               <PopoverHeader>
-                <PopoverTitle>More filters</PopoverTitle>
-                <PopoverDescription>{description}</PopoverDescription>
+                <PopoverTitle>{f.moreFilters}</PopoverTitle>
+                <PopoverDescription>{description ?? f.description}</PopoverDescription>
               </PopoverHeader>
               <Tooltip>
                 <TooltipTrigger
-                  render={
-                    <Button type="button" variant="ghost" size="icon-sm" aria-label="Close filters" onClick={() => setExpanded(false)} />
-                  }
+                  render={<Button type="button" variant="ghost" size="icon-sm" aria-label={f.close} onClick={() => setExpanded(false)} />}
                 >
                   <X />
                 </TooltipTrigger>
-                <TooltipContent>Close filters</TooltipContent>
+                <TooltipContent>{f.close}</TooltipContent>
               </Tooltip>
             </header>
             <div className="grid min-h-0 grid-cols-2 gap-3 overflow-y-auto overscroll-contain p-3 max-[640px]:grid-cols-1">
               {showPrintType && (
                 <section className="grid content-start gap-2">
-                  <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Print type</h3>
+                  <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">{f.printType}</h3>
                   <Select
                     items={[
-                      { value: '', label: 'All print types' },
-                      ...printTypes.map((printType) => ({ value: printType, label: printTypeLabel(printType) })),
+                      { value: '', label: f.allPrintTypes },
+                      ...printTypes.map((printType) => ({ value: printType, label: printTypeLabel(t, printType) })),
                     ]}
                     value={search.printType ?? ''}
                     onValueChange={(value) => onChange({ printType: (value || undefined) as PrintType | undefined, printer: undefined })}
                   >
-                    <SelectTrigger className="w-full" aria-label="Filter by print type">
+                    <SelectTrigger className="w-full" aria-label={f.printTypeAria}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All print types</SelectItem>
+                      <SelectItem value="">{f.allPrintTypes}</SelectItem>
                       {printTypes.map((printType) => (
                         <SelectItem key={printType} value={printType}>
-                          {printTypeLabel(printType)}
+                          {printTypeLabel(t, printType)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -310,27 +284,27 @@ export function BoardFilters({
               )}
               {tagOptions.length > 0 && (
                 <section className="grid content-start gap-2">
-                  <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Tag</h3>
+                  <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">{f.tag}</h3>
                   <FilterCombobox
-                    ariaLabel="Filter by tag"
+                    ariaLabel={f.tagAria}
                     value={search.tag}
                     onChange={(tag) => onChange({ tag })}
                     options={tagOptions}
-                    placeholder="Any tag"
-                    emptyLabel="No tags found."
+                    placeholder={f.anyTag}
+                    emptyLabel={f.noTags}
                     renderOption={(option) => <TagTreeRow depth={option.depth} color={option.color} name={option.name} />}
                     optionAriaLabel={(option) => option.label}
                   />
                 </section>
               )}
               <section className="ph-no-capture grid content-start gap-2">
-                <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Requester</h3>
+                <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">{f.requester}</h3>
                 <FilterCombobox
-                  ariaLabel="Filter by requester"
+                  ariaLabel={f.requesterAria}
                   value={search.requester}
                   onChange={(requester) => onChange({ requester })}
-                  placeholder="Anyone"
-                  emptyLabel="No people found."
+                  placeholder={f.anyone}
+                  emptyLabel={f.noPeople}
                   redacted
                   options={facets.requesters.map((requester) => ({
                     value: requester.value,
@@ -339,80 +313,82 @@ export function BoardFilters({
                 />
               </section>
               <section className="grid content-start gap-2">
-                <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Quantity</h3>
+                <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">{f.quantity}</h3>
                 <div className="grid grid-cols-2 gap-2">
                   <Input
-                    aria-label="Minimum quantity"
+                    aria-label={f.minQuantity}
                     type="number"
                     min={MIN_REQUEST_QUANTITY}
                     max={MAX_REQUEST_QUANTITY}
-                    placeholder="Minimum"
+                    placeholder={f.minimum}
                     value={search.minQuantity ?? ''}
                     onChange={(event) => onChange({ minQuantity: event.target.value ? Number(event.target.value) : undefined })}
                   />
                   <Input
-                    aria-label="Maximum quantity"
+                    aria-label={f.maxQuantity}
                     type="number"
                     min={MIN_REQUEST_QUANTITY}
                     max={MAX_REQUEST_QUANTITY}
-                    placeholder="Maximum"
+                    placeholder={f.maximum}
                     value={search.maxQuantity ?? ''}
                     onChange={(event) => onChange({ maxQuantity: event.target.value ? Number(event.target.value) : undefined })}
                   />
                 </div>
               </section>
               <section className="grid content-start gap-2">
-                <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Material per copy</h3>
+                <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">{f.material}</h3>
                 <div className="grid grid-cols-2 gap-2">
                   <Input
-                    aria-label="Minimum estimated material per copy"
+                    aria-label={f.minMaterial}
                     type="number"
                     min="0"
                     step="any"
-                    placeholder="Minimum"
+                    placeholder={f.minimum}
                     value={search.minMaterial ?? ''}
                     onChange={(event) => onChange({ minMaterial: event.target.value ? Number(event.target.value) : undefined })}
                   />
                   <Input
-                    aria-label="Maximum estimated material per copy"
+                    aria-label={f.maxMaterial}
                     type="number"
                     min="0"
                     step="any"
-                    placeholder="Maximum"
+                    placeholder={f.maximum}
                     value={search.maxMaterial ?? ''}
                     onChange={(event) => onChange({ maxMaterial: event.target.value ? Number(event.target.value) : undefined })}
                   />
                 </div>
               </section>
               <section className="grid content-start gap-2">
-                <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Created</h3>
+                <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">{f.created}</h3>
                 <div className="grid grid-cols-2 gap-2">
-                  <DatePicker label="After" value={search.createdAfter} onChange={(createdAfter) => onChange({ createdAfter })} />
-                  <DatePicker label="Before" value={search.createdBefore} onChange={(createdBefore) => onChange({ createdBefore })} />
+                  <DatePicker label={f.after} value={search.createdAfter} onChange={(createdAfter) => onChange({ createdAfter })} />
+                  <DatePicker label={f.before} value={search.createdBefore} onChange={(createdBefore) => onChange({ createdBefore })} />
                 </div>
               </section>
               <section className="grid content-start gap-2">
-                <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Last updated</h3>
+                <h3 className="font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">{f.lastUpdated}</h3>
                 <div className="grid grid-cols-2 gap-2">
-                  <DatePicker label="After" value={search.updatedAfter} onChange={(updatedAfter) => onChange({ updatedAfter })} />
-                  <DatePicker label="Before" value={search.updatedBefore} onChange={(updatedBefore) => onChange({ updatedBefore })} />
+                  <DatePicker label={f.after} value={search.updatedAfter} onChange={(updatedAfter) => onChange({ updatedAfter })} />
+                  <DatePicker label={f.before} value={search.updatedBefore} onChange={(updatedBefore) => onChange({ updatedBefore })} />
                 </div>
               </section>
               <section className="col-span-2 grid grid-cols-4 gap-2 max-[640px]:col-span-1 max-[640px]:grid-cols-2">
-                <h3 className="col-span-full font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">Metadata</h3>
-                {BOARD_METADATA_FILTERS.map(([key, label]) => (
+                <h3 className="col-span-full font-heading text-xs font-semibold tracking-wide uppercase text-muted-foreground">
+                  {f.metadata}
+                </h3>
+                {BOARD_METADATA_FILTERS.map((key) => (
                   <label className="grid gap-1 text-xs text-muted-foreground" key={key}>
-                    <span>{label}</span>
+                    <span>{f.metadataFields[key]}</span>
                     <Select
-                      items={AVAILABILITY}
+                      items={availability}
                       value={search[key] === undefined ? '' : search[key] ? 'yes' : 'no'}
                       onValueChange={(value) => onChange({ [key]: value === '' ? undefined : value === 'yes' })}
                     >
-                      <SelectTrigger className="w-full" aria-label={`${label} availability`}>
+                      <SelectTrigger className="w-full" aria-label={f.availabilityAria(f.metadataFields[key])}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {AVAILABILITY.map((option) => (
+                        {availability.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}
                           </SelectItem>
@@ -425,10 +401,10 @@ export function BoardFilters({
             </div>
             <footer className="flex shrink-0 justify-end gap-2 border-t bg-muted/30 p-2">
               <Button type="button" variant="ghost" size="sm" onClick={clear}>
-                Reset all filters
+                {f.resetAll}
               </Button>
               <Button type="button" size="sm" onClick={() => setExpanded(false)}>
-                Done
+                {t.common.done}
               </Button>
             </footer>
           </PopoverContent>
@@ -436,7 +412,7 @@ export function BoardFilters({
         {onManageTags && (
           <Button type="button" variant="outline" onClick={onManageTags}>
             <Tags />
-            Tags
+            {f.tags}
           </Button>
         )}
 
@@ -461,7 +437,7 @@ export function BoardFilters({
             </Button>
           ))}
           <Button type="button" variant="ghost" size="xs" onClick={clear}>
-            Clear all
+            {f.clearAll}
           </Button>
         </div>
       )}

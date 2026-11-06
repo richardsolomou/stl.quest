@@ -11,7 +11,6 @@ import {
   standardRateLimitOptions,
   standardSessionOptions,
 } from 'ras-stack/auth'
-import { standardAuthEmails } from 'ras-stack/email'
 import { and, eq, ne, sql } from 'drizzle-orm'
 import type { STLQuestDatabase } from '../db'
 import { databaseProvider } from '../db/connection'
@@ -35,6 +34,8 @@ import { copyRequest } from './copyRequest'
 import { hostedDeployment } from './hosted'
 import { stripeBillingPlugin } from './billing'
 import { OIDC_DISCOVERY_TIMEOUT_MS } from './integrations'
+import { requestLocale, serverMessages } from './locale'
+import { isLocale, messagesFor } from '../core/i18n'
 
 // Every auth call awaits Better Auth's startup, which runs OIDC discovery, so an unreachable or mismatched issuer skips the provider
 // until the next restart or settings save. Better Auth verifies ID tokens against the discovered issuer without comparing it to ours.
@@ -86,7 +87,28 @@ function atPublicOrigin(request: Request) {
   return copyRequest(request, `${origin}${url.pathname}${url.search}`, request.headers)
 }
 
-const SELF_SIGNUP_DISABLED = 'sign-up is closed; ask an administrator for an invite'
+type AuthEmailInput = { user: { email: string; locale?: unknown }; url: string }
+
+/** Written in the account's chosen language, else the language of the request that asked for the link. */
+function authEmails(delivery: EmailDelivery) {
+  const send =
+    (kind: 'resetPassword' | 'verifyEmail') =>
+    async ({ user, url }: AuthEmailInput) => {
+      const t = messagesFor(isLocale(user.locale) ? user.locale : requestLocale()).email.auth
+      const copy = t[kind]
+      await delivery.send({
+        to: user.email,
+        subject: copy.subject,
+        text: `${copy.text(url)}\n\n${t.expiry}`,
+        html: `<p>${escapeHtml(copy.html)}</p><p><a href="${escapeHtml(url)}">${escapeHtml(copy.action)}</a></p><p>${escapeHtml(t.expiry)}</p>`,
+      })
+    }
+  return { sendResetPassword: send('resetPassword'), sendVerificationEmail: send('verifyEmail') }
+}
+
+function escapeHtml(value: string) {
+  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
+}
 
 function passwordFromMutation(path: string, body: unknown) {
   if (!body || typeof body !== 'object') return undefined
@@ -116,7 +138,7 @@ export function createAuth(
   const accountMutationQueues = new Map<string, PQueue>()
   const auth = options?.auth ?? { password: true, passwordReset: true, socialProviders: [] }
   const email = options?.email
-  const authEmails = email ? standardAuthEmails(email, { productName: 'STL Quest' }) : undefined
+  const emails = email ? authEmails(email) : undefined
   const providerOptions = (provider: (typeof auth.socialProviders)[number]) => {
     const config = options?.auth?.[provider]
     return config ? { ...config, enabled: true, disableImplicitSignUp: true } : undefined
@@ -167,9 +189,9 @@ export function createAuth(
         hash: (password: string) => argon2.hash(password),
         verify: ({ hash, password }: { hash: string; password: string }) => argon2.verify(hash, password),
       },
-      ...(authEmails ? { sendResetPassword: authEmails.sendResetPassword } : {}),
+      ...(emails ? { sendResetPassword: emails.sendResetPassword } : {}),
     }),
-    emailVerification: authEmails ? { sendVerificationEmail: authEmails.sendVerificationEmail } : undefined,
+    emailVerification: emails ? { sendVerificationEmail: emails.sendVerificationEmail } : undefined,
     socialProviders,
     account: standardAccountOptions({
       accountLinking: {
@@ -180,7 +202,10 @@ export function createAuth(
     }),
     session: standardSessionOptions({ expiresIn: 30 * 24 * 60 * 60 }),
     user: {
-      additionalFields: { color: { type: 'string', required: false, input: false } },
+      additionalFields: {
+        color: { type: 'string', required: false, input: false },
+        locale: { type: 'string', required: false, input: false },
+      },
       changeEmail: {
         enabled: true,
         updateEmailWithoutVerification: false,
@@ -192,7 +217,8 @@ export function createAuth(
           before: async (user) => {
             if (authProvisioningAllowed()) return { data: withBoundedName(user) }
             const invite = options?.claimInvite ? await claimAuthInvite(options.claimInvite, normalizeEmail(user.email)) : undefined
-            if (!invite && !(await selfSignupOpen())) throw new APIError('FORBIDDEN', { message: SELF_SIGNUP_DISABLED })
+            if (!invite && !(await selfSignupOpen()))
+              throw new APIError('FORBIDDEN', { message: serverMessages().server.auth.signUpClosed })
             return { data: { ...withBoundedName(user), role: 'requester' } }
           },
           after: async (user) => {
@@ -217,23 +243,23 @@ export function createAuth(
         if (ctx.path === '/sign-in/social') {
           const provider = (ctx.body as { provider?: string } | undefined)?.provider
           if (!provider || !auth.socialProviders.includes(provider as (typeof auth.socialProviders)[number])) {
-            throw new APIError('FORBIDDEN', { message: 'social provider is not enabled' })
+            throw new APIError('FORBIDDEN', { message: serverMessages().server.auth.socialProviderNotEnabled })
           }
         }
         if (ctx.path === '/sign-up/email' && !(await selfSignupOpen())) {
           const token = authInviteToken()
           const recipient = (ctx.body as { email?: unknown } | undefined)?.email
           const invited = token && typeof recipient === 'string' && (await options?.inviteClaimable?.(token, normalizeEmail(recipient)))
-          if (!invited) throw new APIError('FORBIDDEN', { message: SELF_SIGNUP_DISABLED })
+          if (!invited) throw new APIError('FORBIDDEN', { message: serverMessages().server.auth.signUpClosed })
         }
         const password = passwordFromMutation(ctx.path, ctx.body)
         if (typeof password === 'string' && password.length < PASSWORD_MIN_LENGTH) {
-          throw new APIError('BAD_REQUEST', { message: `password must be at least ${PASSWORD_MIN_LENGTH} characters` })
+          throw new APIError('BAD_REQUEST', { message: serverMessages().server.auth.passwordTooShort(PASSWORD_MIN_LENGTH) })
         }
         if (ctx.path === '/organization/update') {
           const name = (ctx.body as { data?: { name?: unknown } } | undefined)?.data?.name
           if (typeof name === 'string' && name.length > MAX_WORKSPACE_NAME_LENGTH) {
-            throw new APIError('BAD_REQUEST', { message: `workspace names can be up to ${MAX_WORKSPACE_NAME_LENGTH} characters` })
+            throw new APIError('BAD_REQUEST', { message: serverMessages().server.workspace.nameTooLong(MAX_WORKSPACE_NAME_LENGTH) })
           }
         }
       }),
@@ -294,7 +320,7 @@ export function createAuth(
             .where(and(eq(accountTable.userId, session.user.id), eq(accountTable.providerId, providerId)))
             .all()
           const target = candidates.find((account) => linkedAccountActive(account, oidcIssuer)) ?? candidates[0]
-          if (!target) throw new APIError('BAD_REQUEST', { message: 'sign-in method not found' })
+          if (!target) throw new APIError('BAD_REQUEST', { message: serverMessages().server.auth.signInMethodNotFound })
           const remaining = await database
             .select({ providerId: accountTable.providerId, accountId: accountTable.accountId })
             .from(accountTable)
@@ -307,7 +333,7 @@ export function createAuth(
                 ? auth.password
                 : auth.socialProviders.includes(account.providerId as (typeof auth.socialProviders)[number])),
           )
-          if (!usable) throw new APIError('BAD_REQUEST', { message: 'cannot remove the last enabled sign-in method' })
+          if (!usable) throw new APIError('BAD_REQUEST', { message: serverMessages().server.auth.lastSignInMethod })
           return authInstance.api.unlinkAccount({ body: { accountId: target.id }, headers })
         })
       },

@@ -12,4 +12,16 @@ describe('formatBytes', () => {
     [999_995_300, '1.0 GB'],
     [999_999, '1.0 MB'],
   ])('formats %s bytes as %s', (bytes, expected) => expect(formatBytes(bytes)).toBe(expected))
+
+  it('uses French units and decimal comma', () => {
+    expect(formatBytes(1_500_000_000, 'fr')).toBe('1,5 Go')
+  })
+
+  it('uses a German decimal comma', () => {
+    expect(formatBytes(1_500_000, 'de')).toBe('1,5 MB')
+  })
+
+  it('does not group thousands of the largest unit', () => {
+    expect(formatBytes(3_000_000_000_000_000)).toBe('3000.0 TB')
+  })
 })

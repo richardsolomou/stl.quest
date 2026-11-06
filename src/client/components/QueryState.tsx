@@ -3,6 +3,7 @@ import { Alert, AlertAction, AlertDescription, AlertTitle } from '../../componen
 import { Button } from '../../components/ui/button'
 import { Spinner } from '../../components/ui/spinner'
 import { cn } from '../../lib/utils'
+import { useI18n } from '../i18n'
 import { queryErrorMessage, queryStateKind } from '../queryState'
 
 export function QueryState({
@@ -20,6 +21,7 @@ export function QueryState({
   onRetry: () => void
   className?: string
 }) {
+  const { t } = useI18n()
   if (queryStateKind(loading, error) === 'loading') {
     return (
       <output className={cn('flex items-center justify-center gap-2 p-6 text-muted-foreground', className)}>
@@ -32,10 +34,10 @@ export function QueryState({
     <Alert variant="destructive" className={cn('pr-24', className)}>
       <CircleAlert />
       <AlertTitle>{errorTitle}</AlertTitle>
-      <AlertDescription>{queryErrorMessage(error)}</AlertDescription>
+      <AlertDescription>{queryErrorMessage(error, t)}</AlertDescription>
       <AlertAction>
         <Button type="button" size="sm" variant="outline" onClick={onRetry}>
-          Retry
+          {t.shell.query.retry}
         </Button>
       </AlertAction>
     </Alert>

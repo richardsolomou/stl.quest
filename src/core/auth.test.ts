@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { messagesFor } from './i18n'
 import {
+  authErrorMessage,
   linkedAccountActive,
   normalizeOidcIssuer,
   oidcDiscoveryUrl,
@@ -30,18 +32,43 @@ describe('signInFailureReason', () => {
   })
 })
 
+const en = messagesFor('en').auth
+const fr = messagesFor('fr').auth
+
+describe('authErrorMessage', () => {
+  it('translates a known Better Auth code', () => {
+    expect(authErrorMessage(fr, { code: 'USER_ALREADY_EXISTS', message: 'User already exists.' }, 'x')).toBe(fr.errors.USER_ALREADY_EXISTS)
+  })
+
+  it('keeps Better Auth wording in English', () => {
+    expect(authErrorMessage(en, { code: 'USER_ALREADY_EXISTS', message: 'User already exists.' }, 'x')).toBe('User already exists.')
+  })
+
+  it('falls back to the server message for an unknown code', () => {
+    expect(authErrorMessage(fr, { code: 'SOMETHING_NEW', message: 'Server says no' }, 'x')).toBe('Server says no')
+  })
+
+  it('falls back to the fallback without a message', () => {
+    expect(authErrorMessage(fr, {}, 'fallback')).toBe('fallback')
+  })
+})
+
 describe('signInFailureMessage', () => {
+  it('translates the credential message', () => {
+    expect(signInFailureMessage(fr, { status: 401 })).toBe('E-mail ou mot de passe incorrect.')
+  })
+
   it('tells a rate-limited user to wait rather than that their password is wrong', () => {
-    expect(signInFailureMessage({ status: 429 })).toBe('Too many sign-in attempts. Wait a minute, then try again.')
+    expect(signInFailureMessage(en, { status: 429 })).toBe('Too many sign-in attempts. Wait a minute, then try again.')
   })
 
   it('keeps the credential message for a real 401', () => {
-    expect(signInFailureMessage({ status: 401 })).toBe('Email or password is incorrect.')
+    expect(signInFailureMessage(en, { status: 401 })).toBe('Email or password is incorrect.')
   })
 
   it('surfaces the server message for other failures instead of a wrong-password lie', () => {
-    expect(signInFailureMessage({ status: 503, message: 'Service unavailable.' })).toBe('Service unavailable.')
-    expect(signInFailureMessage({ status: 500 })).toBe('Something went wrong signing in. Try again.')
+    expect(signInFailureMessage(en, { status: 503, message: 'Service unavailable.' })).toBe('Service unavailable.')
+    expect(signInFailureMessage(en, { status: 500 })).toBe('Something went wrong signing in. Try again.')
   })
 })
 

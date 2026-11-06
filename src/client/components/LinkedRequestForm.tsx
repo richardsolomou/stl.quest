@@ -9,6 +9,7 @@ import { MAX_REQUEST_NAME_LENGTH, MAX_REQUEST_QUANTITY, MAX_REQUEST_SOURCE_URL_L
 import type { LinkedRequestValues } from '../linkedRequest'
 import { printTypeLabel } from '../fleet'
 import { DialogProblem } from './DialogProblem'
+import { useI18n } from '../i18n'
 
 export function LinkedRequestForm({
   values,
@@ -29,10 +30,11 @@ export function LinkedRequestForm({
   onCancel: () => void
   onSubmit: (event: React.FormEvent) => void
 }) {
+  const { t } = useI18n()
   return (
     <form onSubmit={onSubmit} className="space-y-3">
       <Field>
-        <FieldLabel htmlFor="linked-request-name">Title</FieldLabel>
+        <FieldLabel htmlFor="linked-request-name">{t.requests.fields.title}</FieldLabel>
         <Input
           id="linked-request-name"
           value={values.name}
@@ -41,25 +43,23 @@ export function LinkedRequestForm({
         />
       </Field>
       <Field>
-        <FieldLabel htmlFor="linked-request-url">Source link</FieldLabel>
+        <FieldLabel htmlFor="linked-request-url">{t.requests.fields.sourceLink}</FieldLabel>
         <Input
           id="linked-request-url"
           type="url"
           inputMode="url"
           value={values.sourceUrl}
           onChange={(event) => onChange({ sourceUrl: event.target.value })}
-          placeholder="https://…"
+          placeholder={t.requests.linked.sourcePlaceholder}
           maxLength={MAX_REQUEST_SOURCE_URL_LENGTH}
         />
-        <p className="text-xs text-muted-foreground">
-          Any link works. Previews are fetched for MakerWorld, Printables, MyMiniFactory, Cults3D and Thingiverse.
-        </p>
+        <p className="text-xs text-muted-foreground">{t.requests.linked.linkHint}</p>
       </Field>
       <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-3">
         <Field>
-          <FieldLabel htmlFor="linked-request-print-type">Print type</FieldLabel>
+          <FieldLabel htmlFor="linked-request-print-type">{t.requests.fields.printType}</FieldLabel>
           <Select
-            items={printTypes.map((printType) => ({ value: printType, label: printTypeLabel(printType) }))}
+            items={printTypes.map((printType) => ({ value: printType, label: printTypeLabel(t, printType) }))}
             value={values.printType}
             onValueChange={(printType) => onChange({ printType: printType ?? '' })}
           >
@@ -69,14 +69,14 @@ export function LinkedRequestForm({
             <SelectContent>
               {printTypes.map((printType) => (
                 <SelectItem key={printType} value={printType}>
-                  {printTypeLabel(printType)}
+                  {printTypeLabel(t, printType)}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </Field>
         <Field>
-          <FieldLabel htmlFor="linked-request-quantity">Copies</FieldLabel>
+          <FieldLabel htmlFor="linked-request-quantity">{t.requests.fields.copies}</FieldLabel>
           <Input
             id="linked-request-quantity"
             type="number"
@@ -89,28 +89,24 @@ export function LinkedRequestForm({
         </Field>
       </div>
       <Field>
-        <FieldLabel htmlFor="linked-request-notes">Notes</FieldLabel>
+        <FieldLabel htmlFor="linked-request-notes">{t.requests.fields.notes}</FieldLabel>
         <Textarea
           id="linked-request-notes"
           rows={3}
           value={values.notes}
           onChange={(event) => onChange({ notes: event.target.value })}
-          placeholder="colour, who it is for — anything the printer should know"
+          placeholder={t.requests.linked.notesPlaceholder}
         />
       </Field>
       <FieldError>{validation}</FieldError>
-      <DialogProblem
-        title="This print could not be added"
-        hint="Nothing was added. Check the details and your connection, then try again."
-        error={failure}
-      />
+      <DialogProblem title={t.requests.linked.failedTitle} hint={t.requests.linked.failedHint} error={failure} />
       <div className="flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
         <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
-          Cancel
+          {t.common.cancel}
         </Button>
         <Button type="submit" disabled={pending}>
           {pending && <Spinner />}
-          {pending ? 'Adding…' : 'Add to queue'}
+          {pending ? t.requests.linked.adding : t.requests.linked.addToQueue}
         </Button>
       </div>
     </form>

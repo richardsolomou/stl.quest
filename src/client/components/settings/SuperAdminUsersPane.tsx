@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
 import type { Account } from '../../../core/types'
+import { useI18n } from '../../i18n'
 import { accountsQuery, sessionQuery } from '../../queries'
 import { retryQueries } from '../../queryState'
 import { QueryState } from '../QueryState'
@@ -17,6 +18,8 @@ import { SuperAdminUserDetailDialog } from './SuperAdminUserDetailDialog'
 import { accountPlanOptions, accountRoleOptions, superAdminUserColumns, type SuperAdminUserAction } from './SuperAdminUsersTable'
 
 export function SuperAdminUsersPane({ hosted }: { hosted: boolean }) {
+  const { t, locale } = useI18n()
+  const copy = t.superAdmin.users
   const usersResult = useQuery(accountsQuery())
   const sessionResult = useQuery(sessionQuery())
   const users = usersResult.data
@@ -29,12 +32,12 @@ export function SuperAdminUsersPane({ hosted }: { hosted: boolean }) {
   if (!users || !session) {
     return (
       <SettingsPage>
-        <SettingsHeader title="Users" description="Manage every account and super admin." />
+        <SettingsHeader title={copy.title} description={copy.description} />
         <QueryState
           loading={usersResult.isPending || sessionResult.isPending}
           error={usersResult.error ?? sessionResult.error}
-          loadingLabel="Loading users…"
-          errorTitle="Could not load users"
+          loadingLabel={copy.loading}
+          errorTitle={copy.loadError}
           onRetry={() => void retryQueries(usersResult.refetch, sessionResult.refetch)}
         />
       </SettingsPage>
@@ -43,12 +46,14 @@ export function SuperAdminUsersPane({ hosted }: { hosted: boolean }) {
 
   return (
     <SettingsPage>
-      <SettingsHeader title="Users" description="Manage every account and super admin." />
+      <SettingsHeader title={copy.title} description={copy.description} />
       <SelfSignupSetting enabled={session.auth.selfSignup} />
       <SettingNotice notice={notice} />
       <SettingsTableSection>
         <DataTable
           columns={superAdminUserColumns({
+            t,
+            locale,
             me: session.identity,
             hosted,
             passwordEnabled,
@@ -58,21 +63,21 @@ export function SuperAdminUsersPane({ hosted }: { hosted: boolean }) {
             },
           })}
           data={users}
-          search={{ label: 'Search users', placeholder: 'Search users…' }}
+          search={{ label: copy.searchLabel, placeholder: copy.searchPlaceholder }}
           filters={[
             {
               columnId: 'role',
-              label: 'Filter users by role',
-              allOption: { value: 'all', label: 'All roles' },
-              options: accountRoleOptions,
+              label: copy.filterByRole,
+              allOption: { value: 'all', label: copy.allRoles },
+              options: accountRoleOptions(t),
               className: 'w-44',
             },
             ...(hosted
               ? [
                   {
                     columnId: 'plan',
-                    label: 'Filter users by plan',
-                    allOption: { value: 'all', label: 'All plans' },
+                    label: copy.filterByPlan,
+                    allOption: { value: 'all', label: copy.allPlans },
                     options: accountPlanOptions,
                     className: 'w-40',
                   },
@@ -85,24 +90,24 @@ export function SuperAdminUsersPane({ hosted }: { hosted: boolean }) {
             storageKey: 'stlquest:super-admin-users:columns',
             initial: { updatedAt: false, workspaceCount: false },
             labels: {
-              email: 'Email',
-              role: 'Role',
-              createdAt: 'Created',
-              updatedAt: 'Updated',
-              lastOnlineAt: 'Last online',
-              workspaceCount: 'Workspaces',
-              plan: 'Plan',
-              storage: 'Included storage',
+              email: t.superAdmin.columns.email,
+              role: t.superAdmin.columns.role,
+              createdAt: t.superAdmin.columns.created,
+              updatedAt: t.superAdmin.columns.updated,
+              lastOnlineAt: t.superAdmin.columns.lastOnline,
+              workspaceCount: t.superAdmin.columns.workspaces,
+              plan: t.superAdmin.columns.plan,
+              storage: t.superAdmin.columns.includedStorage,
             },
           }}
-          emptyMessage="No users match these filters."
-          itemLabel={{ singular: 'user', plural: 'users' }}
+          emptyMessage={copy.empty}
+          itemLabel={{ singular: copy.itemSingular, plural: copy.itemPlural }}
           alignLastColumnRight
           onRowClick={(user) => {
             setNotice(undefined)
             setDialog({ action: 'details', user })
           }}
-          getRowLabel={(user) => `View details for ${user.name}`}
+          getRowLabel={(user) => t.superAdmin.viewDetails(user.name)}
         />
       </SettingsTableSection>
       {dialog?.action === 'details' && <SuperAdminUserDetailDialog user={dialog.user} hosted={hosted} onDone={() => setDialog(null)} />}
@@ -115,8 +120,8 @@ export function SuperAdminUsersPane({ hosted }: { hosted: boolean }) {
           onSaved={(user) =>
             setNotice({
               tone: 'success',
-              title: `New password set for ${user.name}`,
-              hint: 'They have been signed out everywhere and need the new password to sign back in.',
+              title: copy.passwordSetTitle(user.name),
+              hint: copy.passwordSetHint,
             })
           }
         />
@@ -128,8 +133,8 @@ export function SuperAdminUsersPane({ hosted }: { hosted: boolean }) {
           onDeleted={(user) =>
             setNotice({
               tone: 'success',
-              title: `${user.name} was deleted`,
-              hint: 'Their sessions, print requests, and the workspaces where they were the only member are gone.',
+              title: copy.deletedTitle(user.name),
+              hint: copy.deletedHint,
             })
           }
         />
@@ -137,7 +142,7 @@ export function SuperAdminUsersPane({ hosted }: { hosted: boolean }) {
       {adding && <CreateUserDialog passwordEnabled={passwordEnabled} onDone={() => setAdding(false)} />}
       <SettingsActions>
         <Button type="button" onClick={() => setAdding(true)}>
-          Add user
+          {copy.add}
         </Button>
       </SettingsActions>
     </SettingsPage>

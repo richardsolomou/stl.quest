@@ -11,6 +11,7 @@ import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
+import type { Messages } from '../../../core/i18n'
 import type { Identity, MemberRequestVisibility, WorkspaceRole } from '../../../core/types'
 import type { MemberRequestVisibilityChoice } from '../../../core/visibility'
 import { removeWorkspaceMember, updateMemberRequestVisibility, updateWorkspaceMemberRole } from '../../../server/fns'
@@ -25,19 +26,15 @@ import { UserTableIdentity, userEmailColumnMeta } from '../UserTableIdentity'
 import { UserSummary } from '../UserSummary'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsTableSection } from './SettingsLayout'
 import { InviteDialog, PendingInvites } from './WorkspaceInvites'
+import { useI18n } from '../../i18n'
 
-const MEMBER_ROLE_OPTIONS = [
-  { value: 'member', label: 'Member' },
-  { value: 'admin', label: 'Admin' },
-] as const
+type MembersCopy = Messages['settings']['members']
 
-const VISIBILITY_CHOICE_OPTIONS = [
-  { value: 'default', label: 'Workspace default' },
-  { value: 'own', label: 'Only their own requests' },
-  { value: 'all', label: 'All requests' },
-] as const
-
-const visibilityLabel = (visibility: MemberRequestVisibility) => (visibility === 'own' ? 'Own requests' : 'All requests')
+const memberRoleOptions = (copy: MembersCopy) =>
+  [
+    { value: 'member', label: copy.roles.member },
+    { value: 'admin', label: copy.roles.admin },
+  ] as const
 
 export function UsersPane({ me }: { me: Identity }) {
   const workspaceSlug = useWorkspaceSlug()
@@ -48,15 +45,17 @@ export function UsersPane({ me }: { me: Identity }) {
   const smtpConfigured = session?.email.workspaceConfigured === true
   const [inviting, setInviting] = useState(false)
   const [dialog, setDialog] = useState<{ action: UserAction; user: WorkspaceMember } | null>(null)
+  const { t, locale } = useI18n()
+  const copy = t.settings.members
   if (!users || !session) {
     return (
       <SettingsPage>
-        <SettingsHeader title="Members" description="Manage workspace access, roles, and invitations." />
+        <SettingsHeader title={copy.title} description={copy.description} />
         <QueryState
           loading={usersResult.isPending || sessionResult.isPending}
           error={usersResult.error ?? sessionResult.error}
-          loadingLabel="Loading members…"
-          errorTitle="Could not load members"
+          loadingLabel={copy.loading}
+          errorTitle={copy.loadError}
           onRetry={() => void retryQueries(usersResult.refetch, sessionResult.refetch)}
         />
       </SettingsPage>
@@ -64,21 +63,23 @@ export function UsersPane({ me }: { me: Identity }) {
   }
   return (
     <SettingsPage>
-      <SettingsHeader title="Members" description="Manage workspace access, roles, and invitations." />
+      <SettingsHeader title={copy.title} description={copy.description} />
       <SettingsTableSection>
         <DataTable
           columns={userColumns({
             me,
+            copy,
+            locale,
             onAction: (action, user) => setDialog({ action, user }),
           })}
           data={users}
-          search={{ label: 'Search members', placeholder: 'Search members…' }}
+          search={{ label: copy.table.searchLabel, placeholder: copy.table.searchPlaceholder }}
           filters={[
             {
               columnId: 'workspaceAccess',
-              label: 'Filter members by role',
-              allOption: { value: 'all', label: 'All roles' },
-              options: MEMBER_ROLE_OPTIONS,
+              label: copy.table.roleFilter,
+              allOption: { value: 'all', label: copy.table.allRoles },
+              options: memberRoleOptions(copy),
               className: 'w-36',
             },
           ]}
@@ -86,8 +87,8 @@ export function UsersPane({ me }: { me: Identity }) {
             { id: 'workspaceAccess', desc: false },
             { id: 'name', desc: false },
           ]}
-          emptyMessage="No members match these filters."
-          itemLabel={{ singular: 'member', plural: 'members' }}
+          emptyMessage={copy.table.empty}
+          itemLabel={copy.table.itemLabel}
           alignLastColumnRight
         />
       </SettingsTableSection>
@@ -97,7 +98,7 @@ export function UsersPane({ me }: { me: Identity }) {
       {inviting && <InviteDialog smtpConfigured={smtpConfigured} onDone={() => setInviting(false)} />}
       <SettingsActions>
         <Button type="button" data-onboarding="invite" onClick={() => setInviting(true)}>
-          Invite user
+          {copy.invite}
         </Button>
       </SettingsActions>
       <PendingInvites />
@@ -113,50 +114,56 @@ type WorkspaceMember = Identity & {
 }
 type UserAction = 'role' | 'visibility' | 'remove'
 type WorkspaceAccess = 'admin' | 'member'
-const workspaceRoleLabel = (user: WorkspaceMember) =>
-  user.workspaceRole === 'owner' ? 'Owner' : user.workspaceRole === 'admin' ? 'Admin' : 'Member'
+const workspaceRoleLabel = (copy: MembersCopy, user: WorkspaceMember) => copy.roles[user.workspaceRole ?? 'member']
 
-function userColumns({ me, onAction }: { me: Identity; onAction: (action: UserAction, user: WorkspaceMember) => void }) {
+function userColumns({
+  me,
+  copy,
+  locale,
+  onAction,
+}: {
+  me: Identity
+  copy: MembersCopy
+  locale: string
+  onAction: (action: UserAction, user: WorkspaceMember) => void
+}) {
   return columnHelper.columns([
     columnHelper.accessor('name', {
-      header: 'Name',
+      header: copy.table.name,
       cell: ({ row }) => <UserTableIdentity name={row.original.name} email={row.original.email} image={row.original.image} />,
     }),
     columnHelper.accessor('email', {
-      header: 'Email',
+      header: copy.table.email,
       cell: ({ getValue }) => <ProtectedEmail email={getValue()} className="block max-w-40" />,
       meta: userEmailColumnMeta,
     }),
     columnHelper.accessor((user): WorkspaceAccess => (user.workspaceRole === 'member' ? 'member' : 'admin'), {
       id: 'workspaceAccess',
-      header: 'Role',
-      cell: ({ getValue }) => {
-        const role = getValue()
-        return <Badge variant="secondary">{role[0].toUpperCase() + role.slice(1)}</Badge>
-      },
+      header: copy.table.role,
+      cell: ({ getValue }) => <Badge variant="secondary">{copy.roles[getValue()]}</Badge>,
       meta: { className: '@max-sm:hidden' },
     }),
     columnHelper.accessor((user) => user.effectiveRequestVisibility, {
       id: 'requestVisibility',
-      header: 'Sees',
+      header: copy.table.sees,
       cell: ({ row, getValue }) => (
         <span className="text-sm text-muted-foreground">
-          {visibilityLabel(getValue())}
-          {row.original.requestVisibility && <span className="ml-1 text-xs">(set for them)</span>}
+          {getValue() === 'own' ? copy.table.seesOwn : copy.table.seesAll}
+          {row.original.requestVisibility && <span className="ml-1 text-xs">{copy.table.setForThem}</span>}
         </span>
       ),
       meta: { className: '@max-xl:hidden' },
     }),
     columnHelper.accessor('lastActiveAt', {
-      header: 'Last active',
+      header: copy.table.lastActive,
       cell: ({ getValue }) => {
         const value = getValue()
         return value ? (
           <time dateTime={new Date(value).toISOString()} className="whitespace-nowrap text-sm text-muted-foreground">
-            {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(value)}
+            {new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(value)}
           </time>
         ) : (
-          <span className="text-sm text-muted-foreground">Unknown</span>
+          <span className="text-sm text-muted-foreground">{copy.table.unknown}</span>
         )
       },
       sortUndefined: 'last',
@@ -164,12 +171,12 @@ function userColumns({ me, onAction }: { me: Identity; onAction: (action: UserAc
     }),
     columnHelper.display({
       id: 'actions',
-      header: 'Actions',
+      header: copy.table.actions,
       cell: ({ row }) =>
         row.original.id === me.id ? (
-          <span className="text-xs text-muted-foreground">You</span>
+          <span className="text-xs text-muted-foreground">{copy.table.you}</span>
         ) : row.original.workspaceRole === 'owner' ? (
-          <span className="text-xs text-muted-foreground">Owner</span>
+          <span className="text-xs text-muted-foreground">{copy.roles.owner}</span>
         ) : (
           <UserActions user={row.original} onAction={onAction} />
         ),
@@ -179,6 +186,8 @@ function userColumns({ me, onAction }: { me: Identity; onAction: (action: UserAc
 
 function UserActions({ user, onAction }: { user: WorkspaceMember; onAction: (action: UserAction, user: WorkspaceMember) => void }) {
   const [open, setOpen] = useState(false)
+  const { t } = useI18n()
+  const copy = t.settings.members
   const choose = (action: UserAction) => {
     setOpen(false)
     onAction(action, user)
@@ -186,24 +195,26 @@ function UserActions({ user, onAction }: { user: WorkspaceMember; onAction: (act
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
-        render={<Button type="button" variant="ghost" size="icon-sm" className="ph-no-capture" aria-label={`Actions for ${user.name}`} />}
+        render={
+          <Button type="button" variant="ghost" size="icon-sm" className="ph-no-capture" aria-label={copy.actions.label(user.name)} />
+        }
       >
         <Ellipsis />
       </PopoverTrigger>
       <PopoverContent align="end" className="w-48 gap-0.5 p-1">
         <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => choose('role')}>
           <ShieldCheck />
-          Change role
+          {copy.actions.changeRole}
         </Button>
         {user.role !== 'admin' && (
           <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => choose('visibility')}>
             <Eye />
-            Change visibility
+            {copy.actions.changeVisibility}
           </Button>
         )}
         <Button type="button" variant="ghost" className="w-full justify-start text-destructive" onClick={() => choose('remove')}>
           <Trash2 />
-          Remove member
+          {copy.actions.remove}
         </Button>
       </PopoverContent>
     </Popover>
@@ -215,6 +226,9 @@ function ChangeRoleDialog({ user, onDone }: { user: WorkspaceMember; onDone: () 
   const queryClient = useQueryClient()
   const [role, setRole] = useState<Exclude<WorkspaceRole, 'owner'>>(user.workspaceRole === 'admin' ? 'admin' : 'member')
   const callUpdateRole = useServerFn(updateWorkspaceMemberRole)
+  const { t } = useI18n()
+  const copy = t.settings.members
+  const roleOptions = memberRoleOptions(copy)
   const mutation = useMutation({
     mutationFn: (nextRole: Exclude<WorkspaceRole, 'owner'>) => callUpdateRole({ data: { workspaceSlug, userId: user.id, role: nextRole } }),
     onSuccess: async () => {
@@ -224,36 +238,32 @@ function ChangeRoleDialog({ user, onDone }: { user: WorkspaceMember; onDone: () 
   })
 
   return (
-    <DialogShell title="Change role" onClose={onDone} preventClose={mutation.isPending}>
-      <UserSummary user={user} role={workspaceRoleLabel(user)} />
+    <DialogShell title={copy.role.title} onClose={onDone} preventClose={mutation.isPending}>
+      <UserSummary user={user} role={workspaceRoleLabel(copy, user)} />
       <Field>
-        <FieldLabel htmlFor={`role-${user.id}`}>Role</FieldLabel>
-        <Select items={MEMBER_ROLE_OPTIONS} value={role} onValueChange={(value) => setRole(value as Exclude<WorkspaceRole, 'owner'>)}>
-          <SelectTrigger className="ph-no-capture w-full" id={`role-${user.id}`} aria-label={`Role for ${user.name}`}>
+        <FieldLabel htmlFor={`role-${user.id}`}>{copy.role.label}</FieldLabel>
+        <Select items={roleOptions} value={role} onValueChange={(value) => setRole(value as Exclude<WorkspaceRole, 'owner'>)}>
+          <SelectTrigger className="ph-no-capture w-full" id={`role-${user.id}`} aria-label={copy.role.selectLabel(user.name)}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {MEMBER_ROLE_OPTIONS.map((option) => (
+            {roleOptions.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <FieldDescription>Workspace admins can manage members, settings, and every print request in this workspace.</FieldDescription>
+        <FieldDescription>{copy.role.help}</FieldDescription>
       </Field>
-      <DialogProblem
-        title="The role was not changed"
-        hint="A workspace must keep at least one owner, and only an owner can hand that role over."
-        error={mutation.error?.message}
-      />
+      <DialogProblem title={copy.role.notSaved} hint={copy.role.notSavedHint} error={mutation.error?.message} />
       <div className="flex flex-wrap justify-end gap-2">
         <Button type="button" variant="outline" onClick={onDone} disabled={mutation.isPending}>
-          Cancel
+          {t.common.cancel}
         </Button>
         <Button type="button" disabled={role === user.workspaceRole || mutation.isPending} onClick={() => mutation.mutate(role)}>
           {mutation.isPending && <Spinner />}
-          {mutation.isPending ? 'Saving…' : 'Change role'}
+          {mutation.isPending ? t.common.saving : copy.actions.changeRole}
         </Button>
       </div>
     </DialogShell>
@@ -266,6 +276,8 @@ function ChangeVisibilityDialog({ user, onDone }: { user: WorkspaceMember; onDon
   const board = useQuery(boardQuery(workspaceSlug))
   const [choice, setChoice] = useState<MemberRequestVisibilityChoice>(user.requestVisibility ?? 'default')
   const callUpdateVisibility = useServerFn(updateMemberRequestVisibility)
+  const { t } = useI18n()
+  const copy = t.settings.members
   const mutation = useMutation({
     mutationFn: (visibility: MemberRequestVisibilityChoice) =>
       callUpdateVisibility({ data: { workspaceSlug, userId: user.id, visibility } }),
@@ -274,18 +286,22 @@ function ChangeVisibilityDialog({ user, onDone }: { user: WorkspaceMember; onDon
       onDone()
     },
   })
-  const defaultLabel = board.data?.privateRequests ? 'only their own requests' : 'all requests'
-  const options = VISIBILITY_CHOICE_OPTIONS.map((option) =>
-    option.value === 'default' && board.data ? { ...option, label: `Workspace default — ${defaultLabel}` } : option,
-  )
+  const options = [
+    {
+      value: 'default',
+      label: board.data ? (board.data.privateRequests ? copy.visibility.defaultOwn : copy.visibility.defaultAll) : copy.visibility.default,
+    },
+    { value: 'own', label: copy.visibility.own },
+    { value: 'all', label: copy.visibility.all },
+  ] as const
 
   return (
-    <DialogShell title="Change request visibility" onClose={onDone} preventClose={mutation.isPending}>
-      <UserSummary user={user} role={workspaceRoleLabel(user)} />
+    <DialogShell title={copy.visibility.title} onClose={onDone} preventClose={mutation.isPending}>
+      <UserSummary user={user} role={workspaceRoleLabel(copy, user)} />
       <Field>
-        <FieldLabel htmlFor={`visibility-${user.id}`}>Requests they see</FieldLabel>
+        <FieldLabel htmlFor={`visibility-${user.id}`}>{copy.visibility.label}</FieldLabel>
         <Select items={options} value={choice} onValueChange={(value) => setChoice(value as MemberRequestVisibilityChoice)}>
-          <SelectTrigger className="ph-no-capture w-full" id={`visibility-${user.id}`} aria-label={`Request visibility for ${user.name}`}>
+          <SelectTrigger className="ph-no-capture w-full" id={`visibility-${user.id}`} aria-label={copy.visibility.selectLabel(user.name)}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -296,19 +312,12 @@ function ChangeVisibilityDialog({ user, onDone }: { user: WorkspaceMember; onDon
             ))}
           </SelectContent>
         </Select>
-        <FieldDescription>
-          This is what they see, not who can see them: scoping someone to their own requests hides the rest of the board, the other people
-          in the workspace, and their models from them. It does not hide their own requests from members who see the whole board.
-        </FieldDescription>
+        <FieldDescription>{copy.visibility.help}</FieldDescription>
       </Field>
-      <DialogProblem
-        title="The visibility was not changed"
-        hint="They still see the same requests. Try again in a moment."
-        error={mutation.error?.message}
-      />
+      <DialogProblem title={copy.visibility.notSaved} hint={copy.visibility.notSavedHint} error={mutation.error?.message} />
       <div className="flex flex-wrap justify-end gap-2">
         <Button type="button" variant="outline" onClick={onDone} disabled={mutation.isPending}>
-          Cancel
+          {t.common.cancel}
         </Button>
         <Button
           type="button"
@@ -316,7 +325,7 @@ function ChangeVisibilityDialog({ user, onDone }: { user: WorkspaceMember; onDon
           onClick={() => mutation.mutate(choice)}
         >
           {mutation.isPending && <Spinner />}
-          {mutation.isPending ? 'Saving…' : 'Change visibility'}
+          {mutation.isPending ? t.common.saving : copy.actions.changeVisibility}
         </Button>
       </div>
     </DialogShell>
@@ -327,6 +336,8 @@ function RemoveMemberDialog({ user, onDone }: { user: WorkspaceMember; onDone: (
   const workspaceSlug = useWorkspaceSlug()
   const queryClient = useQueryClient()
   const callRemove = useServerFn(removeWorkspaceMember)
+  const { t } = useI18n()
+  const copy = t.settings.members
   const mutation = useMutation({
     mutationFn: () => callRemove({ data: { workspaceSlug, userId: user.id } }),
     onSuccess: async () => {
@@ -335,24 +346,17 @@ function RemoveMemberDialog({ user, onDone }: { user: WorkspaceMember; onDone: (
     },
   })
   return (
-    <DialogShell title="Remove member" onClose={onDone} preventClose={mutation.isPending}>
-      <UserSummary user={user} role={workspaceRoleLabel(user)} />
-      <p className="text-sm text-muted-foreground">
-        They lose access to this workspace immediately. Their account and the print requests they already made are kept, and you can invite
-        them back at any time.
-      </p>
-      <DialogProblem
-        title="The member was not removed"
-        hint="They still have access to this workspace. Check that they are not the last owner, then try again."
-        error={mutation.error?.message}
-      />
+    <DialogShell title={copy.actions.remove} onClose={onDone} preventClose={mutation.isPending}>
+      <UserSummary user={user} role={workspaceRoleLabel(copy, user)} />
+      <p className="text-sm text-muted-foreground">{copy.remove.description}</p>
+      <DialogProblem title={copy.remove.notRemoved} hint={copy.remove.notRemovedHint} error={mutation.error?.message} />
       <div className="flex flex-wrap justify-end gap-2">
         <Button type="button" variant="outline" onClick={onDone} disabled={mutation.isPending}>
-          Cancel
+          {t.common.cancel}
         </Button>
         <Button type="button" variant="destructive" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
           {mutation.isPending && <Spinner />}
-          Remove member
+          {copy.actions.remove}
         </Button>
       </div>
     </DialogShell>

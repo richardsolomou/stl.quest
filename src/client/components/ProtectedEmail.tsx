@@ -1,15 +1,17 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { useI18n } from '../i18n'
 
 export function ProtectedEmail({ email, className }: { email: string; className?: string }) {
+  const { t } = useI18n()
   const [revealed, setRevealed] = useState(false)
 
   return (
     <button
       type="button"
       className={cn('ph-no-capture max-w-full cursor-pointer text-left', className)}
-      aria-label={revealed ? email : 'Reveal email address'}
-      title={revealed ? undefined : 'Click to reveal email address'}
+      aria-label={revealed ? email : t.account.protectedEmail.reveal}
+      title={revealed ? undefined : t.account.protectedEmail.revealHint}
       onClick={(event) => {
         event.preventDefault()
         event.stopPropagation()

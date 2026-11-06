@@ -9,9 +9,11 @@ import { useWorkspaceSlug } from '../workspace'
 import { DetailRow } from './DetailRow'
 import { requestPrintEstimate } from './PrintEstimate'
 import { formatMoney } from './priceCalculator/format'
+import { useI18n } from '../i18n'
 
 /** Admin-only: the calculator setup is private to admins, and the default rates would price work nobody configured. */
 export function RequestCostEstimate({ request }: { request: PublicPrintRequest }) {
+  const { t, locale } = useI18n()
   const workspaceSlug = useWorkspaceSlug()
   const query = useQuery(priceCalculatorSettingsQuery(workspaceSlug))
   const estimate = requestPrintEstimate(request)
@@ -20,20 +22,20 @@ export function RequestCostEstimate({ request }: { request: PublicPrintRequest }
   if (!quote) return null
   const { currency } = query.data.settings
   return (
-    <DetailRow label="Estimated cost">
-      <strong>{formatMoney(quote.result.costPrice, currency)}</strong>{' '}
+    <DetailRow label={t.requests.cost.label}>
+      <strong>{formatMoney(quote.result.costPrice, currency, locale)}</strong>{' '}
       <span className="text-muted-foreground">
-        · {formatMoney(quote.result.standardPrice, currency)} suggested{request.quantity > 1 && ` for all ${request.quantity} copies`}
+        · {t.requests.cost.suggested(formatMoney(quote.result.standardPrice, currency, locale), request.quantity)}
       </span>
       <p className="mt-0.5 text-xs text-muted-foreground">
-        From your saved calculator setup, assuming one plate per copy and no hands-on time.{' '}
+        {t.requests.cost.hint}{' '}
         <Link
           to="/calculator"
           search={calculatorSearch(request.printType, quote.job)}
           className="inline-flex items-center gap-1 font-medium text-primary underline underline-offset-4 hover:text-primary/80"
         >
           <Calculator className="size-3.5" />
-          Open in calculator
+          {t.requests.cost.openCalculator}
         </Link>
       </p>
     </DetailRow>

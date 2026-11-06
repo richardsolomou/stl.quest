@@ -75,6 +75,7 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `account_email_change_requested`  | —                                                                                            |
 | `account_profile_updated`         | `name_changed`, `email_change_requested`                                                     |
 | `notification_preference_changed` | `kind`, `enabled`                                                                            |
+| `interface_language_changed`      | `locale`                                                                                     |
 | `print_ready_email_sent`          | `request_count`, `copy_count`                                                                |
 | `password_changed`                | `other_sessions_revoked`                                                                     |
 | `two_factor_enabled`              | —                                                                                            |
@@ -97,6 +98,8 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `product_tour_progress_reached`   | `percent`                                                                                    |
 
 `account_created` is only present for password sign-in; `trusted_device` is only present for two-factor sign-in. `workspace_deleted.deleted_by` is `owner` when an owner deleted their workspace and `super_admin` when a super admin deleted it from **Super Admin → Workspaces**. `account_deleted` records that a super admin deleted another account; `deleted_workspace_count` is the number of workspaces deleted with it because the account was their only member. `user_sign_in_failed` records a rejected password sign-in with an anonymous categorical `reason` of `invalid_credentials`, `rate_limited`, or `error`; `password_reset_requested` records that a reset was requested and carries no email address or other identifier.
+
+`interface_language_changed.locale` is `en` or `fr` for a chosen language, or `browser` when the account goes back to following the browser's languages.
 
 `price_calculator_settings_saved.currency` is the ISO 4217 code of the calculator's display currency, such as `EUR` or `CAD`.
 

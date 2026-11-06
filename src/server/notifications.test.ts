@@ -2,10 +2,12 @@ import crypto from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EmailMessage } from '../adapters/email'
 import type { EmailBranding } from '../core/email'
+import type { Locale } from '../core/i18n'
 import { encryptSetting } from './integrations'
+import { withRequestLocale } from './locale'
 import { deliveryTracker, emailNotifier, mailerTemplate, sendInviteEmail, workspaceEmailConfigured, workspaceMailer } from './notifications'
 
-function notifier(send: () => Promise<void>, branding: EmailBranding = {}, relayed = false, ownServer = false) {
+function notifier(send: () => Promise<void>, branding: EmailBranding = {}, relayed = false, ownServer = false, locale?: Locale) {
   const capture = vi.fn(async () => undefined)
   const email = { send: vi.fn(send), verify: async () => undefined }
   const deliveries = deliveryTracker()
@@ -21,6 +23,7 @@ function notifier(send: () => Promise<void>, branding: EmailBranding = {}, relay
       branding: async () => branding,
       appUrl: () => 'https://print.example',
       deliveries,
+      recipientLocale: async () => locale,
     }),
   }
 }
@@ -36,6 +39,12 @@ describe('print-ready email notifier', () => {
         text: expect.stringContaining('https://print.example'),
       }),
     )
+  })
+
+  it('writes the email in the requester’s chosen language', async () => {
+    const { email, notifier: ready } = notifier(async () => undefined, {}, false, false, 'fr')
+    await ready.printsReady({ id: 'requester', email: 'owner@example.com', name: 'Maya' }, [{ name: 'Bracket', count: 2 }])
+    expect(email.send).toHaveBeenCalledWith(expect.objectContaining({ subject: 'Vos impressions sont prêtes dans Print lab' }))
   })
 
   it('embeds the workspace logo inline', async () => {
@@ -95,6 +104,7 @@ describe('print-ready email notifier', () => {
       branding,
       appUrl: () => undefined,
       deliveries: deliveryTracker(),
+      recipientLocale: async () => undefined,
     })
     await ready.printsReady({ id: 'requester', email: 'owner@example.com', name: 'Maya' }, [{ name: 'Bracket', count: 1 }])
     expect(branding).not.toHaveBeenCalled()
@@ -144,6 +154,7 @@ describe('print-ready sending availability', () => {
     branding: async () => ({}),
     appUrl: () => undefined,
     deliveries: deliveryTracker(),
+    recipientLocale: async () => undefined,
   }
 
   it('can send with a mailer', async () => {
@@ -235,6 +246,11 @@ describe('invitation emails', () => {
     await sendInviteEmail({ delivery: { send, verify: async () => undefined }, relayed: false, ownServer }, branding, recipient)
     return send.mock.calls[0][0]
   }
+
+  it('writes the standard invitation in the inviter’s language', async () => {
+    const french = new Request('http://localhost', { headers: { 'accept-language': 'fr' } })
+    expect((await withRequestLocale(french, () => sent(false))).subject).toBe('Vous êtes invité à rejoindre Lab sur STL Quest')
+  })
 
   it('uses the custom template through the workspace mail server', async () => {
     expect((await sent(true)).subject).toBe('Join Lab')

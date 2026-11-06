@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { automaticPrintEstimate, effectivePrintEstimate, formatEstimateTime } from './printEstimates'
+import { messagesFor } from './i18n'
+import { automaticPrintEstimate, effectivePrintEstimate, formatEstimateMaterial, formatEstimateTime } from './printEstimates'
 
 describe('print estimates', () => {
   it('combines a dense shell with 15% internal infill', () => {
@@ -60,6 +61,22 @@ describe('print estimates', () => {
   })
 
   it('formats durations for the board', () => {
-    expect(formatEstimateTime(135)).toBe('2h 15m')
+    expect(formatEstimateTime(135, messagesFor('en').requests)).toBe('2h 15m')
+  })
+
+  it('formats an estimate time in German', () => {
+    expect(formatEstimateTime(135, messagesFor('de').requests)).toBe('2 Std. 15 Min.')
+  })
+
+  it('formats a material estimate with a French decimal comma', () => {
+    expect(formatEstimateMaterial(12.04, 'fr')).toBe('12,0')
+  })
+
+  it('keeps a large English material estimate ungrouped', () => {
+    expect(formatEstimateMaterial(1234.4)).toBe('1234')
+  })
+
+  it('drops trailing zeros from a small material estimate', () => {
+    expect(formatEstimateMaterial(1.5)).toBe('1.5')
   })
 })

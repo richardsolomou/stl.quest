@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { useI18n } from '../../i18n'
 
 export type SetupMode = 'preset' | 'custom'
 
@@ -30,10 +31,11 @@ export function SetupGroup({
   )
 }
 
-export function ModeSelector({ label, value, onChange }: { label: string; value: SetupMode; onChange: (value: SetupMode) => void }) {
+export function ModeSelector({ legend, value, onChange }: { legend: string; value: SetupMode; onChange: (value: SetupMode) => void }) {
+  const { t } = useI18n()
   return (
     <fieldset className="m-0 flex min-w-0 rounded-lg border border-input bg-background p-0.5">
-      <legend className="sr-only">{label} mode</legend>
+      <legend className="sr-only">{legend}</legend>
       {(['preset', 'custom'] as const).map((option) => (
         <Button
           key={option}
@@ -44,7 +46,7 @@ export function ModeSelector({ label, value, onChange }: { label: string; value:
           aria-pressed={value === option}
           onClick={() => onChange(option)}
         >
-          {option}
+          {t.calculator.modes[option]}
         </Button>
       ))}
     </fieldset>

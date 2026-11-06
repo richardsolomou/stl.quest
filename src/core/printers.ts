@@ -1,3 +1,4 @@
+import type { Messages } from './i18n'
 import type { ModelDimensions, PrinterProfile, PrintRequest, PrintType } from './types'
 import { workflow } from './workflow'
 import { getPrinterPreset, PRINTER_PRESETS } from './printerPresets'
@@ -41,12 +42,12 @@ export function printerProfileFromPreset(id: string, preset: PrinterPreset): Pri
   }
 }
 
-export function printerProfilesValidationError(profiles: PrinterProfile[]) {
+export function printerProfilesValidationError(profiles: PrinterProfile[], t: Messages) {
   const names = new Set<string>()
   for (const profile of profiles.filter(({ archived }) => !archived)) {
     const name = profile.name.trim()
-    if (!name) return 'Give every printer a name.'
-    if (names.has(name.toLowerCase())) return 'Printer names must be unique.'
+    if (!name) return t.settings.printers.validation.missingName
+    if (names.has(name.toLowerCase())) return t.settings.printers.validation.duplicateName
     names.add(name.toLowerCase())
   }
   return ''

@@ -19,6 +19,7 @@ import type { NewUploadedRequestInput } from '../core/services'
 import { UploadRequestLimiter, validSameOrigin } from './uploadGuards'
 import { hostedStorageRequiresRemote } from './storagePolicy'
 import { logger } from './logger'
+import { serverMessages } from './locale'
 import { storagePlans } from '../core/plans'
 
 const WORKSPACE_METADATA_KEY = 'stlQuestWorkspaceId'
@@ -218,13 +219,12 @@ function uploadWorkspaceId(metadata: Record<string, string | null> | undefined) 
 }
 
 export async function handleUpload(request: Request) {
-  if (!validSameOrigin(request)) return Response.json({ error: 'cross-origin upload rejected' }, { status: 403 })
+  if (!validSameOrigin(request)) return Response.json({ error: serverMessages().server.upload.crossOrigin }, { status: 403 })
   const instance = await app()
   const context = await instance.workspace(request.headers)
   if (hostedStorageRequiresRemote(context.storage))
-    return Response.json({ error: 'an admin must configure cloud or S3-compatible storage before uploads are allowed' }, { status: 503 })
-  if (!context.storageReady)
-    return Response.json({ error: 'storage is not ready — an admin needs to fix Settings → Storage first' }, { status: 503 })
+    return Response.json({ error: serverMessages().server.upload.remoteStorageRequired }, { status: 503 })
+  if (!context.storageReady) return Response.json({ error: serverMessages().server.upload.storageNotReady }, { status: 503 })
   if (await context.storageMigration.active())
     return Response.json({ error: 'storage migration is in progress — uploads are temporarily paused' }, { status: 423 })
   const release = uploadRequests.enter(`${context.workspace.id}:${context.identity.id}`)

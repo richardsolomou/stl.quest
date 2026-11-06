@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { DialogProblem } from './DialogProblem'
 import { Spinner } from '@/components/ui/spinner'
+import { useI18n } from '../i18n'
 
 export function ConfirmDialog({
   open,
@@ -20,7 +21,7 @@ export function ConfirmDialog({
   size = 'default',
   confirmLabel,
   pendingLabel,
-  cancelLabel = 'Cancel',
+  cancelLabel,
   destructive = false,
   pending = false,
   confirmDisabled = false,
@@ -44,6 +45,7 @@ export function ConfirmDialog({
   onConfirm: () => void
   onCancel: () => void
 }) {
+  const { t } = useI18n()
   return (
     <AlertDialog
       open={open}
@@ -57,9 +59,9 @@ export function ConfirmDialog({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         {details}
-        {problem && <DialogProblem title={problem.title} hint={problem.hint} error={problem.error ?? 'No further detail was returned.'} />}
+        {problem && <DialogProblem title={problem.title} hint={problem.hint} error={problem.error ?? t.shell.confirm.noDetail} />}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>{cancelLabel}</AlertDialogCancel>
+          <AlertDialogCancel disabled={pending}>{cancelLabel ?? t.common.cancel}</AlertDialogCancel>
           <AlertDialogAction disabled={pending || confirmDisabled} variant={destructive ? 'destructive' : 'default'} onClick={onConfirm}>
             {pending && <Spinner />}
             {pending ? (pendingLabel ?? `${confirmLabel}…`) : confirmLabel}

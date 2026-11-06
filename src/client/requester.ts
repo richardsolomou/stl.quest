@@ -9,8 +9,9 @@ type Requester = { requesterId: string; requesterName: string }
  */
 export const requesterColors = [1, 2, 3, 4, 5, 6, 7, 8].map((index) => `var(--requester-${index})`)
 
-export function requesterLabel(request: Requester): string {
-  return request.requesterName?.trim() || 'Requester'
+/** The fallback only shows for a request whose requester has no name; colours hash the same name in every language. */
+export function requesterLabel(request: Requester, fallback = 'Requester'): string {
+  return request.requesterName?.trim() || fallback
 }
 
 /** One person, one ink, wherever they appear — the card avatar and the detail chip must agree. */

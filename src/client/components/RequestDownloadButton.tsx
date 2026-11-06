@@ -4,8 +4,10 @@ import { cn } from '@/lib/utils'
 import type { PublicPrintRequest } from '../../core/types'
 import { requestDownloadHref } from '../boardDownload'
 import { signalProductTourProgress } from '../productTour'
+import { useI18n } from '../i18n'
 
 export function RequestDownloadButton({ request }: { request: PublicPrintRequest }) {
+  const { t } = useI18n()
   const posthog = usePostHog()
   return (
     <a
@@ -17,7 +19,7 @@ export function RequestDownloadButton({ request }: { request: PublicPrintRequest
         signalProductTourProgress('download')
       }}
     >
-      Download model
+      {t.requests.downloadModel}
     </a>
   )
 }

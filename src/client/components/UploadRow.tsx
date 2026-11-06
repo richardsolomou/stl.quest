@@ -13,6 +13,7 @@ import type { UploadEntry } from './uploadTypes'
 import { printTypeLabel } from '../fleet'
 import { AddOptionalFieldButton, RemovableField } from './OptionalFieldControls'
 import { ModelFormatLabel } from './ModelFormatLabel'
+import { useI18n } from '../i18n'
 
 export function UploadRow({
   entry,
@@ -25,6 +26,7 @@ export function UploadRow({
   onRemove: () => void
   printTypes: readonly PrintType[]
 }) {
+  const { t } = useI18n()
   return (
     <Item variant="muted" className={cn('items-start max-sm:flex-col', entry.state === 'error' && 'ring-1 ring-destructive')}>
       <ItemMedia className="grid size-12 place-items-center overflow-hidden rounded-md border bg-background [background-image:var(--grid)] [background-size:12px_12px] max-sm:size-16">
@@ -37,7 +39,7 @@ export function UploadRow({
       <ItemContent className="min-w-0 gap-1.5 max-sm:w-full">
         <div className="grid grid-cols-[minmax(0,1fr)_4rem_auto] items-center gap-2 max-sm:grid-cols-[minmax(0,1fr)_auto]">
           <Input
-            aria-label="Name"
+            aria-label={t.requests.fields.name}
             value={entry.name}
             onChange={(event) => onPatch({ name: event.target.value })}
             maxLength={MAX_REQUEST_NAME_LENGTH}
@@ -45,7 +47,7 @@ export function UploadRow({
             disabled={entry.state === 'done'}
           />
           <Input
-            aria-label="Copies"
+            aria-label={t.requests.fields.copies}
             className="w-16 shrink-0 max-sm:row-start-2"
             type="number"
             inputMode="numeric"
@@ -56,7 +58,9 @@ export function UploadRow({
             disabled={entry.state === 'done'}
           />
           {entry.state === 'done' ? (
-            <span className="shrink-0 font-mono text-sm text-[var(--chart-2)] max-sm:col-start-2 max-sm:row-start-2">added</span>
+            <span className="shrink-0 font-mono text-sm text-[var(--chart-2)] max-sm:col-start-2 max-sm:row-start-2">
+              {t.requests.uploadRow.added}
+            </span>
           ) : (
             <Tooltip>
               <TooltipTrigger
@@ -66,31 +70,31 @@ export function UploadRow({
                     variant="ghost"
                     size="icon-sm"
                     className="shrink-0 text-muted-foreground hover:text-destructive max-sm:col-start-2 max-sm:row-start-1"
-                    aria-label={`Remove ${entry.name}`}
+                    aria-label={t.requests.uploadRow.remove(entry.name)}
                     onClick={onRemove}
                   />
                 }
               >
                 <X />
               </TooltipTrigger>
-              <TooltipContent>Remove print</TooltipContent>
+              <TooltipContent>{t.requests.uploadRow.removePrint}</TooltipContent>
             </Tooltip>
           )}
         </div>
         {printTypes.length > 1 && (
           <Select
-            items={printTypes.map((printType) => ({ value: printType, label: printTypeLabel(printType) }))}
+            items={printTypes.map((printType) => ({ value: printType, label: printTypeLabel(t, printType) }))}
             value={entry.printType}
             onValueChange={(printType) => onPatch({ printType: printType ?? '' })}
             disabled={entry.state === 'done'}
           >
-            <SelectTrigger className="w-full" aria-label={`Print type for ${entry.name}`}>
+            <SelectTrigger className="w-full" aria-label={t.requests.fields.printTypeFor(entry.name)}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {printTypes.map((printType) => (
                 <SelectItem key={printType} value={printType}>
-                  {printTypeLabel(printType)}
+                  {printTypeLabel(t, printType)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -98,31 +102,31 @@ export function UploadRow({
         )}
         {entry.noteOpen && (
           <RemovableField
-            removeLabel="Remove note"
+            removeLabel={t.requests.fields.removeNote}
             onRemove={entry.state === 'pending' ? () => onPatch({ noteOpen: false, notes: '' }) : undefined}
           >
             <Textarea
-              aria-label="Notes"
+              aria-label={t.requests.fields.notes}
               rows={2}
               value={entry.notes}
               onChange={(event) => onPatch({ notes: event.target.value })}
-              placeholder="scale, supports, colour — anything the printer should know"
+              placeholder={t.requests.fields.notesPlaceholder}
               disabled={entry.state === 'done'}
             />
           </RemovableField>
         )}
         {entry.linkOpen && (
           <RemovableField
-            removeLabel="Remove link"
+            removeLabel={t.requests.fields.removeLink}
             onRemove={entry.state === 'pending' ? () => onPatch({ linkOpen: false, sourceUrl: '' }) : undefined}
           >
             <Input
-              aria-label="Source URL"
+              aria-label={t.requests.fields.sourceUrl}
               type="url"
               inputMode="url"
               value={entry.sourceUrl}
               onChange={(event) => onPatch({ sourceUrl: event.target.value })}
-              placeholder="https://… where this model came from"
+              placeholder={t.requests.fields.sourcePlaceholder}
               maxLength={MAX_REQUEST_SOURCE_URL_LENGTH}
               disabled={entry.state === 'done'}
             />
@@ -130,8 +134,8 @@ export function UploadRow({
         )}
         {entry.state === 'pending' && (!entry.noteOpen || !entry.linkOpen) && (
           <div className="grid gap-1 sm:flex sm:flex-wrap sm:gap-x-3">
-            {!entry.noteOpen && <AddOptionalFieldButton label="Add note" onClick={() => onPatch({ noteOpen: true })} />}
-            {!entry.linkOpen && <AddOptionalFieldButton label="Add link" onClick={() => onPatch({ linkOpen: true })} />}
+            {!entry.noteOpen && <AddOptionalFieldButton label={t.requests.fields.addNote} onClick={() => onPatch({ noteOpen: true })} />}
+            {!entry.linkOpen && <AddOptionalFieldButton label={t.requests.fields.addLink} onClick={() => onPatch({ linkOpen: true })} />}
           </div>
         )}
       </ItemContent>

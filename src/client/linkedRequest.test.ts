@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { messagesFor } from '../core/i18n'
 import { linkedRequestData, linkedRequestDirty, linkedRequestValidationError, linkedRequestValues } from './linkedRequest'
+
+const t = messagesFor('en').requests
 
 describe('linked request form', () => {
   it('normalizes valid request data', () => {
@@ -24,7 +27,11 @@ describe('linked request form', () => {
   it('rejects missing and unsafe links', () => {
     const values = { ...linkedRequestValues('filament'), name: 'Cable organizer', sourceUrl: 'javascript:alert(1)' }
 
-    expect(linkedRequestValidationError(values)).toBe('Enter a valid http(s) source link.')
+    expect(linkedRequestValidationError(values, t)).toBe('Enter a valid http(s) source link.')
+  })
+
+  it('explains the problem in the active language', () => {
+    expect(linkedRequestValidationError(linkedRequestValues('filament'), messagesFor('fr').requests)).toBe('Saisissez un titre.')
   })
 
   it('only marks user-entered values as dirty', () => {

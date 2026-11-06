@@ -2,6 +2,7 @@ import type { ModelFormat } from './assetKeys'
 import type { StoragePlan } from './plans'
 import type { NotificationKind, NotificationPreferences } from './notifications'
 import type { OnboardingProgress } from './onboarding'
+import type { Locale } from './i18n/locales'
 
 export type Role = 'admin' | 'requester'
 export type AccountRole = 'super_admin' | 'requester'
@@ -27,6 +28,8 @@ export type Identity = {
   twoFactorEnabled?: boolean
   impersonatedBy?: string
   superAdmin?: boolean
+  /** The user's chosen interface language; undefined follows the browser. */
+  locale?: Locale
 }
 
 export type Account = Pick<Identity, 'id' | 'email' | 'name' | 'image'> & {
@@ -478,6 +481,10 @@ interface RepositoryShape {
   deleteSetting(key: string): void
   replacePrinterProfiles(profiles: PrinterProfile[]): void
   countUsers(): number
+  /** Undefined clears the preference so the browser's languages decide. */
+  setUserLocale(userId: string, locale: Locale | undefined): void
+  /** Undefined when the user follows the browser or the stored value is no longer a supported language. */
+  userLocale(userId: string): Locale | undefined
   countOwnedWorkspaces(userId: string): number
   getUserOnboarding(userId: string, workspaceId?: string): OnboardingProgress
   saveUserOnboarding(userId: string, progress: OnboardingProgress, workspaceId?: string): void
@@ -585,6 +592,8 @@ export type StorageConfig =
 export type StorageMigrationState = 'running' | 'failed' | 'completed' | 'cancelled'
 export type StorageMigrationPhase = 'clearing' | 'copying'
 
+export type StorageMigrationFailure = { kind: 'quota' | 'cloudflareUploadLimit' | 'webdavUploadLimit'; path: string; bytes: number }
+
 export type StorageMigration = {
   id: string
   ownerId?: string
@@ -601,6 +610,8 @@ export type StorageMigration = {
   currentPath?: string
   cancelRequestedAt?: number
   error?: string
+  /** Set for an expected failure the browser words in the viewer's language; `error` keeps the English for logs and older clients. */
+  failure?: StorageMigrationFailure
   startedAt: number
   updatedAt: number
   finishedAt?: number

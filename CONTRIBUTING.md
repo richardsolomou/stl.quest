@@ -77,6 +77,10 @@ When changesets reach `main`, CI updates `package.json`, `deploy/truenas/stlques
 - Server-side state changes publish a typed `AppEvent` (see `src/core/types.ts`); additions are fine, renames are breaking.
 - New functionality comes with tests. Test behavior through the public surface (service methods, HTTP routes), not implementation details.
 
+## Translations
+
+Interface text lives in `src/core/i18n/`. English in `en/` is the source, and each other language mirrors it file by file with every catalog typed `typeof` its English counterpart, so a missing or extra message fails the type check. Components read messages with `useI18n()`, and server responses and emails use `serverMessages()` or the recipient's stored language. To add a language, copy `fr/` to a folder named after its language code, translate every message, add the code and its own name to `LOCALES` and `LOCALE_NAMES` in `src/core/i18n/locales.ts`, and register the folder in `src/core/i18n/index.ts`.
+
 ## Shared infrastructure
 
 Realtime delivery uses three retries, eight concurrent channels, and at most 1,024 pending channels. Publications coalesce by workspace; terminal failures are logged and later mutations can publish again. Delivery is best-effort, not a durable outbox. Application shutdown drains pending publications after stopping workspace workers.

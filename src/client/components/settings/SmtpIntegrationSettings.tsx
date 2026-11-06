@@ -14,23 +14,21 @@ import { DialogProblem } from '../DialogProblem'
 import { DialogShell } from '../DialogShell'
 import { SettingRow } from '../SettingRow'
 import { SettingsSection } from './SettingsLayout'
+import { useI18n } from '../../i18n'
 
 export function SmtpSettings({ data, onConfigure }: { data: PublicIntegrationConfig; onConfigure: () => void }) {
+  const { t } = useI18n()
+  const copy = t.settings.smtp
   return (
-    <SettingsSection
-      title="Outbound email"
-      description="Optional. SMTP delivers workspace invitations, self-service password resets, and print-ready emails."
-    >
+    <SettingsSection title={copy.title} description={copy.description}>
       <SettingRow
         icon={<AuthMethodIcon method="smtp" />}
         name="SMTP"
-        status={{ label: data.smtp.configured ? 'Sending' : 'Not set up', tone: data.smtp.configured ? 'on' : 'off' }}
-        detail={
-          data.smtp.configured ? `Messages are sent from ${data.smtp.from}.` : 'Connect any standard mail server or self-hosted relay.'
-        }
+        status={{ label: data.smtp.configured ? copy.sending : copy.notSetUp, tone: data.smtp.configured ? 'on' : 'off' }}
+        detail={data.smtp.configured ? copy.sentFrom(data.smtp.from) : copy.connectHint}
         actions={
           <Button type="button" variant="outline" size="sm" onClick={onConfigure}>
-            {data.smtp.configured ? 'Edit' : 'Set up SMTP'}
+            {data.smtp.configured ? t.common.edit : copy.setUp}
           </Button>
         }
       />
@@ -82,42 +80,42 @@ export function SmtpDialog({
     user: smtp.user ?? '',
     password: '',
   })
+  const { t } = useI18n()
+  const copy = t.settings.smtp.dialog
   const saveMutation = useMutation({ mutationFn: save, onSuccess: onDone })
   const removeMutation = useMutation({ mutationFn: remove, onSuccess: onDone })
   const set = <K extends keyof typeof values>(key: K, value: (typeof values)[K]) => setValues((state) => ({ ...state, [key]: value }))
   return (
-    <DialogShell open title={smtp.configured ? 'Edit SMTP' : 'Configure SMTP'} onClose={onDone}>
-      <p className="text-sm leading-relaxed text-muted-foreground">
-        STL Quest signs in and sends a test message before saving, so mistakes surface here rather than on the first invitation.
-      </p>
+    <DialogShell open title={smtp.configured ? copy.editTitle : copy.configureTitle} onClose={onDone}>
+      <p className="text-sm leading-relaxed text-muted-foreground">{copy.description}</p>
       <FieldSet>
-        <FieldLegend>Server</FieldLegend>
+        <FieldLegend>{copy.server}</FieldLegend>
         <Field>
-          <FieldLabel htmlFor="smtp-from">From address</FieldLabel>
+          <FieldLabel htmlFor="smtp-from">{copy.fromLabel}</FieldLabel>
           <Input
             id="smtp-from"
             value={values.from}
-            placeholder="prints@example.com"
+            placeholder={copy.fromPlaceholder}
             onChange={(event) => set('from', event.target.value)}
           />
-          <FieldDescription>Recipients see this address as the sender.</FieldDescription>
+          <FieldDescription>{copy.fromHint}</FieldDescription>
         </Field>
         <Field>
-          <FieldLabel htmlFor="smtp-host">Host</FieldLabel>
+          <FieldLabel htmlFor="smtp-host">{copy.hostLabel}</FieldLabel>
           <Input id="smtp-host" value={values.host} placeholder="smtp.example.com" onChange={(event) => set('host', event.target.value)} />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field>
-            <FieldLabel htmlFor="smtp-port">Port</FieldLabel>
+            <FieldLabel htmlFor="smtp-port">{copy.portLabel}</FieldLabel>
             <Input id="smtp-port" type="number" value={values.port} onChange={(event) => set('port', Number(event.target.value))} />
             {hint && <FieldDescription>{hint}</FieldDescription>}
           </Field>
           <Field>
-            <FieldLabel htmlFor="smtp-security">Security</FieldLabel>
+            <FieldLabel htmlFor="smtp-security">{copy.securityLabel}</FieldLabel>
             <Select
               items={[
                 { value: 'starttls', label: 'STARTTLS' },
-                { value: 'tls', label: 'Implicit TLS' },
+                { value: 'tls', label: copy.implicitTls },
               ]}
               value={values.secure ? 'tls' : 'starttls'}
               onValueChange={(value) => set('secure', value === 'tls')}
@@ -127,37 +125,33 @@ export function SmtpDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="starttls">STARTTLS</SelectItem>
-                <SelectItem value="tls">Implicit TLS</SelectItem>
+                <SelectItem value="tls">{copy.implicitTls}</SelectItem>
               </SelectContent>
             </Select>
           </Field>
         </div>
       </FieldSet>
       <FieldSet>
-        <FieldLegend>Credentials</FieldLegend>
+        <FieldLegend>{copy.credentials}</FieldLegend>
         <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
           <Field>
-            <FieldLabel htmlFor="smtp-user">Username</FieldLabel>
+            <FieldLabel htmlFor="smtp-user">{copy.userLabel}</FieldLabel>
             <Input id="smtp-user" value={values.user} autoComplete="off" onChange={(event) => set('user', event.target.value)} />
           </Field>
           <Field>
-            <FieldLabel htmlFor="smtp-password">Password</FieldLabel>
+            <FieldLabel htmlFor="smtp-password">{copy.passwordLabel}</FieldLabel>
             <Input
               id="smtp-password"
               type="password"
               value={values.password}
               autoComplete="off"
               onChange={(event) => set('password', event.target.value)}
-              placeholder={smtp.passwordConfigured ? 'Leave blank to keep it for the same host and username' : ''}
+              placeholder={smtp.passwordConfigured ? copy.passwordKeep : ''}
             />
           </Field>
         </div>
       </FieldSet>
-      <DialogProblem
-        title="SMTP was not saved"
-        hint="Check the host, port, and security mode, and that this server can reach the mail host."
-        error={saveMutation.error?.message ?? removeMutation.error?.message}
-      />
+      <DialogProblem title={copy.notSaved} hint={copy.notSavedHint} error={saveMutation.error?.message ?? removeMutation.error?.message} />
       <div className="flex justify-between gap-2">
         {smtp.configured ? (
           <Button
@@ -165,21 +159,21 @@ export function SmtpDialog({
             disabled={smtp.source === 'environment' || removeMutation.isPending}
             onClick={() => removeMutation.mutate()}
           >
-            Remove SMTP
+            {copy.remove}
           </Button>
         ) : (
           <span />
         )}
         <div className="flex gap-2">
           <Button variant="outline" onClick={onDone}>
-            Cancel
+            {t.common.cancel}
           </Button>
           <Button
             disabled={!values.from || !values.host || saveMutation.isPending || smtp.source === 'environment'}
             onClick={() => saveMutation.mutate({ ...values, user: values.user || undefined, password: values.password || undefined })}
           >
             {saveMutation.isPending && <Spinner />}
-            {saveMutation.isPending ? 'Verifying…' : 'Verify and save'}
+            {saveMutation.isPending ? copy.verifying : copy.save}
           </Button>
         </div>
       </div>

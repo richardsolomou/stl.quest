@@ -39,6 +39,7 @@ import {
   type LinkedRequestValues,
 } from '../linkedRequest'
 import { LinkedRequestForm } from './LinkedRequestForm'
+import { useI18n } from '../i18n'
 
 export function UploadForm({
   initialFiles,
@@ -53,6 +54,7 @@ export function UploadForm({
   uploadsEnabled: boolean
   onClose: () => void
 }) {
+  const { t } = useI18n()
   const workspaceSlug = useWorkspaceSlug()
   const posthog = usePostHog()
   const queryClient = useQueryClient()
@@ -126,7 +128,7 @@ export function UploadForm({
 
   const addPreparedFiles = (files: Iterable<File>, quantities = new Map<File, number>()) => {
     setValidation('')
-    const { accepted, rejected } = prepareUploadFiles(files, printTypes)
+    const { accepted, rejected } = prepareUploadFiles(files, printTypes, t.requests)
     const prepared = accepted.map((entry) => ({ ...entry, quantity: String(quantities.get(entry.file) ?? 1) }))
     if (prepared.length) setEntries((prev) => [...prev, ...prepared])
     if (rejected.length) setSkipped(rejected)
@@ -151,7 +153,10 @@ export function UploadForm({
         })
         .catch((error) => {
           if (generation === inspectionGeneration.current)
-            setSkipped((current) => [...current, `${file.name} (${error instanceof Error ? error.message : 'invalid 3MF'})`])
+            setSkipped((current) => [
+              ...current,
+              t.requests.upload.rejectedFile(file.name, error instanceof Error ? error.message : t.requests.upload.invalidThreeMf),
+            ])
         })
         .finally(() => {
           if (inspecting && generation === inspectionGeneration.current) setInspectingFiles((count) => Math.max(0, count - 1))
@@ -192,7 +197,7 @@ export function UploadForm({
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     if (busy) return
-    const invalid = uploadValidationError(entries)
+    const invalid = uploadValidationError(entries, t.requests)
     if (invalid) {
       setValidation(invalid)
       return
@@ -236,7 +241,7 @@ export function UploadForm({
           })
         }
         patchEntry(entry.key, { state: 'error' })
-        reason ||= uploadErrorMessage(err)
+        reason ||= uploadErrorMessage(err, t.requests)
         quota ||= rejection === 'storage_quota'
       }
     }
@@ -263,7 +268,7 @@ export function UploadForm({
 
   const submitLinked = (event: React.FormEvent) => {
     event.preventDefault()
-    const validationError = linkedRequestValidationError(linkedValues)
+    const validationError = linkedRequestValidationError(linkedValues, t.requests)
     setLinkedValidation(validationError ?? '')
     if (validationError) return
     const data = linkedRequestData(workspaceSlug, linkedValues)
@@ -274,25 +279,20 @@ export function UploadForm({
 
   return (
     <>
-      <DialogShell
-        onClose={requestClose}
-        title="Add a print"
-        description="Upload a model, or save a link to print later."
-        preventClose={busy}
-      >
+      <DialogShell onClose={requestClose} title={t.requests.upload.title} description={t.requests.upload.description} preventClose={busy}>
         {/* Choosing a mode is not the action that commits, so the selected segment is raised, not amber. */}
         <fieldset className="m-0 grid grid-cols-2 rounded-lg bg-muted p-1">
-          <legend className="sr-only">How to add a print</legend>
+          <legend className="sr-only">{t.requests.upload.modeLegend}</legend>
           <Button
             type="button"
             variant="ghost"
             aria-pressed={mode === 'upload'}
             className={cn(mode === 'upload' && 'bg-accent text-foreground ring-1 ring-foreground/10 hover:bg-accent')}
             disabled={!uploadsEnabled}
-            title={uploadsEnabled ? undefined : 'File uploads are unavailable until storage is ready'}
+            title={uploadsEnabled ? undefined : t.requests.upload.uploadsUnavailable}
             onClick={() => setMode('upload')}
           >
-            <Upload /> Upload files
+            <Upload /> {t.requests.upload.uploadFiles}
           </Button>
           <Button
             type="button"
@@ -301,7 +301,7 @@ export function UploadForm({
             className={cn(mode === 'link' && 'bg-accent text-foreground ring-1 ring-foreground/10 hover:bg-accent')}
             onClick={() => setMode('link')}
           >
-            <Link2 /> Add from link
+            <Link2 /> {t.requests.upload.addFromLink}
           </Button>
         </fieldset>
 
@@ -311,7 +311,7 @@ export function UploadForm({
             printTypes={printTypes}
             pending={linkedMutation.isPending}
             validation={linkedValidation}
-            failure={linkedMutation.error ? errorMessage(linkedMutation.error, 'The server did not accept this print.') : undefined}
+            failure={linkedMutation.error ? errorMessage(linkedMutation.error, t.requests.linked.rejected) : undefined}
             onChange={(patch) => {
               setLinkedValidation('')
               setLinkedValues((current) => ({ ...current, ...patch }))
@@ -331,12 +331,12 @@ export function UploadForm({
                 {inspectingFiles > 0 ? (
                   <span className="inline-flex items-center gap-2">
                     <Spinner />
-                    Inspecting {inspectingFiles} 3MF file{inspectingFiles === 1 ? '' : 's'}…
+                    {t.requests.upload.inspecting(inspectingFiles)}
                   </span>
                 ) : entries.length === 0 ? (
-                  'Drop STL, 3MF, or OBJ files here, or click to browse'
+                  t.requests.upload.dropPrompt
                 ) : (
-                  `${entries.length} file${entries.length > 1 ? 's' : ''} — drop more or click to add`
+                  t.requests.upload.filesAdded(entries.length)
                 )}
               </EmptyDescription>
             </Empty>
@@ -358,38 +358,26 @@ export function UploadForm({
             )}
 
             <FieldError>{validation}</FieldError>
-            {skipped.length > 0 && (
-              <p className="text-sm text-muted-foreground">
-                Skipped {skipped.join(', ')} — STL Quest accepts .stl, .3mf, and .obj files up to the configured size limit.
-              </p>
-            )}
+            {skipped.length > 0 && <p className="text-sm text-muted-foreground">{t.requests.upload.skipped(skipped.join(', '))}</p>}
             <DialogProblem
-              title={
-                failure
-                  ? `${failure.count} of ${failure.total} print${failure.total > 1 ? 's' : ''} could not be added`
-                  : 'Some prints could not be added'
-              }
-              hint={
-                failure?.quota
-                  ? 'Free up space by deleting prints you no longer need, or raise the allowance.'
-                  : 'The rows that failed are marked below; everything else was added. Press Add to retry just those.'
-              }
+              title={failure ? t.requests.upload.failedTitle(failure.count, failure.total) : t.requests.upload.failedTitleFallback}
+              hint={failure?.quota ? t.requests.upload.quotaHint : t.requests.upload.retryHint}
               error={failure?.reason}
             />
             {failure?.quota && <StorageUpgradeAction className="mb-3 self-start" onNavigate={onClose} />}
-            {progress !== null && <Progress value={progress * 100} aria-label="Upload progress" />}
+            {progress !== null && <Progress value={progress * 100} aria-label={t.requests.upload.progressLabel} />}
 
             <div className="mt-2 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
               <Button type="button" variant="outline" onClick={requestClose}>
-                Cancel
+                {t.common.cancel}
               </Button>
               <Button type="submit" disabled={uploading || inspectingFiles > 0 || remaining.length === 0}>
                 {uploading && <Spinner />}
                 {uploading
                   ? progress !== null
-                    ? `Uploading… ${Math.round(progress * 100)}%`
-                    : 'Uploading…'
-                  : `Add ${remaining.length || ''} print${remaining.length === 1 ? '' : 's'}`}
+                    ? t.requests.upload.uploadingPercent(Math.round(progress * 100))
+                    : t.requests.upload.uploading
+                  : t.requests.upload.addPrints(remaining.length)}
               </Button>
             </div>
           </form>
@@ -397,17 +385,13 @@ export function UploadForm({
       </DialogShell>
       <ConfirmDialog
         open={splitCandidates.length > 0}
-        title={`${splitCandidates[0]?.itemCount ?? 0} separate build items found`}
-        description={`Keep this 3MF together as one print request, or create ${splitCandidates[0]?.requestCount ?? 0} independent requests. Repeated objects become copies of one request.`}
-        confirmLabel="Split into requests"
-        pendingLabel={splitProgress ? `Splitting ${splitProgress.completed} of ${splitProgress.total}…` : 'Preparing split…'}
-        cancelLabel="Keep together"
+        title={t.requests.split.title(splitCandidates[0]?.itemCount ?? 0)}
+        description={t.requests.split.description(splitCandidates[0]?.requestCount ?? 0)}
+        confirmLabel={t.requests.split.confirm}
+        pendingLabel={splitProgress ? t.requests.split.progress(splitProgress.completed, splitProgress.total) : t.requests.split.preparing}
+        cancelLabel={t.requests.split.keepTogether}
         pending={splitting}
-        problem={
-          splitFailure
-            ? { title: 'This 3MF could not be split', hint: 'Keep it together, or try splitting it again.', error: splitFailure }
-            : undefined
-        }
+        problem={splitFailure ? { title: t.requests.split.failedTitle, hint: t.requests.split.failedHint, error: splitFailure } : undefined}
         onCancel={() => {
           const candidate = splitCandidates[0]
           if (candidate) resolveSplitCandidate([{ file: candidate.file, quantity: 1 }])
@@ -420,7 +404,7 @@ export function UploadForm({
           setSplitFailure(undefined)
           void splitThreeMf(candidate.file, (completed, total) => setSplitProgress({ completed, total }))
             .then(resolveSplitCandidate)
-            .catch((error) => setSplitFailure(error instanceof Error ? error.message : 'The file could not be split.'))
+            .catch((error) => setSplitFailure(error instanceof Error ? error.message : t.requests.split.failedFallback))
             .finally(() => {
               setSplitting(false)
               setSplitProgress(undefined)
@@ -429,9 +413,9 @@ export function UploadForm({
       />
       <ConfirmDialog
         open={confirmClose}
-        title="Discard this draft?"
-        description="Entered details and selected files will be lost."
-        confirmLabel="Discard"
+        title={t.requests.upload.discardTitle}
+        description={t.requests.upload.discardDescription}
+        confirmLabel={t.requests.modal.discard}
         destructive
         onCancel={() => setConfirmClose(false)}
         onConfirm={dismiss}

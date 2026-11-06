@@ -148,6 +148,13 @@
       "when": 1791470489594,
       "tag": "0020_unknown_doctor_spectrum",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793971101756,
+      "tag": "0021_typical_vapor",
+      "breakpoints": true
     }
   ]
 }

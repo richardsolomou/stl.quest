@@ -26,6 +26,7 @@ import {
 } from '@tanstack/react-table'
 import { ArrowDown, ArrowUp, ArrowUpDown, Columns3, Search } from 'lucide-react'
 
+import { useI18n } from '@/client/i18n'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
@@ -101,6 +102,7 @@ function DataTable<TData extends RowData>({
   columnVisibility: columnVisibilityOptions,
   sortingStorageKey,
 }: DataTableProps<TData>) {
+  const { t } = useI18n()
   const [sorting, setSorting] = useState<SortingState>(initialSorting)
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = useState('')
@@ -198,7 +200,7 @@ function DataTable<TData extends RowData>({
             <Popover>
               <PopoverTrigger render={<Button type="button" variant="outline" className="ml-auto" />}>
                 <Columns3 />
-                Columns
+                {t.shell.ui.columns}
               </PopoverTrigger>
               <PopoverContent align="end" className="w-52 gap-1 p-2">
                 {table
@@ -299,34 +301,30 @@ function DataTable<TData extends RowData>({
         </Table>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 border-t p-3 text-sm text-muted-foreground">
-        <span>
-          {filteredCount} {filteredCount === 1 ? itemLabel.singular : itemLabel.plural}
-        </span>
+        <span>{t.shell.ui.itemCount(filteredCount, filteredCount === 1 ? itemLabel.singular : itemLabel.plural)}</span>
         <div className="flex flex-wrap items-center gap-2">
           <Select
-            items={pageSizeOptions.map((size) => ({ value: String(size), label: `${size} per page` }))}
+            items={pageSizeOptions.map((size) => ({ value: String(size), label: t.shell.ui.perPage(size) }))}
             value={String(table.state.pagination.pageSize)}
             onValueChange={(value) => table.setPageSize(Number(value))}
           >
-            <SelectTrigger aria-label={`${itemLabel.plural[0].toUpperCase()}${itemLabel.plural.slice(1)} per page`}>
+            <SelectTrigger aria-label={t.shell.ui.itemsPerPage(itemLabel.plural)}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {pageSizeOptions.map((size) => (
                 <SelectItem key={size} value={String(size)}>
-                  {size} per page
+                  {t.shell.ui.perPage(size)}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <span>
-            Page {table.state.pagination.pageIndex + 1} of {Math.max(1, table.getPageCount())}
-          </span>
+          <span>{t.shell.ui.pageOf(table.state.pagination.pageIndex + 1, Math.max(1, table.getPageCount()))}</span>
           <Button type="button" variant="outline" size="sm" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}>
-            Previous
+            {t.shell.ui.previous}
           </Button>
           <Button type="button" variant="outline" size="sm" disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}>
-            Next
+            {t.shell.ui.next}
           </Button>
         </div>
       </div>

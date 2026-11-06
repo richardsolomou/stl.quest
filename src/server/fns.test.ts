@@ -10,6 +10,7 @@ import {
   parseEmailLogo,
   storedPriceCalculatorSettings,
 } from './fns'
+import { withRequestLocale } from './locale'
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])
 
@@ -111,6 +112,20 @@ describe('workspace SMTP password', () => {
 describe('workspace SMTP port', () => {
   it('refuses a non-submission port on the hosted service', async () => {
     expect(await rejection(() => assertWorkspaceSmtpPort(6379, true))).toBe(400)
+  })
+
+  it('explains the refused port in the request’s language', async () => {
+    const french = new Request('http://localhost', { headers: { 'accept-language': 'fr-FR,fr;q=0.9' } })
+    const refusal = withRequestLocale(french, () => {
+      try {
+        assertWorkspaceSmtpPort(6379, true)
+      } catch (error) {
+        return error
+      }
+    })
+    await expect(refusal instanceof Response && refusal.text()).resolves.toBe(
+      'utilisez un port de soumission de courrier\u202f: 465, 587, 2525',
+    )
   })
 
   it('allows a submission port on the hosted service', () => {

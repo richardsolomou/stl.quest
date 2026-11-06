@@ -1,5 +1,6 @@
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useI18n } from '../i18n'
 
 export type MoveDestination = { id: string; label: string }
 
@@ -14,9 +15,10 @@ export function MoveDestinationField({
   destinations: MoveDestination[]
   onChange: (value: string) => void
 }) {
+  const { t } = useI18n()
   return (
     <Field className="mb-3">
-      <FieldLabel htmlFor={id}>Destination</FieldLabel>
+      <FieldLabel htmlFor={id}>{t.board.move.destination}</FieldLabel>
       <Select value={value} onValueChange={(next) => onChange(next ?? '')}>
         <SelectTrigger id={id} className="w-full">
           <SelectValue>{destinations.find((option) => option.id === value)?.label}</SelectValue>

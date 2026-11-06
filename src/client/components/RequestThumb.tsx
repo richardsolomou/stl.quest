@@ -4,14 +4,16 @@ import type { PublicPrintRequest } from '../../core/types'
 import { LazyThumb } from './LazyThumb'
 import { ModelFormatLabel } from './ModelFormatLabel'
 import { SourcePreviewImage } from './SourcePreviewImage'
+import { useI18n } from '../i18n'
 
 const thumbPlaceholder =
   'thumb absolute inset-0 overflow-hidden rounded-sm border border-ticket-foreground/15 bg-background [background-image:var(--grid)] [background-size:12px_12px]'
 
 function LinkedThumbFallback() {
+  const { t } = useI18n()
   return (
     <div className={cn(thumbPlaceholder, 'grid place-items-center')}>
-      <Link2 className="size-6 text-primary" aria-label="Linked print" />
+      <Link2 className="size-6 text-primary" aria-label={t.requests.thumb.linkedPrint} />
     </div>
   )
 }

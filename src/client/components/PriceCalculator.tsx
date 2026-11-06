@@ -9,6 +9,7 @@ import {
 } from '../../core/priceCalculator'
 import { savePriceCalculatorSettings } from '../../server/fns'
 import type { calculatorPrefill } from '../calculatorSearch'
+import { useI18n } from '../i18n'
 import { priceCalculatorSettingsQuery } from '../queries'
 import { QueryState } from './QueryState'
 import { JobSection } from './priceCalculator/JobSection'
@@ -28,19 +29,17 @@ const emptyJob: PriceCalculatorJob = {
 type Prefill = ReturnType<typeof calculatorPrefill>
 
 export function PriceCalculator({ workspaceSlug, prefill }: { workspaceSlug: string; prefill?: Prefill }) {
+  const { t } = useI18n()
   const query = useQuery(priceCalculatorSettingsQuery(workspaceSlug))
   if (!query.data) {
     return (
       <SettingsPage>
-        <SettingsHeader
-          title="Print calculator"
-          description="Work out a rough resin or FDM print price without attaching it to a request."
-        />
+        <SettingsHeader title={t.calculator.title} description={t.calculator.loadingDescription} />
         <QueryState
           loading={query.isPending}
           error={query.error}
-          loadingLabel="Loading calculator…"
-          errorTitle="Could not load the calculator"
+          loadingLabel={t.calculator.loading}
+          errorTitle={t.calculator.loadError}
           onRetry={() => void query.refetch()}
         />
       </SettingsPage>
@@ -58,6 +57,7 @@ function LoadedPriceCalculator({
   savedSettings: PriceCalculatorSettings
   prefill?: Prefill
 }) {
+  const { t } = useI18n()
   const [settings, setSettings] = useState(() =>
     prefill ? selectPriceCalculatorPrintType(savedSettings, prefill.printType) : savedSettings,
   )
@@ -92,10 +92,7 @@ function LoadedPriceCalculator({
 
   return (
     <SettingsPage>
-      <SettingsHeader
-        title="Print calculator"
-        description="A private pricing scratchpad. Enter the totals from your slicer; nothing here is attached to a request."
-      />
+      <SettingsHeader title={t.calculator.title} description={t.calculator.description} />
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(19rem,0.8fr)]">
         <JobSection settings={settings} job={job} result={result} onJobChange={setJob} onPrintTypeChange={selectPrintType} />
         <QuoteSection settings={settings} job={job} result={result} mode={priceMode} onModeChange={setPriceMode} />

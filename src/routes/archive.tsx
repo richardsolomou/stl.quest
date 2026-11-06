@@ -22,6 +22,8 @@ import { errorMessage } from '../core/error'
 import { printGroupBranchIds } from '../core/printGroups'
 import type { PublicPrintRequest } from '../core/types'
 import { unarchiveRequests } from '../server/fns'
+import { useI18n } from '../client/i18n'
+import type { Locale } from '../core/i18n'
 
 export const Route = createFileRoute('/archive')({ validateSearch: validateRequestSearch, component: ArchivePage })
 
@@ -36,6 +38,7 @@ function ArchivePage() {
 }
 
 function ArchiveView() {
+  const { t } = useI18n()
   const workspaceSlug = useWorkspaceSlug()
   const queryClient = useQueryClient()
   const search = Route.useSearch()
@@ -54,8 +57,8 @@ function ArchiveView() {
         <QueryState
           loading
           error={undefined}
-          loadingLabel="Loading archive…"
-          errorTitle="Could not load the archive"
+          loadingLabel={t.requests.archive.loading}
+          errorTitle={t.requests.archive.loadFailed}
           onRetry={() => undefined}
         />
       </div>
@@ -67,8 +70,8 @@ function ArchiveView() {
         <QueryState
           loading={false}
           error={result.error}
-          loadingLabel="Loading archive…"
-          errorTitle="Could not load the archive"
+          loadingLabel={t.requests.archive.loading}
+          errorTitle={t.requests.archive.loadFailed}
           onRetry={() => void retryQueries(result.refetch)}
           className="w-full max-w-xl"
         />
@@ -87,10 +90,8 @@ function ArchiveView() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <header className="shrink-0">
-        <h1 className="font-heading text-xl font-semibold">Archive</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Archived prints stay out of the board but keep their stage, source, files, and history. Move one back whenever you need it again.
-        </p>
+        <h1 className="font-heading text-xl font-semibold">{t.requests.archive.title}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t.requests.archive.description}</p>
       </header>
       <BoardFilters
         className="-mx-5 shrink-0 px-5"
@@ -99,18 +100,14 @@ function ArchiveView() {
         tags={tags}
         sortGroups={ARCHIVE_SORT_GROUPS}
         defaultSort="archived-desc"
-        ariaLabel="Archive filters"
-        description="Combine any fields to narrow the archive."
+        ariaLabel={t.requests.archive.filtersLabel}
+        description={t.requests.archive.filtersDescription}
         onChange={(patch, replace = false) => void navigate({ search: updateRequestSearch(search, patch), replace })}
       />
       {archivedRequests.length === 0 ? (
         <div className="grid place-items-center gap-3 rounded-xl border border-dashed border-blueprint/25 p-10 text-center">
           <ArchiveX aria-hidden="true" className="size-8 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            {filtered
-              ? 'No archived prints match these filters.'
-              : 'Nothing is archived yet. Right-click a print on the board and choose Archive.'}
-          </p>
+          <p className="text-sm text-muted-foreground">{filtered ? t.requests.archive.noMatches : t.requests.archive.empty}</p>
         </div>
       ) : (
         <ArchivedRequestList
@@ -120,10 +117,10 @@ function ArchiveView() {
           onRestore={(id) => restoreMutation.mutate({ data: { workspaceSlug, ids: [id] } })}
         />
       )}
-      {restoreMutation.isPending && <output className="text-sm text-muted-foreground">Moving back to the board…</output>}
+      {restoreMutation.isPending && <output className="text-sm text-muted-foreground">{t.requests.archive.restoring}</output>}
       {restoreMutation.isError && (
         <p role="alert" className="text-sm text-destructive">
-          {errorMessage(restoreMutation.error, 'The print could not be moved back to the board.')}
+          {errorMessage(restoreMutation.error, t.requests.archive.restoreFailed)}
         </p>
       )}
     </div>
@@ -186,6 +183,7 @@ function ArchivedRequestRow({
   pending: boolean
   onRestore: () => void
 }) {
+  const { t, locale } = useI18n()
   return (
     <div className="flex items-center gap-3 rounded-lg border bg-card p-2.5">
       {request.hasThumbnail ? (
@@ -197,7 +195,7 @@ function ArchivedRequestRow({
           className="thumb size-16 shrink-0 rounded-sm border object-cover"
           fallback={
             <div className="thumb grid size-16 shrink-0 place-items-center overflow-hidden rounded-sm border bg-background [background-image:var(--grid)] [background-size:12px_12px]">
-              <Link2 className="size-6 text-primary" aria-label="Linked print" />
+              <Link2 className="size-6 text-primary" aria-label={t.requests.thumb.linkedPrint} />
             </div>
           }
         />
@@ -206,7 +204,7 @@ function ArchivedRequestRow({
           {request.hasFile ? (
             <ModelFormatLabel format={request.modelFormat} />
           ) : (
-            <Link2 className="size-6 text-primary" aria-label="Linked print" />
+            <Link2 className="size-6 text-primary" aria-label={t.requests.thumb.linkedPrint} />
           )}
         </div>
       )}
@@ -215,14 +213,16 @@ function ArchivedRequestRow({
         <div className="mt-1 flex items-center gap-x-2 text-xs text-muted-foreground">
           {showRequester && (
             <>
-              <UserAvatar name={requesterLabel(request)} image={request.requesterImage} size="sm" />
-              <span>{requesterLabel(request)}</span>
+              <UserAvatar name={requesterLabel(request, t.requests.requesterFallback)} image={request.requesterImage} size="sm" />
+              <span>{requesterLabel(request, t.requests.requesterFallback)}</span>
             </>
           )}
           <span className="font-mono">×{request.quantity}</span>
           {request.archivedAt && (
-            <span title={`Archived ${formatDateTime(request.archivedAt)}`}>
-              Archived <time dateTime={new Date(request.archivedAt).toISOString()}>{formatDate(request.archivedAt)}</time>
+            <span title={t.requests.archive.archivedAt(formatDateTime(request.archivedAt, locale))}>
+              {t.requests.archive.archivedOn.before}
+              <time dateTime={new Date(request.archivedAt).toISOString()}>{formatDate(request.archivedAt, locale)}</time>
+              {t.requests.archive.archivedOn.after}
             </span>
           )}
         </div>
@@ -230,17 +230,17 @@ function ArchivedRequestRow({
       {request.canArchive && (
         <Button type="button" variant="outline" size="sm" disabled={pending} onClick={onRestore}>
           <ArchiveRestore />
-          Move back
+          {t.requests.archive.moveBack}
         </Button>
       )}
     </div>
   )
 }
 
-function formatDate(value: number) {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(value)
+function formatDate(value: number, locale: Locale) {
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(value)
 }
 
-function formatDateTime(value: number) {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(value)
+function formatDateTime(value: number, locale: Locale) {
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(value)
 }

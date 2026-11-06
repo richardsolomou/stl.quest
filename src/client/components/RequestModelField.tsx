@@ -5,6 +5,7 @@ import { LazyStlViewer } from './LazyStlViewer'
 import { SourcePreviewImage } from './SourcePreviewImage'
 import type { ModelAttachment } from '../modelAttachment'
 import type { PublicPrintRequest } from '../../core/types'
+import { useI18n } from '../i18n'
 
 /** The model area of the print dialog: the viewer or cover when reading, and the model picker when editing. */
 export function RequestModelField({
@@ -16,6 +17,7 @@ export function RequestModelField({
   editing: boolean
   attachment: ModelAttachment
 }) {
+  const { t } = useI18n()
   const input = useRef<HTMLInputElement>(null)
   const staged = attachment.staged.file
 
@@ -54,8 +56,8 @@ export function RequestModelField({
           onClick={() => input.current?.click()}
         >
           <Upload className="size-8" />
-          {request.hasFile ? 'Choose the model that replaces it' : 'Choose a model'}
-          <span className="text-xs text-muted-foreground">.stl, .3mf, or .obj, or drop one on this dialog</span>
+          {request.hasFile ? t.requests.modelField.chooseReplacement : t.requests.modelField.chooseModel}
+          <span className="text-xs text-muted-foreground">{t.requests.modelField.formats}</span>
         </button>
       ) : (
         <div className="relative [&>*]:mb-0">
@@ -64,7 +66,7 @@ export function RequestModelField({
             type="button"
             variant="secondary"
             size="icon"
-            aria-label={staged ? 'Remove the chosen model' : 'Remove the current model'}
+            aria-label={staged ? t.requests.modelField.removeChosen : t.requests.modelField.removeCurrent}
             className="absolute top-2 right-2"
             onClick={() => attachment.clear()}
           >
@@ -75,21 +77,22 @@ export function RequestModelField({
       <p className="mt-1.5 text-xs text-muted-foreground">
         {staged ? (
           <>
-            <span className="font-medium text-foreground">{staged.name}</span> is uploaded when you save.
+            <span className="font-medium text-foreground">{staged.name}</span>
+            {t.requests.modelField.uploadedOnSave}
           </>
         ) : attachment.state === 'empty' ? (
           request.hasFile ? (
             <>
-              Pick the file that takes its place before saving.{' '}
+              {t.requests.modelField.pickReplacement}{' '}
               <button type="button" className="underline underline-offset-4" onClick={() => attachment.reset()}>
-                Keep the current model
+                {t.requests.modelField.keepCurrent}
               </button>
             </>
           ) : (
-            'This print is saved from a link. Choose a model to make it printable.'
+            t.requests.modelField.linkOnlyHint
           )
         ) : (
-          'Delete this model to put a different one in its place.'
+          t.requests.modelField.deleteToReplace
         )}
       </p>
     </div>

@@ -17,6 +17,7 @@ import { DialogShell } from '../DialogShell'
 import { SettingRow } from '../SettingRow'
 import { SettingsSection } from './SettingsLayout'
 import { SocialProviderSetupInstructions } from './SocialProviderSetupInstructions'
+import { useI18n } from '../../i18n'
 
 const refreshIntegrationSettings = (queryClient: ReturnType<typeof useQueryClient>) =>
   invalidateQueries(queryClient, 'integrations', 'session', 'auth-capabilities')
@@ -33,25 +34,20 @@ export function AuthenticationSettings({
     mutationFn: useServerFn(updatePasswordAuth),
     onSuccess: () => refreshIntegrationSettings(queryClient),
   })
+  const { t } = useI18n()
+  const copy = t.settings.signIn
   return (
-    <SettingsSection
-      title="Sign-in methods"
-      description="Password, Google, Discord, and OpenID Connect can be enabled together. Joining an existing workspace always requires an invite."
-    >
+    <SettingsSection title={copy.title} description={copy.description}>
       <div className="flex flex-col gap-2">
         <SettingRow
           icon={<AuthMethodIcon method="password" />}
-          name="Password"
-          status={{ label: data.passwordEnabled ? 'Enabled' : 'Disabled', tone: data.passwordEnabled ? 'on' : 'off' }}
-          detail={
-            data.passwordForcedByRecovery
-              ? 'Built-in email and password sign-in. Recovery mode is forcing this on.'
-              : 'Built-in email and password sign-in.'
-          }
+          name={copy.password.name}
+          status={{ label: data.passwordEnabled ? copy.status.enabled : copy.status.disabled, tone: data.passwordEnabled ? 'on' : 'off' }}
+          detail={data.passwordForcedByRecovery ? copy.password.detailRecovery : copy.password.detail}
           problem={passwordMutation.error?.message}
           actions={
             <Switch
-              aria-label="Enable password authentication"
+              aria-label={copy.password.toggle}
               checked={data.passwordEnabled}
               disabled={data.passwordSource === 'environment' || passwordMutation.isPending}
               onCheckedChange={(enabled) => passwordMutation.mutate({ data: { enabled } })}
@@ -80,28 +76,27 @@ function ProviderRow({
     mutationFn: useServerFn(updateSocialProviderEnabled),
     onSuccess: () => refreshIntegrationSettings(queryClient),
   })
+  const { t } = useI18n()
+  const copy = t.settings.signIn
+  const description = t.settings.socialProviders[item.id].description
   const status = config.enabled
-    ? { label: 'Enabled', tone: 'on' as const }
+    ? { label: copy.status.enabled, tone: 'on' as const }
     : config.linked
-      ? { label: 'Tested, not enabled', tone: 'ready' as const }
+      ? { label: copy.status.tested, tone: 'ready' as const }
       : config.configured
-        ? { label: 'Needs testing', tone: 'ready' as const }
-        : { label: 'Not set up', tone: 'off' as const }
+        ? { label: copy.status.needsTesting, tone: 'ready' as const }
+        : { label: copy.status.notSetUp, tone: 'off' as const }
   return (
     <SettingRow
       icon={<AuthMethodIcon method={item.id} />}
       name={item.name}
       status={status}
-      detail={
-        config.configured && !config.linked
-          ? `${item.description} Sign in once with ${item.name} to prove the credentials work, then enable it.`
-          : item.description
-      }
+      detail={config.configured && !config.linked ? `${description} ${copy.provider.testHint(item.name)}` : description}
       problem={mutation.error?.message}
       actions={
         <>
           <Button type="button" variant="outline" size="sm" onClick={onConfigure}>
-            {config.configured ? 'Edit app' : 'Set up app'}
+            {config.configured ? copy.provider.editApp : copy.provider.setUpApp}
           </Button>
           {config.configured && !config.linked && (
             <Button
@@ -116,11 +111,11 @@ function ProviderRow({
                 })
               }
             >
-              Test sign-in
+              {copy.provider.test}
             </Button>
           )}
           <Switch
-            aria-label={`Enable ${item.name} authentication`}
+            aria-label={copy.provider.toggle(item.name)}
             checked={config.enabled}
             disabled={!config.configured || !config.linked || config.source === 'environment' || mutation.isPending}
             onCheckedChange={(enabled) => mutation.mutate({ data: { provider: item.id, enabled } })}
@@ -155,37 +150,38 @@ export function ProviderDialog({
       onDone()
     },
   })
-  const providerSettings = SOCIAL_PROVIDER_SETTINGS[provider]
-  const name = providerSettings.name
+  const { t } = useI18n()
+  const copy = t.settings.signIn.dialog
+  const name = SOCIAL_PROVIDER_SETTINGS[provider].name
   const callbackUrl = `${origin}/api/auth/callback/${provider}`
   const oidc = provider === 'oidc'
   return (
-    <DialogShell open title={`Configure ${name}`} className="sm:max-w-[640px]" onClose={onDone}>
+    <DialogShell open title={copy.title(name)} className="sm:max-w-[640px]" onClose={onDone}>
       <div className="space-y-5 pr-1">
         <SocialProviderSetupInstructions provider={provider} origin={origin} callbackUrl={callbackUrl} />
         <FieldSet>
-          <FieldLegend>App credentials</FieldLegend>
+          <FieldLegend>{copy.credentials}</FieldLegend>
           <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
             <Field>
-              <FieldLabel htmlFor="provider-client-id">Client ID</FieldLabel>
+              <FieldLabel htmlFor="provider-client-id">{copy.clientId}</FieldLabel>
               <Input id="provider-client-id" value={clientId} autoComplete="off" onChange={(event) => setClientId(event.target.value)} />
             </Field>
             <Field>
-              <FieldLabel htmlFor="provider-client-secret">Client secret</FieldLabel>
+              <FieldLabel htmlFor="provider-client-secret">{copy.clientSecret}</FieldLabel>
               <Input
                 id="provider-client-secret"
                 type="password"
                 value={clientSecret}
                 autoComplete="off"
                 onChange={(event) => setClientSecret(event.target.value)}
-                placeholder={current.secretConfigured ? 'Leave blank to keep the current secret' : ''}
+                placeholder={current.secretConfigured ? copy.secretKeep : ''}
               />
             </Field>
           </div>
           {oidc && (
             <>
               <Field>
-                <FieldLabel htmlFor="provider-issuer">Issuer URL</FieldLabel>
+                <FieldLabel htmlFor="provider-issuer">{copy.issuer}</FieldLabel>
                 <Input
                   id="provider-issuer"
                   type="url"
@@ -194,37 +190,37 @@ export function ProviderDialog({
                   placeholder="https://auth.example.com/application/o/stlquest/"
                   onChange={(event) => setIssuer(event.target.value)}
                 />
-                <FieldDescription>STL Quest reads the provider settings from the issuer's OpenID discovery document.</FieldDescription>
+                <FieldDescription>{copy.issuerHint}</FieldDescription>
               </Field>
               <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
                 <Field>
-                  <FieldLabel htmlFor="provider-scopes">Scopes</FieldLabel>
+                  <FieldLabel htmlFor="provider-scopes">{copy.scopes}</FieldLabel>
                   <Input id="provider-scopes" value={scopes} autoComplete="off" onChange={(event) => setScopes(event.target.value)} />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="provider-name">Button label</FieldLabel>
+                  <FieldLabel htmlFor="provider-name">{copy.buttonLabel}</FieldLabel>
                   <Input
                     id="provider-name"
                     value={buttonName}
                     maxLength={OIDC_NAME_MAX_LENGTH}
                     autoComplete="off"
-                    placeholder="SSO"
+                    placeholder={copy.buttonPlaceholder}
                     onChange={(event) => setButtonName(event.target.value)}
                   />
                 </Field>
               </div>
             </>
           )}
-          <FieldDescription>After saving, sign in once with {name} to prove the credentials work. Then enable it.</FieldDescription>
+          <FieldDescription>{copy.afterSave(name)}</FieldDescription>
         </FieldSet>
         <DialogProblem
-          title={`${name} credentials were not saved`}
-          hint={`Check that the client ID and secret match the OAuth client in ${providerSettings.consoleName}.`}
+          title={copy.notSaved(name)}
+          hint={copy.notSavedHint(t.settings.socialProviders[provider].consoleName)}
           error={mutation.error?.message}
         />
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onDone}>
-            Cancel
+            {t.common.cancel}
           </Button>
           <Button
             disabled={!clientId || (oidc && !issuer) || mutation.isPending}
@@ -238,7 +234,7 @@ export function ProviderDialog({
             }
           >
             {mutation.isPending && <Spinner />}
-            {mutation.isPending ? 'Saving…' : 'Save'}
+            {mutation.isPending ? t.common.saving : t.common.save}
           </Button>
         </div>
       </div>

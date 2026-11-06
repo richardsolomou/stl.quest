@@ -44,7 +44,6 @@ import {
 } from './app'
 import { managedStorageAvailable } from './managedStorage'
 import { storagePlans } from '../core/plans'
-import { STORAGE_FOLDER_PROBLEMS } from '../core/storageProblems'
 import { billingAvailable } from './billing'
 import { workflow } from '../core/workflow'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS, PRICE_CALCULATOR_SETTING, type PriceCalculatorSettings } from '../core/priceCalculator'
@@ -149,6 +148,8 @@ import { HOSTED_OWNED_WORKSPACE_LIMIT, hostedDeployment } from './hosted'
 import { cloudStorageApp, requireCloudStorageApp, setCloudStorageApp } from './cloudStorage'
 import { normalizeAuthHeaders, writeAuthCookies } from './authCookies'
 import { mutationRpc, rpc } from './rpc'
+import { requestLocale, serverMessages } from './locale'
+import { LOCALES } from '../core/i18n/locales'
 import { workspaceMutation } from './workspaceRpc'
 import { resolveSourceImage } from './sourcePreview'
 
@@ -158,11 +159,12 @@ export const canViewManagedStorageUsage = (role: Role) => role === 'admin'
 
 const getRequest = getRawRequest
 const getRequestHeaders = () => normalizeAuthHeaders(getRawRequest().headers)
+const errors = () => serverMessages().server
 
 const me = async (instance: Awaited<ReturnType<typeof app>>) => instance.requireIdentity(getRequestHeaders())
 const superAdmin = async (instance: Awaited<ReturnType<typeof app>>) => {
   const identity = await me(instance)
-  if (!identity.superAdmin) throw new Response('forbidden', { status: 403 })
+  if (!identity.superAdmin) throw new Response(errors().access.forbidden, { status: 403 })
   return identity
 }
 
@@ -201,12 +203,12 @@ async function resolvedOnboardingProgress(
 function assertSocialProviderMutable(provider: (typeof SOCIAL_AUTH_PROVIDERS)[number]) {
   const prefix = `AUTH_${provider.toUpperCase()}`
   if (process.env[`${prefix}_CLIENT_ID`] || process.env[`${prefix}_CLIENT_SECRET`]) {
-    throw new Response(`${provider} is controlled by the deployment environment`, { status: 409 })
+    throw new Response(errors().auth.providerControlledByEnvironment(provider), { status: 409 })
   }
 }
 
 function assertSmtpMutable() {
-  if (process.env.SMTP_HOST) throw new Response('SMTP is controlled by the deployment environment', { status: 409 })
+  if (process.env.SMTP_HOST) throw new Response(errors().email.smtpControlledByEnvironment, { status: 409 })
 }
 
 async function inviteWorkspace(instance: Awaited<ReturnType<typeof app>>, token: string) {
@@ -222,7 +224,7 @@ async function requireValidInvite(instance: Awaited<ReturnType<typeof app>>, tok
   const resolved = await inviteWorkspace(instance, token)
   const invite = resolved && (await resolved.context.repository.findInvite(resolved.tokenHash))
   if (!resolved || !invite || !inviteIsActive(invite, Date.now())) {
-    throw new Response('this invite link is no longer valid', { status: 410 })
+    throw new Response(errors().invite.invalid, { status: 410 })
   }
   return { ...resolved, invite }
 }
@@ -239,7 +241,7 @@ const workspaceContext = async (instance: Awaited<ReturnType<typeof app>>, works
   instance.workspace(getRequestHeaders(), workspaceSlug)
 const workspaceAdmin = async (instance: Awaited<ReturnType<typeof app>>, workspaceSlug?: string) => {
   const context = await workspaceContext(instance, workspaceSlug)
-  if (context.identity.role !== 'admin') throw new Response('forbidden', { status: 403 })
+  if (context.identity.role !== 'admin') throw new Response(errors().access.forbidden, { status: 403 })
   return context
 }
 
@@ -331,6 +333,7 @@ export const sessionInfo = createServerFn({ method: 'GET' })
           : undefined
       return {
         identity: context?.identity ?? identity,
+        locale: requestLocale(),
         serverVersion: __APP_VERSION__,
         workspaces,
         workspace: context?.workspace,
@@ -471,10 +474,10 @@ export const setOwnPassword = createServerFn({ method: 'POST' })
     mutationRpc(async () => {
       const instance = await app()
       const identity = await me(instance)
-      if (!instance.authCapabilities.password) throw new Response('password authentication is disabled', { status: 409 })
+      if (!instance.authCapabilities.password) throw new Response(errors().account.passwordAuthDisabled, { status: 409 })
       const linked = await instance.auth.manageAccount.linkedProviders(getRequestHeaders())
       if (linked.includes('credential')) {
-        throw new Response('this account already has a password', { status: 409 })
+        throw new Response(errors().account.alreadyHasPassword, { status: 409 })
       }
       await instance.auth.api.setPassword({ body: { newPassword: data.password }, headers: getRequestHeaders() })
       void instance.telemetry.capture(identity.id, 'sign_in_method_added', { provider: 'password' }).catch(() => undefined)
@@ -490,7 +493,7 @@ export const changeOwnEmail = createServerFn({ method: 'POST' })
       const identity = await me(instance)
       const linked = await instance.auth.manageAccount.linkedProviders(getRequestHeaders())
       if (!linked.includes('credential')) {
-        throw new Response('create a password before changing your email address', { status: 409 })
+        throw new Response(errors().account.passwordBeforeEmailChange, { status: 409 })
       }
       await instance.auth.manageAccount.changeEmail({
         headers: getRequestHeaders(),
@@ -536,16 +539,15 @@ export const updatePasswordAuth = createServerFn({ method: 'POST' })
       const instance = await app()
       const identity = await superAdmin(instance)
       if (process.env.AUTH_PASSWORD_ENABLED !== undefined || process.env.AUTH_PASSWORD_RECOVERY !== undefined) {
-        throw new Response('password authentication is controlled by the deployment environment', { status: 409 })
+        throw new Response(errors().auth.passwordControlledByEnvironment, { status: 409 })
       }
       const config = await integrationConfig(instance)
       if (!data.enabled) {
         const enabledProviders = instance.authCapabilities.socialProviders
-        if (enabledProviders.length === 0)
-          throw new Response('enable and test a social provider before disabling passwords', { status: 409 })
+        if (enabledProviders.length === 0) throw new Response(errors().auth.socialProviderBeforeDisablingPasswords, { status: 409 })
         const linked = await instance.auth.manageAccount.linkedProviders(getRequestHeaders())
         if (!enabledProviders.some((provider) => linked.includes(provider))) {
-          throw new Response('link the current admin account to an enabled social provider before disabling passwords', { status: 409 })
+          throw new Response(errors().auth.linkProviderBeforeDisablingPasswords, { status: 409 })
         }
       }
       await setStoredIntegrationConfig(deploymentSettings(instance.repository), { ...config, passwordEnabled: data.enabled })
@@ -568,10 +570,10 @@ export const saveSocialProvider = createServerFn({ method: 'POST' })
       const current = config[data.provider]
       const anotherEnabled = SOCIAL_AUTH_PROVIDERS.some((candidate) => candidate !== data.provider && config[candidate]?.enabled)
       if (current?.enabled && !instance.authCapabilities.password && !anotherEnabled) {
-        throw new Response('enable password authentication before changing the only active social provider', { status: 409 })
+        throw new Response(errors().auth.passwordBeforeChangingOnlyProvider, { status: 409 })
       }
       const clientSecret = data.clientSecret || current?.clientSecret
-      if (!clientSecret) throw new Response('client secret is required', { status: 400 })
+      if (!clientSecret) throw new Response(errors().auth.clientSecretRequired, { status: 400 })
       const discoveryProblem = data.provider === 'oidc' ? await oidcDiscoveryProblem(data.issuer) : undefined
       if (discoveryProblem) throw new Response(discoveryProblem, { status: 400 })
       const issuer = data.provider === 'oidc' ? data.issuer : undefined
@@ -609,15 +611,15 @@ export const updateSocialProviderEnabled = createServerFn({ method: 'POST' })
       assertSocialProviderMutable(data.provider)
       const config = await integrationConfig(instance)
       const provider = config[data.provider]
-      if (!provider) throw new Response(`${data.provider} is not configured`, { status: 400 })
+      if (!provider) throw new Response(errors().auth.providerNotConfigured(data.provider), { status: 400 })
       if (data.enabled) {
         const linked = await instance.auth.manageAccount.linkedProviders(getRequestHeaders())
         if (!linked.includes(data.provider)) {
-          throw new Response(`test ${data.provider} by linking the current admin account before enabling it`, { status: 409 })
+          throw new Response(errors().auth.testProviderBeforeEnabling(data.provider), { status: 409 })
         }
       } else if (!instance.authCapabilities.password) {
         const remaining = SOCIAL_AUTH_PROVIDERS.some((candidate) => candidate !== data.provider && config[candidate]?.enabled)
-        if (!remaining) throw new Response('cannot disable the last active authentication method', { status: 409 })
+        if (!remaining) throw new Response(errors().auth.lastAuthMethod, { status: 409 })
       }
       await setStoredIntegrationConfig(deploymentSettings(instance.repository), {
         ...config,
@@ -752,7 +754,7 @@ export const getAdminWorkspace = createServerFn({ method: 'GET' })
       const instance = await app()
       await superAdmin(instance)
       const workspace = (await instance.repository.listAdminWorkspaces(data.id))[0]
-      if (!workspace) throw new Response('workspace not found', { status: 404 })
+      if (!workspace) throw new Response(errors().workspace.notFound, { status: 404 })
       const scoped = await instance.repository.scoped(workspace.id)
       const [members, configured] = await Promise.all([scoped.listUsers(), storageConfigured(scoped)])
       const config = configured ? await resolveStorageConfig(scoped) : undefined
@@ -787,7 +789,7 @@ export const getAdminAccount = createServerFn({ method: 'GET' })
       const instance = await app()
       await superAdmin(instance)
       const account = await instance.repository.getAdminAccountDetails(data.id)
-      if (!account) throw new Response('account not found', { status: 404 })
+      if (!account) throw new Response(errors().account.notFound, { status: 404 })
       return { ...account, image: userImage(account.email, account.image) }
     }),
   )
@@ -798,7 +800,7 @@ export const deleteAccount = createServerFn({ method: 'POST' })
     mutationRpc(async () => {
       const instance = await app()
       const identity = await superAdmin(instance)
-      if (identity.id === data.id) throw new Response('you cannot delete your own account', { status: 409 })
+      if (identity.id === data.id) throw new Response(errors().account.cannotDeleteSelf, { status: 409 })
       const result = await instance.deleteAccount(getRequestHeaders(), data.id)
       void instance.telemetry
         .capture(identity.id, 'account_deleted', { deleted_workspace_count: result.deletedWorkspaceCount })
@@ -825,7 +827,7 @@ export const removeWorkspaceMember = createServerFn({ method: 'POST' })
     mutationRpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      if (context.identity.id === data.userId) throw new Response('you cannot remove yourself', { status: 409 })
+      if (context.identity.id === data.userId) throw new Response(errors().workspace.cannotRemoveSelf, { status: 409 })
       await context.repository.removeWorkspaceMember(data.userId)
       // A visibility override outlives the membership otherwise, and would silently apply again on re-invite.
       const board = await resolveBoardConfig(context.repository)
@@ -844,7 +846,7 @@ export const createInvite = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const label = data.label?.trim() ?? ''
       const mailer = data.email ? await workspaceMailer(context.repository, instance.emailDelivery, hostedDeployment()) : undefined
-      if (data.email && !mailer) throw new Response('configure SMTP before emailing invitations', { status: 409 })
+      if (data.email && !mailer) throw new Response(errors().invite.configureSmtp, { status: 409 })
       // The raw token exists only in this response; the database keeps a hash.
       const token = crypto.randomBytes(32).toString('base64url')
       const id = crypto.randomUUID()
@@ -866,7 +868,7 @@ export const createInvite = createServerFn({ method: 'POST' })
           })
         } catch (error) {
           await context.repository.deleteInvite(id)
-          throw new Response(`could not send invitation: ${errorMessage(error, 'unknown error')}`, { status: 502 })
+          throw new Response(errors().invite.sendFailed(errorMessage(error, errors().unknownError)), { status: 502 })
         }
       }
       void instance.telemetry
@@ -936,7 +938,7 @@ export const beginProviderInvite = createServerFn({ method: 'POST' })
       const instance = await app()
       await requireValidInvite(instance, data.token)
       if (!instance.authCapabilities.socialProviders.includes(data.provider)) {
-        throw new Response(`${data.provider} authentication is not enabled`, { status: 400 })
+        throw new Response(errors().auth.providerNotEnabled(data.provider), { status: 400 })
       }
       setCookie('stlquest_invite', data.token, {
         httpOnly: true,
@@ -956,10 +958,10 @@ export const acceptInvite = createServerFn({ method: 'POST' })
       const instance = await app()
       const { workspace, invite } = await requireValidInvite(instance, data.token)
       if (invite.recipientEmail && invite.recipientEmail !== data.email) {
-        throw new Response('this invitation belongs to another email address', { status: 403 })
+        throw new Response(errors().invite.otherEmail, { status: 403 })
       }
       if (await instance.repository.accountExists(data.email)) {
-        throw new Response('an account with this email already exists — sign in instead', { status: 409 })
+        throw new Response(errors().invite.accountExists, { status: 409 })
       }
 
       const { withAuthInvite } = await import('./authInvite')
@@ -971,7 +973,7 @@ export const acceptInvite = createServerFn({ method: 'POST' })
         }),
       )
       writeAuthCookies(created.headers)
-      await instance.repository.ensurePersonalWorkspace(created.response.user)
+      await instance.repository.ensurePersonalWorkspace(created.response.user, serverMessages().common)
       void instance.telemetry.capture(created.response.user.id, 'invite_accepted', {}).catch(() => undefined)
       return { workspaceId: workspace.id }
     }),
@@ -984,12 +986,12 @@ export const acceptWorkspaceInvite = createServerFn({ method: 'POST' })
       const instance = await app()
       const headers = getRequestHeaders()
       const identity = await instance.identity(headers)
-      if (!identity) throw new Response('unauthenticated', { status: 401 })
+      if (!identity) throw new Response(errors().access.unauthenticated, { status: 401 })
       const resolved = await inviteWorkspace(instance, data.token)
-      if (!resolved) throw new Response('this invite link is no longer valid', { status: 410 })
+      if (!resolved) throw new Response(errors().invite.invalid, { status: 410 })
       const { tokenHash, workspace, context } = resolved
       const accepted = await context.repository.acceptInviteForUser(tokenHash, Date.now(), identity)
-      if (!accepted) throw new Response('this invite link is no longer valid', { status: 410 })
+      if (!accepted) throw new Response(errors().invite.invalid, { status: 410 })
       await instance.setActiveWorkspace(workspace.id, headers)
       context.events.publish('user.created')
       void instance.telemetry.capture(identity.id, 'invite_accepted', {}).catch(() => undefined)
@@ -1046,6 +1048,19 @@ export const getNotificationPreferences = createServerFn({ method: 'GET' })
     rpc(async () => {
       const context = await workspaceContext(await app(), data.workspaceSlug)
       return context.service.notificationPreferences(context.identity)
+    }),
+  )
+
+export const updateLocale = createServerFn({ method: 'POST' })
+  .validator(z.object({ locale: z.enum(LOCALES).optional() }))
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      const identity = await instance.requireIdentity(getRequestHeaders())
+      await instance.repository.setUserLocale(identity.id, data.locale)
+      void instance.telemetry
+        .capture(identity.id, 'interface_language_changed', { locale: data.locale ?? 'browser' })
+        .catch(() => undefined)
     }),
   )
 
@@ -1189,7 +1204,7 @@ export const saveWorkspaceSmtp = createServerFn({ method: 'POST' })
       const { logoSrc, ...headers } = brandedEmailParts(await readEmailBranding(context.repository), false)
       await verifySmtp(workspaceEmailDelivery(smtp, hosted), {
         to: context.identity.email,
-        ...mailServerTestEmail({ workspaceName: context.workspace.name, logoSrc }),
+        ...mailServerTestEmail({ t: serverMessages().email, workspaceName: context.workspace.name, logoSrc }),
         ...headers,
       })
       await context.repository.setSetting(WORKSPACE_SMTP_SETTING, encryptSetting(smtp))
@@ -1207,13 +1222,12 @@ async function verifySmtp(delivery: EmailDelivery, test: EmailMessage) {
     await delivery.verify()
     await delivery.send(test)
   } catch (error) {
-    throw new Response(`SMTP verification failed: ${errorMessage(error, 'unknown error')}`, { status: 400 })
+    throw new Response(errors().email.smtpVerificationFailed(errorMessage(error, errors().unknownError)), { status: 400 })
   }
 }
 
 export function assertWorkspaceSmtpPort(port: number, hosted: boolean) {
-  if (hosted && !hostedSmtpPortAllowed(port))
-    throw new Response(`use a mail submission port: ${HOSTED_SMTP_PORTS.join(', ')}`, { status: 400 })
+  if (hosted && !hostedSmtpPortAllowed(port)) throw new Response(errors().email.submissionPort(HOSTED_SMTP_PORTS), { status: 400 })
 }
 
 export const saveEmailTemplate = createServerFn({ method: 'POST' })
@@ -1243,7 +1257,7 @@ export function nextEmailTemplates(
   change: { kind: EmailTemplateKind; template: EmailTemplate | null },
   ownServer: boolean,
 ): EmailTemplates {
-  if (change.template && !ownServer) throw new Response('connect your own mail server before customizing email templates', { status: 409 })
+  if (change.template && !ownServer) throw new Response(errors().email.ownServerForTemplates, { status: 409 })
   const { [change.kind]: _, ...others } = current ?? {}
   return change.template ? { ...others, [change.kind]: change.template } : others
 }
@@ -1269,10 +1283,9 @@ export const removeWorkspaceSmtp = createServerFn({ method: 'POST' })
 
 export function parseEmailLogo(data: string): EmailLogo {
   const bytes = Buffer.from(data, 'base64')
-  if (bytes.byteLength > MAX_EMAIL_LOGO_BYTES)
-    throw new Response(`the logo must be ${MAX_EMAIL_LOGO_BYTES / 1024} KB or smaller`, { status: 413 })
+  if (bytes.byteLength > MAX_EMAIL_LOGO_BYTES) throw new Response(errors().email.logoTooLarge(MAX_EMAIL_LOGO_BYTES / 1024), { status: 413 })
   const contentType = sourceImageContentType(bytes)
-  if (!contentType || !isEmailLogoType(contentType)) throw new Response('the logo must be a PNG, JPEG, or GIF image', { status: 400 })
+  if (!contentType || !isEmailLogoType(contentType)) throw new Response(errors().email.logoType, { status: 400 })
   return { contentType, data: bytes.toString('base64') }
 }
 
@@ -1364,7 +1377,7 @@ export const updateMemberRequestVisibility = createServerFn({ method: 'POST' })
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       const members = await context.repository.listUsers()
-      if (!members.some((member) => member.id === data.userId)) throw new Response('member not found', { status: 404 })
+      if (!members.some((member) => member.id === data.userId)) throw new Response(errors().workspace.memberNotFound, { status: 404 })
       const config = withMemberRequestVisibility(await resolveBoardConfig(context.repository), data.userId, data.visibility)
       await context.repository.setSetting('board', config)
       // The member's own board, people list, and realtime subscription all rescope on the next fetch.
@@ -1396,20 +1409,16 @@ export const listStorageDirectories = createServerFn({ method: 'POST' })
     rpc(async () => {
       const instance = await app()
       await workspaceAdmin(instance, data.workspaceSlug)
-      if (!localStorageEnabled()) throw new Response('local storage is unavailable in this deployment mode', { status: 403 })
-      if (!path.isAbsolute(data.path)) throw new Response('folder path must be absolute', { status: 400 })
+      if (!localStorageEnabled()) throw new Response(errors().storage.localUnavailable, { status: 403 })
+      if (!path.isAbsolute(data.path)) throw new Response(errors().storage.absolutePath, { status: 400 })
       const directory = path.resolve(data.path)
       let directories: Awaited<ReturnType<typeof storageDirectories>>
       try {
         directories = await storageDirectories(directory)
       } catch (error) {
         const code = (error as NodeJS.ErrnoException).code
-        const message =
-          code === 'EACCES'
-            ? STORAGE_FOLDER_PROBLEMS.unreadable
-            : code === 'ENOTDIR'
-              ? STORAGE_FOLDER_PROBLEMS.notAFolder
-              : STORAGE_FOLDER_PROBLEMS.missing
+        const problems = serverMessages().storage.problems
+        const message = code === 'EACCES' ? problems.unreadable : code === 'ENOTDIR' ? problems.notAFolder : problems.missing
         throw new Response(message, { status: 400 })
       }
       return { path: directory, directories }
@@ -1469,7 +1478,7 @@ export const saveCloudStorageApp = createServerFn({ method: 'POST' })
       const deployment = deploymentSettings(instance.repository)
       const current = await cloudStorageApp(deployment, data.provider)
       const clientSecret = data.clientSecret || current?.clientSecret
-      if (!clientSecret) throw new Response(`${cloudStorageProviderName(data.provider)} app secret is required`, { status: 400 })
+      if (!clientSecret) throw new Response(errors().storage.appSecretRequired(cloudStorageProviderName(data.provider)), { status: 400 })
       await setCloudStorageApp(deployment, data.provider, {
         clientId: data.clientId,
         clientSecret,
@@ -1486,7 +1495,7 @@ export const setCloudStorageProviderEnabled = createServerFn({ method: 'POST' })
       await superAdmin(instance)
       const deployment = deploymentSettings(instance.repository)
       const current = await cloudStorageApp(deployment, data.provider)
-      if (!current) throw new Response(`${cloudStorageProviderName(data.provider)} is not set up`, { status: 409 })
+      if (!current) throw new Response(errors().storage.notSetUp(cloudStorageProviderName(data.provider)), { status: 409 })
       await setCloudStorageApp(deployment, data.provider, { ...current, enabled: data.enabled })
     }),
   )
@@ -1505,7 +1514,7 @@ export const removeCloudStorageApp = createServerFn({ method: 'POST' })
           data.provider,
         )
       )
-        throw new Response(`move workspaces away from ${cloudStorageProviderName(data.provider)} before removing its app`, { status: 409 })
+        throw new Response(errors().storage.moveWorkspacesBeforeRemovingApp(cloudStorageProviderName(data.provider)), { status: 409 })
       await setCloudStorageApp(deploymentSettings(instance.repository), data.provider, undefined)
     }),
   )
@@ -1539,9 +1548,9 @@ export const removeCloudConnection = createServerFn({ method: 'POST' })
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       if (context.storage.adapter === data.provider)
-        throw new Response(`move storage away from ${cloudStorageProviderName(data.provider)} before disconnecting it`, { status: 409 })
+        throw new Response(errors().storage.moveStorageBeforeDisconnecting(cloudStorageProviderName(data.provider)), { status: 409 })
       if ((await context.repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state === 'running')
-        throw new Response('wait for the storage migration to finish', { status: 409 })
+        throw new Response(errors().storage.waitForMigration, { status: 409 })
       await disconnectCloudStorage(context.repository, data.provider)
       void instance.telemetry.capture(context.identity.id, 'cloud_storage_disconnected', { provider: data.provider }).catch(() => undefined)
     }),
@@ -1558,7 +1567,7 @@ export const startStorageMigration = createServerFn({ method: 'POST' })
       let claimedManagedStorage = false
       if (config.adapter === 'managed') {
         const ownerId = await context.repository.workspaceOwnerId()
-        if (!ownerId) throw new Response('workspace owner not found', { status: 409 })
+        if (!ownerId) throw new Response(errors().workspace.ownerNotFound, { status: 409 })
         claimedManagedStorage = await context.repository.claimManagedStorage(ownerId, HOSTED_OWNED_WORKSPACE_LIMIT)
       }
       let migration: StorageMigration
@@ -1641,7 +1650,7 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
         const destinationInventory = locationChanged ? await inspectStorageCandidate(destination, true) : emptyStorageInventory()
         await validateStorageCandidate(config, context.repository, context.workspace.id)
         if (data.destinationAction === 'clear-all' && !locationChanged)
-          throw new Response('choose a different storage location before replacing its contents', { status: 400 })
+          throw new Response(errors().storage.chooseDifferentLocation, { status: 400 })
         const storageHasActivity =
           (await context.repository.listRequests()).length > 0 ||
           (await context.repository.listOperations()).length > 0 ||
@@ -1653,13 +1662,12 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
         ) {
           return { reviewRequired: true as const, migrationRequired, destinationInventory }
         }
-        if (data.destinationAction === 'clear-all')
-          throw new Response('replace destination contents through a storage migration', { status: 409 })
+        if (data.destinationAction === 'clear-all') throw new Response(errors().storage.replaceThroughMigration, { status: 409 })
 
         let claimedManagedStorage = false
         if (config.adapter === 'managed') {
           const ownerId = await context.repository.workspaceOwnerId()
-          if (!ownerId) throw new Response('workspace owner not found', { status: 409 })
+          if (!ownerId) throw new Response(errors().workspace.ownerNotFound, { status: 409 })
           claimedManagedStorage = await context.repository.claimManagedStorage(ownerId, HOSTED_OWNED_WORKSPACE_LIMIT)
         }
         try {

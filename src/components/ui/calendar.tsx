@@ -1,9 +1,15 @@
 import * as React from 'react'
 import { DayPicker, getDefaultClassNames, type DayButton, type Locale } from 'react-day-picker'
+import { de, fr } from 'react-day-picker/locale'
+import type { Locale as AppLocale } from '@/core/i18n'
+import { useI18n } from '@/client/i18n'
 
 import { cn } from '@/lib/utils'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon } from 'lucide-react'
+
+/** English stays on DayPicker's default rather than naming a region, so its formatting is unchanged. */
+const dayPickerLocales: Record<AppLocale, Locale | undefined> = { en: undefined, fr, de }
 
 function CalendarRoot({
   className: rootClassName,
@@ -44,6 +50,8 @@ function Calendar({
   buttonVariant?: React.ComponentProps<typeof Button>['variant']
 }) {
   const defaultClassNames = getDefaultClassNames()
+  const i18n = useI18n()
+  const dayPickerLocale = locale ?? dayPickerLocales[i18n.locale]
 
   return (
     <DayPicker
@@ -55,9 +63,9 @@ function Calendar({
         className,
       )}
       captionLayout={captionLayout}
-      locale={locale}
+      locale={dayPickerLocale}
       formatters={{
-        formatMonthDropdown: (date) => date.toLocaleString(locale?.code, { month: 'short' }),
+        formatMonthDropdown: (date) => date.toLocaleString(dayPickerLocale?.code, { month: 'short' }),
         ...formatters,
       }}
       classNames={{
@@ -162,4 +170,4 @@ function CalendarDayButton({
   )
 }
 
-export { Calendar, CalendarDayButton }
+export { Calendar, CalendarDayButton, dayPickerLocales }

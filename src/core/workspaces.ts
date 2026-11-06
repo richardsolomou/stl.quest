@@ -1,3 +1,4 @@
+import type { Messages } from './i18n'
 export function workspaceSlug(name: string) {
   const slug = name
     .normalize('NFKD')
@@ -12,8 +13,6 @@ export function workspaceSlug(name: string) {
 /** Bounds every stored workspace name, so the name an owner types to confirm a deletion always fits the same limit. */
 export const MAX_WORKSPACE_NAME_LENGTH = 80
 
-const PERSONAL_WORKSPACE_SUFFIX = "'s workspace"
-
 /** Shortens a name to `maxLength` UTF-16 units, the unit validation counts, without splitting a surrogate pair. */
 export function truncateWorkspaceName(name: string, maxLength = MAX_WORKSPACE_NAME_LENGTH) {
   let truncated = ''
@@ -24,9 +23,10 @@ export function truncateWorkspaceName(name: string, maxLength = MAX_WORKSPACE_NA
   return truncated.trimEnd()
 }
 
-export function personalWorkspaceName(userName: string) {
-  const owner = truncateWorkspaceName(userName.trim(), MAX_WORKSPACE_NAME_LENGTH - PERSONAL_WORKSPACE_SUFFIX.length)
-  return owner ? `${owner}${PERSONAL_WORKSPACE_SUFFIX}` : 'My workspace'
+/** Named once at creation in the creator's language; it is ordinary data afterwards and can be renamed. */
+export function personalWorkspaceName(userName: string, t: Messages['common']) {
+  const owner = truncateWorkspaceName(userName.trim(), MAX_WORKSPACE_NAME_LENGTH - t.personalWorkspace('').length)
+  return owner ? t.personalWorkspace(owner) : t.myWorkspace
 }
 
 export const MEMBER_ACTIVITY_INTERVAL_MS = 60 * 60 * 1000
@@ -46,10 +46,7 @@ export function accountDeletionWorkspaces(owned: OwnedWorkspace[]) {
   const soleOwned = owned.filter((workspace) => workspace.ownerCount === 1)
   const blocking = soleOwned.filter((workspace) => workspace.memberCount > 1)
   return {
-    conflict:
-      blocking.length === 0
-        ? undefined
-        : `this user is the only owner of ${blocking.map(({ name }) => name).join(', ')}. Remove the other members or delete ${blocking.length === 1 ? 'that workspace' : 'those workspaces'} first`,
+    blocking: blocking.map(({ name }) => name),
     removed: soleOwned.filter((workspace) => workspace.memberCount === 1),
   }
 }

@@ -1,3 +1,4 @@
+import type { Messages } from '../core/i18n'
 import type { PrintType } from '../core/types'
 import {
   MAX_REQUEST_NAME_LENGTH,
@@ -50,16 +51,16 @@ export function linkedRequestData(workspaceSlug: string, values: LinkedRequestVa
   }
 }
 
-export function linkedRequestValidationError(values: LinkedRequestValues) {
+export function linkedRequestValidationError(values: LinkedRequestValues, t: Messages['requests']) {
   const name = values.name.trim()
   const quantity = Number(values.quantity)
-  if (!name) return 'Enter a title.'
-  if (name.length > MAX_REQUEST_NAME_LENGTH) return `Keep the title under ${MAX_REQUEST_NAME_LENGTH} characters.`
-  if (!validSourceUrl(values.sourceUrl.trim())) return 'Enter a valid http(s) source link.'
+  if (!name) return t.validation.enterTitle
+  if (name.length > MAX_REQUEST_NAME_LENGTH) return t.validation.titleTooLong(MAX_REQUEST_NAME_LENGTH)
+  if (!validSourceUrl(values.sourceUrl.trim())) return t.validation.invalidSourceLink
   if (!Number.isInteger(quantity) || quantity < MIN_REQUEST_QUANTITY || quantity > MAX_REQUEST_QUANTITY) {
-    return `Choose between ${MIN_REQUEST_QUANTITY} and ${MAX_REQUEST_QUANTITY} copies.`
+    return t.validation.quantityRange(MIN_REQUEST_QUANTITY, MAX_REQUEST_QUANTITY)
   }
-  if (!values.printType) return 'Choose resin or filament.'
-  if (values.notes.trim().length > MAX_REQUEST_NOTES_LENGTH) return `Keep notes under ${MAX_REQUEST_NOTES_LENGTH} characters.`
+  if (!values.printType) return t.validation.choosePrintType
+  if (values.notes.trim().length > MAX_REQUEST_NOTES_LENGTH) return t.validation.notesTooLong(MAX_REQUEST_NOTES_LENGTH)
   return undefined
 }

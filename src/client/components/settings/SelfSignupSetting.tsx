@@ -5,10 +5,12 @@ import { Switch } from '@/components/ui/switch'
 import { updateSelfSignupSettings } from '../../../server/fns'
 import { SettingNotice, noticeDetail } from '../SettingNotice'
 import { SettingsSection } from './SettingsLayout'
+import { useI18n } from '../../i18n'
 
 export function SelfSignupSetting({ enabled }: { enabled: boolean }) {
   const callUpdate = useServerFn(updateSelfSignupSettings)
   const queryClient = useQueryClient()
+  const copy = useI18n().t.settings.selfSignup
   const mutation = useMutation({
     mutationFn: callUpdate,
     onSuccess: () =>
@@ -21,8 +23,8 @@ export function SelfSignupSetting({ enabled }: { enabled: boolean }) {
     <SettingsSection>
       <Field orientation="horizontal">
         <FieldContent>
-          <FieldLabel htmlFor="self-signup-enabled">Allow self-signup</FieldLabel>
-          <FieldDescription>When this is off, people can only create an account from an invite link or through Add user.</FieldDescription>
+          <FieldLabel htmlFor="self-signup-enabled">{copy.label}</FieldLabel>
+          <FieldDescription>{copy.description}</FieldDescription>
         </FieldContent>
         <Switch
           id="self-signup-enabled"
@@ -35,8 +37,8 @@ export function SelfSignupSetting({ enabled }: { enabled: boolean }) {
         <SettingNotice
           notice={{
             tone: 'error',
-            title: 'That preference was not saved',
-            hint: 'Self-signup is still set the way it was before. Try again in a moment.',
+            title: copy.notSaved,
+            hint: copy.notSavedHint,
             detail: noticeDetail(mutation.error),
           }}
         />

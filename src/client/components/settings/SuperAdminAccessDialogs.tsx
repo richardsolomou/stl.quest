@@ -4,41 +4,39 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
+import type { Messages } from '../../../core/i18n'
 import type { Account, AccountRole } from '../../../core/types'
 import { authClient } from '../../authClient'
+import { useI18n } from '../../i18n'
 import { DialogProblem } from '../DialogProblem'
 import { DialogShell } from '../DialogShell'
 import { UserSummary } from '../UserSummary'
 import { accountRoleOptions } from './SuperAdminUsersTable'
 
-export const roleLabel = (user: Account) => (user.role === 'super_admin' ? 'Super admin' : 'User')
+export const roleLabel = (user: Account, t: Messages) => t.superAdmin.roles[user.role]
 
 export function ImpersonateUserDialog({ user, onDone }: { user: Account; onDone: () => void }) {
+  const { t } = useI18n()
+  const copy = t.superAdmin.impersonate
   const mutation = useMutation({
     mutationFn: async () => {
       const { error } = await authClient.admin.impersonateUser({ userId: user.id })
-      if (error) throw new Error(`Could not view STL Quest as ${user.name}.`)
+      if (error) throw new Error(copy.failed(user.name))
     },
     onSuccess: () => window.location.assign('/'),
   })
   return (
-    <DialogShell title="View as user" onClose={onDone} preventClose={mutation.isPending}>
-      <UserSummary user={user} role={roleLabel(user)} />
-      <p className="text-sm text-muted-foreground">
-        You’ll use STL Quest with this user’s permissions for up to one hour, or until you exit impersonation.
-      </p>
-      <DialogProblem
-        title="Could not switch to this user"
-        hint="You are still signed in as yourself. Try again in a moment."
-        error={mutation.error?.message}
-      />
+    <DialogShell title={copy.title} onClose={onDone} preventClose={mutation.isPending}>
+      <UserSummary user={user} role={roleLabel(user, t)} />
+      <p className="text-sm text-muted-foreground">{copy.description}</p>
+      <DialogProblem title={copy.problemTitle} hint={copy.problemHint} error={mutation.error?.message} />
       <div className="flex flex-wrap justify-end gap-2">
         <Button type="button" variant="outline" onClick={onDone} disabled={mutation.isPending}>
-          Cancel
+          {t.common.cancel}
         </Button>
         <Button type="button" className="ph-no-capture" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
           {mutation.isPending && <Spinner />}
-          {mutation.isPending ? 'Switching…' : `View as ${user.name}`}
+          {mutation.isPending ? copy.switching : copy.confirm(user.name)}
         </Button>
       </div>
     </DialogShell>
@@ -46,12 +44,15 @@ export function ImpersonateUserDialog({ user, onDone }: { user: Account; onDone:
 }
 
 export function ChangeServerRoleDialog({ user, onDone }: { user: Account; onDone: () => void }) {
+  const { t } = useI18n()
+  const copy = t.superAdmin.changeRole
+  const options = accountRoleOptions(t)
   const queryClient = useQueryClient()
   const [role, setRole] = useState<AccountRole>(user.role)
   const mutation = useMutation({
     mutationFn: async (nextRole: AccountRole) => {
       const { error } = await authClient.admin.setRole({ userId: user.id, role: nextRole })
-      if (error) throw new Error('Could not change this server role.')
+      if (error) throw new Error(copy.failed)
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['accounts'] })
@@ -59,36 +60,32 @@ export function ChangeServerRoleDialog({ user, onDone }: { user: Account; onDone
     },
   })
   return (
-    <DialogShell title="Change server role" onClose={onDone} preventClose={mutation.isPending}>
-      <UserSummary user={user} role={roleLabel(user)} />
+    <DialogShell title={copy.title} onClose={onDone} preventClose={mutation.isPending}>
+      <UserSummary user={user} role={roleLabel(user, t)} />
       <Field>
-        <FieldLabel htmlFor={`server-role-${user.id}`}>Role</FieldLabel>
-        <Select items={accountRoleOptions} value={role} onValueChange={(value) => setRole(value as AccountRole)}>
-          <SelectTrigger className="ph-no-capture w-full" id={`server-role-${user.id}`} aria-label={`Server role for ${user.name}`}>
+        <FieldLabel htmlFor={`server-role-${user.id}`}>{copy.role}</FieldLabel>
+        <Select items={options} value={role} onValueChange={(value) => setRole(value as AccountRole)}>
+          <SelectTrigger className="ph-no-capture w-full" id={`server-role-${user.id}`} aria-label={copy.roleFor(user.name)}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {accountRoleOptions.map((option) => (
+            {options.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <FieldDescription>Super admins can manage all accounts, authentication, telemetry, and diagnostics.</FieldDescription>
+        <FieldDescription>{copy.description}</FieldDescription>
       </Field>
-      <DialogProblem
-        title="The server role was not changed"
-        hint="A deployment must keep at least one super admin, and you cannot remove your own super admin role."
-        error={mutation.error?.message}
-      />
+      <DialogProblem title={copy.problemTitle} hint={copy.problemHint} error={mutation.error?.message} />
       <div className="flex flex-wrap justify-end gap-2">
         <Button type="button" variant="outline" onClick={onDone} disabled={mutation.isPending}>
-          Cancel
+          {t.common.cancel}
         </Button>
         <Button type="button" disabled={role === user.role || mutation.isPending} onClick={() => mutation.mutate(role)}>
           {mutation.isPending && <Spinner />}
-          {mutation.isPending ? 'Saving…' : 'Change role'}
+          {mutation.isPending ? t.common.saving : copy.confirm}
         </Button>
       </div>
     </DialogShell>

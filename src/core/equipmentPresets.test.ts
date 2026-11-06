@@ -23,7 +23,7 @@ describe('equipment presets', () => {
 
   it('uses the main printer catalogue with sourced power or a process default', () => {
     expect(printerPowerProfile('filament-bambu-lab-p1s')).toMatchObject({ watts: 1000, basis: 'maximum power at 220 V' })
-    expect(printerPowerProfile('filament-bambu-lab-h2d')).toMatchObject({ watts: 200, basis: expect.stringContaining('default estimate') })
+    expect(printerPowerProfile('filament-bambu-lab-h2d')).toEqual({ phase: 'printing', watts: 200 })
   })
 
   it('adds printing, washing, drying, and curing power independently', () => {

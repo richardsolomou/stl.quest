@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { isExpectedStorageProblem, STORAGE_FOLDER_PROBLEMS } from './storageProblems'
+import { LOCALES, messagesFor } from './i18n'
+import { isExpectedStorageProblem } from './storageProblems'
 
 describe('isExpectedStorageProblem', () => {
-  it('recognizes every folder listing problem the server can report', () => {
-    for (const problem of Object.values(STORAGE_FOLDER_PROBLEMS)) expect(isExpectedStorageProblem(problem)).toBe(true)
+  it.each(LOCALES)('recognizes every folder listing problem the server can report in %s', (locale) => {
+    const { unreadable, notAFolder, missing } = messagesFor(locale).storage.problems
+    for (const problem of [unreadable, notAFolder, missing]) expect(isExpectedStorageProblem(problem)).toBe(true)
+  })
+
+  it.each(LOCALES)('recognizes a destination problem with its detail appended in %s', (locale) => {
+    expect(isExpectedStorageProblem(messagesFor(locale).storage.problems.unusable('EACCES'))).toBe(true)
+  })
+
+  it.each(LOCALES)('recognizes an uninspectable destination with its detail appended in %s', (locale) => {
+    expect(isExpectedStorageProblem(messagesFor(locale).storage.problems.uninspectable('AccessDenied'))).toBe(true)
   })
 
   it('recognizes a destination problem with its filesystem detail appended', () => {

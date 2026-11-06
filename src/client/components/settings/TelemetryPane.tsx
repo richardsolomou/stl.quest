@@ -7,12 +7,14 @@ import { telemetryQuery } from '../../queries'
 import { QueryState } from '../QueryState'
 import { SettingNotice, noticeDetail } from '../SettingNotice'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { useI18n } from '../../i18n'
 
 export function TelemetryPane() {
   const query = useQuery(telemetryQuery())
   const current = query.data
   const callUpdate = useServerFn(updateTelemetrySettings)
   const queryClient = useQueryClient()
+  const copy = useI18n().t.settings.telemetry
   // The switch itself reports the saved state, so success needs no announcement — only a failure does.
   const mutation = useMutation({
     mutationFn: callUpdate,
@@ -21,12 +23,12 @@ export function TelemetryPane() {
   if (!current) {
     return (
       <SettingsPage>
-        <SettingsHeader title="Telemetry" description="Control anonymous usage reporting." />
+        <SettingsHeader title={copy.title} description={copy.loadingDescription} />
         <QueryState
           loading={query.isPending}
           error={query.error}
-          loadingLabel="Loading telemetry settings…"
-          errorTitle="Could not load telemetry settings"
+          loadingLabel={copy.loading}
+          errorTitle={copy.loadError}
           onRetry={() => void query.refetch()}
         />
       </SettingsPage>
@@ -35,15 +37,12 @@ export function TelemetryPane() {
 
   return (
     <SettingsPage>
-      <SettingsHeader
-        title="Telemetry"
-        description="STL Quest sends anonymous usage events to help improve the app. Model geometry, request details, names, and email addresses are never included."
-      />
+      <SettingsHeader title={copy.title} description={copy.description} />
       <SettingsSection>
         <Field orientation="horizontal">
           <FieldContent>
-            <FieldLabel htmlFor="telemetry-enabled">Share anonymous usage data</FieldLabel>
-            <FieldDescription>Enabled by default and can be disabled at any time.</FieldDescription>
+            <FieldLabel htmlFor="telemetry-enabled">{copy.label}</FieldLabel>
+            <FieldDescription>{copy.hint}</FieldDescription>
           </FieldContent>
           <Switch
             id="telemetry-enabled"
@@ -56,8 +55,8 @@ export function TelemetryPane() {
           <SettingNotice
             notice={{
               tone: 'error',
-              title: 'That preference was not saved',
-              hint: 'Telemetry is still set the way it was before. Try again in a moment.',
+              title: copy.notSaved,
+              hint: copy.notSavedHint,
               detail: noticeDetail(mutation.error),
             }}
           />

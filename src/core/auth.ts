@@ -1,4 +1,5 @@
 import { authFailureMessage, classifySignInFailure, type SignInFailureReason } from 'ras-stack/auth/client'
+import type { Messages } from './i18n'
 
 export const SOCIAL_AUTH_PROVIDERS = ['google', 'discord', 'oidc'] as const
 export type SocialAuthProvider = (typeof SOCIAL_AUTH_PROVIDERS)[number]
@@ -58,14 +59,24 @@ export function linkedAccountActive(account: { providerId: string; accountId: st
 
 export const signInFailureReason = classifySignInFailure
 
-export function signInFailureMessage(failed: { status?: number; code?: string; message?: string } | null | undefined): string {
+type AuthMessages = Messages['auth']
+type AuthFailure = { status?: number; code?: string; message?: string } | null | undefined
+
+/** Better Auth reports a stable code with English text; a known code gets the translated message, anything else keeps the server's wording. */
+export function authErrorMessage(t: AuthMessages, failed: unknown, fallback: string): string {
+  const code = failed && typeof failed === 'object' ? (failed as { code?: unknown }).code : undefined
+  const known = typeof code === 'string' ? (t.errors as Record<string, string | undefined>)[code] : undefined
+  return known ?? authFailureMessage(failed, fallback)
+}
+
+export function signInFailureMessage(t: AuthMessages, failed: AuthFailure): string {
   switch (signInFailureReason(failed)) {
     case 'rate_limited':
-      return 'Too many sign-in attempts. Wait a minute, then try again.'
+      return t.signInFailure.rateLimited
     case 'invalid_credentials':
-      return 'Email or password is incorrect.'
+      return t.signInFailure.invalidCredentials
     default:
-      return authFailureMessage(failed, 'Something went wrong signing in. Try again.')
+      return authErrorMessage(t, failed, t.signInFailure.fallback)
   }
 }
 

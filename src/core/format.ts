@@ -1,5 +1,7 @@
-export function formatBytes(bytes: number) {
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+import { DEFAULT_LOCALE, messagesFor, type Locale } from './i18n'
+
+export function formatBytes(bytes: number, locale: Locale = DEFAULT_LOCALE) {
+  const units = messagesFor(locale).common.byteUnits
   let value = bytes
   let unit = 0
   while (value >= 1_000 && unit < units.length - 1) {
@@ -11,5 +13,7 @@ export function formatBytes(bytes: number) {
     value /= 1_000
     unit++
   }
-  return `${value.toFixed(unit ? 1 : 0)} ${units[unit]}`
+  const digits = unit ? 1 : 0
+  const number = new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits, useGrouping: false })
+  return `${number.format(value)} ${units[unit]}`
 }

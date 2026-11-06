@@ -1,3 +1,4 @@
+import type { Messages } from './i18n'
 import { storagePlans, type StoragePlan } from './plans'
 import type { Account, WorkspaceRole } from './types'
 
@@ -69,21 +70,28 @@ export type AdminAccountDetails = Account & {
   }
 }
 
-export function adminWorkspaceAttentionReasons(workspace: AdminWorkspace): string[] {
-  const reasons: string[] = []
-  if (!workspace.storageConfigured) reasons.push('Storage is not configured')
-  if (workspace.failedJobCount > 0)
-    reasons.push(`${workspace.failedJobCount} failed background ${workspace.failedJobCount === 1 ? 'job' : 'jobs'}`)
+type AttentionIssue = { kind: 'storageMissing' | 'storageFull' | 'storageNearlyFull' } | { kind: 'failedJobs'; count: number }
+
+function attentionIssues(workspace: AdminWorkspace): AttentionIssue[] {
+  const issues: AttentionIssue[] = []
+  if (!workspace.storageConfigured) issues.push({ kind: 'storageMissing' })
+  if (workspace.failedJobCount > 0) issues.push({ kind: 'failedJobs', count: workspace.failedJobCount })
   if (workspace.managedStorage) {
     const { usedBytes, quotaBytes } = workspace.managedStorage
-    if (quotaBytes > 0 && usedBytes >= quotaBytes) reasons.push('Managed storage is full')
-    else if (quotaBytes > 0 && usedBytes / quotaBytes >= 0.9) reasons.push('Managed storage is over 90% full')
+    if (quotaBytes > 0 && usedBytes >= quotaBytes) issues.push({ kind: 'storageFull' })
+    else if (quotaBytes > 0 && usedBytes / quotaBytes >= 0.9) issues.push({ kind: 'storageNearlyFull' })
   }
-  return reasons
+  return issues
+}
+
+export function adminWorkspaceAttentionReasons(workspace: AdminWorkspace, t: Messages['superAdmin']): string[] {
+  return attentionIssues(workspace).map((issue) =>
+    issue.kind === 'failedJobs' ? t.attention.failedJobs(issue.count) : t.attention[issue.kind],
+  )
 }
 
 export function adminWorkspaceHealth(workspace: AdminWorkspace): 'healthy' | 'attention' {
-  return adminWorkspaceAttentionReasons(workspace).length ? 'attention' : 'healthy'
+  return attentionIssues(workspace).length ? 'attention' : 'healthy'
 }
 
 export function managedStorageSummary(plan: StoragePlan, usedBytes: number) {

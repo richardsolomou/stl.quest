@@ -6,15 +6,14 @@ import { Button } from '@/components/ui/button'
 import type { DataTableFeatures } from '@/components/ui/data-table'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { formatBytes } from '../../../core/format'
+import type { Locale, Messages } from '../../../core/i18n'
 import { storagePlans } from '../../../core/plans'
-import type { Account, AccountRole, Identity } from '../../../core/types'
+import type { Account, Identity } from '../../../core/types'
 import { ProtectedEmail } from '../ProtectedEmail'
 import { UserTableIdentity, userEmailColumnMeta } from '../UserTableIdentity'
 
-export const accountRoleOptions = [
-  { value: 'requester', label: 'User' },
-  { value: 'super_admin', label: 'Super admin' },
-] as const
+export const accountRoleOptions = (t: Messages) =>
+  (['requester', 'super_admin'] as const).map((value) => ({ value, label: t.superAdmin.roles[value] }))
 
 export const accountPlanOptions = [
   { value: 'free', label: 'Free' },
@@ -27,73 +26,81 @@ export type SuperAdminUserAction = 'details' | 'impersonate' | 'role' | 'passwor
 const columnHelper = createColumnHelper<DataTableFeatures, Account>()
 
 export function superAdminUserColumns({
+  t,
+  locale,
   me,
   hosted,
   passwordEnabled,
   onAction,
 }: {
+  t: Messages
+  locale: Locale
   me?: Identity
   hosted: boolean
   passwordEnabled: boolean
   onAction: (action: SuperAdminUserAction, user: Account) => void
 }) {
+  const copy = t.superAdmin
   return columnHelper.columns([
     columnHelper.accessor('name', {
-      header: 'Name',
+      header: copy.columns.name,
       cell: ({ row }) => <UserTableIdentity name={row.original.name} email={row.original.email} image={row.original.image} />,
       enableHiding: false,
     }),
     columnHelper.accessor('email', {
-      header: 'Email',
+      header: copy.columns.email,
       cell: ({ getValue }) => <ProtectedEmail email={getValue()} className="block max-w-40" />,
       meta: userEmailColumnMeta,
     }),
-    columnHelper.accessor('role', { header: 'Role', cell: ServerRoleCell, meta: { className: '@max-sm:hidden' } }),
+    columnHelper.accessor('role', {
+      header: copy.columns.role,
+      cell: ({ getValue }) => <Badge variant="secondary">{copy.roles[getValue()]}</Badge>,
+      meta: { className: '@max-sm:hidden' },
+    }),
     columnHelper.accessor('createdAt', {
-      header: 'Created',
-      cell: ({ getValue }) => <DateCell value={getValue()} />,
+      header: copy.columns.created,
+      cell: ({ getValue }) => <DateCell value={getValue()} locale={locale} />,
       meta: { className: '@max-3xl:hidden' },
     }),
     columnHelper.accessor('updatedAt', {
-      header: 'Updated',
-      cell: ({ getValue }) => <DateCell value={getValue()} />,
+      header: copy.columns.updated,
+      cell: ({ getValue }) => <DateCell value={getValue()} locale={locale} />,
       meta: { className: '@max-3xl:hidden' },
     }),
     columnHelper.accessor('lastOnlineAt', {
-      header: 'Last online',
+      header: copy.columns.lastOnline,
       cell: ({ getValue }) => {
         const value = getValue()
-        return value ? <DateCell value={value} /> : <span className="text-muted-foreground">Never</span>
+        return value ? <DateCell value={value} locale={locale} /> : <span className="text-muted-foreground">{copy.never}</span>
       },
       sortUndefined: 'last',
       meta: { className: '@max-xl:hidden' },
     }),
-    columnHelper.accessor('workspaceCount', { header: 'Workspaces', meta: { className: '@max-xl:hidden' } }),
+    columnHelper.accessor('workspaceCount', { header: copy.columns.workspaces, meta: { className: '@max-xl:hidden' } }),
     ...(hosted
       ? [
           columnHelper.accessor('plan', {
-            header: 'Plan',
+            header: copy.columns.plan,
             cell: ({ getValue }) => {
               const plan = getValue() ?? 'free'
-              return <Badge variant="secondary">{storagePlans[plan].name}</Badge>
+              return <Badge variant="secondary">{t.settings.plan.names[plan]}</Badge>
             },
             meta: { className: '@max-xl:hidden' },
           }),
           columnHelper.accessor('managedStorageUsedBytes', {
             id: 'storage',
-            header: 'Included storage',
+            header: copy.columns.includedStorage,
             cell: ({ row }) => {
               const account = row.original
-              if (!account.managedStorageWorkspaceCount) return <span className="text-muted-foreground">Not in use</span>
+              if (!account.managedStorageWorkspaceCount) return <span className="text-muted-foreground">{copy.notInUse}</span>
               const usedBytes = account.managedStorageUsedBytes ?? 0
               const quotaBytes = account.managedStorageQuotaBytes ?? storagePlans.free.quotaBytes
               const percentage = quotaBytes > 0 ? Math.min(100, Math.round((usedBytes / quotaBytes) * 100)) : 0
               return (
                 <div className="whitespace-nowrap">
-                  <p>{formatBytes(usedBytes)}</p>
+                  <p>{formatBytes(usedBytes, locale)}</p>
                   <p className="text-xs text-muted-foreground">
-                    {percentage}% of {formatBytes(quotaBytes)} · {account.managedStorageWorkspaceCount}{' '}
-                    {account.managedStorageWorkspaceCount === 1 ? 'workspace' : 'workspaces'}
+                    {copy.users.storageUsage(percentage, formatBytes(quotaBytes, locale), account.managedStorageWorkspaceCount)}
                   </p>
                 </div>
               )
@@ -105,31 +112,34 @@ export function superAdminUserColumns({
     columnHelper.display({
       id: 'actions',
       enableHiding: false,
-      header: 'Actions',
+      header: copy.columns.actions,
       cell: ({ row }) => (
         <div className="flex justify-end">
-          <UserActions user={row.original} isMe={row.original.id === me?.id} passwordEnabled={passwordEnabled} onAction={onAction} />
+          <UserActions t={t} user={row.original} isMe={row.original.id === me?.id} passwordEnabled={passwordEnabled} onAction={onAction} />
         </div>
       ),
     }),
   ])
 }
 
-function DateCell({ value }: { value: number }) {
-  return <time dateTime={new Date(value).toISOString()}>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(value)}</time>
+function DateCell({ value, locale }: { value: number; locale: Locale }) {
+  return <time dateTime={new Date(value).toISOString()}>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(value)}</time>
 }
 
 function UserActions({
+  t,
   user,
   isMe,
   passwordEnabled,
   onAction,
 }: {
+  t: Messages
   user: Account
   isMe: boolean
   passwordEnabled: boolean
   onAction: (action: SuperAdminUserAction, user: Account) => void
 }) {
+  const copy = t.superAdmin.userActions
   const [open, setOpen] = useState(false)
   const choose = (action: SuperAdminUserAction) => {
     setOpen(false)
@@ -138,7 +148,9 @@ function UserActions({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
-        render={<Button type="button" variant="ghost" size="icon-sm" className="ph-no-capture" aria-label={`Actions for ${user.name}`} />}
+        render={
+          <Button type="button" variant="ghost" size="icon-sm" className="ph-no-capture" aria-label={t.superAdmin.actionsFor(user.name)} />
+        }
       >
         <Ellipsis />
       </PopoverTrigger>
@@ -148,22 +160,22 @@ function UserActions({
           variant="ghost"
           className="w-full justify-start"
           disabled={isMe}
-          title={isMe ? 'You are already viewing STL Quest as this user.' : undefined}
+          title={isMe ? copy.impersonateSelf : undefined}
           onClick={() => choose('impersonate')}
         >
           <Eye />
-          View as user
+          {copy.impersonate}
         </Button>
         <Button
           type="button"
           variant="ghost"
           className="w-full justify-start"
           disabled={isMe}
-          title={isMe ? 'You cannot change your own server role.' : undefined}
+          title={isMe ? copy.changeRoleSelf : undefined}
           onClick={() => choose('role')}
         >
           <ShieldCheck />
-          Change server role
+          {copy.changeRole}
         </Button>
         {passwordEnabled && (
           <Button
@@ -171,11 +183,11 @@ function UserActions({
             variant="ghost"
             className="w-full justify-start"
             disabled={isMe}
-            title={isMe ? 'Change your own password from Account settings.' : undefined}
+            title={isMe ? copy.setPasswordSelf : undefined}
             onClick={() => choose('password')}
           >
             <KeyRound />
-            Set password
+            {copy.setPassword}
           </Button>
         )}
         <Button
@@ -183,18 +195,14 @@ function UserActions({
           variant="ghost"
           className="w-full justify-start text-destructive hover:text-destructive"
           disabled={isMe}
-          title={isMe ? 'You cannot delete your own account.' : undefined}
+          title={isMe ? copy.deleteSelf : undefined}
           onClick={() => choose('delete')}
         >
           <Trash2 />
-          Delete user
+          {copy.delete}
         </Button>
-        {isMe && <p className="mt-1 border-t px-2 pt-2 pb-1 text-xs text-muted-foreground">Manage your account from Account settings.</p>}
+        {isMe && <p className="mt-1 border-t px-2 pt-2 pb-1 text-xs text-muted-foreground">{copy.manageSelf}</p>}
       </PopoverContent>
     </Popover>
   )
-}
-
-function ServerRoleCell({ getValue }: { getValue: () => AccountRole }) {
-  return <Badge variant="secondary">{getValue() === 'super_admin' ? 'Super admin' : 'User'}</Badge>
 }
