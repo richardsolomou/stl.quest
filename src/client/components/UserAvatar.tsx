@@ -15,7 +15,10 @@ export function UserAvatar({ name, image, size = 'default' }: { name: string; im
   return (
     <Avatar size={size} className="ph-no-capture" aria-hidden="true">
       {image && <AvatarImage src={image} alt="" />}
-      <AvatarFallback className="font-heading font-semibold" style={{ backgroundColor: `${ink}26`, color: ink }}>
+      <AvatarFallback
+        className="font-heading font-semibold"
+        style={{ backgroundColor: `color-mix(in srgb, ${ink} 15%, transparent)`, color: ink }}
+      >
         {initials || '?'}
       </AvatarFallback>
     </Avatar>

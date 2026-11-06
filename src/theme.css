@@ -23,6 +23,7 @@
   --border: #2b2f38;
   --input: #2b2f38;
   --field: rgb(0 0 0 / 0.1);
+  --field-hover: rgb(0 0 0 / 0.15);
   --ring: #e89a3c;
   --chart-1: #e89a3c;
   --chart-2: #6fae6a;
@@ -60,11 +61,22 @@
   --tag-indigo: #9d9be7;
   --tag-violet: #b593dc;
   --tag-fuchsia: #d389ba;
+
+  /* Requester inks for avatar initials and requester chips: one cool band, so a person never reads as a stage colour. */
+  --requester-1: #7fa6d9;
+  --requester-2: #8f9ee0;
+  --requester-3: #a394dd;
+  --requester-4: #b98fd4;
+  --requester-5: #cf8cc4;
+  --requester-6: #dd8aa8;
+  --requester-7: #9fb0c4;
+  --requester-8: #c0a9bd;
 }
 
-/* The same workshop in daylight: warm paper surfaces, and amber, teal, and green darkened until text in them passes
-   WCAG AA on the floor. Tag dots keep the dark theme's hues, which still read as one set on a light ticket. */
-:root[data-theme='light'] {
+/* The same workshop in daylight: warm paper surfaces, and amber, teal, green, and requester inks darkened until text in
+   them passes WCAG AA on the floor. Tag dots keep the dark theme's hues, which still read as one set on a light ticket.
+   Pages that declare a dark-only colour scheme, such as the landing pages, keep the dark tokens. */
+:root[data-theme='light']:not(:has(> head > meta[name='color-scheme'][content='dark'])) {
   color-scheme: light;
   --grid:
     repeating-linear-gradient(0deg, transparent 0 23px, rgb(42 117 132 / 0.08) 23px 24px),
@@ -88,6 +100,7 @@
   --border: #d8d3c6;
   --input: #cfcabd;
   --field: #fffefb;
+  --field-hover: #ece9e0;
   --ring: #a65a0c;
   --chart-1: #a65a0c;
   --chart-2: #2f7d3c;
@@ -107,6 +120,14 @@
   --ticket-muted: #5d625b;
   --blueprint: #2a7584;
   --blueprint-foreground: #ffffff;
+  --requester-1: #4c6482;
+  --requester-2: #576089;
+  --requester-3: #655c89;
+  --requester-4: #735983;
+  --requester-5: #7e5578;
+  --requester-6: #875466;
+  --requester-7: #59636e;
+  --requester-8: #6c5f6a;
 }
 
 @theme inline {
@@ -130,6 +151,7 @@
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-field: var(--field);
+  --color-field-hover: var(--field-hover);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
   --color-success: var(--success);

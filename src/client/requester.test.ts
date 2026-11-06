@@ -21,7 +21,7 @@ describe('requester colours', () => {
   it('only generates colours from the reserved-safe palette', () => {
     const names = Array.from({ length: 200 }, (_, index) => `Requester ${index}`)
     const generated = new Set(names.map((name) => requesterColor(request(name), [])))
-    expect([...generated].every((color) => requesterColors.includes(color as (typeof requesterColors)[number]))).toBe(true)
+    expect([...generated].every((color) => requesterColors.includes(color))).toBe(true)
   })
 
   it('spreads across the palette rather than collapsing onto one entry', () => {

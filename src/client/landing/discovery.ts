@@ -47,6 +47,8 @@ export function landingHead(page: SitePage) {
       { name: 'description', content: page.description },
       { name: 'robots', content: 'index, follow' },
       { name: 'theme-color', content: '#15171c' },
+      // Keeps the dark design whatever the visitor's theme; src/theme.css skips the light tokens on such pages.
+      { name: 'color-scheme', content: 'dark' },
       { property: 'og:type', content: 'website' },
       { property: 'og:url', content: url },
       { property: 'og:title', content: page.title },

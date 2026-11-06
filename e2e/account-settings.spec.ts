@@ -100,12 +100,6 @@ test('manages profile details through the protected account surface', async ({ p
   if (captureScreenshots) await page.screenshot({ path: path.join(screenshots, 'account-light-theme.png'), fullPage: true })
   await page.reload()
   await expect(html).toHaveAttribute('data-theme', 'light')
-  await page.getByRole('combobox', { name: 'Theme' }).click()
-  await page.getByRole('option', { name: 'Match system' }).click()
-  await expect(html).toHaveAttribute('data-theme', 'dark')
-  await page.emulateMedia({ colorScheme: 'light' })
-  await expect(html).toHaveAttribute('data-theme', 'light')
-  await page.emulateMedia({ colorScheme: 'dark' })
 
   // A tab opened before a release keeps calling server functions by id, including ones the release removed.
   await page.route('**/_serverFn/*', (route) =>
@@ -115,8 +109,16 @@ test('manages profile details through the protected account surface', async ({ p
   )
   await page.getByRole('switch', { name: 'Prints ready' }).click()
   await expect(page.locator('[data-sonner-toast]', { hasText: 'STL Quest has been updated. Refresh the page to continue.' })).toBeVisible()
+  await expect(page.locator('[data-sonner-toaster]')).toHaveAttribute('data-sonner-theme', 'light')
   await expect(page.getByRole('switch', { name: 'Prints ready' })).not.toBeChecked()
   await page.unroute('**/_serverFn/*')
+
+  await page.getByRole('combobox', { name: 'Theme' }).click()
+  await page.getByRole('option', { name: 'Match system' }).click()
+  await expect(html).toHaveAttribute('data-theme', 'dark')
+  await page.emulateMedia({ colorScheme: 'light' })
+  await expect(html).toHaveAttribute('data-theme', 'light')
+  await page.emulateMedia({ colorScheme: 'dark' })
 
   expect((await page.request.post('/api/auth/change-email', { data: { newEmail: 'attacker@example.com' } })).status()).toBe(404)
   expect((await page.request.post('/api/auth/unlink-account', { data: { providerId: 'credential' } })).status()).toBe(404)

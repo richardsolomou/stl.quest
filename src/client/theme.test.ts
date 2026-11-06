@@ -5,6 +5,7 @@ import { setThemePreference, themeScript } from './theme'
 function browser({ stored, systemDark = false }: { stored?: string; systemDark?: boolean }) {
   const storage = new Map(stored === undefined ? [] : [['stlquest:theme', stored]])
   const listeners = new EventTarget()
+  const addEventListener = vi.fn(listeners.addEventListener.bind(listeners))
   const system = Object.assign(new EventTarget(), { matches: systemDark })
   const root = { dataset: {} as Record<string, string> }
   const globals = {
@@ -15,12 +16,13 @@ function browser({ stored, systemDark = false }: { stored?: string; systemDark?:
     },
     document: { documentElement: root },
     matchMedia: () => system,
-    addEventListener: listeners.addEventListener.bind(listeners),
+    addEventListener,
     dispatchEvent: listeners.dispatchEvent.bind(listeners),
   }
   for (const [name, value] of Object.entries(globals)) vi.stubGlobal(name, value)
-  runInNewContext(themeScript, globals)
-  return { root, system }
+  const run = () => runInNewContext(themeScript, globals)
+  run()
+  return { root, system, storage, run, addEventListener, dispatch: (event: Event) => listeners.dispatchEvent(event) }
 }
 
 afterEach(() => {
@@ -53,6 +55,19 @@ describe('themeScript', () => {
     system.matches = true
     system.dispatchEvent(new Event('change'))
     expect(root.dataset.theme).toBe('dark')
+  })
+
+  it('reapplies when another tab changes the stored choice', () => {
+    const { root, storage, dispatch } = browser({})
+    storage.set('stlquest:theme', 'dark')
+    dispatch(new Event('storage'))
+    expect(root.dataset.theme).toBe('dark')
+  })
+
+  it('registers its listeners once when the router runs it again', () => {
+    const { run, addEventListener } = browser({})
+    run()
+    expect(addEventListener).toHaveBeenCalledTimes(2)
   })
 })
 

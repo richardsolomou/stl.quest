@@ -11,11 +11,14 @@ type ResolvedTheme = Exclude<ThemePreference, 'system'>
 
 const storageKey = 'stlquest:theme'
 const changeEvent = 'stlquest:theme'
+const explicitThemes: readonly string[] = themePreferences.map((option) => option.value).filter((value) => value !== 'system')
+const isExplicit = (value: string | null): value is ResolvedTheme => value !== null && explicitThemes.includes(value)
 
 /**
  * Sets `data-theme` on `<html>` before the first paint, and again whenever the stored choice or the system scheme
  * changes, so this is the only place a preference turns into a theme.
  *
+ * The router appends the script again on client navigations that change the head, so listeners register only once.
  * A literal rather than a serialized function: the router reruns a head script whose text differs from the server's.
  */
 export const themeScript = `(() => {
@@ -26,9 +29,11 @@ export const themeScript = `(() => {
     try {
       preference = localStorage.getItem(${JSON.stringify(storageKey)})
     } catch {}
-    root.dataset.theme = preference === 'light' || preference === 'dark' ? preference : systemDark.matches ? 'dark' : 'light'
+    root.dataset.theme = ${JSON.stringify(explicitThemes)}.includes(preference) ? preference : systemDark.matches ? 'dark' : 'light'
   }
   apply()
+  if (globalThis.__stlquestTheme) return
+  globalThis.__stlquestTheme = true
   systemDark.addEventListener('change', apply)
   addEventListener('storage', apply)
   addEventListener(${JSON.stringify(changeEvent)}, apply)
@@ -37,7 +42,7 @@ export const themeScript = `(() => {
 function storedPreference(): ThemePreference {
   try {
     const stored = localStorage.getItem(storageKey)
-    return stored === 'light' || stored === 'dark' ? stored : 'system'
+    return isExplicit(stored) ? stored : 'system'
   } catch {
     return 'system'
   }
