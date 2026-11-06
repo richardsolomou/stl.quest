@@ -54,27 +54,25 @@ e2e-install:
     pnpm exec playwright install chromium
 
 e2e-build:
-    docker build -t stlquest-e2e .
+    sh scripts/e2eLock.sh docker build -t stlquest-e2e .
 
-e2e *args: e2e-build
-    sh scripts/runE2e.sh {{ args }}
+e2e *args:
+    sh scripts/e2eLock.sh sh -c 'just e2e-build && just e2e-run "$@"' e2e {{ args }}
 
 e2e-run *args:
-    sh scripts/runE2e.sh {{ args }}
+    sh scripts/e2eLock.sh sh scripts/runE2e.sh {{ args }}
 
-e2e-distributed: e2e-build
-    pnpm exec playwright test --config playwright.distributed.config.ts
+e2e-distributed:
+    sh scripts/e2eLock.sh sh -c 'just e2e-build && just e2e-distributed-run'
 
 e2e-distributed-run:
-    pnpm exec playwright test --config playwright.distributed.config.ts
+    sh scripts/e2eLock.sh pnpm exec playwright test --config playwright.distributed.config.ts
 
 e2e-ci:
-    sh scripts/runE2e.sh e2e/00-stlquest.spec.ts e2e/account-settings.spec.ts e2e/chunk-recovery.spec.ts e2e/request-ordering.spec.ts
-    sh scripts/runE2e.sh --project hosted-managed --project self-hosted-http --project self-hosted-https --project preview-seed
-    pnpm exec playwright test --config playwright.distributed.config.ts
+    sh scripts/e2eLock.sh sh -c 'just e2e-run e2e/00-stlquest.spec.ts e2e/account-settings.spec.ts e2e/chunk-recovery.spec.ts e2e/request-ordering.spec.ts && just e2e-run --project hosted-managed --project self-hosted-http --project self-hosted-https --project preview-seed && just e2e-distributed-run'
 
-e2e-screenshots *args: e2e-build
-    CAPTURE_E2E_SCREENSHOTS=1 sh scripts/runE2e.sh {{ args }}
+e2e-screenshots *args:
+    sh scripts/e2eLock.sh sh -c 'just e2e-build && CAPTURE_E2E_SCREENSHOTS=1 just e2e-run "$@"' e2e {{ args }}
 
-e2e-trace *args: e2e-build
-    PLAYWRIGHT_TRACE=1 sh scripts/runE2e.sh {{ args }}
+e2e-trace *args:
+    sh scripts/e2eLock.sh sh -c 'just e2e-build && PLAYWRIGHT_TRACE=1 just e2e-run "$@"' e2e {{ args }}
