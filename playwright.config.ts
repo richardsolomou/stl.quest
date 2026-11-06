@@ -53,7 +53,8 @@ export default defineConfig({
   // default under CI load. Retries stay off, so assertions need room instead.
   expect: { timeout: 15_000 },
   reporter: process.env.CI ? 'github' : 'list',
-  use: { baseURL, trace, screenshot: 'only-on-failure' },
+  // Playwright emulates a light system scheme by default; dark keeps inspection screenshots on the default theme.
+  use: { baseURL, trace, screenshot: 'only-on-failure', colorScheme: 'dark' },
   projects: [
     {
       name: 'chromium',

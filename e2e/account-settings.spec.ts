@@ -91,6 +91,22 @@ test('manages profile details through the protected account surface', async ({ p
   await page.reload()
   await expect(page.getByRole('switch', { name: 'Prints ready' })).not.toBeChecked()
 
+  const html = page.locator('html')
+  await expect(html).toHaveAttribute('data-theme', 'dark')
+  await page.getByRole('combobox', { name: 'Theme' }).click()
+  await page.getByRole('option', { name: 'Light' }).click()
+  await expect(html).toHaveAttribute('data-theme', 'light')
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(243, 241, 234)')
+  if (captureScreenshots) await page.screenshot({ path: path.join(screenshots, 'account-light-theme.png'), fullPage: true })
+  await page.reload()
+  await expect(html).toHaveAttribute('data-theme', 'light')
+  await page.getByRole('combobox', { name: 'Theme' }).click()
+  await page.getByRole('option', { name: 'Match system' }).click()
+  await expect(html).toHaveAttribute('data-theme', 'dark')
+  await page.emulateMedia({ colorScheme: 'light' })
+  await expect(html).toHaveAttribute('data-theme', 'light')
+  await page.emulateMedia({ colorScheme: 'dark' })
+
   // A tab opened before a release keeps calling server functions by id, including ones the release removed.
   await page.route('**/_serverFn/*', (route) =>
     route.request().method() === 'POST'
