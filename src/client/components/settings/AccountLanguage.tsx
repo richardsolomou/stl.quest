@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { Field, FieldLabel } from '@/components/ui/field'
+import { Field, FieldContent, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { LOCALE_NAMES, LOCALES, isLocale, negotiateLocale, type Locale } from '../../../core/i18n'
 import { updateLocale } from '../../../server/fns'
@@ -24,9 +24,12 @@ export function AccountLanguage({ preference }: { preference?: Locale }) {
   const items = [{ value: BROWSER, label: browserLabel }, ...LOCALES.map((locale) => ({ value: locale, label: LOCALE_NAMES[locale] }))]
   const value = preference ?? BROWSER
   return (
-    <SettingsSection title={t.language.title} description={t.language.description}>
-      <Field>
-        <FieldLabel htmlFor="interface-language">{t.language.label}</FieldLabel>
+    <SettingsSection title={t.language.title}>
+      <Field orientation="horizontal" className="max-sm:flex-col">
+        <FieldContent>
+          <FieldLabel htmlFor="interface-language">{t.language.label}</FieldLabel>
+          <FieldDescription>{t.language.description}</FieldDescription>
+        </FieldContent>
         <Select
           items={items}
           value={value}
@@ -36,10 +39,10 @@ export function AccountLanguage({ preference }: { preference?: Locale }) {
             mutation.mutate({ data: { locale: isLocale(next) ? next : undefined } })
           }}
         >
-          <SelectTrigger className="w-full sm:w-72" id="interface-language" aria-label={t.language.label}>
+          <SelectTrigger className="w-auto max-w-56 max-sm:w-full max-sm:max-w-none" id="interface-language" aria-label={t.language.label}>
             <SelectValue />
           </SelectTrigger>
-          <SelectContent align="start" alignItemWithTrigger={false}>
+          <SelectContent align="end" alignItemWithTrigger={false}>
             {items.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}

@@ -10,13 +10,13 @@ export function AccountAppearance() {
   const items = themePreferences.map((value) => ({ value, label: copy.themes[value] }))
   return (
     <SettingsSection title={copy.title}>
-      <Field orientation="horizontal">
+      <Field orientation="horizontal" className="max-sm:flex-col">
         <FieldContent>
           <FieldLabel htmlFor="theme-preference">{copy.theme}</FieldLabel>
           <FieldDescription>{copy.themeDescription}</FieldDescription>
         </FieldContent>
         <Select items={items} value={preference} onValueChange={(value) => setThemePreference(value as ThemePreference)}>
-          <SelectTrigger id="theme-preference" className="w-40">
+          <SelectTrigger id="theme-preference" className="w-40 max-sm:w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent align="end" alignItemWithTrigger={false}>
