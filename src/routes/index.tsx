@@ -31,7 +31,7 @@ import { retryQueries } from '../client/queryState'
 import { requestViewedProperties } from '../client/telemetry'
 import { PrintersPane } from '../client/components/settings/PrintersPane'
 import { StoragePane } from '../client/components/settings/StoragePane'
-import { peopleQuery, requestsQuery, sessionQuery } from '../client/queries'
+import { peopleQuery, pendingEstimateRefetchInterval, requestsQuery, sessionQuery } from '../client/queries'
 import { useWorkspaceSlug } from '../client/workspace'
 import { needsStorageOnboarding, storageSetupState } from '../client/onboarding'
 import type { PublicPrintRequest } from '../core/types'
@@ -128,7 +128,7 @@ function AuthenticatedHome() {
   const hideRequester = ownRequestsOnly
   const effectiveSearch = !isWorkspaceOwner && search.sort === 'round-robin' ? { ...search, sort: undefined } : search
   const filters = filtersFromSearch(effectiveSearch)
-  const requestsResult = useQuery(requestsQuery(workspaceSlug, filters))
+  const requestsResult = useQuery({ ...requestsQuery(workspaceSlug, filters), refetchInterval: pendingEstimateRefetchInterval })
   const peopleResult = useQuery(peopleQuery(workspaceSlug))
   const result = requestsResult.data
   const people = peopleResult.data
@@ -209,7 +209,11 @@ function AuthenticatedHome() {
   // A print opened from My requests may sit outside the current board filters; that list shares this cache entry,
   // which stays enabled while such a print is open so workspace invalidations keep the dialog current.
   const openOffBoard = openRequestId !== null && !requests.some((request) => request.id === openRequestId)
-  const myRequestsResult = useQuery({ ...requestsQuery(workspaceSlug, { requester: identity?.id }), enabled: openOffBoard })
+  const myRequestsResult = useQuery({
+    ...requestsQuery(workspaceSlug, { requester: identity?.id }),
+    enabled: openOffBoard,
+    refetchInterval: pendingEstimateRefetchInterval,
+  })
   const findRequest = (id: string | null) =>
     requests.find((request) => request.id === id) ?? myRequestsResult.data?.requests.find((request) => request.id === id)
   const openRequest = (id: string) => {
