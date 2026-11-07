@@ -38,7 +38,7 @@ import {
 import { useWorkspaceSlug } from '../workspace'
 import { useModelAttachment } from '../modelAttachment'
 import { workflow } from '../../core/workflow'
-import { formatEstimateMaterial, formatEstimateTime } from '../../core/printEstimates'
+import { estimatePending, formatEstimateMaterial, formatEstimateTime } from '../../core/printEstimates'
 import { RequestModelField } from './RequestModelField'
 import { useI18n } from '../i18n'
 import { statusText, type Messages } from '../../core/i18n'
@@ -333,7 +333,7 @@ export function RequestModal({
                   value={values.estimatedMaterial}
                   placeholder={
                     automaticEstimate?.material === undefined
-                      ? estimatePlaceholder(t, request.estimateGeometryStatus)
+                      ? estimatePlaceholder(t, request)
                       : `≈${formatEstimateMaterial(automaticEstimate.material, locale)}`
                   }
                   onChange={(event) => patchValues({ estimatedMaterial: event.target.value })}
@@ -350,7 +350,7 @@ export function RequestModal({
                   value={values.estimatedMinutes}
                   placeholder={
                     automaticEstimate?.minutes === undefined
-                      ? estimatePlaceholder(t, request.estimateGeometryStatus)
+                      ? estimatePlaceholder(t, request)
                       : `≈${formatEstimateTime(automaticEstimate.minutes, t.requests)}`
                   }
                   onChange={(event) => patchValues({ estimatedMinutes: event.target.value })}
@@ -449,6 +449,6 @@ export function RequestModal({
   )
 }
 
-function estimatePlaceholder(t: Messages, status: PublicPrintRequest['estimateGeometryStatus']) {
-  return status === 'pending' || status === 'running' ? t.requests.modal.calculating : t.requests.modal.notAvailable
+function estimatePlaceholder(t: Messages, request: PublicPrintRequest) {
+  return estimatePending(request) ? t.requests.modal.calculating : t.requests.modal.notAvailable
 }
