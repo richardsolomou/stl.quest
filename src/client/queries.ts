@@ -27,6 +27,7 @@ import {
   getNotificationPreferences,
   sessionInfo,
 } from '../server/fns'
+import { estimatePending } from '../core/printEstimates'
 import type { PublicRequestQueryResult, RequestFilters } from '../core/types'
 
 export type RequestQuerySnapshot = [readonly unknown[], PublicRequestQueryResult | undefined]
@@ -69,6 +70,8 @@ export const requestsQuery = (workspaceSlug: string, filters: RequestFilters = {
     queryKey: ['requests', workspaceSlug, filters],
     queryFn: () => listRequests({ data: { ...filters, workspaceSlug } }),
     placeholderData: (previousData, previousQuery) => (previousQuery?.queryKey[1] === workspaceSlug ? previousData : undefined),
+    // Realtime normally reports the finished estimate, but a proxy that drops the WebSocket would leave the card pending for good.
+    refetchInterval: (query) => (query.state.data?.requests.some(estimatePending) ? 5_000 : false),
   })
 export const peopleQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['people', workspaceSlug], queryFn: () => listPeople({ data: { workspaceSlug } }) })

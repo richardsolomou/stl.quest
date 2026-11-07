@@ -1,7 +1,7 @@
 import { QueryClient } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
 import type { PublicPrintRequest, PublicRequestQueryResult } from '../core/types'
-import { preloadSessionQueries, removeRequestFromQueries, restoreRequestQueries } from './queries'
+import { preloadSessionQueries, removeRequestFromQueries, requestsQuery, restoreRequestQueries } from './queries'
 
 describe('preloadSessionQueries', () => {
   it('seeds the active workspace session query', async () => {
@@ -94,5 +94,51 @@ describe('optimistic request deletion', () => {
     restoreRequestQueries(queryClient, snapshots)
 
     expect(queryClient.getQueryData(queryKey)).toEqual(result)
+  })
+})
+
+describe('requestsQuery', () => {
+  const request = {
+    id: 'request-1',
+    name: 'Dragon',
+    quantity: 1,
+    counts: { pending: 1 },
+    orders: {},
+    hasThumbnail: false,
+    createdAt: 1,
+    updatedAt: 1,
+    requesterId: 'user-1',
+    requesterName: 'Requester',
+    mine: true,
+    canEdit: true,
+    canDelete: true,
+    canArchive: true,
+    hasFile: true,
+    hasSourceImage: false,
+    hasPreview: false,
+    groups: [],
+  } satisfies PublicPrintRequest
+
+  function refetchInterval(requests?: PublicPrintRequest[]) {
+    const interval = requestsQuery('workshop').refetchInterval
+    if (typeof interval !== 'function') throw new Error('the requests query should derive its interval from the loaded prints')
+    const data =
+      requests && ({ requests, groups: [], facets: { requesters: [], total: 0, available: 0 } } satisfies PublicRequestQueryResult)
+    return interval({ state: { data } } as Parameters<typeof interval>[0])
+  }
+
+  it('polls while a print still waits for its estimate, so a dropped realtime connection cannot leave it pending', () => {
+    expect(refetchInterval([request, { ...request, id: 'request-2', estimateGeometryStatus: 'running' }])).toBe(5_000)
+    expect(refetchInterval([{ ...request, estimateGeometryStatus: 'pending' }])).toBe(5_000)
+  })
+
+  it('stops polling once every estimate has settled', () => {
+    expect(refetchInterval(undefined)).toBe(false)
+    expect(
+      refetchInterval([
+        { ...request, estimateGeometryStatus: 'ready' },
+        { ...request, estimateGeometryStatus: 'failed' },
+      ]),
+    ).toBe(false)
   })
 })

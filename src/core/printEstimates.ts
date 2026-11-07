@@ -1,5 +1,5 @@
 import { DEFAULT_LOCALE, type Locale, type Messages } from './i18n'
-import type { PrintType } from './types'
+import type { PrintType, PublicPrintRequest } from './types'
 
 const FILAMENT_DENSITY_G_PER_CM3 = 1.24
 const FILAMENT_INFILL_FRACTION = 0.15
@@ -57,6 +57,11 @@ function filamentMinutes(material?: number, heightMm?: number) {
   const layerMinutes = positive(heightMm) ? (heightMm / FILAMENT_LAYER_HEIGHT_MM) * (FILAMENT_MINIMUM_LAYER_SECONDS / 60) : undefined
   const printingMinutes = Math.max(extrusionMinutes ?? 0, layerMinutes ?? 0)
   return printingMinutes ? FILAMENT_STARTUP_MINUTES + printingMinutes : undefined
+}
+
+/** The geometry a fresh or replaced model still owes, so the missing estimate reads as pending rather than absent. */
+export function estimatePending(request: Pick<PublicPrintRequest, 'estimateGeometryStatus'>) {
+  return request.estimateGeometryStatus === 'pending' || request.estimateGeometryStatus === 'running'
 }
 
 export function effectivePrintEstimate(input: {
