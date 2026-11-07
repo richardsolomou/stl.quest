@@ -70,9 +70,10 @@ export const requestsQuery = (workspaceSlug: string, filters: RequestFilters = {
     queryKey: ['requests', workspaceSlug, filters],
     queryFn: () => listRequests({ data: { ...filters, workspaceSlug } }),
     placeholderData: (previousData, previousQuery) => (previousQuery?.queryKey[1] === workspaceSlug ? previousData : undefined),
-    // Realtime normally reports the finished estimate, but a proxy that drops the WebSocket would leave the card pending for good.
-    refetchInterval: (query) => (query.state.data?.requests.some(estimatePending) ? 5_000 : false),
   })
+// Realtime normally reports the finished estimate, but a proxy that drops the WebSocket would leave the board's cards pending for good.
+export const pendingEstimateRefetchInterval = (query: { state: { data?: PublicRequestQueryResult } }) =>
+  query.state.data?.requests.some(estimatePending) ? 5_000 : false
 export const peopleQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['people', workspaceSlug], queryFn: () => listPeople({ data: { workspaceSlug } }) })
 export const usersQuery = (workspaceSlug: string) =>

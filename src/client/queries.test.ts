@@ -1,7 +1,28 @@
 import { QueryClient } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
 import type { PublicPrintRequest, PublicRequestQueryResult } from '../core/types'
-import { preloadSessionQueries, removeRequestFromQueries, requestsQuery, restoreRequestQueries } from './queries'
+import { pendingEstimateRefetchInterval, preloadSessionQueries, removeRequestFromQueries, restoreRequestQueries } from './queries'
+
+const request = {
+  id: 'request-1',
+  name: 'Dragon',
+  quantity: 1,
+  counts: { pending: 1 },
+  orders: {},
+  hasThumbnail: false,
+  createdAt: 1,
+  updatedAt: 1,
+  requesterId: 'user-1',
+  requesterName: 'Requester',
+  mine: true,
+  canEdit: true,
+  canDelete: true,
+  canArchive: true,
+  hasFile: true,
+  hasSourceImage: false,
+  hasPreview: false,
+  groups: [],
+} satisfies PublicPrintRequest
 
 describe('preloadSessionQueries', () => {
   it('seeds the active workspace session query', async () => {
@@ -31,27 +52,6 @@ describe('preloadSessionQueries', () => {
 })
 
 describe('optimistic request deletion', () => {
-  const request = {
-    id: 'request-1',
-    name: 'Dragon',
-    quantity: 1,
-    counts: { pending: 1 },
-    orders: {},
-    hasThumbnail: false,
-    createdAt: 1,
-    updatedAt: 1,
-    requesterId: 'user-1',
-    requesterName: 'Requester',
-    mine: true,
-    canEdit: true,
-    canDelete: true,
-    canArchive: true,
-    hasFile: true,
-    hasSourceImage: false,
-    hasPreview: false,
-    groups: [],
-  } satisfies PublicPrintRequest
-
   it('removes a request from every cached workspace view', async () => {
     const queryClient = new QueryClient()
     const result = {
@@ -97,34 +97,10 @@ describe('optimistic request deletion', () => {
   })
 })
 
-describe('requestsQuery', () => {
-  const request = {
-    id: 'request-1',
-    name: 'Dragon',
-    quantity: 1,
-    counts: { pending: 1 },
-    orders: {},
-    hasThumbnail: false,
-    createdAt: 1,
-    updatedAt: 1,
-    requesterId: 'user-1',
-    requesterName: 'Requester',
-    mine: true,
-    canEdit: true,
-    canDelete: true,
-    canArchive: true,
-    hasFile: true,
-    hasSourceImage: false,
-    hasPreview: false,
-    groups: [],
-  } satisfies PublicPrintRequest
-
+describe('pendingEstimateRefetchInterval', () => {
   function refetchInterval(requests?: PublicPrintRequest[]) {
-    const interval = requestsQuery('workshop').refetchInterval
-    if (typeof interval !== 'function') throw new Error('the requests query should derive its interval from the loaded prints')
-    const data =
-      requests && ({ requests, groups: [], facets: { requesters: [], total: 0, available: 0 } } satisfies PublicRequestQueryResult)
-    return interval({ state: { data } } as Parameters<typeof interval>[0])
+    const data = requests && { requests, groups: [], facets: { requesters: [], total: 0, available: 0 } }
+    return pendingEstimateRefetchInterval({ state: { data } })
   }
 
   it('polls while a print still waits for its estimate, so a dropped realtime connection cannot leave it pending', () => {
@@ -133,7 +109,7 @@ describe('requestsQuery', () => {
   })
 
   it('stops polling once every estimate has settled', () => {
-    expect(refetchInterval(undefined)).toBe(false)
+    expect(refetchInterval()).toBe(false)
     expect(
       refetchInterval([
         { ...request, estimateGeometryStatus: 'ready' },
