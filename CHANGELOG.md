@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.47.1
+
+### Patch Changes
+
+- fdf7210: Refresh the board while a print still works out its estimate, so that the estimate and thumbnail appear even when a proxy blocks live updates.
+- c8629d2: Keep the last known update notice after a failed release check and retry failed checks sooner, so that a GitHub rate limit or outage does not hide the notice for 12 hours.
+- 9ffb455: Bundle Caddy and Centrifugo built with patched x/net and klauspost/compress, so that the container image clears the HIGH-severity advisories CVE-2026-78661 and GO-2026-6865.
+
 ## 1.47.0
 
 ### Minor Changes
