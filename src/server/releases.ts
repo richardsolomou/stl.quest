@@ -94,7 +94,7 @@ export function createReleaseChecker({
       } catch (error) {
         // Keep the last known update so a transient failure does not hide the notice.
         failures += 1
-        const backoffAt = now() + Math.min(retryMs * 2 ** (failures - 1), cacheMs)
+        const backoffAt = now() + retryMs * 2 ** (failures - 1)
         const retryAt = error instanceof ReleaseRequestError ? error.retryAt : undefined
         expiresAt = Math.min(Math.max(backoffAt, retryAt ?? 0), now() + cacheMs)
         logger.warn(

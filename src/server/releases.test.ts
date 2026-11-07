@@ -72,6 +72,10 @@ describe('release updates', () => {
     time -= 1
     await check('0.27.2')
     expect(fetcher).toHaveBeenCalledTimes(6)
+
+    time += 1
+    await check('0.27.2')
+    expect(fetcher).toHaveBeenCalledTimes(7)
   })
 
   it('waits for the GitHub rate limit reset, then recovers', async () => {
