@@ -1,6 +1,6 @@
 import { Spinner } from '@/components/ui/spinner'
 import type { PublicPrintRequest } from '../../core/types'
-import { formatEstimateMaterial, formatEstimateTime } from '../../core/printEstimates'
+import { estimatePending, formatEstimateMaterial, formatEstimateTime } from '../../core/printEstimates'
 import { DetailRow } from './DetailRow'
 import { useI18n, type I18n } from '../i18n'
 
@@ -30,11 +30,6 @@ export function printEstimateSummary(request: PublicPrintRequest, i18n: I18n) {
   const estimate = requestPrintEstimate(request)
   const parts = estimate ? estimateParts(estimate, i18n) : []
   return parts.length ? parts.join(' · ') : undefined
-}
-
-/** The geometry a fresh or replaced model still owes, so the missing estimate reads as pending rather than absent. */
-function estimatePending(request: PublicPrintRequest) {
-  return request.estimateGeometryStatus === 'pending' || request.estimateGeometryStatus === 'running'
 }
 
 export function PrintEstimateBadges({ request }: { request: PublicPrintRequest }) {

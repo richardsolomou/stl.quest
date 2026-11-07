@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { messagesFor } from './i18n'
-import { automaticPrintEstimate, effectivePrintEstimate, formatEstimateMaterial, formatEstimateTime } from './printEstimates'
+import {
+  automaticPrintEstimate,
+  effectivePrintEstimate,
+  estimatePending,
+  formatEstimateMaterial,
+  formatEstimateTime,
+} from './printEstimates'
 
 describe('print estimates', () => {
   it('combines a dense shell with 15% internal infill', () => {
@@ -58,6 +64,14 @@ describe('print estimates', () => {
         minutesOverride: 45,
       }),
     ).toMatchObject({ material: 7, minutes: 45, materialAdjusted: true, minutesAdjusted: true })
+  })
+
+  it('treats only queued or running geometry as a pending estimate', () => {
+    expect(estimatePending({ estimateGeometryStatus: 'pending' })).toBe(true)
+    expect(estimatePending({ estimateGeometryStatus: 'running' })).toBe(true)
+    expect(estimatePending({ estimateGeometryStatus: 'ready' })).toBe(false)
+    expect(estimatePending({ estimateGeometryStatus: 'failed' })).toBe(false)
+    expect(estimatePending({})).toBe(false)
   })
 
   it('formats durations for the board', () => {
