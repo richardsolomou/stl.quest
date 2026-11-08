@@ -1,6 +1,6 @@
 import { STLLoader } from 'three-stdlib'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { InvalidMeshError, parseStl } from './stl'
+import { assertBinaryStlFits, InvalidMeshError, parseStl } from './stl'
 
 function loaderPositions(file: Uint8Array) {
   const geometry = new STLLoader().parse(file.slice().buffer)
@@ -143,5 +143,17 @@ describe('STL format detection', () => {
   it('rejects a truncated binary STL whose header starts with solid', () => {
     const file = binaryStl('solid exported by a CAD tool', 10, [[0, 0, 0, 2, 0, 0, 0, 2, 0]])
     expect(() => parseStl(file)).toThrow('invalid or truncated binary STL')
+  })
+})
+
+describe('assertBinaryStlFits', () => {
+  it('accepts a binary STL whose header matches its size, and text that names its solid', () => {
+    expect(() => assertBinaryStlFits(binaryStl('part', 1, [[0, 0, 0, 1, 0, 0, 0, 1, 0]]))).not.toThrow()
+    expect(() => assertBinaryStlFits(new TextEncoder().encode(`solid part\n${TRIANGLE.repeat(2)}endsolid part\n`))).not.toThrow()
+  })
+
+  it('rejects a binary header that declares more triangles than the file holds', () => {
+    const file = binaryStl('part', 0x0aaaaaaa, [[0, 0, 0, 1, 0, 0, 0, 1, 0]])
+    expect(() => assertBinaryStlFits(file)).toThrow(InvalidMeshError)
   })
 })

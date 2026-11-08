@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import * as THREE from 'three'
+import { STLLoader } from 'three-stdlib'
 import { InvalidMeshError } from '../core/mesh/stl'
 import { encodePreviewMesh } from '../core/mesh/previewMesh'
 import { buildScene, parseStl } from './stl'
@@ -25,18 +26,31 @@ describe('client STL parser', () => {
     geometry.dispose()
   })
 
-  it('reports a corrupt binary STL as an InvalidMeshError instead of a bare RangeError', async () => {
-    // A binary STL header whose 32-bit face count is garbage: three-stdlib allocates
-    // Float32Array(faces * 9) and throws a bare RangeError, which the viewer would offer to
-    // retry forever. The guard must turn it into a terminal InvalidMeshError.
+  it('loads a well-formed binary STL', async () => {
+    const buffer = new ArrayBuffer(84 + 50)
+    const view = new DataView(buffer)
+    view.setUint32(80, 1, true)
+    ;[0, 0, 0, 10, 0, 0, 0, 10, 0].forEach((value, index) => view.setFloat32(84 + 12 + index * 4, value, true))
+    const geometry = await parseStl(buffer)
+    expect(geometry.getAttribute('position').count).toBe(3)
+    geometry.dispose()
+  })
+
+  it.each([
+    ['too large to allocate', 0xffffffff],
+    ['small enough to allocate', 0x0aaaaaaa],
+  ])('rejects a binary STL header whose face count is %s before the loader allocates it', async (_, faces) => {
+    // three-stdlib allocates Float32Array(faces * 9) from the header alone. A count just under the
+    // browser limit makes it really try to reserve gigabytes, so the check must run first.
     const buffer = new ArrayBuffer(84)
-    new DataView(buffer).setUint32(80, 0xffffffff, true)
-    const caught = await parseStl(buffer).then(
-      () => undefined,
-      (error: unknown) => error,
-    )
-    expect(caught).toBeInstanceOf(InvalidMeshError)
-    expect((caught as InvalidMeshError).cause).toBeInstanceOf(RangeError)
+    new DataView(buffer).setUint32(80, faces, true)
+    const parse = vi.spyOn(STLLoader.prototype, 'parse')
+    try {
+      await expect(parseStl(buffer)).rejects.toBeInstanceOf(InvalidMeshError)
+      expect(parse).not.toHaveBeenCalled()
+    } finally {
+      parse.mockRestore()
+    }
   })
 
   it('uses flat shading instead of untrusted STL facet normals', () => {
