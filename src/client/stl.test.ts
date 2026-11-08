@@ -40,8 +40,6 @@ describe('client STL parser', () => {
     ['too large to allocate', 0xffffffff],
     ['small enough to allocate', 0x0aaaaaaa],
   ])('rejects a binary STL header whose face count is %s before the loader allocates it', async (_, faces) => {
-    // three-stdlib allocates Float32Array(faces * 9) from the header alone. A count just under the
-    // browser limit makes it really try to reserve gigabytes, so the check must run first.
     const buffer = new ArrayBuffer(84)
     new DataView(buffer).setUint32(80, faces, true)
     const parse = vi.spyOn(STLLoader.prototype, 'parse')
