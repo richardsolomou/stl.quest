@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.47.2
+
+### Patch Changes
+
+- 32f0b99: Reject a corrupt binary STL in the 3D viewer before it reads the triangle count, so that a bad file shows "can't display this model" and does not try to reserve gigabytes of memory.
+
 ## 1.47.1
 
 ### Patch Changes
