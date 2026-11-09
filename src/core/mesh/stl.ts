@@ -33,6 +33,16 @@ export function parseStl(file: Uint8Array): Float32Array {
   return new Float32Array(position.array)
 }
 
+// three-stdlib's STLLoader trusts the triangle count in a binary header and allocates
+// Float32Array(count * 9) before it reads a facet, so a corrupt header can request gigabytes.
+// Reject a file that the loader would read as binary when its header declares more triangles
+// than the file holds.
+export function assertBinaryStlFits(file: Uint8Array): void {
+  if (file.byteLength < 84 || isAsciiStl(file)) return
+  const triangleCount = new DataView(file.buffer, file.byteOffset, file.byteLength).getUint32(80, true)
+  if (84 + triangleCount * 50 > file.byteLength) throw truncatedBinary()
+}
+
 function parseBinaryPositions(file: Uint8Array): Float32Array | undefined {
   if (file.byteLength < 84) return undefined
   const view = new DataView(file.buffer, file.byteOffset, file.byteLength)

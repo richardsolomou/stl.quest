@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { STLLoader } from 'three-stdlib'
 import { decodePreviewMesh } from '../core/mesh/previewMesh'
 import { MODEL_COLOR } from '../core/mesh/appearance'
-import { InvalidMeshError } from '../core/mesh/stl'
+import { assertBinaryStlFits, InvalidMeshError } from '../core/mesh/stl'
 import { isThreeMf, parseThreeMf } from '../core/mesh/threeMf'
 import { isObj, parseObj } from '../core/mesh/obj'
 
@@ -42,13 +42,13 @@ export async function parseStl(buffer: ArrayBuffer): Promise<THREE.BufferGeometr
 }
 
 function parseStlGeometry(buffer: ArrayBuffer): THREE.BufferGeometry {
+  assertBinaryStlFits(new Uint8Array(buffer))
   try {
     return new STLLoader().parse(buffer)
   } catch (error) {
-    // three-stdlib reads a 32-bit face count from the binary STL header and allocates
-    // new Float32Array(faces * 9). A corrupt or non-STL file yields a garbage count, so the
-    // allocation throws a bare RangeError. Report it as invalid input so the viewer reaches its
-    // terminal "can't display this model" state, not a retry that re-fetches the same bytes.
+    // A short or corrupt buffer makes three-stdlib throw a bare RangeError. Report it as invalid
+    // input so the viewer reaches its terminal "can't display this model" state, not a retry
+    // that re-fetches the same bytes.
     throw new InvalidMeshError('could not parse STL', { cause: error })
   }
 }
