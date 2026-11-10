@@ -1624,6 +1624,39 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await dropboxIntegration.getByRole('switch', { name: 'Enable Dropbox' }).click()
   await expect(dropboxIntegration.getByText('Available to workspaces')).toBeVisible()
   await screenshot(page, 'integration-account-access-copy')
+  const googleIntegration = page.getByRole('region', { name: 'Google', exact: true })
+  await googleIntegration.getByRole('button', { name: 'Set up app' }).click()
+  const googleDialog = page.getByRole('dialog', { name: 'Configure Google' })
+  await googleDialog.getByLabel('Client ID').fill('test-client-id')
+  await googleDialog.getByLabel('Client secret').fill('test-client-secret')
+  await googleDialog.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(googleDialog).not.toBeVisible()
+  let finishProviderTest!: () => void
+  const providerTestResponse = new Promise<void>((resolve) => {
+    finishProviderTest = resolve
+  })
+  await page.route('**/api/auth/link-social', async (route) => {
+    await providerTestResponse
+    await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ message: 'Provider test rejected' }) })
+  })
+  await googleIntegration.getByRole('button', { name: 'Test sign-in' }).click()
+  await expect(googleIntegration.getByRole('button', { name: 'Testing sign-in…' })).toBeDisabled()
+  finishProviderTest()
+  await expect(googleIntegration.getByText('Provider test rejected')).toBeVisible()
+  await expect(googleIntegration.getByRole('button', { name: 'Test sign-in' })).toBeEnabled()
+  await page.unroute('**/api/auth/link-social')
+  await page.goto('/admin/integrations?authTest=oidc&authTestFailed=true&error=access_denied')
+  await expect(
+    page
+      .getByRole('region', { name: 'OpenID Connect', exact: true })
+      .getByText('The provider denied or cancelled the authorization request. Try again and approve access for STL Quest in the provider.'),
+  ).toBeVisible()
+  await expect(page.getByRole('region', { name: 'OpenID Connect', exact: true }).locator('pre code')).toHaveText('access_denied')
+  await page.goto('/admin/integrations?authTest=oidc&authTestFailed=true&error=unable_to_link_account')
+  await expect(page.getByText('The provider account could not be linked.', { exact: false })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'OpenID Connect', exact: true }).locator('pre code')).toHaveText('unable_to_link_account')
+  await page.goto('/admin/integrations')
+
   await page
     .locator('[data-slot="settings-section"]')
     .filter({ hasText: 'Outbound email' })

@@ -354,6 +354,26 @@ export const settings = {
       editApp: 'Edit app',
       setUpApp: 'Set up app',
       test: 'Test sign-in',
+      testing: 'Testing sign-in…',
+      testSucceeded: 'Sign-in test succeeded. You can now enable this provider.',
+      testFailed: 'Sign-in test failed. Check the provider settings and try again.',
+      testErrors: {
+        linking:
+          'The provider account could not be linked. Check that your identity provider sends email and email_verified=true. If it still fails, check the STL Quest server logs for the account-linking error.',
+        emailMissing:
+          'The provider did not return an email address. Include the email scope and configure an email claim for this application in your identity provider.',
+        emailUnverified:
+          'The provider did not confirm a verified email address. Verify the account email and configure your identity provider to send email_verified=true.',
+        alreadyLinked:
+          'This provider account is already linked to another STL Quest user. Sign in with a different provider account or unlink it from the other user first.',
+        consent: 'The provider denied or cancelled the authorization request. Try again and approve access for STL Quest in the provider.',
+        expired:
+          'The sign-in callback was missing, expired, or could not be matched to this browser session. Start the test again in the same browser and allow cookies.',
+        profile:
+          'STL Quest could not verify the provider response or read the account profile. Check the issuer URL, client credentials, scopes, and exact callback URL shown in Edit app. Check the server logs for the verification error.',
+        unavailable:
+          'The provider is unavailable. Check the saved credentials and issuer URL, and confirm STL Quest can reach the discovery endpoint. Save the configuration and retry; check the server logs if discovery fails.',
+      },
       toggle: (provider: string) => `Enable ${provider} authentication`,
     },
     dialog: {

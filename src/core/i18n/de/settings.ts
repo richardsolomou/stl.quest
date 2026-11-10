@@ -367,6 +367,27 @@ export const settings: typeof en = {
       editApp: 'App bearbeiten',
       setUpApp: 'App einrichten',
       test: 'Anmeldung testen',
+      testing: 'Anmeldung wird getestet…',
+      testSucceeded: 'Anmeldetest erfolgreich. Du kannst diesen Anbieter jetzt aktivieren.',
+      testFailed: 'Anmeldetest fehlgeschlagen. Prüfe die Anbietereinstellungen und versuche es erneut.',
+      testErrors: {
+        linking:
+          'Das Anbieterkonto konnte nicht verknüpft werden. Prüfe, ob dein Identitätsanbieter email und email_verified=true sendet. Falls es weiterhin fehlschlägt, prüfe die STL-Quest-Serverlogs auf den Verknüpfungsfehler.',
+        emailMissing:
+          'Der Anbieter hat keine E-Mail-Adresse zurückgegeben. Ergänze den Scope email und konfiguriere einen E-Mail-Claim für diese Anwendung beim Identitätsanbieter.',
+        emailUnverified:
+          'Der Anbieter hat keine bestätigte E-Mail-Adresse gemeldet. Bestätige die Konto-E-Mail und konfiguriere den Identitätsanbieter so, dass er email_verified=true sendet.',
+        alreadyLinked:
+          'Dieses Anbieterkonto ist bereits mit einem anderen STL-Quest-Benutzer verknüpft. Melde dich mit einem anderen Anbieterkonto an oder entferne zuerst die bestehende Verknüpfung.',
+        consent:
+          'Der Anbieter hat die Autorisierung abgelehnt oder abgebrochen. Versuche es erneut und erlaube STL Quest den Zugriff beim Anbieter.',
+        expired:
+          'Der Anmelderückruf fehlt, ist abgelaufen oder passt nicht zur Browsersitzung. Starte den Test erneut im selben Browser und erlaube Cookies.',
+        profile:
+          'STL Quest konnte die Anbieterantwort nicht prüfen oder das Kontoprofil nicht lesen. Prüfe Aussteller-URL, Zugangsdaten, Scopes und die genaue Callback-URL unter App bearbeiten. Details stehen in den Serverlogs.',
+        unavailable:
+          'Der Anbieter ist nicht verfügbar. Prüfe die gespeicherten Zugangsdaten, die Aussteller-URL und die Erreichbarkeit des Discovery-Endpunkts. Speichere die Konfiguration erneut. Details zu Discovery-Fehlern stehen in den Serverlogs.',
+      },
       toggle: (provider: string) => `${provider}-Authentifizierung aktivieren`,
     },
     dialog: {

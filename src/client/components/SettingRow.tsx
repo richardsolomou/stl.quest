@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { CircleAlert } from 'lucide-react'
+import { CircleAlert, CircleCheck } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 
@@ -13,13 +13,15 @@ export function SettingRow({
   detail,
   actions,
   problem,
+  success,
 }: {
   icon: ReactNode
   name: string
   status: SettingRowStatus
   detail: ReactNode
   actions: ReactNode
-  problem?: string
+  problem?: ReactNode
+  success?: string
 }) {
   return (
     <section aria-label={name} className="rounded-lg border bg-card p-3">
@@ -35,6 +37,12 @@ export function SettingRow({
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 max-sm:hidden">{actions}</div>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2 sm:hidden">{actions}</div>
+      {success && !problem && (
+        <output className="mt-3 flex items-start gap-2 rounded-lg border px-2.5 py-2 text-sm">
+          <CircleCheck className="mt-0.5 size-4 shrink-0 text-primary" />
+          <span>{success}</span>
+        </output>
+      )}
       {problem && (
         <Alert variant="destructive" className="mt-3">
           <CircleAlert />

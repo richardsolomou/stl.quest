@@ -360,6 +360,26 @@ export const settings: typeof en = {
       editApp: 'Modifier l’application',
       setUpApp: 'Configurer l’application',
       test: 'Tester la connexion',
+      testing: 'Test de connexion…',
+      testSucceeded: 'Test de connexion réussi. Vous pouvez maintenant activer ce fournisseur.',
+      testFailed: 'Échec du test de connexion. Vérifiez les paramètres du fournisseur et réessayez.',
+      testErrors: {
+        linking:
+          'Le compte du fournisseur n’a pas pu être associé. Vérifiez que votre fournisseur d’identité envoie email et email_verified=true. Si le problème persiste, consultez les journaux du serveur STL Quest pour l’erreur d’association.',
+        emailMissing:
+          'Le fournisseur n’a pas renvoyé d’adresse e-mail. Ajoutez la portée email et configurez une déclaration e-mail pour cette application chez votre fournisseur d’identité.',
+        emailUnverified:
+          'Le fournisseur n’a pas confirmé une adresse e-mail vérifiée. Vérifiez l’adresse du compte et configurez le fournisseur pour envoyer email_verified=true.',
+        alreadyLinked:
+          'Ce compte fournisseur est déjà associé à un autre utilisateur STL Quest. Utilisez un autre compte fournisseur ou supprimez d’abord l’association existante.',
+        consent: 'Le fournisseur a refusé ou annulé l’autorisation. Réessayez et autorisez l’accès à STL Quest chez le fournisseur.',
+        expired:
+          'Le retour de connexion est absent, a expiré ou ne correspond pas à cette session. Relancez le test dans le même navigateur en autorisant les cookies.',
+        profile:
+          'STL Quest n’a pas pu vérifier la réponse du fournisseur ou lire le profil. Vérifiez l’URL de l’émetteur, les identifiants, les portées et l’URL de retour exacte dans Modifier l’application. Consultez les journaux du serveur pour les détails.',
+        unavailable:
+          'Le fournisseur est indisponible. Vérifiez les identifiants enregistrés, l’URL de l’émetteur et l’accès au point de découverte. Enregistrez à nouveau la configuration. Consultez les journaux du serveur si la découverte échoue.',
+      },
       toggle: (provider: string) => `Activer l’authentification ${provider}`,
     },
     dialog: {

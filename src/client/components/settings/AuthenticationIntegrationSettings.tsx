@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
+import { useLocation } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -8,7 +9,12 @@ import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
 import { OIDC_DEFAULT_SCOPES, OIDC_NAME_MAX_LENGTH, type PublicIntegrationConfig, type SocialAuthProvider } from '../../../core/auth'
 import { saveSocialProvider, updatePasswordAuth, updateSocialProviderEnabled } from '../../../server/fns'
-import { authClient } from '../../authClient'
+import {
+  socialProviderTestErrorCode,
+  socialProviderTestFailure,
+  socialProviderTestResult,
+  startSocialProviderTest,
+} from '../../socialProviderTest'
 import { invalidateQueries } from '../../queryState'
 import { SOCIAL_PROVIDER_OPTIONS, SOCIAL_PROVIDER_SETTINGS } from '../../socialProviderSettings'
 import { AuthMethodIcon } from '../AuthMethodIcon'
@@ -78,6 +84,16 @@ function ProviderRow({
   })
   const { t } = useI18n()
   const copy = t.settings.signIn
+  const search = useLocation({ select: (location) => location.searchStr })
+  const result = socialProviderTestResult(search, item.id)
+  const testMutation = useMutation({
+    mutationFn: () => startSocialProviderTest(item.id, copy.provider.testFailed),
+  })
+  const callbackFailure =
+    socialProviderTestFailure(search, item.id, copy.provider) ??
+    (result === 'returned' && !config.linked ? copy.provider.testErrors.linking : undefined)
+  const failure = mutation.error?.message ?? testMutation.error?.message ?? callbackFailure
+  const errorCode = socialProviderTestErrorCode(search, item.id)
   const description = t.settings.socialProviders[item.id].description
   const status = config.enabled
     ? { label: copy.status.enabled, tone: 'on' as const }
@@ -92,26 +108,28 @@ function ProviderRow({
       name={item.name}
       status={status}
       detail={config.configured && !config.linked ? `${description} ${copy.provider.testHint(item.name)}` : description}
-      problem={mutation.error?.message}
+      success={result === 'returned' && config.linked ? copy.provider.testSucceeded : undefined}
+      problem={
+        failure ? (
+          <div className="min-w-0 space-y-2">
+            <p>{failure}</p>
+            {errorCode && !mutation.error && !testMutation.error && (
+              <pre className="overflow-x-auto rounded-md bg-muted p-2 text-xs">
+                <code>{errorCode}</code>
+              </pre>
+            )}
+          </div>
+        ) : undefined
+      }
       actions={
         <>
           <Button type="button" variant="outline" size="sm" onClick={onConfigure}>
             {config.configured ? copy.provider.editApp : copy.provider.setUpApp}
           </Button>
           {config.configured && !config.linked && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                void authClient.linkSocial({
-                  provider: item.id,
-                  callbackURL: '/admin/integrations',
-                  errorCallbackURL: '/admin/integrations',
-                })
-              }
-            >
-              {copy.provider.test}
+            <Button type="button" variant="outline" size="sm" disabled={testMutation.isPending} onClick={() => testMutation.mutate()}>
+              {testMutation.isPending && <Spinner />}
+              {testMutation.isPending ? copy.provider.testing : copy.provider.test}
             </Button>
           )}
           <Switch
