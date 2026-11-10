@@ -1,14 +1,23 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { Button } from '@/components/ui/button'
 import { useQuery } from '@tanstack/react-query'
 import { Badge } from '@/components/ui/badge'
 import { formatBytes } from '../../../core/format'
 import type { Locale } from '../../../core/i18n'
-import { adminWorkspaceAttentionReasons, adminWorkspaceHealth, type AdminWorkspace, type AdminWorkspaceDetails } from '../../../core/admin'
+import {
+  adminWorkspaceAttentionReasons,
+  adminWorkspaceHealth,
+  type AdminWorkspace,
+  type AdminWorkspaceDetails,
+  type AdminWorkspaceMember,
+} from '../../../core/admin'
 import { useI18n } from '../../i18n'
-import { adminWorkspaceQuery } from '../../queries'
+import { adminWorkspaceQuery, sessionQuery } from '../../queries'
 import { DialogShell } from '../DialogShell'
 import { ProtectedEmail } from '../ProtectedEmail'
 import { QueryState } from '../QueryState'
+import { SuperAdminAddMemberForm } from './SuperAdminAddMemberForm'
+import { SuperAdminRemoveMemberDialog } from './SuperAdminRemoveMemberDialog'
 
 export function SuperAdminWorkspaceDialog({ workspace, onDone }: { workspace: AdminWorkspace; onDone: () => void }) {
   const copy = useI18n().t.superAdmin.workspaceDetails
@@ -32,6 +41,8 @@ export function SuperAdminWorkspaceDialog({ workspace, onDone }: { workspace: Ad
 
 function WorkspaceDetails({ workspace }: { workspace: AdminWorkspaceDetails }) {
   const { t, locale } = useI18n()
+  const identity = useQuery(sessionQuery()).data?.identity
+  const [removing, setRemoving] = useState<AdminWorkspaceMember | null>(null)
   const copy = t.superAdmin.workspaceDetails
   const formatDateTime = (value: number) => dateTime(value, locale)
   const attention = adminWorkspaceAttentionReasons(workspace, t.superAdmin)
@@ -101,18 +112,37 @@ function WorkspaceDetails({ workspace }: { workspace: AdminWorkspaceDetails }) {
       </DetailSection>
 
       <DetailSection title={copy.members}>
+        <SuperAdminAddMemberForm workspace={workspace} />
         <div className="divide-y rounded-md border">
           {workspace.members.map((member) => (
-            <div key={member.id} className="flex min-w-0 items-center justify-between gap-4 px-3 py-2.5 text-sm">
-              <div className="min-w-0">
+            <div
+              key={member.id}
+              className="flex min-w-0 flex-col gap-2 px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+            >
+              <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{member.name}</p>
                 <ProtectedEmail email={member.email} className="truncate text-xs text-muted-foreground" />
               </div>
-              <Badge variant="secondary">{t.superAdmin.workspaceRoles[member.role]}</Badge>
+              <div className="flex shrink-0 items-center justify-between gap-2">
+                <Badge variant="secondary">{t.superAdmin.workspaceRoles[member.role]}</Badge>
+                {identity?.superAdmin && member.role !== 'owner' && member.id !== identity.id && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive"
+                    aria-label={copy.removeMember(member.name)}
+                    onClick={() => setRemoving(member)}
+                  >
+                    {t.settings.members.actions.remove}
+                  </Button>
+                )}
+              </div>
             </div>
           ))}
         </div>
       </DetailSection>
+      {removing && <SuperAdminRemoveMemberDialog workspaceId={workspace.id} member={removing} onDone={() => setRemoving(null)} />}
     </div>
   )
 }

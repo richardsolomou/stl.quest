@@ -962,6 +962,70 @@ describe('app initialization', () => {
       process.env.PRINTS_DIR = path.join(temporary, 'prints')
     })
 
+    it('lets a super admin add an existing account without changing existing roles or other workspaces', async () => {
+      const { instance, adminHeaders, makerHeaders, maker } = await superAdminAndMaker()
+      const actor = await instance.requireIdentity(adminHeaders)
+      const another = await instance.createWorkspace(makerHeaders, 'Unrelated farm')
+      await instance.addWorkspaceMemberAsSuperAdmin(adminHeaders, maker.workspace.id, actor.id, 'admin')
+      expect(
+        (await instance.repository.listWorkspacesForUser(actor.id)).find((workspace) => workspace.id === maker.workspace.id)?.role,
+      ).toBe('admin')
+      expect((await instance.repository.listWorkspacesForUser(actor.id)).some((workspace) => workspace.id === another.id)).toBe(false)
+      await instance.addWorkspaceMemberAsSuperAdmin(adminHeaders, maker.workspace.id, maker.identity.id, 'member')
+      expect((await maker.repository.listUsers()).find((account) => account.id === maker.identity.id)?.workspaceRole).toBe('owner')
+      await instance.addWorkspaceMemberAsSuperAdmin(adminHeaders, maker.workspace.id, actor.id, 'member')
+      expect((await maker.repository.listUsers()).filter((account) => account.id === actor.id)).toHaveLength(1)
+      expect((await maker.repository.listUsers()).find((account) => account.id === actor.id)?.workspaceRole).toBe('admin')
+    })
+
+    it('rejects direct additions by non-super admins and additions to missing accounts or workspaces', async () => {
+      const { instance, adminHeaders, makerHeaders, maker } = await superAdminAndMaker()
+      await expect(
+        instance.addWorkspaceMemberAsSuperAdmin(makerHeaders, maker.workspace.id, maker.identity.id, 'member'),
+      ).rejects.toMatchObject({ status: 403 })
+      await expect(
+        instance.addWorkspaceMemberAsSuperAdmin(new Headers(), maker.workspace.id, maker.identity.id, 'member'),
+      ).rejects.toMatchObject({ status: 401 })
+      await expect(instance.addWorkspaceMemberAsSuperAdmin(adminHeaders, 'missing', maker.identity.id, 'member')).rejects.toMatchObject({
+        status: 404,
+      })
+      await expect(instance.addWorkspaceMemberAsSuperAdmin(adminHeaders, maker.workspace.id, 'missing', 'member')).rejects.toMatchObject({
+        status: 404,
+      })
+    })
+
+    it('removes a member only from the selected workspace and rejects unauthorized removals', async () => {
+      const { instance, adminHeaders, makerHeaders, maker } = await superAdminAndMaker()
+      const guestHeaders = await signUp(instance, 'guest@example.com', 'Guest')
+      const guest = await instance.requireIdentity(guestHeaders)
+      const another = await instance.createWorkspace(makerHeaders, 'Another farm')
+      await instance.addWorkspaceMemberAsSuperAdmin(adminHeaders, maker.workspace.id, guest.id, 'member')
+      await instance.addWorkspaceMemberAsSuperAdmin(adminHeaders, another.id, guest.id, 'admin')
+      await expect(instance.removeWorkspaceMemberAsSuperAdmin(makerHeaders, maker.workspace.id, guest.id)).rejects.toMatchObject({
+        status: 403,
+      })
+      await expect(instance.removeWorkspaceMemberAsSuperAdmin(new Headers(), maker.workspace.id, guest.id)).rejects.toMatchObject({
+        status: 401,
+      })
+      await expect(instance.removeWorkspaceMemberAsSuperAdmin(adminHeaders, 'missing', guest.id)).rejects.toMatchObject({ status: 404 })
+      await expect(instance.removeWorkspaceMemberAsSuperAdmin(adminHeaders, maker.workspace.id, maker.identity.id)).rejects.toMatchObject({
+        status: 409,
+      })
+      await instance.removeWorkspaceMemberAsSuperAdmin(adminHeaders, maker.workspace.id, guest.id)
+      expect((await instance.repository.listWorkspacesForUser(guest.id)).some((workspace) => workspace.id === maker.workspace.id)).toBe(
+        false,
+      )
+      expect((await instance.repository.listWorkspacesForUser(guest.id)).find((workspace) => workspace.id === another.id)?.role).toBe(
+        'admin',
+      )
+      await expect(instance.workspace(guestHeaders, maker.workspace.slug)).rejects.toMatchObject({ status: 404 })
+      const actor = await instance.requireIdentity(adminHeaders)
+      await instance.addWorkspaceMemberAsSuperAdmin(adminHeaders, maker.workspace.id, actor.id, 'admin')
+      await expect(instance.removeWorkspaceMemberAsSuperAdmin(adminHeaders, maker.workspace.id, actor.id)).rejects.toMatchObject({
+        status: 409,
+      })
+    })
+
     it('deletes another user workspace with its records and local files', async () => {
       const { instance, adminHeaders, maker } = await superAdminAndMaker()
       const requestId = await maker.repository.createRequest({

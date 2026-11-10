@@ -26,6 +26,7 @@ import { UserTableIdentity, userEmailColumnMeta } from '../UserTableIdentity'
 import { UserSummary } from '../UserSummary'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsTableSection } from './SettingsLayout'
 import { InviteDialog, PendingInvites } from './WorkspaceInvites'
+import { SuperAdminAddMemberForm } from './SuperAdminAddMemberForm'
 import { useI18n } from '../../i18n'
 
 type MembersCopy = Messages['settings']['members']
@@ -44,6 +45,7 @@ export function UsersPane({ me }: { me: Identity }) {
   const session = sessionResult.data
   const smtpConfigured = session?.email.workspaceConfigured === true
   const [inviting, setInviting] = useState(false)
+  const [adding, setAdding] = useState(false)
   const [dialog, setDialog] = useState<{ action: UserAction; user: WorkspaceMember } | null>(null)
   const { t, locale } = useI18n()
   const copy = t.settings.members
@@ -96,7 +98,17 @@ export function UsersPane({ me }: { me: Identity }) {
       {dialog?.action === 'visibility' && <ChangeVisibilityDialog user={dialog.user} onDone={() => setDialog(null)} />}
       {dialog?.action === 'remove' && <RemoveMemberDialog user={dialog.user} onDone={() => setDialog(null)} />}
       {inviting && <InviteDialog smtpConfigured={smtpConfigured} onDone={() => setInviting(false)} />}
+      {adding && me.superAdmin && me.workspaceId && (
+        <DialogShell title={t.superAdmin.workspaceDetails.addUser} onClose={() => setAdding(false)}>
+          <SuperAdminAddMemberForm workspace={{ id: me.workspaceId, members: users }} onAdded={() => setAdding(false)} />
+        </DialogShell>
+      )}
       <SettingsActions>
+        {me.superAdmin && me.workspaceId && (
+          <Button type="button" onClick={() => setAdding(true)}>
+            {t.superAdmin.workspaceDetails.addUser}
+          </Button>
+        )}
         <Button type="button" data-onboarding="invite" onClick={() => setInviting(true)}>
           {copy.invite}
         </Button>

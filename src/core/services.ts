@@ -42,7 +42,7 @@ import { modelFormat, sourceImageKey } from './assetKeys'
 import { automaticPrintEstimate } from './printEstimates'
 import { printGroupCohortKey, printGroupNameTaken, validPrintGroupName } from './printGroups'
 import { autoArchiveDue } from './autoArchive'
-import { normalizeBoardConfig } from './visibility'
+import { normalizeBoardConfig, withMemberRequestVisibility } from './visibility'
 import { messagesFor, type Messages } from './i18n'
 
 export type NewRequestInput = Omit<NewPrintRequest, 'ownerUserId'> & { fileName: string; filePath: string }
@@ -71,6 +71,29 @@ export class STLQuestService {
 
   private get text() {
     return this.messages().server
+  }
+
+  async removeWorkspaceMember(actor: Identity, userId: string) {
+    if (!actor.superAdmin && actor.role !== 'admin') throw new Response(this.text.access.forbidden, { status: 403 })
+    if (actor.id === userId) throw new Response(this.text.workspace.cannotRemoveSelf, { status: 409 })
+    if (!(await this.repository.listUsers()).some((member) => member.id === userId)) return
+    await this.repository.removeWorkspaceMember(userId)
+    // Clear overrides so they cannot silently apply if this account rejoins.
+    const board = normalizeBoardConfig(await this.repository.getSetting<Partial<BoardConfig>>('board'))
+    if (board.memberVisibility[userId]) await this.repository.setSetting('board', withMemberRequestVisibility(board, userId, 'default'))
+    this.events.publish('user.created')
+    void this.telemetry.capture(actor.id, 'workspace_member_removed', {}).catch(() => undefined)
+  }
+
+  async addWorkspaceMember(actor: Identity, userId: string, role: 'admin' | 'member') {
+    if (!actor.superAdmin) throw new Response(this.text.access.forbidden, { status: 403 })
+    if (!(await this.repository.listAccounts()).some((account) => account.id === userId))
+      throw new Response(this.text.account.notFound, { status: 404 })
+    // Adding an existing member must never change their role (especially an owner).
+    if ((await this.repository.listUsers()).some((member) => member.id === userId)) return
+    await this.repository.addWorkspaceMember(userId, role)
+    this.events.publish('user.created')
+    void this.telemetry.capture(actor.id, 'workspace_member_added', { role }).catch(() => undefined)
   }
 
   async listRequests(identity: Identity, ownRequestsOnly = false, filters: RequestFilters = {}): Promise<PublicRequestQueryResult> {

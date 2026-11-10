@@ -522,6 +522,22 @@ async function createApp() {
       return nextWorkspace
     }
 
+    const removeWorkspaceMemberAsSuperAdmin = async (headers: Headers, workspaceId: string, userId: string) => {
+      const actor = await requireIdentity(headers)
+      if (!actor.superAdmin) throw new Response(serverMessages().server.access.forbidden, { status: 403 })
+      const target = await repository!.workspaceById(workspaceId)
+      if (!target) throw new Response(serverMessages().server.workspace.notFound, { status: 404 })
+      await (await runtime(target)).service.removeWorkspaceMember(actor, userId)
+    }
+
+    const addWorkspaceMemberAsSuperAdmin = async (headers: Headers, workspaceId: string, userId: string, role: 'admin' | 'member') => {
+      const actor = await requireIdentity(headers)
+      if (!actor.superAdmin) throw new Response(serverMessages().server.access.forbidden, { status: 403 })
+      const target = await repository!.workspaceById(workspaceId)
+      if (!target) throw new Response(serverMessages().server.workspace.notFound, { status: 404 })
+      await (await runtime(target)).service.addWorkspaceMember(actor, userId, role)
+    }
+
     const deleteWorkspaceAsSuperAdmin = async (headers: Headers, workspaceId: string, confirmation: string) => {
       const actor = await requireIdentity(headers)
       if (!actor.superAdmin) throw new Response(serverMessages().server.access.forbidden, { status: 403 })
@@ -655,6 +671,8 @@ async function createApp() {
       createWorkspace,
       deleteWorkspace,
       deleteWorkspaceAsSuperAdmin,
+      addWorkspaceMemberAsSuperAdmin,
+      removeWorkspaceMemberAsSuperAdmin,
       deleteAccount,
       setActiveWorkspace,
       workspace,

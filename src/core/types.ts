@@ -461,6 +461,8 @@ interface RepositoryShape {
   completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }): void
   recordSourceImagePath(id: string, path: string | null): void
   listPeople(): Person[]
+  removeWorkspaceMember(userId: string): void
+  addWorkspaceMember(userId: string, role: WorkspaceRole): void
   listUsers(): Identity[]
   listMemberActivity(): { userId: string; lastActiveAt: number }[]
   recordMemberActivity(userId: string, now: number): void

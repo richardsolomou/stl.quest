@@ -4,7 +4,7 @@ import { expect, test } from './fixtures/test'
 test('signs in over direct self-hosted HTTP', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Set up STL Quest' }).click()
-  await page.getByLabel('Name').fill('Owner')
+  await page.getByLabel('Name').fill('Owner with a long display name for workspace administration')
   await page.getByLabel('Email').fill('owner@example.com')
   await page.getByLabel('Password').fill('correct-horse-battery-staple')
   await page.getByRole('button', { name: 'Create super admin' }).click()
@@ -45,6 +45,12 @@ test('signs in over direct self-hosted HTTP', async ({ page }) => {
   await expect(page.getByText('Leaver was deleted')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Actions for Leaver' })).toHaveCount(0)
 
+  await page.getByRole('button', { name: 'Add user', exact: true }).click()
+  await createUserDialog.getByLabel('Name').fill('Removable member')
+  await createUserDialog.getByLabel('Email').fill('removable@example.com')
+  await createUserDialog.getByLabel('Password').fill('removable-password')
+  await createUserDialog.getByRole('button', { name: 'Create user' }).click()
+
   await page.getByRole('button', { name: 'Actions for Requester' }).click()
   await page.getByRole('button', { name: 'View as user' }).click()
   await page.getByRole('button', { name: 'View as Requester' }).click()
@@ -54,6 +60,25 @@ test('signs in over direct self-hosted HTTP', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Exit impersonation' }).click()
   await expect(page.getByText('Viewing as Requester')).toHaveCount(0)
+  await page.goto('/settings/users')
+  await page.getByRole('button', { name: 'Add user', exact: true }).click()
+  const addMember = page.getByRole('dialog', { name: 'Add user', exact: true })
+  const settingsPicker = addMember.getByRole('combobox', { name: 'Add user' })
+  for (const width of [320, 1280]) {
+    await page.setViewportSize({ width, height: 900 })
+    await settingsPicker.fill('requester@example.com')
+    await settingsPicker.press('ArrowDown')
+    await expectWithinViewportWidth(page, page.getByRole('option', { name: 'Requester (requester@example.com)' }))
+    if (process.env.CAPTURE_E2E_SCREENSHOTS === '1')
+      await page.screenshot({ path: `test-results/settings-add-member-${width}.png`, fullPage: true, animations: 'disabled' })
+    await settingsPicker.press('Escape')
+  }
+  await settingsPicker.fill('requester@example.com')
+  await settingsPicker.press('ArrowDown')
+  await page.getByRole('option', { name: 'Requester (requester@example.com)' }).click()
+  await addMember.getByRole('button', { name: 'Add user', exact: true }).click()
+  await expect(addMember).toHaveCount(0)
+  await expect(page.getByRole('row').filter({ hasText: 'Requester' })).toHaveCount(1)
   await page.goto('/admin/workspaces')
   const workspaceActions = page.getByRole('button', { name: "Actions for Requester's workspace" })
   for (const width of [320, 768, 1280]) {
@@ -61,6 +86,62 @@ test('signs in over direct self-hosted HTTP', async ({ page }) => {
     await expectTablesFitWidth(page)
     await expectWithinViewportWidth(page, workspaceActions)
   }
+  await page.getByRole('row', { name: "View details for Requester's workspace" }).click()
+  const details = page.getByRole('dialog', { name: "Requester's workspace", exact: true })
+  const accountPicker = details.getByRole('combobox', { name: 'Add user' })
+  for (const width of [320, 1280]) {
+    await page.setViewportSize({ width, height: 900 })
+    await accountPicker.fill('owner@example.com')
+    await accountPicker.press('ArrowDown')
+    await expect(
+      page.getByRole('option', { name: 'Owner with a long display name for workspace administration (owner@example.com)' }),
+    ).toBeVisible()
+    await expectWithinViewportWidth(
+      page,
+      page.getByRole('option', { name: 'Owner with a long display name for workspace administration (owner@example.com)' }),
+    )
+    await expect
+      .poll(async () => {
+        const input = await accountPicker.locator('..').boundingBox()
+        const popup = await page.locator('[data-slot="combobox-content"]').boundingBox()
+        return input && popup ? Math.abs(input.width - popup.width) : Infinity
+      })
+      .toBeLessThan(8)
+    if (process.env.CAPTURE_E2E_SCREENSHOTS === '1')
+      await page.screenshot({ path: `test-results/admin-add-member-${width}.png`, fullPage: true, animations: 'disabled' })
+    await accountPicker.press('Escape')
+  }
+  await accountPicker.fill('owner@example.com')
+  await accountPicker.press('ArrowDown')
+  await page.getByRole('option', { name: 'Owner with a long display name for workspace administration (owner@example.com)' }).click()
+  await details.getByLabel('Role', { exact: true }).selectOption('admin')
+  await details.getByRole('button', { name: 'Add user', exact: true }).click()
+  await expect(details.getByText('owner@example.com', { exact: true })).toBeVisible()
+  await expect(details.getByRole('button', { name: 'Add user', exact: true })).toBeDisabled()
+  await accountPicker.fill('removable@example.com')
+  await accountPicker.press('ArrowDown')
+  await page.getByRole('option', { name: 'Removable member (removable@example.com)' }).click()
+  await details.getByRole('button', { name: 'Add user', exact: true }).click()
+  const removeMember = details.getByRole('button', { name: 'Remove member: Removable member', exact: true })
+  await expect(removeMember).toBeVisible()
+  await expect(details.getByRole('button', { name: 'Remove member: Requester', exact: true })).toHaveCount(0)
+  for (const width of [320, 1280]) {
+    await page.setViewportSize({ width, height: 900 })
+    await removeMember.scrollIntoViewIfNeeded()
+    await expectWithinViewportWidth(page, removeMember)
+    if (process.env.CAPTURE_E2E_SCREENSHOTS === '1')
+      await page.screenshot({ path: `test-results/admin-remove-member-${width}.png`, fullPage: true, animations: 'disabled' })
+  }
+  await removeMember.click()
+  const removeConfirmation = page.getByRole('alertdialog', { name: 'Remove member', exact: true })
+  await removeConfirmation.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(removeMember).toBeVisible()
+  await removeMember.click()
+  await removeConfirmation.getByRole('button', { name: 'Remove member', exact: true }).click()
+  await expect(removeConfirmation).toHaveCount(0)
+  await expect(removeMember).toHaveCount(0)
+  await expect(details.getByText('Removable member', { exact: true })).toHaveCount(0)
+  await details.getByRole('button', { name: 'Close', exact: true }).click()
   await workspaceActions.click()
   await page.getByRole('button', { name: 'Delete workspace' }).click()
   const deleteWorkspaceDialog = page.getByRole('alertdialog', { name: 'Delete workspace' })
