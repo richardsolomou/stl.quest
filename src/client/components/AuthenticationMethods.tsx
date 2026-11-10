@@ -20,6 +20,7 @@ import {
 import { PASSWORD_MIN_LENGTH } from '../../core/security'
 import { authClient } from '../authClient'
 import { useI18n } from '../i18n'
+import { startSocialSignIn } from '../socialSignIn'
 import { AuthMethodIcon } from './AuthMethodIcon'
 import { PasswordAuthDivider } from './PasswordAuthDivider'
 import { TwoFactorSignInForm } from './TwoFactorSignInForm'
@@ -54,14 +55,14 @@ export function AuthenticationMethods({
   const signInWithProvider = async (provider: SocialAuthProvider) => {
     setBusy(true)
     setError('')
-    const { error: failed } = await authClient.signIn.social({
+    const started = await startSocialSignIn({
       provider,
       callbackURL: '/',
       // Back to the screen that started sign-in, which on the hosted service is not the landing page at /.
       errorCallbackURL: window.location.pathname,
       requestSignUp: signingUp,
     })
-    if (failed) {
+    if (!started) {
       setError(t.auth.continueFailed(socialProviderName(provider, auth.oidcName)))
       setBusy(false)
     }
@@ -111,6 +112,8 @@ export function AuthenticationMethods({
               })
               await queryClient.invalidateQueries({ queryKey: ['session'] })
               await router.invalidate()
+            } catch {
+              setError(signingUp ? t.auth.methods.createAccountFailed : t.auth.signInFailure.fallback)
             } finally {
               setBusy(false)
             }
@@ -170,16 +173,21 @@ export function AuthenticationMethods({
                 setBusy(true)
                 setError('')
                 setResetSent(false)
-                const { error: failed } = await authClient.requestPasswordReset({
-                  email: values.email,
-                  redirectTo: '/reset-password',
-                })
-                if (failed) setError(t.auth.methods.resetEmailFailed)
-                else {
-                  setResetSent(true)
-                  posthog.capture('password_reset_requested')
+                try {
+                  const { error: failed } = await authClient.requestPasswordReset({
+                    email: values.email,
+                    redirectTo: '/reset-password',
+                  })
+                  if (failed) setError(t.auth.methods.resetEmailFailed)
+                  else {
+                    setResetSent(true)
+                    posthog.capture('password_reset_requested')
+                  }
+                } catch {
+                  setError(t.auth.methods.resetEmailFailed)
+                } finally {
+                  setBusy(false)
                 }
-                setBusy(false)
               }}
             >
               {t.auth.methods.forgotPassword}
