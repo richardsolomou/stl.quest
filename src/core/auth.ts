@@ -98,6 +98,7 @@ export type SocialProviderConfig = {
 }
 
 export type OidcProviderConfig = SocialProviderConfig & {
+  allowSignup?: boolean
   issuer: string
   scopes: string[]
   name: string
@@ -107,6 +108,30 @@ export type SocialProviderConfigs = {
   google?: SocialProviderConfig
   discord?: SocialProviderConfig
   oidc?: OidcProviderConfig
+}
+
+export function socialProviderCredentialsChanged(
+  current: IntegrationConfig[SocialAuthProvider],
+  clientId: string,
+  clientSecret: string,
+  issuer?: string,
+) {
+  return (
+    current?.clientId !== clientId ||
+    (clientSecret !== '' && current?.clientSecret !== clientSecret) ||
+    (issuer !== undefined && (current && 'issuer' in current ? current.issuer : undefined) !== issuer)
+  )
+}
+
+export function socialProviderNeedsRetest(
+  current: SocialProviderConfig | OidcProviderConfig | undefined,
+  next: { clientId: string; clientSecret: string; issuer?: string; scopes?: string[] },
+) {
+  return (
+    socialProviderCredentialsChanged(current, next.clientId, next.clientSecret, next.issuer) ||
+    (next.scopes !== undefined &&
+      JSON.stringify(current && 'scopes' in current ? current.scopes : undefined) !== JSON.stringify(next.scopes))
+  )
 }
 
 export type SmtpEmailConfig = {
@@ -190,6 +215,8 @@ export type PublicSocialProviderConfig = {
   clientId: string
   secretConfigured: boolean
   source: 'database' | 'environment'
+  allowSignup?: boolean
+  allowSignupSource?: 'database' | 'environment'
   issuer?: string
   scopes?: string[]
   name?: string

@@ -11,6 +11,7 @@ import {
   signInFailureMessage,
   signInFailureReason,
   socialProviderName,
+  socialProviderNeedsRetest,
 } from './auth'
 
 describe('signInFailureReason', () => {
@@ -123,5 +124,25 @@ describe('OpenID Connect settings', () => {
     expect(linkedAccountActive(link, 'https://auth.example.com/realms/mai')).toBe(false)
     expect(linkedAccountActive(link, undefined)).toBe(false)
     expect(linkedAccountActive({ providerId: 'google', accountId: '42' }, undefined)).toBe(true)
+  })
+})
+
+describe('social provider retesting', () => {
+  const current = {
+    enabled: true,
+    clientId: 'id',
+    clientSecret: 'secret',
+    issuer: 'https://id.example.com',
+    scopes: ['openid', 'email'],
+    name: 'SSO',
+    allowSignup: true,
+  }
+  it('keeps a tested provider enabled when only account creation changes', () => {
+    expect(socialProviderNeedsRetest(current, { ...current, clientSecret: '' })).toBe(false)
+  })
+  it('requires testing new credentials, issuer, or scopes', () => {
+    expect(socialProviderNeedsRetest(current, { ...current, clientSecret: 'replacement' })).toBe(true)
+    expect(socialProviderNeedsRetest(current, { ...current, issuer: 'https://other.example.com' })).toBe(true)
+    expect(socialProviderNeedsRetest(current, { ...current, scopes: ['openid'] })).toBe(true)
   })
 })

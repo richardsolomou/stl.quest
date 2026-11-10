@@ -397,6 +397,11 @@ export const settings: typeof en = {
       clientSecret: 'Client-Secret',
       secretKeep: 'Leer lassen, um das aktuelle Secret zu behalten',
       issuer: 'Issuer-URL',
+      allowSignup: 'Kontoerstellung bei der Anmeldung erlauben',
+      allowSignupHint:
+        'Erstelle Konten für neue OIDC-Benutzer, wenn die Selbstregistrierung erlaubt ist. Deaktivieren, um OIDC auf bereits verknüpfte Konten zu beschränken.',
+      allowSignupManaged:
+        'Durch die Umgebungskonfiguration vorgegeben. Entferne die entsprechenden AUTH_OIDC_*-Variablen und starte die App neu, um diese Option hier zu ändern.',
       issuerHint: 'STL Quest liest die Anbietereinstellungen aus dem OpenID-Discovery-Dokument des Issuers.',
       scopes: 'Scopes',
       buttonLabel: 'Schaltflächenbeschriftung',

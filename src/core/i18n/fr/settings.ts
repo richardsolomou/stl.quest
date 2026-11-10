@@ -389,6 +389,11 @@ export const settings: typeof en = {
       clientSecret: 'Secret client',
       secretKeep: 'Laissez vide pour conserver le secret actuel',
       issuer: 'URL de l’émetteur',
+      allowSignup: 'Autoriser la création de compte à la connexion',
+      allowSignupHint:
+        'Créer des comptes pour les nouveaux utilisateurs OIDC lorsque les inscriptions sont ouvertes. Désactivez cette option pour limiter OIDC aux comptes déjà associés.',
+      allowSignupManaged:
+        'Géré par la configuration de l’environnement. Supprimez les variables AUTH_OIDC_* concernées et redémarrez pour modifier cette option ici.',
       issuerHint: 'STL Quest lit les paramètres du fournisseur dans le document de découverte OpenID de l’émetteur.',
       scopes: 'Portées',
       buttonLabel: 'Libellé du bouton',

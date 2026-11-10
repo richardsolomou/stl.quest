@@ -55,6 +55,8 @@ import {
   type IntegrationConfig,
   type SmtpEmailConfig,
   type SignInCapabilities,
+  socialProviderCredentialsChanged,
+  socialProviderNeedsRetest,
 } from '../core/auth'
 import type { BoardConfig, PrinterProfile, Repository, Role, StorageMigration, Telemetry } from '../core/types'
 import { printerProfileChanges, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
@@ -67,7 +69,6 @@ import {
   publicSmtpConfig,
   setStoredIntegrationConfig,
   oidcDiscoveryProblem,
-  socialProviderCredentialsChanged,
 } from './integrations'
 import { userImage } from './avatar'
 import { readEmailBranding, readWorkspaceSmtp, sendInviteEmail, workspaceEmailConfigured, workspaceMailer } from './notifications'
@@ -568,15 +569,22 @@ export const saveSocialProvider = createServerFn({ method: 'POST' })
       assertSocialProviderMutable(data.provider)
       const config = await integrationConfig(instance)
       const current = config[data.provider]
+      const issuer = data.provider === 'oidc' ? data.issuer : undefined
+      const requiresRetest = socialProviderNeedsRetest(current, {
+        clientId: data.clientId,
+        clientSecret: data.clientSecret,
+        issuer,
+        scopes: data.provider === 'oidc' ? parseOidcScopes(data.scopes) : undefined,
+      })
+      const enabled = Boolean(current?.enabled && !requiresRetest)
       const anotherEnabled = SOCIAL_AUTH_PROVIDERS.some((candidate) => candidate !== data.provider && config[candidate]?.enabled)
-      if (current?.enabled && !instance.authCapabilities.password && !anotherEnabled) {
+      if (requiresRetest && current?.enabled && !instance.authCapabilities.password && !anotherEnabled) {
         throw new Response(errors().auth.passwordBeforeChangingOnlyProvider, { status: 409 })
       }
       const clientSecret = data.clientSecret || current?.clientSecret
       if (!clientSecret) throw new Response(errors().auth.clientSecretRequired, { status: 400 })
-      const discoveryProblem = data.provider === 'oidc' ? await oidcDiscoveryProblem(data.issuer) : undefined
+      const discoveryProblem = data.provider === 'oidc' && requiresRetest ? await oidcDiscoveryProblem(data.issuer) : undefined
       if (discoveryProblem) throw new Response(discoveryProblem, { status: 400 })
-      const issuer = data.provider === 'oidc' ? data.issuer : undefined
       if (current && socialProviderCredentialsChanged(current, data.clientId, data.clientSecret, issuer)) {
         const linked = await instance.auth.manageAccount.linkedProviders(getRequestHeaders())
         if (linked.includes(data.provider)) {
@@ -588,17 +596,20 @@ export const saveSocialProvider = createServerFn({ method: 'POST' })
         [data.provider]:
           data.provider === 'oidc'
             ? {
-                enabled: false,
+                enabled,
                 clientId: data.clientId,
                 clientSecret,
                 issuer: data.issuer,
+                allowSignup: process.env.AUTH_OIDC_ALLOW_SIGNUP?.trim()
+                  ? (config.oidc?.allowSignup ?? true)
+                  : (data.allowSignup ?? config.oidc?.allowSignup ?? true),
                 scopes: parseOidcScopes(data.scopes),
                 name: oidcDisplayName(data.name),
               }
-            : { enabled: false, clientId: data.clientId, clientSecret },
+            : { enabled, clientId: data.clientId, clientSecret },
       })
       await resetApp()
-      return { provider: data.provider, configured: true, enabled: false }
+      return { provider: data.provider, configured: true, enabled }
     }),
   )
 

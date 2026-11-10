@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
 import fs from 'node:fs/promises'
+import { createServer } from 'node:http'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import type { Locator, Page } from '@playwright/test'
@@ -1655,6 +1656,48 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.goto('/admin/integrations?authTest=oidc&authTestFailed=true&error=unable_to_link_account')
   await expect(page.getByText('The provider account could not be linked.', { exact: false })).toBeVisible()
   await expect(page.getByRole('region', { name: 'OpenID Connect', exact: true }).locator('pre code')).toHaveText('unable_to_link_account')
+  let oidcIssuer = ''
+  const discovery = createServer((_request, response) => {
+    response.writeHead(200, { 'Content-Type': 'application/json' })
+    response.end(
+      JSON.stringify({
+        issuer: oidcIssuer,
+        authorization_endpoint: `${oidcIssuer}/authorize`,
+        token_endpoint: `${oidcIssuer}/token`,
+        jwks_uri: `${oidcIssuer}/jwks`,
+      }),
+    )
+  })
+  await new Promise<void>((resolve) => discovery.listen(0, '0.0.0.0', resolve))
+  try {
+    const address = discovery.address()
+    if (!address || typeof address === 'string') throw new Error('OIDC test discovery did not listen on a port')
+    const host = process.env.PLAYWRIGHT_FAST_SERVER || process.env.PLAYWRIGHT_DEV_SERVER ? '127.0.0.1' : 'host.docker.internal'
+    oidcIssuer = `http://${host}:${address.port}`
+    await page.goto('/admin/integrations')
+    const oidcIntegration = page.getByRole('region', { name: 'OpenID Connect', exact: true })
+    await oidcIntegration.getByRole('button', { name: 'Set up app' }).click()
+    const oidcDialog = page.getByRole('dialog', { name: 'Configure OpenID Connect' })
+    await oidcDialog.getByLabel('Client ID').fill('oidc-test-client')
+    await oidcDialog.getByLabel('Client secret').fill('oidc-test-secret')
+    await oidcDialog.getByLabel('Issuer URL', { exact: true }).fill(oidcIssuer)
+    const allowSignup = oidcDialog.getByRole('switch', { name: 'Allow account creation on sign-in' })
+    await expect(allowSignup).toBeChecked()
+    await allowSignup.click()
+    await oidcDialog.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(oidcDialog).not.toBeVisible()
+    await oidcIntegration.getByRole('button', { name: 'Edit app' }).click()
+    await expect(allowSignup).not.toBeChecked()
+    await expect(oidcDialog.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+    await allowSignup.click()
+    await oidcDialog.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(oidcDialog).not.toBeVisible()
+    await oidcIntegration.getByRole('button', { name: 'Edit app' }).click()
+    await expect(allowSignup).toBeChecked()
+    await oidcDialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  } finally {
+    await new Promise<void>((resolve, reject) => discovery.close((error) => (error ? reject(error) : resolve())))
+  }
   await page.goto('/admin/integrations')
 
   await page

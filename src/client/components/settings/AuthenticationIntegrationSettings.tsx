@@ -161,6 +161,7 @@ export function ProviderDialog({
   const [issuer, setIssuer] = useState(current.issuer ?? '')
   const [scopes, setScopes] = useState((current.scopes ?? OIDC_DEFAULT_SCOPES).join(' '))
   const [buttonName, setButtonName] = useState(current.name ?? '')
+  const [allowSignup, setAllowSignup] = useState(current.allowSignup ?? true)
   const mutation = useMutation({
     mutationFn: useServerFn(saveSocialProvider),
     onSuccess: async () => {
@@ -210,6 +211,22 @@ export function ProviderDialog({
                 />
                 <FieldDescription>{copy.issuerHint}</FieldDescription>
               </Field>
+              <Field>
+                <div className="flex items-center justify-between gap-3">
+                  <FieldLabel htmlFor="provider-allow-signup">{copy.allowSignup}</FieldLabel>
+                  <Switch
+                    id="provider-allow-signup"
+                    checked={allowSignup}
+                    disabled={current.allowSignupSource === 'environment' || current.source === 'environment'}
+                    onCheckedChange={setAllowSignup}
+                  />
+                </div>
+                <FieldDescription>
+                  {current.allowSignupSource === 'environment' || current.source === 'environment'
+                    ? copy.allowSignupManaged
+                    : copy.allowSignupHint}
+                </FieldDescription>
+              </Field>
               <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
                 <Field>
                   <FieldLabel htmlFor="provider-scopes">{copy.scopes}</FieldLabel>
@@ -241,12 +258,24 @@ export function ProviderDialog({
             {t.common.cancel}
           </Button>
           <Button
-            disabled={!clientId || (oidc && !issuer) || mutation.isPending}
+            disabled={
+              !clientId ||
+              (oidc && !issuer) ||
+              mutation.isPending ||
+              (current.configured &&
+                clientId === current.clientId &&
+                clientSecret === '' &&
+                (!oidc ||
+                  (issuer === (current.issuer ?? '') &&
+                    scopes === (current.scopes ?? OIDC_DEFAULT_SCOPES).join(' ') &&
+                    buttonName === (current.name ?? '') &&
+                    allowSignup === (current.allowSignup ?? true))))
+            }
             onClick={() =>
               mutation.mutate({
                 data:
                   provider === 'oidc'
-                    ? { provider, clientId, clientSecret, issuer, scopes, name: buttonName }
+                    ? { provider, clientId, clientSecret, issuer, scopes, name: buttonName, allowSignup }
                     : { provider, clientId, clientSecret },
               })
             }

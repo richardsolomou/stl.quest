@@ -25,6 +25,37 @@ afterEach(() => {
 })
 
 describe('integration settings', () => {
+  it('shows an account creation override before OIDC credentials are configured', () => {
+    const env = { AUTH_OIDC_ALLOW_SIGNUP: 'false' }
+    const effective = resolveAuthAdapterConfig(undefined, env)
+    expect(publicIntegrationConfig(undefined, effective, undefined, 'http://localhost', env).providers.oidc).toMatchObject({
+      configured: false,
+      allowSignup: false,
+      allowSignupSource: 'environment',
+    })
+  })
+
+  it.each([undefined, '', 'true', 'false'])('reports the effective OIDC account creation setting and its source for %s', (override) => {
+    const stored = {
+      passwordEnabled: true,
+      oidc: {
+        enabled: true,
+        clientId: 'id',
+        clientSecret: 'secret',
+        issuer: 'https://id.example.com',
+        scopes: ['openid'],
+        name: 'SSO',
+        allowSignup: false,
+      },
+    }
+    const env = { AUTH_OIDC_ALLOW_SIGNUP: override }
+    const effective = resolveAuthAdapterConfig(stored, env)
+    expect(publicIntegrationConfig(stored, effective, undefined, 'http://localhost', env).providers.oidc).toMatchObject({
+      allowSignup: override === 'true',
+      allowSignupSource: override ? 'environment' : 'database',
+    })
+  })
+
   it('requires another sign-in when social provider credentials change', () => {
     const current = { enabled: false, clientId: 'client', clientSecret: 'secret' }
 

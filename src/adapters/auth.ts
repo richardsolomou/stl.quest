@@ -44,7 +44,7 @@ export function resolveAuthAdapterConfig(stored?: IntegrationConfig, environment
     passwordReset: password,
     socialProviders,
     oidcName: providers.oidc?.name,
-    ...(providers.oidc ? { oidcAllowSignup: environmentFlag(environment.AUTH_OIDC_ALLOW_SIGNUP, true) } : {}),
+    oidcAllowSignup: environmentFlag(environment.AUTH_OIDC_ALLOW_SIGNUP, stored?.oidc?.allowSignup ?? true),
     ...providers,
   }
 }

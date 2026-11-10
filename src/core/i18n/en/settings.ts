@@ -383,6 +383,11 @@ export const settings = {
       clientSecret: 'Client secret',
       secretKeep: 'Leave blank to keep the current secret',
       issuer: 'Issuer URL',
+      allowSignup: 'Allow account creation on sign-in',
+      allowSignupHint:
+        'Create accounts for new OIDC users when self-signup is open. Turn off to restrict OIDC to existing linked accounts.',
+      allowSignupManaged:
+        'Managed by environment configuration. Remove the relevant AUTH_OIDC_* overrides and restart to change this option here.',
       issuerHint: "STL Quest reads the provider settings from the issuer's OpenID discovery document.",
       scopes: 'Scopes',
       buttonLabel: 'Button label',

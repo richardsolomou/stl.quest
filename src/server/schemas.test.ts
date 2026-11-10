@@ -15,6 +15,7 @@ import {
   printerProfilesSchema,
   requestFiltersSchema,
   storageSettingsSchema,
+  socialProviderSettingsSchema,
   updateRequestSchema,
 } from './schemas'
 
@@ -275,5 +276,21 @@ describe('email template schema', () => {
   it('rejects a template over the placeholder limit', () => {
     const html = '{{link}}'.repeat(MAX_EMAIL_TEMPLATE_PLACEHOLDERS)
     expect(emailTemplateSchema.safeParse({ kind: 'invite', template: { subject: '{{workspace}}', html } }).success).toBe(false)
+  })
+})
+
+describe('OIDC account creation settings', () => {
+  it.each([true, false])('accepts account creation set to %s', (allowSignup) => {
+    expect(
+      socialProviderSettingsSchema.parse({
+        provider: 'oidc',
+        clientId: 'id',
+        clientSecret: '',
+        issuer: 'https://id.example.com',
+        scopes: 'openid email',
+        name: 'SSO',
+        allowSignup,
+      }),
+    ).toMatchObject({ allowSignup })
   })
 })

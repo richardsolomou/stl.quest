@@ -7,6 +7,7 @@ describe('auth adapter configuration', () => {
       password: true,
       passwordReset: true,
       socialProviders: [],
+      oidcAllowSignup: true,
     })
   })
 
@@ -55,6 +56,22 @@ describe('auth adapter configuration', () => {
       oidc: { enabled: true, clientId: 'id', clientSecret: 'secret', issuer: 'https://id.example.com', scopes: ['openid'], name: 'SSO' },
     }
     expect(resolveAuthAdapterConfig(stored, { AUTH_OIDC_ALLOW_SIGNUP: value }).oidcAllowSignup).toBe(value !== 'false')
+  })
+
+  it.each([undefined, '', 'true', 'false'])('preserves the stored OIDC account creation preference with override %s', (override) => {
+    const stored = {
+      passwordEnabled: true,
+      oidc: {
+        enabled: true,
+        clientId: 'id',
+        clientSecret: 'secret',
+        issuer: 'https://id.example.com',
+        scopes: ['openid'],
+        name: 'SSO',
+        allowSignup: false,
+      },
+    }
+    expect(resolveAuthAdapterConfig(stored, { AUTH_OIDC_ALLOW_SIGNUP: override }).oidcAllowSignup).toBe(override === 'true')
   })
 
   it('uses database settings unless environment variables override them', () => {
