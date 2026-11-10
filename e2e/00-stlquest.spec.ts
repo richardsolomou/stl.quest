@@ -1947,6 +1947,12 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await page.getByRole('button', { name: 'Sign out' }).click()
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+  await page.goto('/?error=signup_disabled&error_description=private-provider-details')
+  await expect(page.getByRole('alert')).toContainText('Could not complete sign-in. Try again or contact your administrator.')
+  await expect(page.getByRole('alert').locator('pre code')).toHaveText('signup_disabled')
+  await expect(page.getByText('private-provider-details', { exact: true })).toHaveCount(0)
+
+  await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
 
   await page.goto('/?signup=true')
   await expect(page.getByRole('heading', { name: 'Create account' })).toBeVisible()
