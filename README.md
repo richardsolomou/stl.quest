@@ -77,6 +77,8 @@ See the [deployment guide](docs/deployment.md#platform-app-stores) for platform-
 
 Use **Workspace Settings** to manage printers, members, board behavior, and storage. Use **Super Admin** to manage user accounts, sign-in methods, email delivery, telemetry, and diagnostics.
 
+OIDC sign-in creates new accounts by default when self-signup is open. Set `AUTH_OIDC_ALLOW_SIGNUP=false` to restrict OIDC to existing accounts.
+
 See the [deployment guide](docs/deployment.md) for environment variables, reverse proxy setup, health checks, backups, and upgrades.
 
 ## Storage and backups 💾

@@ -49,6 +49,14 @@ describe('auth adapter configuration', () => {
     )
   })
 
+  it.each([undefined, 'true', 'false'])('controls stored OIDC account creation with %s', (value) => {
+    const stored = {
+      passwordEnabled: true,
+      oidc: { enabled: true, clientId: 'id', clientSecret: 'secret', issuer: 'https://id.example.com', scopes: ['openid'], name: 'SSO' },
+    }
+    expect(resolveAuthAdapterConfig(stored, { AUTH_OIDC_ALLOW_SIGNUP: value }).oidcAllowSignup).toBe(value !== 'false')
+  })
+
   it('uses database settings unless environment variables override them', () => {
     const stored = {
       passwordEnabled: false,

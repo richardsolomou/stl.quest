@@ -39,7 +39,7 @@ import { isLocale, messagesFor } from '../core/i18n'
 
 // Every auth call awaits Better Auth's startup, which runs OIDC discovery, so an unreachable or mismatched issuer skips the provider
 // until the next restart or settings save. Better Auth verifies ID tokens against the discovered issuer without comparing it to ours.
-function oidcPlugin(config: OidcProviderConfig | undefined) {
+function oidcPlugin(config: OidcProviderConfig | undefined, allowSignup = true) {
   if (!config) return undefined
   const plugin = genericOAuth({
     config: [
@@ -51,7 +51,8 @@ function oidcPlugin(config: OidcProviderConfig | undefined) {
         clientId: config.clientId,
         clientSecret: config.clientSecret,
         scopes: config.scopes,
-        disableImplicitSignUp: true,
+        disableImplicitSignUp: !allowSignup,
+        disableSignUp: !allowSignup,
         accountSubject: ({ profile }) => (profile.sub ? oidcAccountId(config.issuer, String(profile.sub)) : ''),
         // The CSP cannot list every identity provider's avatar host, so the profile picture is not stored.
         mapProfileToUser: () => ({ image: undefined }),
@@ -147,7 +148,7 @@ export function createAuth(
     ...(providerOptions('google') ? { google: providerOptions('google')! } : {}),
     ...(providerOptions('discord') ? { discord: providerOptions('discord')! } : {}),
   }
-  const oidc = oidcPlugin(options?.auth?.oidc)
+  const oidc = oidcPlugin(options?.auth?.oidc, options?.auth?.oidcAllowSignup)
   const billing = stripeBillingPlugin()
   const claimInitialSuperAdmin = async () => {
     await database.run(sql`

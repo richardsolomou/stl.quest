@@ -37,6 +37,7 @@ services:
       AUTH_OIDC_SCOPES: ${AUTH_OIDC_SCOPES:-}
       AUTH_OIDC_NAME: ${AUTH_OIDC_NAME:-}
       AUTH_OIDC_ENABLED: ${AUTH_OIDC_ENABLED:-true}
+      AUTH_OIDC_ALLOW_SIGNUP: ${AUTH_OIDC_ALLOW_SIGNUP:-true}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-}
       BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-}
       # Optional SMTP delivery for invitation and password-reset email.
