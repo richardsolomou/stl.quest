@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.48.0
+
+### Minor Changes
+
+- d52361a: Allow new accounts to be created on OIDC sign-in, configurable in the OIDC setup dialog or with `AUTH_OIDC_ALLOW_SIGNUP`, so that people can join through single sign-on without a separate sign-up step.
+
+### Patch Changes
+
+- d52361a: Show loading, success, and actionable failure feedback with error codes when testing sign-in providers.
+- d52361a: Show a generic message when SSO sign-in or account creation fails so that users can retry with a short error code and no provider descriptions.
+
 ## 1.47.3
 
 ### Patch Changes
