@@ -205,7 +205,8 @@ export const CLOUD_STORAGE_APP_KEYS = {
   box: 'box',
 } as const satisfies Record<CloudStorageProvider, keyof IntegrationConfig>
 
-export type AuthAdapterConfig = AuthCapabilities & SocialProviderConfigs & { oidcAllowSignup?: boolean }
+export type AuthAdapterConfig = AuthCapabilities &
+  SocialProviderConfigs & { oidcAllowSignup?: boolean; oidcAllowSignupSource?: 'database' | 'environment' }
 export type EmailCapabilities = { configured: boolean }
 
 export type PublicSocialProviderConfig = {

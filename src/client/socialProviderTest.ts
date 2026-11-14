@@ -1,6 +1,7 @@
 import type { Messages } from '../core/i18n'
 import type { SocialAuthProvider } from '../core/auth'
 import { authClient } from './authClient'
+import { socialSignInErrorCode } from './socialSignIn'
 
 export function socialProviderTestResult(search: string, provider: SocialAuthProvider) {
   const params = new URLSearchParams(search)
@@ -9,9 +10,7 @@ export function socialProviderTestResult(search: string, provider: SocialAuthPro
 }
 
 export function socialProviderTestErrorCode(search: string, provider: SocialAuthProvider) {
-  if (socialProviderTestResult(search, provider) !== 'failed') return undefined
-  const code = new URLSearchParams(search).get('error')
-  return code && /^[a-z0-9_]{1,100}$/i.test(code) ? code : undefined
+  return socialProviderTestResult(search, provider) === 'failed' ? socialSignInErrorCode(search) : undefined
 }
 
 export function socialProviderTestFailure(search: string, provider: SocialAuthProvider, copy: Messages['settings']['signIn']['provider']) {

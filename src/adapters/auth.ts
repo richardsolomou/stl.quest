@@ -11,7 +11,7 @@ import {
   type SocialProviderConfigs,
 } from '../core/auth'
 import { providerCredentials } from 'ras-stack/auth'
-import { environmentFlag } from './environment'
+import { environmentFlag, environmentFlagSet } from './environment'
 
 function environmentProvider(provider: SocialAuthProvider, environment: NodeJS.ProcessEnv): SocialProviderConfig | undefined {
   const credentials = providerCredentials(provider, environment, { prefix: 'AUTH_' })
@@ -29,10 +29,11 @@ function environmentOidcProvider(environment: NodeJS.ProcessEnv): OidcProviderCo
 }
 
 export function resolveAuthAdapterConfig(stored?: IntegrationConfig, environment: NodeJS.ProcessEnv = process.env): AuthAdapterConfig {
+  const environmentOidc = environmentOidcProvider(environment)
   const providers: SocialProviderConfigs = {
     google: environmentProvider('google', environment) ?? stored?.google,
     discord: environmentProvider('discord', environment) ?? stored?.discord,
-    oidc: environmentOidcProvider(environment) ?? stored?.oidc,
+    oidc: environmentOidc ?? stored?.oidc,
   }
   const recovery = environmentFlag(environment.AUTH_PASSWORD_RECOVERY)
   const password = recovery || environmentFlag(environment.AUTH_PASSWORD_ENABLED, stored?.passwordEnabled ?? true)
@@ -44,7 +45,9 @@ export function resolveAuthAdapterConfig(stored?: IntegrationConfig, environment
     passwordReset: password,
     socialProviders,
     oidcName: providers.oidc?.name,
-    oidcAllowSignup: environmentFlag(environment.AUTH_OIDC_ALLOW_SIGNUP, stored?.oidc?.allowSignup ?? true),
+    // An environment-configured provider ignores the stored setting, which the UI can no longer change.
+    oidcAllowSignup: environmentFlag(environment.AUTH_OIDC_ALLOW_SIGNUP, (environmentOidc ? undefined : stored?.oidc?.allowSignup) ?? true),
+    oidcAllowSignupSource: environmentFlagSet(environment.AUTH_OIDC_ALLOW_SIGNUP) ? 'environment' : 'database',
     ...providers,
   }
 }

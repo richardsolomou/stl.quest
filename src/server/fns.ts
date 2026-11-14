@@ -600,9 +600,10 @@ export const saveSocialProvider = createServerFn({ method: 'POST' })
                 clientId: data.clientId,
                 clientSecret,
                 issuer: data.issuer,
-                allowSignup: process.env.AUTH_OIDC_ALLOW_SIGNUP?.trim()
-                  ? (config.oidc?.allowSignup ?? true)
-                  : (data.allowSignup ?? config.oidc?.allowSignup ?? true),
+                allowSignup:
+                  resolveAuthAdapterConfig(config).oidcAllowSignupSource === 'environment'
+                    ? config.oidc?.allowSignup
+                    : (data.allowSignup ?? config.oidc?.allowSignup),
                 scopes: parseOidcScopes(data.scopes),
                 name: oidcDisplayName(data.name),
               }

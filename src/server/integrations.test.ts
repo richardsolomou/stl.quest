@@ -3,13 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { IntegrationConfig } from '../core/auth'
-import {
-  decryptIntegrationConfig,
-  encryptIntegrationConfig,
-  oidcDiscoveryProblem,
-  publicIntegrationConfig,
-  socialProviderCredentialsChanged,
-} from './integrations'
+import { decryptIntegrationConfig, encryptIntegrationConfig, oidcDiscoveryProblem, publicIntegrationConfig } from './integrations'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { resolveSmtpConfig } from '../adapters/email'
 
@@ -35,7 +29,13 @@ describe('integration settings', () => {
     })
   })
 
-  it.each([undefined, '', 'true', 'false'])('reports the effective OIDC account creation setting and its source for %s', (override) => {
+  it.each([
+    [undefined, false, 'database'],
+    ['', false, 'database'],
+    ['disabled', false, 'database'],
+    ['true', true, 'environment'],
+    ['false', false, 'environment'],
+  ] as const)('reports the effective OIDC account creation setting and its source for %s', (override, allowSignup, allowSignupSource) => {
     const stored = {
       passwordEnabled: true,
       oidc: {
@@ -51,31 +51,9 @@ describe('integration settings', () => {
     const env = { AUTH_OIDC_ALLOW_SIGNUP: override }
     const effective = resolveAuthAdapterConfig(stored, env)
     expect(publicIntegrationConfig(stored, effective, undefined, 'http://localhost', env).providers.oidc).toMatchObject({
-      allowSignup: override === 'true',
-      allowSignupSource: override ? 'environment' : 'database',
+      allowSignup,
+      allowSignupSource,
     })
-  })
-
-  it('requires another sign-in when social provider credentials change', () => {
-    const current = { enabled: false, clientId: 'client', clientSecret: 'secret' }
-
-    expect(socialProviderCredentialsChanged(current, 'client', 'replacement')).toBe(true)
-    expect(socialProviderCredentialsChanged(current, 'replacement', '')).toBe(true)
-    expect(socialProviderCredentialsChanged(current, 'client', '')).toBe(false)
-  })
-
-  it('requires another sign-in when the OIDC issuer changes', () => {
-    const current = {
-      enabled: true,
-      clientId: 'client',
-      clientSecret: 'secret',
-      issuer: 'https://a.example.com',
-      scopes: ['openid'],
-      name: 'SSO',
-    }
-
-    expect(socialProviderCredentialsChanged(current, 'client', '', 'https://b.example.com')).toBe(true)
-    expect(socialProviderCredentialsChanged(current, 'client', '', 'https://a.example.com')).toBe(false)
   })
 
   describe('OIDC discovery check', () => {

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { useLocation } from '@tanstack/react-router'
+import { useLocation, useRouter } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -27,6 +27,12 @@ import { useI18n } from '../../i18n'
 
 const refreshIntegrationSettings = (queryClient: ReturnType<typeof useQueryClient>) =>
   invalidateQueries(queryClient, 'integrations', 'session', 'auth-capabilities')
+
+/** A provider test result lives in the callback URL, so any provider change makes it stale. */
+function useClearProviderTestResult() {
+  const router = useRouter()
+  return () => router.history.replace(router.state.location.pathname)
+}
 
 export function AuthenticationSettings({
   data,
@@ -78,9 +84,13 @@ function ProviderRow({
   onConfigure: () => void
 }) {
   const queryClient = useQueryClient()
+  const clearTestResult = useClearProviderTestResult()
   const mutation = useMutation({
     mutationFn: useServerFn(updateSocialProviderEnabled),
-    onSuccess: () => refreshIntegrationSettings(queryClient),
+    onSuccess: async () => {
+      clearTestResult()
+      await refreshIntegrationSettings(queryClient)
+    },
   })
   const { t } = useI18n()
   const copy = t.settings.signIn
@@ -162,9 +172,11 @@ export function ProviderDialog({
   const [scopes, setScopes] = useState((current.scopes ?? OIDC_DEFAULT_SCOPES).join(' '))
   const [buttonName, setButtonName] = useState(current.name ?? '')
   const [allowSignup, setAllowSignup] = useState(current.allowSignup ?? true)
+  const clearTestResult = useClearProviderTestResult()
   const mutation = useMutation({
     mutationFn: useServerFn(saveSocialProvider),
     onSuccess: async () => {
+      clearTestResult()
       await queryClient.invalidateQueries({ queryKey: ['integrations'] })
       onDone()
     },
