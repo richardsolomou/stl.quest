@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,12 +12,18 @@ import {
   useComboboxAnchor,
 } from '@/components/ui/combobox'
 import { Field, FieldLabel, FieldDescription } from '@/components/ui/field'
-import type { Account } from '../../../core/types'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import type { Account, AssignableWorkspaceRole } from '../../../core/types'
 import { addAdminWorkspaceMember } from '../../../server/fns'
 import { useI18n } from '../../i18n'
 import { accountsQuery } from '../../queries'
 import { invalidateQueries } from '../../queryState'
 import { QueryState } from '../QueryState'
+
+/** Deployment-wide admin views do not subscribe to the target workspace's realtime channel. */
+export async function invalidateSuperAdminMembership(queryClient: QueryClient) {
+  await invalidateQueries(queryClient, 'admin-workspace', 'admin-workspaces', 'admin-account', 'accounts', 'users', 'people')
+}
 
 export function SuperAdminAddMemberForm({
   workspace,
@@ -33,14 +39,17 @@ export function SuperAdminAddMemberForm({
   const queryClient = useQueryClient()
   const callAdd = useServerFn(addAdminWorkspaceMember)
   const [selected, setSelected] = useState<Account | null>(null)
-  const [role, setRole] = useState<'admin' | 'member'>('member')
+  const [role, setRole] = useState<AssignableWorkspaceRole>('member')
+  const roleOptions = [
+    { value: 'member', label: t.superAdmin.workspaceRoles.member },
+    { value: 'admin', label: t.superAdmin.workspaceRoles.admin },
+  ] as const
   const options = (accounts.data ?? []).filter((account) => !workspace.members.some((member) => member.id === account.id))
   const mutation = useMutation({
     mutationFn: (userId: string) => callAdd({ data: { id: workspace.id, userId, role } }),
     onSuccess: async () => {
       setSelected(null)
-      // Deployment-wide admin views do not subscribe to the target workspace channel.
-      await invalidateQueries(queryClient, 'admin-workspace', 'admin-workspaces', 'admin-account', 'accounts', 'users', 'people')
+      await invalidateSuperAdminMembership(queryClient)
       onAdded?.()
     },
   })
@@ -92,16 +101,23 @@ export function SuperAdminAddMemberForm({
       <div className="flex flex-wrap items-end gap-3">
         <Field className="w-auto">
           <FieldLabel htmlFor="admin-add-member-role">{copy.role}</FieldLabel>
-          <select
-            id="admin-add-member-role"
-            className="h-9 rounded-md border bg-background px-3 text-sm"
+          <Select
+            items={roleOptions}
             value={role}
-            onChange={(event) => setRole(event.target.value as 'admin' | 'member')}
+            onValueChange={(value) => setRole(value as AssignableWorkspaceRole)}
             disabled={mutation.isPending}
           >
-            <option value="member">{t.superAdmin.workspaceRoles.member}</option>
-            <option value="admin">{t.superAdmin.workspaceRoles.admin}</option>
-          </select>
+            <SelectTrigger className="w-40" id="admin-add-member-role">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {roleOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Field>
         <Button type="submit" disabled={!selected || !options.some((account) => account.id === selected.id) || mutation.isPending}>
           {mutation.isPending ? copy.adding : copy.addUser}

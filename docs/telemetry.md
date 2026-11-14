@@ -42,8 +42,8 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `workspace_switched`              | —                                                                                            |
 | `workspace_deleted`               | `deleted_by`                                                                                 |
 | `workspace_member_role_changed`   | `role`                                                                                       |
-| `workspace_member_added`          | `role` (direct addition by a super admin)                                                    |
-| `workspace_member_removed`        | —                                                                                            |
+| `workspace_member_added`          | `role`, `workspace_id` (direct addition by a super admin)                                    |
+| `workspace_member_removed`        | `workspace_id`                                                                               |
 | `printer_saved`                   | `printer_count`, `added_count`, `updated_count`, `removed_count`                             |
 | `price_calculator_settings_saved` | `currency`, `resin_preset`, `electricity_preset`, `equipment_preset_count`                   |
 | `email_logo_updated`              | `has_logo`                                                                                   |

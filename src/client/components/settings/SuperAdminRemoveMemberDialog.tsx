@@ -3,9 +3,9 @@ import { useServerFn } from '@tanstack/react-start'
 import type { AdminWorkspaceMember } from '../../../core/admin'
 import { removeAdminWorkspaceMember } from '../../../server/fns'
 import { useI18n } from '../../i18n'
-import { invalidateQueries } from '../../queryState'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { UserSummary } from '../UserSummary'
+import { invalidateSuperAdminMembership } from './SuperAdminAddMemberForm'
 
 export function SuperAdminRemoveMemberDialog({
   workspaceId,
@@ -23,7 +23,7 @@ export function SuperAdminRemoveMemberDialog({
   const mutation = useMutation({
     mutationFn: () => callRemove({ data: { id: workspaceId, userId: member.id } }),
     onSuccess: async () => {
-      await invalidateQueries(queryClient, 'admin-workspace', 'admin-workspaces', 'admin-account', 'accounts', 'users', 'people')
+      await invalidateSuperAdminMembership(queryClient)
       onDone()
     },
   })

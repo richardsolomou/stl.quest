@@ -7,6 +7,7 @@ import type { Locale } from './i18n/locales'
 export type Role = 'admin' | 'requester'
 export type AccountRole = 'super_admin' | 'requester'
 export type WorkspaceRole = 'owner' | 'admin' | 'member'
+export type AssignableWorkspaceRole = Exclude<WorkspaceRole, 'owner'>
 export type PrintType = 'resin' | 'filament'
 
 export type WorkspaceSummary = {
@@ -461,12 +462,15 @@ interface RepositoryShape {
   completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }): void
   recordSourceImagePath(id: string, path: string | null): void
   listPeople(): Person[]
-  removeWorkspaceMember(userId: string): void
-  addWorkspaceMember(userId: string, role: WorkspaceRole): void
+  /** Returns whether a membership was removed; a non-member is a no-op. */
+  removeWorkspaceMember(userId: string): boolean
+  /** Returns whether a membership was created; an existing membership keeps its role. */
+  addWorkspaceMember(userId: string, role: WorkspaceRole): boolean
   listUsers(): Identity[]
   listMemberActivity(): { userId: string; lastActiveAt: number }[]
   recordMemberActivity(userId: string, now: number): void
   listAccounts(): Account[]
+  userExists(userId: string): boolean
   accountExists(email: string): boolean
   createInvite(invite: { id: string; tokenHash: string; role: Role; label?: string; recipientEmail?: string; expiresAt: number }): void
   listInvites(): Invite[]

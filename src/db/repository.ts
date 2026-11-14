@@ -2319,6 +2319,10 @@ export class DrizzleRepository implements Repository {
     }
   }
 
+  async userExists(userId: string) {
+    return Boolean(await this.database.select({ id: user.id }).from(user).where(eq(user.id, userId)).get())
+  }
+
   async accountExists(email: string) {
     return Boolean(
       await this.database
@@ -2767,7 +2771,7 @@ export class DrizzleRepository implements Repository {
   }
 
   async addWorkspaceMember(userId: string, role: import('../core/types').WorkspaceRole) {
-    await this.addWorkspaceMemberWith(this.database, await this.workspace(), userId, role)
+    return await this.addWorkspaceMemberWith(this.database, await this.workspace(), userId, role)
   }
 
   async claimInviteGlobally(tokenHash: string, now: number, email: string) {
@@ -2903,11 +2907,13 @@ export class DrizzleRepository implements Repository {
     role: import('../core/types').WorkspaceRole,
     createdAt = new Date(),
   ) {
-    await database
+    const added = await database
       .insert(member)
       .values({ id: crypto.randomUUID(), organizationId: workspaceId, userId, role, createdAt })
       .onConflictDoNothing()
-      .run()
+      .returning({ id: member.id })
+      .get()
+    return Boolean(added)
   }
 
   private async availableWorkspaceSlug(database: DatabaseExecutor, name: string) {
@@ -2965,12 +2971,13 @@ export class DrizzleRepository implements Repository {
       .from(member)
       .where(and(eq(member.organizationId, await this.workspace()), eq(member.userId, userId)))
       .get()
-    if (!current) return
+    if (!current) return false
     if (current.role === 'owner') throw new Response('the workspace owner cannot be removed', { status: 409 })
     await this.database
       .delete(member)
       .where(and(eq(member.organizationId, await this.workspace()), eq(member.userId, userId)))
       .run()
+    return true
   }
 
   async createInvite(invite: { id: string; tokenHash: string; role: Role; label?: string; recipientEmail?: string; expiresAt: number }) {

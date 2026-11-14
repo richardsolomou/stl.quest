@@ -259,7 +259,7 @@ export const superAdmin: typeof en = {
     role: 'Rolle',
     adding: 'Wird hinzugefügt…',
     addError: 'Benutzer konnte nicht hinzugefügt werden',
-    addHint: 'Wähle ein bestehendes Konto aus, um sofort Zugriff zu gewähren.',
+    addHint: 'Wählen Sie ein bestehendes Konto aus, um sofort Zugriff zu gewähren.',
 
     description: (slug: string) => `Details zu ${slug} für die gesamte Installation`,
     loading: 'Details zum Arbeitsbereich werden geladen…',

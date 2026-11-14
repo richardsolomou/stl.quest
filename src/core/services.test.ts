@@ -111,6 +111,22 @@ describe('STLQuestService crash recovery', () => {
     await expect(scopedService.removeWorkspaceMember(admin, admin.id)).rejects.toMatchObject({ status: 409 })
   })
 
+  it('lets a workspace admin who is not a super admin remove a member', async () => {
+    await repository.addWorkspaceMember(requester.id, 'member')
+    await service.removeWorkspaceMember(admin, requester.id)
+    expect((await repository.listUsers()).some((account) => account.id === requester.id)).toBe(false)
+  })
+
+  it('lets a super admin remove a member regardless of their own workspace role', async () => {
+    await repository.addWorkspaceMember(otherRequester.id, 'member')
+    await service.removeWorkspaceMember({ ...requester, superAdmin: true }, otherRequester.id)
+    expect((await repository.listUsers()).some((account) => account.id === otherRequester.id)).toBe(false)
+  })
+
+  it('rejects a direct addition for an unknown account', async () => {
+    await expect(service.addWorkspaceMember({ ...admin, superAdmin: true }, 'missing', 'member')).rejects.toMatchObject({ status: 404 })
+  })
+
   async function request() {
     await assets.write('todo/model.stl', new TextEncoder().encode('stl'))
     const id = await repository.createRequest({

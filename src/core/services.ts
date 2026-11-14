@@ -1,5 +1,6 @@
 import { printGroupColors } from './types'
 import type {
+  AssignableWorkspaceRole,
   CopyMove,
   AttachOperation,
   AppEvent,
@@ -76,8 +77,7 @@ export class STLQuestService {
   async removeWorkspaceMember(actor: Identity, userId: string) {
     if (!actor.superAdmin && actor.role !== 'admin') throw new Response(this.text.access.forbidden, { status: 403 })
     if (actor.id === userId) throw new Response(this.text.workspace.cannotRemoveSelf, { status: 409 })
-    if (!(await this.repository.listUsers()).some((member) => member.id === userId)) return
-    await this.repository.removeWorkspaceMember(userId)
+    if (!(await this.repository.removeWorkspaceMember(userId))) return
     // Clear overrides so they cannot silently apply if this account rejoins.
     const board = normalizeBoardConfig(await this.repository.getSetting<Partial<BoardConfig>>('board'))
     if (board.memberVisibility[userId]) await this.repository.setSetting('board', withMemberRequestVisibility(board, userId, 'default'))
@@ -85,13 +85,10 @@ export class STLQuestService {
     void this.telemetry.capture(actor.id, 'workspace_member_removed', {}).catch(() => undefined)
   }
 
-  async addWorkspaceMember(actor: Identity, userId: string, role: 'admin' | 'member') {
+  async addWorkspaceMember(actor: Identity, userId: string, role: AssignableWorkspaceRole) {
     if (!actor.superAdmin) throw new Response(this.text.access.forbidden, { status: 403 })
-    if (!(await this.repository.listAccounts()).some((account) => account.id === userId))
-      throw new Response(this.text.account.notFound, { status: 404 })
-    // Adding an existing member must never change their role (especially an owner).
-    if ((await this.repository.listUsers()).some((member) => member.id === userId)) return
-    await this.repository.addWorkspaceMember(userId, role)
+    if (!(await this.repository.userExists(userId))) throw new Response(this.text.account.notFound, { status: 404 })
+    if (!(await this.repository.addWorkspaceMember(userId, role))) return
     this.events.publish('user.created')
     void this.telemetry.capture(actor.id, 'workspace_member_added', { role }).catch(() => undefined)
   }
