@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.49.0
+
+### Minor Changes
+
+- 705b193: Allow super admins to add existing users without invitation links from workspace details or member settings, and remove members from workspace details.
+
 ## 1.48.0
 
 ### Minor Changes
