@@ -41,7 +41,11 @@ Along the way:
 
 ## Self-hosted or managed 🔒
 
-Run STL Quest for one group on your own server, or host separate workspaces for several groups. Each workspace has its own board, printers, members, and storage. Users can join more than one workspace by invitation.
+Run STL Quest for one group on your own server, or host separate workspaces for several groups. Each workspace has its own board, printers, members, and storage. Users can join more than one workspace by invitation or be added directly by a super admin.
+
+Super admins can add an existing account from **Super Admin → Workspaces → open a workspace → Add user**, or from **Settings → Members → Add user** (`/settings/users`) for the current workspace. Search by name or email and choose **Member** or **Admin**; access starts immediately without an invitation link. To create an account first, use **Super Admin → Users → Add user**.
+
+To remove a member, open the workspace under **Super Admin → Workspaces** and select **Remove member**, then confirm. Their account and existing print requests are kept, and their request-visibility override is cleared. Workspace owners and your own membership cannot be removed through this action.
 
 With self-hosting, you control the app, database, files, and history. Hosted accounts include storage hosted by STL Quest and shared across three owned workspaces, with optional paid plans for larger libraries, while other workspaces connect their own remote storage. See the [storage guide](docs/storage.md) for the full policy.
 
@@ -61,7 +65,7 @@ docker run -d --name stlquest \
   ghcr.io/richardsolomou/stl.quest:latest
 ```
 
-Open `http://localhost:30455`. The first account created becomes the super admin. Anyone who can reach the server can then create an account. To allow only invited people, turn off **Allow self-signup** under **Super Admin → Users**.
+Open `http://localhost:30455`. The first account created becomes the super admin. Anyone who can reach the server can then create an account. To disable public account creation, turn off **Allow self-signup** under **Super Admin → Users**.
 
 > Local SQLite is the default and `/data` should stay on a local filesystem. Set `DATABASE_URL` to use PostgreSQL instead.
 

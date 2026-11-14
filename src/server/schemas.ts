@@ -29,6 +29,8 @@ import {
 } from '../core/email'
 
 const id = z.string().min(1).max(100)
+export const removeAdminWorkspaceMemberSchema = z.object({ id, userId: id })
+export const addAdminWorkspaceMemberSchema = z.object({ id, userId: id, role: z.enum(['admin', 'member']) })
 const statusId = id
 const inviteToken = z.string().min(1).max(100)
 const printGroupName = z.string().trim().min(1).max(MAX_PRINT_GROUP_NAME_LENGTH)

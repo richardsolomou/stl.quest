@@ -252,6 +252,15 @@ export const superAdmin: typeof en = {
     deletedHint: 'Die Druckanfragen, Modelle, Einstellungen und Einladungen wurden entfernt.',
   },
   workspaceDetails: {
+    removeMember: (name: string) => `Mitglied entfernen: ${name}`,
+    addUser: 'Benutzer hinzufügen',
+    searchAccounts: 'Konten nach Name oder E-Mail suchen',
+    noAccounts: 'Keine Konten verfügbar',
+    role: 'Rolle',
+    adding: 'Wird hinzugefügt…',
+    addError: 'Benutzer konnte nicht hinzugefügt werden',
+    addHint: 'Wählen Sie ein bestehendes Konto aus, um sofort Zugriff zu gewähren.',
+
     description: (slug: string) => `Details zu ${slug} für die gesamte Installation`,
     loading: 'Details zum Arbeitsbereich werden geladen…',
     loadError: 'Die Details zum Arbeitsbereich konnten nicht geladen werden',

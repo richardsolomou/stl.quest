@@ -28,6 +28,7 @@ import { APIError } from 'better-auth/api'
 import { createAuth } from './auth'
 import { deliveryTracker, emailNotifier, readEmailBranding, workspaceMailer, type DeliveryTracker } from './notifications'
 import type {
+  AssignableWorkspaceRole,
   BoardConfig,
   Identity,
   Repository,
@@ -522,11 +523,28 @@ async function createApp() {
       return nextWorkspace
     }
 
-    const deleteWorkspaceAsSuperAdmin = async (headers: Headers, workspaceId: string, confirmation: string) => {
+    const superAdminTarget = async (headers: Headers, workspaceId: string) => {
       const actor = await requireIdentity(headers)
       if (!actor.superAdmin) throw new Response(serverMessages().server.access.forbidden, { status: 403 })
       const target = await repository!.workspaceById(workspaceId)
       if (!target) throw new Response(serverMessages().server.workspace.notFound, { status: 404 })
+      return { actor, target }
+    }
+
+    const removeWorkspaceMemberAsSuperAdmin = async (headers: Headers, workspaceId: string, userId: string) => {
+      const { actor, target } = await superAdminTarget(headers, workspaceId)
+      await (await runtime(target)).service.removeWorkspaceMember(actor, userId)
+      logger.info({ event: 'workspace_member_removed', actor: 'super_admin', workspace_id: workspaceId }, 'super admin removed a member')
+    }
+
+    const addWorkspaceMemberAsSuperAdmin = async (headers: Headers, workspaceId: string, userId: string, role: AssignableWorkspaceRole) => {
+      const { actor, target } = await superAdminTarget(headers, workspaceId)
+      await (await runtime(target)).service.addWorkspaceMember(actor, userId, role)
+      logger.info({ event: 'workspace_member_added', actor: 'super_admin', workspace_id: workspaceId, role }, 'super admin added a member')
+    }
+
+    const deleteWorkspaceAsSuperAdmin = async (headers: Headers, workspaceId: string, confirmation: string) => {
+      const { actor, target } = await superAdminTarget(headers, workspaceId)
       if (confirmation !== target.name) throw new Response(serverMessages().server.workspace.nameMismatch, { status: 400 })
       await (await runtime(target)).assertAssetsMutable()
       const owners = (await (await repository!.scoped(workspaceId)).listUsers()).filter((member) => member.workspaceRole === 'owner')
@@ -655,6 +673,8 @@ async function createApp() {
       createWorkspace,
       deleteWorkspace,
       deleteWorkspaceAsSuperAdmin,
+      addWorkspaceMemberAsSuperAdmin,
+      removeWorkspaceMemberAsSuperAdmin,
       deleteAccount,
       setActiveWorkspace,
       workspace,

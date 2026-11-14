@@ -250,6 +250,15 @@ export const superAdmin: typeof en = {
     deletedHint: 'Ses demandes d’impression, modèles, paramètres et invitations ont été supprimés.',
   },
   workspaceDetails: {
+    removeMember: (name: string) => `Retirer le membre: ${name}`,
+    addUser: 'Ajouter un utilisateur',
+    searchAccounts: 'Rechercher par nom ou adresse e-mail',
+    noAccounts: 'Aucun compte disponible',
+    role: 'Rôle',
+    adding: 'Ajout…',
+    addError: 'Impossible d’ajouter l’utilisateur',
+    addHint: 'Sélectionnez un compte existant pour lui donner accès immédiatement.',
+
     description: (slug: string) => `Détails de ${slug} pour l’ensemble du déploiement`,
     loading: 'Chargement des détails de l’espace de travail…',
     loadError: 'Impossible de charger les détails de l’espace de travail',

@@ -72,6 +72,61 @@ describe('STLQuestService crash recovery', () => {
     await Promise.all([fs.promises.rm(root, { recursive: true }), fs.promises.rm(data, { recursive: true })])
   })
 
+  it('publishes membership changes and captures only the assigned role after direct addition', async () => {
+    const publish = vi.fn()
+    const events: EventBus = { publish }
+    const scopedService = new STLQuestService(repository, assets, staging, events, telemetry, { remove: removeTusUpload })
+    capture.mockClear()
+    await scopedService.addWorkspaceMember({ ...admin, superAdmin: true }, requester.id, 'member')
+    expect((await repository.listUsers()).find((account) => account.id === requester.id)?.workspaceRole).toBe('member')
+    expect(publish).toHaveBeenCalledWith('user.created')
+    expect(capture).toHaveBeenCalledWith(admin.id, 'workspace_member_added', { role: 'member' })
+    capture.mockClear()
+    await scopedService.addWorkspaceMember({ ...admin, superAdmin: true }, requester.id, 'admin')
+    expect(capture).not.toHaveBeenCalled()
+    await expect(scopedService.addWorkspaceMember(admin, otherRequester.id, 'member')).rejects.toMatchObject({ status: 403 })
+  })
+
+  it('removes access and visibility overrides while preserving the account and its requests', async () => {
+    const publish = vi.fn()
+    const scopedService = new STLQuestService(repository, assets, staging, { publish }, telemetry, { remove: removeTusUpload })
+    await repository.addWorkspaceMember(requester.id, 'member')
+    const requestId = await request()
+    await repository.setSetting('board', { memberVisibility: { [requester.id]: 'own', [otherRequester.id]: 'all' } })
+    capture.mockClear()
+    await scopedService.removeWorkspaceMember({ ...admin, superAdmin: true }, requester.id)
+    expect((await repository.listUsers()).some((account) => account.id === requester.id)).toBe(false)
+    expect(await repository.accountExists(requester.email)).toBe(true)
+    expect(await repository.getRequest(requestId)).toBeDefined()
+    expect(await repository.getSetting('board')).toMatchObject({ memberVisibility: { [otherRequester.id]: 'all' } })
+    expect(
+      (await repository.getSetting<{ memberVisibility: Record<string, string> }>('board'))?.memberVisibility[requester.id],
+    ).toBeUndefined()
+    expect(publish).toHaveBeenCalledWith('user.created')
+    expect(capture).toHaveBeenCalledWith(admin.id, 'workspace_member_removed', {})
+    capture.mockClear()
+    await scopedService.removeWorkspaceMember({ ...admin, superAdmin: true }, requester.id)
+    expect(capture).not.toHaveBeenCalled()
+    await expect(scopedService.removeWorkspaceMember(requester, otherRequester.id)).rejects.toMatchObject({ status: 403 })
+    await expect(scopedService.removeWorkspaceMember(admin, admin.id)).rejects.toMatchObject({ status: 409 })
+  })
+
+  it('lets a workspace admin who is not a super admin remove a member', async () => {
+    await repository.addWorkspaceMember(requester.id, 'member')
+    await service.removeWorkspaceMember(admin, requester.id)
+    expect((await repository.listUsers()).some((account) => account.id === requester.id)).toBe(false)
+  })
+
+  it('lets a super admin remove a member regardless of their own workspace role', async () => {
+    await repository.addWorkspaceMember(otherRequester.id, 'member')
+    await service.removeWorkspaceMember({ ...requester, superAdmin: true }, otherRequester.id)
+    expect((await repository.listUsers()).some((account) => account.id === otherRequester.id)).toBe(false)
+  })
+
+  it('rejects a direct addition for an unknown account', async () => {
+    await expect(service.addWorkspaceMember({ ...admin, superAdmin: true }, 'missing', 'member')).rejects.toMatchObject({ status: 404 })
+  })
+
   async function request() {
     await assets.write('todo/model.stl', new TextEncoder().encode('stl'))
     const id = await repository.createRequest({

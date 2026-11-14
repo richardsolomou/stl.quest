@@ -105,9 +105,9 @@ export const settings = {
     },
     remove: {
       description:
-        'They lose access to this workspace immediately. Their account and the print requests they already made are kept, and you can invite them back at any time.',
+        'They lose access to this workspace immediately. Their account and the print requests they already made are kept, and you can invite them back or a super admin can add them again.',
       notRemoved: 'The member was not removed',
-      notRemovedHint: 'They still have access to this workspace. Check that they are not the last owner, then try again.',
+      notRemovedHint: 'They still have access to this workspace. Check that they are not a workspace owner or yourself, then try again.',
     },
   },
   invites: {
@@ -335,7 +335,7 @@ export const settings = {
   signIn: {
     title: 'Sign-in methods',
     description:
-      'Password, Google, Discord, and OpenID Connect can be enabled together. Joining an existing workspace always requires an invite.',
+      'Password, Google, Discord, and OpenID Connect can be enabled together. Existing accounts can join a workspace by invitation or be added directly by a super admin.',
     status: {
       enabled: 'Enabled',
       disabled: 'Disabled',
@@ -558,7 +558,8 @@ export const settings = {
     loadingDescription: 'Deployment-wide sign-in methods, cloud storage apps, and outbound email.',
     loading: 'Loading integration settings…',
     loadError: 'Could not load integration settings',
-    description: 'Deployment-wide sign-in methods, cloud storage apps, and outbound email. Workspace membership is always invite-only.',
+    description:
+      'Deployment-wide sign-in methods, cloud storage apps, and outbound email. Workspace access is granted by invitation or direct addition by a super admin.',
   },
   unsavedChanges: {
     title: 'Leave without saving?',

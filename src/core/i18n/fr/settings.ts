@@ -109,10 +109,10 @@ export const settings: typeof en = {
     },
     remove: {
       description:
-        'Cette personne perd immédiatement l’accès à cet espace de travail. Son compte et les demandes d’impression déjà faites sont conservés, et vous pouvez l’inviter à nouveau à tout moment.',
+        'Cette personne perd immédiatement l’accès à cet espace de travail. Son compte et les demandes d’impression déjà faites sont conservés, et vous pouvez l’inviter à nouveau ou un super administrateur peut l’ajouter directement.',
       notRemoved: 'Le membre n’a pas été retiré',
       notRemovedHint:
-        'Cette personne a toujours accès à cet espace de travail. Vérifiez qu’elle n’est pas le dernier propriétaire, puis réessayez.',
+        'Cette personne a toujours accès à cet espace de travail. Vérifiez qu’il ne s’agit ni d’un propriétaire de l’espace de travail ni de vous-même, puis réessayez.',
     },
   },
   invites: {
@@ -347,7 +347,7 @@ export const settings: typeof en = {
   signIn: {
     title: 'Méthodes de connexion',
     description:
-      'Mot de passe, Google, Discord et OpenID Connect peuvent être activés ensemble. Rejoindre un espace de travail existant nécessite toujours une invitation.',
+      'Mot de passe, Google, Discord et OpenID Connect peuvent être activés ensemble. Les comptes existants peuvent rejoindre un espace de travail sur invitation ou être ajoutés directement par un super administrateur.',
     status: { enabled: 'Activé', disabled: 'Désactivé', tested: 'Testé, non activé', needsTesting: 'À tester', notSetUp: 'Non configuré' },
     password: {
       name: 'Mot de passe',
@@ -568,7 +568,7 @@ export const settings: typeof en = {
     loading: 'Chargement des paramètres d’intégration…',
     loadError: 'Impossible de charger les paramètres d’intégration',
     description:
-      'Méthodes de connexion, applications de stockage cloud et e-mail sortant pour tout le déploiement. L’adhésion à un espace de travail se fait toujours sur invitation.',
+      'Méthodes de connexion, applications de stockage cloud et e-mail sortant pour tout le déploiement. L’accès à un espace de travail est accordé sur invitation ou par ajout direct par un super administrateur.',
   },
   unsavedChanges: {
     title: 'Quitter sans enregistrer ?',

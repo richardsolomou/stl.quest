@@ -33,7 +33,7 @@ STL Quest replaces spreadsheets and chat threads for hobbyists printing for frie
 - Which file formats does it preview? ${list(MODEL_FORMATS.map((format) => format.toUpperCase()))}, with interactive previews and generated thumbnails. Links to MakerWorld, Printables, MyMiniFactory, Cults3D, and Thingiverse get a cover preview.
 - Does it work with both resin and filament printers? Yes. Mixed fleets are supported, and auto-assignment matches each job to a printer by build volume and print type.
 - How is the queue ordered? Round robin between requesters, oldest first, requester priority, or manual ordering.
-- Can several groups share one install? Yes. Each workspace has its own board, printers, members, and storage, and users can join several workspaces by invitation.
+- Can several groups share one install? Yes. Each workspace has its own board, printers, members, and storage, and users can join several workspaces by invitation or be added directly by a super admin.
 - How do people sign in? Email and password, social login, OpenID Connect single sign-on, and two-factor authentication.
 - Does it collect telemetry? Anonymous telemetry is on by default, never includes model files, names, notes, or other request content, and can be turned off: [telemetry page](${LATEST_DOCUMENTATION_URL}/telemetry.md).
 

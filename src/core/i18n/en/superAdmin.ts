@@ -242,6 +242,15 @@ export const superAdmin = {
     deletedHint: 'Its print requests, models, settings, and invitations are gone.',
   },
   workspaceDetails: {
+    removeMember: (name: string) => `Remove member: ${name}`,
+    addUser: 'Add user',
+    searchAccounts: 'Search accounts by name or email',
+    noAccounts: 'No accounts available',
+    role: 'Role',
+    adding: 'Adding…',
+    addError: 'Could not add user',
+    addHint: 'Select an existing account to give it access immediately.',
+
     description: (slug: string) => `Deployment-wide details for ${slug}`,
     loading: 'Loading workspace details…',
     loadError: 'Could not load workspace details',

@@ -75,6 +75,8 @@ import { readEmailBranding, readWorkspaceSmtp, sendInviteEmail, workspaceEmailCo
 import { sourceImageContentType } from './sourcePreview'
 import {
   acceptInviteSchema,
+  addAdminWorkspaceMemberSchema,
+  removeAdminWorkspaceMemberSchema,
   archiveRequestsSchema,
   boardSettingsSchema,
   beginProviderInviteSchema,
@@ -785,6 +787,24 @@ export const getAdminWorkspace = createServerFn({ method: 'GET' })
     }),
   )
 
+export const removeAdminWorkspaceMember = createServerFn({ method: 'POST' })
+  .validator(removeAdminWorkspaceMemberSchema)
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      await instance.removeWorkspaceMemberAsSuperAdmin(getRequestHeaders(), data.id, data.userId)
+    }),
+  )
+
+export const addAdminWorkspaceMember = createServerFn({ method: 'POST' })
+  .validator(addAdminWorkspaceMemberSchema)
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      await instance.addWorkspaceMemberAsSuperAdmin(getRequestHeaders(), data.id, data.userId, data.role)
+    }),
+  )
+
 export const deleteAdminWorkspace = createServerFn({ method: 'POST' })
   .validator(idSchema.extend({ confirmation: workspaceNameConfirmationSchema }))
   .handler(async ({ data }) =>
@@ -839,14 +859,7 @@ export const removeWorkspaceMember = createServerFn({ method: 'POST' })
     mutationRpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      if (context.identity.id === data.userId) throw new Response(errors().workspace.cannotRemoveSelf, { status: 409 })
-      await context.repository.removeWorkspaceMember(data.userId)
-      // A visibility override outlives the membership otherwise, and would silently apply again on re-invite.
-      const board = await resolveBoardConfig(context.repository)
-      if (board.memberVisibility[data.userId])
-        await context.repository.setSetting('board', withMemberRequestVisibility(board, data.userId, 'default'))
-      context.events.publish('user.created')
-      void instance.telemetry.capture(context.identity.id, 'workspace_member_removed', {}).catch(() => undefined)
+      await context.service.removeWorkspaceMember(context.identity, data.userId)
     }),
   )
 

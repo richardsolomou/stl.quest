@@ -110,10 +110,10 @@ export const settings: typeof en = {
     },
     remove: {
       description:
-        'Diese Person verliert sofort den Zugriff auf diesen Arbeitsbereich. Ihr Konto und ihre bisherigen Druckanfragen bleiben erhalten, und Sie können sie jederzeit erneut einladen.',
+        'Diese Person verliert sofort den Zugriff auf diesen Arbeitsbereich. Ihr Konto und ihre bisherigen Druckanfragen bleiben erhalten, und Sie können sie erneut einladen oder als Super-Admin direkt wieder hinzufügen.',
       notRemoved: 'Das Mitglied wurde nicht entfernt',
       notRemovedHint:
-        'Diese Person hat weiterhin Zugriff auf diesen Arbeitsbereich. Prüfen Sie, dass sie nicht der letzte Eigentümer ist, und versuchen Sie es erneut.',
+        'Diese Person hat weiterhin Zugriff auf diesen Arbeitsbereich. Prüfen Sie, dass sie weder Eigentümer des Arbeitsbereichs noch Sie selbst ist, und versuchen Sie es erneut.',
     },
   },
   invites: {
@@ -347,7 +347,7 @@ export const settings: typeof en = {
   signIn: {
     title: 'Anmeldemethoden',
     description:
-      'Passwort, Google, Discord und OpenID Connect können gleichzeitig aktiviert werden. Für den Beitritt zu einem bestehenden Arbeitsbereich ist immer eine Einladung nötig.',
+      'Passwort, Google, Discord und OpenID Connect können gleichzeitig aktiviert werden. Bestehende Konten können einem Arbeitsbereich per Einladung beitreten oder von einem Super-Admin direkt hinzugefügt werden.',
     status: {
       enabled: 'Aktiviert',
       disabled: 'Deaktiviert',
@@ -574,7 +574,7 @@ export const settings: typeof en = {
     loading: 'Integrationseinstellungen werden geladen…',
     loadError: 'Integrationseinstellungen konnten nicht geladen werden',
     description:
-      'Anmeldemethoden, Cloud-Speicher-Apps und ausgehende E-Mail für die gesamte Bereitstellung. Die Mitgliedschaft in Arbeitsbereichen erfolgt immer nur auf Einladung.',
+      'Anmeldemethoden, Cloud-Speicher-Apps und ausgehende E-Mail für die gesamte Bereitstellung. Der Zugriff auf Arbeitsbereiche wird per Einladung oder durch direktes Hinzufügen durch einen Super-Admin gewährt.',
   },
   unsavedChanges: {
     title: 'Ohne Speichern verlassen?',
