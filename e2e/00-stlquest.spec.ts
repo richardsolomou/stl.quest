@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
 import fs from 'node:fs/promises'
+import { createServer } from 'node:http'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import type { Locator, Page } from '@playwright/test'
@@ -1624,6 +1625,84 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await dropboxIntegration.getByRole('switch', { name: 'Enable Dropbox' }).click()
   await expect(dropboxIntegration.getByText('Available to workspaces')).toBeVisible()
   await screenshot(page, 'integration-account-access-copy')
+  const googleIntegration = page.getByRole('region', { name: 'Google', exact: true })
+  await googleIntegration.getByRole('button', { name: 'Set up app' }).click()
+  const googleDialog = page.getByRole('dialog', { name: 'Configure Google' })
+  await googleDialog.getByLabel('Client ID').fill('test-client-id')
+  await googleDialog.getByLabel('Client secret').fill('test-client-secret')
+  await googleDialog.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(googleDialog).not.toBeVisible()
+  let finishProviderTest!: () => void
+  const providerTestResponse = new Promise<void>((resolve) => {
+    finishProviderTest = resolve
+  })
+  await page.route('**/api/auth/link-social', async (route) => {
+    await providerTestResponse
+    await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ message: 'Provider test rejected' }) })
+  })
+  await googleIntegration.getByRole('button', { name: 'Test sign-in' }).click()
+  await expect(googleIntegration.getByRole('button', { name: 'Testing sign-in…' })).toBeDisabled()
+  finishProviderTest()
+  await expect(googleIntegration.getByText('Provider test rejected')).toBeVisible()
+  await expect(googleIntegration.getByRole('button', { name: 'Test sign-in' })).toBeEnabled()
+  await page.unroute('**/api/auth/link-social')
+  await page.goto('/admin/integrations?authTest=oidc&authTestFailed=true&error=access_denied')
+  await expect(
+    page
+      .getByRole('region', { name: 'OpenID Connect', exact: true })
+      .getByText('The provider denied or cancelled the authorization request. Try again and approve access for STL Quest in the provider.'),
+  ).toBeVisible()
+  await expect(page.getByRole('region', { name: 'OpenID Connect', exact: true }).locator('pre code')).toHaveText('access_denied')
+  await page.goto('/admin/integrations?authTest=oidc&authTestFailed=true&error=unable_to_link_account')
+  await expect(page.getByText('The provider account could not be linked.', { exact: false })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'OpenID Connect', exact: true }).locator('pre code')).toHaveText('unable_to_link_account')
+  let oidcIssuer = ''
+  const discovery = createServer((_request, response) => {
+    response.writeHead(200, { 'Content-Type': 'application/json' })
+    response.end(
+      JSON.stringify({
+        issuer: oidcIssuer,
+        authorization_endpoint: `${oidcIssuer}/authorize`,
+        token_endpoint: `${oidcIssuer}/token`,
+        jwks_uri: `${oidcIssuer}/jwks`,
+      }),
+    )
+  })
+  await new Promise<void>((resolve) => discovery.listen(0, '0.0.0.0', resolve))
+  try {
+    const address = discovery.address()
+    if (!address || typeof address === 'string') throw new Error('OIDC test discovery did not listen on a port')
+    const host = process.env.PLAYWRIGHT_FAST_SERVER || process.env.PLAYWRIGHT_DEV_SERVER ? '127.0.0.1' : 'host.docker.internal'
+    oidcIssuer = `http://${host}:${address.port}`
+    await page.goto('/admin/integrations?authTest=oidc&authTestFailed=true&error=access_denied')
+    const oidcIntegration = page.getByRole('region', { name: 'OpenID Connect', exact: true })
+    await expect(oidcIntegration.locator('pre code')).toHaveText('access_denied')
+    await oidcIntegration.getByRole('button', { name: 'Set up app' }).click()
+    const oidcDialog = page.getByRole('dialog', { name: 'Configure OpenID Connect' })
+    await oidcDialog.getByLabel('Client ID').fill('oidc-test-client')
+    await oidcDialog.getByLabel('Client secret').fill('oidc-test-secret')
+    await oidcDialog.getByLabel('Issuer URL', { exact: true }).fill(oidcIssuer)
+    const allowSignup = oidcDialog.getByRole('switch', { name: 'Allow account creation on sign-in' })
+    await expect(allowSignup).toBeChecked()
+    await allowSignup.click()
+    await oidcDialog.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(oidcDialog).not.toBeVisible()
+    await expect(oidcIntegration.locator('pre code')).toHaveCount(0)
+    await expect(page).toHaveURL(/\/admin\/integrations$/)
+    await oidcIntegration.getByRole('button', { name: 'Edit app' }).click()
+    await expect(allowSignup).not.toBeChecked()
+    await expect(oidcDialog.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+    await allowSignup.click()
+    await oidcDialog.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(oidcDialog).not.toBeVisible()
+    await oidcIntegration.getByRole('button', { name: 'Edit app' }).click()
+    await expect(allowSignup).toBeChecked()
+    await oidcDialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  } finally {
+    await new Promise<void>((resolve, reject) => discovery.close((error) => (error ? reject(error) : resolve())))
+  }
+  await page.goto('/admin/integrations')
+
   await page
     .locator('[data-slot="settings-section"]')
     .filter({ hasText: 'Outbound email' })
@@ -1870,6 +1949,12 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
 
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await page.getByRole('button', { name: 'Sign out' }).click()
+  await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+  await page.goto('/?error=signup_disabled&error_description=private-provider-details')
+  await expect(page.getByRole('alert')).toContainText('Could not complete sign-in. Try again or contact your administrator.')
+  await expect(page.getByRole('alert').locator('pre code')).toHaveText('signup_disabled')
+  await expect(page.getByText('private-provider-details', { exact: true })).toHaveCount(0)
+
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
 
   await page.goto('/?signup=true')

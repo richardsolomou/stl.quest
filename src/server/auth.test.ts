@@ -71,7 +71,7 @@ async function listAccounts(repository: DrizzleRepository) {
 
 // Signs Alice up with a password and links her to an OIDC subject under one issuer, then returns an auth instance for
 // another issuer that serves the same subject.
-async function oidcLinkUnderPreviousIssuer(options?: { selfSignup?: boolean }) {
+async function oidcLinkUnderPreviousIssuer(options?: { selfSignup?: boolean; oidcAllowSignup?: boolean; freshInstall?: boolean }) {
   const issuers = ['https://old.example.com', 'https://new.example.com']
   const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 })
   const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url')
@@ -118,6 +118,7 @@ async function oidcLinkUnderPreviousIssuer(options?: { selfSignup?: boolean }) {
         password: true,
         passwordReset: true,
         socialProviders: ['oidc'],
+        oidcAllowSignup: options?.oidcAllowSignup,
         oidc: { enabled: true, clientId: 'oidc-id', clientSecret: 'oidc-secret', issuer, scopes: ['openid', 'email'], name: 'SSO' },
       },
     })
@@ -141,11 +142,7 @@ async function oidcLinkUnderPreviousIssuer(options?: { selfSignup?: boolean }) {
     return await completeOidc(auth, cookieHeaders(started.headers), started.response.url!, identity)
   }
   const oldIssuer = authFor(issuers[0])
-  const { headers } = await oldIssuer.api.signUpEmail({
-    body: { email: 'alice@example.com', password: 'password1234', name: 'Alice' },
-    returnHeaders: true,
-  })
-  const session = cookieHeaders(headers)
+  let session = new Headers()
   const link = async (auth: ReturnType<typeof createAuth>, sub: string) => {
     const linking = await auth.api.linkSocialAccount({
       body: { provider: 'oidc', callbackURL: '/' },
@@ -154,7 +151,14 @@ async function oidcLinkUnderPreviousIssuer(options?: { selfSignup?: boolean }) {
     })
     await completeOidc(auth, mergeCookieHeaders(session, linking.headers), linking.response.url, { sub, email: 'alice@example.com' })
   }
-  await link(oldIssuer, '1')
+  if (!options?.freshInstall) {
+    const { headers } = await oldIssuer.api.signUpEmail({
+      body: { email: 'alice@example.com', password: 'password1234', name: 'Alice' },
+      returnHeaders: true,
+    })
+    session = cookieHeaders(headers)
+    await link(oldIssuer, '1')
+  }
   return { repository, session, oldIssuer, newIssuer: authFor(issuers[1]), signIn, link }
 }
 
@@ -520,7 +524,48 @@ describe('better-auth integration', () => {
     }
 
     expect(await signIn(oldIssuer, { sub: '1', email: 'other@example.com' })).toBe('alice@example.com')
-    expect(await signIn(newIssuer, { sub: '1', email: 'other@example.com' })).toBeUndefined()
+    expect(await signIn(newIssuer, { sub: '1', email: 'alice@example.com' })).toBeUndefined()
+  })
+
+  it('creates an account from an OpenID Connect sign-in by default', async () => {
+    const { repository, oldIssuer, signIn } = await oidcLinkUnderPreviousIssuer()
+    cleanup = () => {
+      vi.unstubAllGlobals()
+      void repository.close()
+    }
+    expect(await signIn(oldIssuer, { sub: '9', email: 'stranger@example.com' })).toBe('stranger@example.com')
+    expect(await repository.countUsers()).toBe(2)
+  })
+
+  it('keeps existing OIDC sign-in working while account creation is disabled', async () => {
+    const { repository, oldIssuer, signIn } = await oidcLinkUnderPreviousIssuer({ oidcAllowSignup: false })
+    cleanup = () => {
+      vi.unstubAllGlobals()
+      void repository.close()
+    }
+    expect(await signIn(oldIssuer, { sub: '1', email: 'alice@example.com' })).toBe('alice@example.com')
+    expect(await signIn(oldIssuer, { sub: '9', email: 'stranger@example.com' })).toBeUndefined()
+    expect(await signIn(oldIssuer, { sub: '9', email: 'stranger@example.com' }, true)).toBeUndefined()
+    expect(await repository.countUsers()).toBe(1)
+  })
+
+  it('creates the first account through OpenID Connect sign-up while account creation is disabled', async () => {
+    const { repository, oldIssuer, signIn } = await oidcLinkUnderPreviousIssuer({ oidcAllowSignup: false, freshInstall: true })
+    cleanup = () => {
+      vi.unstubAllGlobals()
+      void repository.close()
+    }
+    expect(await signIn(oldIssuer, { sub: '1', email: 'first@example.com' }, true)).toBe('first@example.com')
+  })
+
+  it('respects closed self-signup for OpenID Connect sign-in', async () => {
+    const { repository, oldIssuer, signIn } = await oidcLinkUnderPreviousIssuer({ selfSignup: false })
+    cleanup = () => {
+      vi.unstubAllGlobals()
+      void repository.close()
+    }
+    expect(await signIn(oldIssuer, { sub: '9', email: 'stranger@example.com' })).toBeUndefined()
+    expect(await repository.countUsers()).toBe(1)
   })
 
   it('creates an account from an OpenID Connect sign-up while self-signup is on', async () => {

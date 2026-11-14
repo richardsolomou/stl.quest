@@ -1,7 +1,7 @@
 import { useState, type Dispatch, type SetStateAction } from 'react'
 import { usePostHog } from '@posthog/react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useRouter } from '@tanstack/react-router'
+import { useLocation, useRouter } from '@tanstack/react-router'
 import { CircleAlert } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -20,7 +20,7 @@ import {
 import { PASSWORD_MIN_LENGTH } from '../../core/security'
 import { authClient } from '../authClient'
 import { useI18n } from '../i18n'
-import { startSocialSignIn } from '../socialSignIn'
+import { hasSocialSignInError, socialSignInErrorCode, startSocialSignIn } from '../socialSignIn'
 import { AuthMethodIcon } from './AuthMethodIcon'
 import { PasswordAuthDivider } from './PasswordAuthDivider'
 import { TwoFactorSignInForm } from './TwoFactorSignInForm'
@@ -47,7 +47,8 @@ export function AuthenticationMethods({
   const router = useRouter()
   const posthog = usePostHog()
   const [values, setValues] = useState({ email: '', name: '', password: '' })
-  const [error, setError] = useState('')
+  const search = useLocation({ select: (location) => location.searchStr })
+  const [error, setError] = useState(() => (hasSocialSignInError(search) ? t.auth.socialSignInFailed : ''))
   const [busy, setBusy] = useState(false)
   const [resetSent, setResetSent] = useState(false)
   const [twoFactorPending, setTwoFactorPending] = useState(false)
@@ -67,6 +68,21 @@ export function AuthenticationMethods({
       setBusy(false)
     }
   }
+
+  const callbackErrorCode = error === t.auth.socialSignInFailed ? socialSignInErrorCode(search) : undefined
+  const failure = error ? (
+    <Alert variant="destructive">
+      <CircleAlert />
+      <AlertDescription>
+        <p>{error}</p>
+        {callbackErrorCode && (
+          <pre className="overflow-x-auto rounded-md bg-muted p-2 text-xs">
+            <code>{callbackErrorCode}</code>
+          </pre>
+        )}
+      </AlertDescription>
+    </Alert>
+  ) : null
 
   return (
     <CardContent className="flex flex-col gap-4">
@@ -153,12 +169,7 @@ export function AuthenticationMethods({
               autoComplete={signingUp ? 'new-password' : 'current-password'}
             />
           </Field>
-          {error && (
-            <Alert variant="destructive">
-              <CircleAlert />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+          {failure}
           <Button type="submit" disabled={busy || !hydrated}>
             {busy && <Spinner />}
             {busy ? t.auth.working : initialAdmin ? t.auth.methods.createSuperAdmin : signingUp ? t.auth.createAccount : t.auth.signIn}
@@ -213,12 +224,7 @@ export function AuthenticationMethods({
         </form>
       )}
       {auth.password && twoFactorPending && <TwoFactorSignInForm onBack={() => setTwoFactorPending(false)} />}
-      {!auth.password && error && (
-        <Alert variant="destructive">
-          <CircleAlert />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      {!auth.password && failure}
     </CardContent>
   )
 }

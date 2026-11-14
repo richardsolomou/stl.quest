@@ -89,19 +89,6 @@ export async function setStoredIntegrationConfig(
   await repository.setSetting(SETTING_KEY, encryptIntegrationConfig(config, environment))
 }
 
-export function socialProviderCredentialsChanged(
-  current: IntegrationConfig[SocialAuthProvider],
-  clientId: string,
-  clientSecret: string,
-  issuer?: string,
-) {
-  return (
-    current?.clientId !== clientId ||
-    (clientSecret !== '' && current?.clientSecret !== clientSecret) ||
-    (issuer !== undefined && (current && 'issuer' in current ? current.issuer : undefined) !== issuer)
-  )
-}
-
 export const OIDC_DISCOVERY_TIMEOUT_MS = 5_000
 
 export async function oidcDiscoveryProblem(issuer: string, timeoutMs = OIDC_DISCOVERY_TIMEOUT_MS) {
@@ -142,6 +129,12 @@ function publicProvider(
     clientId: config?.clientId ?? '',
     secretConfigured: Boolean(config?.clientSecret),
     source: providerSource(provider, environment),
+    ...(provider === 'oidc'
+      ? {
+          allowSignup: effective.oidcAllowSignup !== false,
+          allowSignupSource: effective.oidcAllowSignupSource ?? 'database',
+        }
+      : {}),
     ...(oidc ? { issuer: oidc.issuer, scopes: oidc.scopes, name: oidc.name } : {}),
   }
 }

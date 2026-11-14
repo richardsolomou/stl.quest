@@ -3,13 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { IntegrationConfig } from '../core/auth'
-import {
-  decryptIntegrationConfig,
-  encryptIntegrationConfig,
-  oidcDiscoveryProblem,
-  publicIntegrationConfig,
-  socialProviderCredentialsChanged,
-} from './integrations'
+import { decryptIntegrationConfig, encryptIntegrationConfig, oidcDiscoveryProblem, publicIntegrationConfig } from './integrations'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { resolveSmtpConfig } from '../adapters/email'
 
@@ -25,26 +19,41 @@ afterEach(() => {
 })
 
 describe('integration settings', () => {
-  it('requires another sign-in when social provider credentials change', () => {
-    const current = { enabled: false, clientId: 'client', clientSecret: 'secret' }
-
-    expect(socialProviderCredentialsChanged(current, 'client', 'replacement')).toBe(true)
-    expect(socialProviderCredentialsChanged(current, 'replacement', '')).toBe(true)
-    expect(socialProviderCredentialsChanged(current, 'client', '')).toBe(false)
+  it('shows an account creation override before OIDC credentials are configured', () => {
+    const env = { AUTH_OIDC_ALLOW_SIGNUP: 'false' }
+    const effective = resolveAuthAdapterConfig(undefined, env)
+    expect(publicIntegrationConfig(undefined, effective, undefined, 'http://localhost', env).providers.oidc).toMatchObject({
+      configured: false,
+      allowSignup: false,
+      allowSignupSource: 'environment',
+    })
   })
 
-  it('requires another sign-in when the OIDC issuer changes', () => {
-    const current = {
-      enabled: true,
-      clientId: 'client',
-      clientSecret: 'secret',
-      issuer: 'https://a.example.com',
-      scopes: ['openid'],
-      name: 'SSO',
+  it.each([
+    [undefined, false, 'database'],
+    ['', false, 'database'],
+    ['disabled', false, 'database'],
+    ['true', true, 'environment'],
+    ['false', false, 'environment'],
+  ] as const)('reports the effective OIDC account creation setting and its source for %s', (override, allowSignup, allowSignupSource) => {
+    const stored = {
+      passwordEnabled: true,
+      oidc: {
+        enabled: true,
+        clientId: 'id',
+        clientSecret: 'secret',
+        issuer: 'https://id.example.com',
+        scopes: ['openid'],
+        name: 'SSO',
+        allowSignup: false,
+      },
     }
-
-    expect(socialProviderCredentialsChanged(current, 'client', '', 'https://b.example.com')).toBe(true)
-    expect(socialProviderCredentialsChanged(current, 'client', '', 'https://a.example.com')).toBe(false)
+    const env = { AUTH_OIDC_ALLOW_SIGNUP: override }
+    const effective = resolveAuthAdapterConfig(stored, env)
+    expect(publicIntegrationConfig(stored, effective, undefined, 'http://localhost', env).providers.oidc).toMatchObject({
+      allowSignup,
+      allowSignupSource,
+    })
   })
 
   describe('OIDC discovery check', () => {

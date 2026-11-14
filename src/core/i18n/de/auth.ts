@@ -10,6 +10,7 @@ export const auth: typeof en = {
   working: 'Wird bearbeitet…',
   haveAccount: 'Sie haben bereits ein Konto? Anmelden',
   continueWith: (provider) => `Weiter mit ${provider}`,
+  socialSignInFailed: 'Die Anmeldung konnte nicht abgeschlossen werden. Versuche es erneut oder kontaktiere deine Administration.',
   continueFailed: (provider) => `Weiter mit ${provider} ist fehlgeschlagen.`,
   passwordDivider: 'oder Passwort verwenden',
   introduction: {
