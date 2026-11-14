@@ -1,10 +1,11 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { createServerOnlyFn } from '@tanstack/react-start'
 import { DEFAULT_LOCALE, messagesFor, negotiateLocale, type Locale } from '../core/i18n'
 
 let instance: AsyncLocalStorage<{ locale: Locale }> | undefined
 
-/** Created on first use: client bundles import server-function modules, and a top-level constructor would survive tree-shaking there. */
-const storage = () => (instance ??= new AsyncLocalStorage())
+/** Strip the Node dependency from client imports of server-function modules, including unbundled dev modules. */
+const storage = createServerOnlyFn(() => (instance ??= new AsyncLocalStorage<{ locale: Locale }>()))
 
 /** Starts from the browser's languages; resolving the signed-in user replaces it with their own choice. */
 export function withRequestLocale<T>(request: Request | undefined, work: () => T): T {

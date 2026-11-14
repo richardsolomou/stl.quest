@@ -39,7 +39,7 @@ import { isLocale, messagesFor } from '../core/i18n'
 
 // Every auth call awaits Better Auth's startup, which runs OIDC discovery, so an unreachable or mismatched issuer skips the provider
 // until the next restart or settings save. Better Auth verifies ID tokens against the discovered issuer without comparing it to ours.
-function oidcPlugin(config: OidcProviderConfig | undefined) {
+function oidcPlugin(config: OidcProviderConfig | undefined, allowSignup: boolean) {
   if (!config) return undefined
   const plugin = genericOAuth({
     config: [
@@ -51,7 +51,7 @@ function oidcPlugin(config: OidcProviderConfig | undefined) {
         clientId: config.clientId,
         clientSecret: config.clientSecret,
         scopes: config.scopes,
-        disableImplicitSignUp: true,
+        disableImplicitSignUp: !allowSignup,
         accountSubject: ({ profile }) => (profile.sub ? oidcAccountId(config.issuer, String(profile.sub)) : ''),
         // The CSP cannot list every identity provider's avatar host, so the profile picture is not stored.
         mapProfileToUser: () => ({ image: undefined }),
@@ -147,7 +147,8 @@ export function createAuth(
     ...(providerOptions('google') ? { google: providerOptions('google')! } : {}),
     ...(providerOptions('discord') ? { discord: providerOptions('discord')! } : {}),
   }
-  const oidc = oidcPlugin(options?.auth?.oidc)
+  const oidcAllowSignup = options?.auth?.oidcAllowSignup !== false
+  const oidc = oidcPlugin(options?.auth?.oidc, oidcAllowSignup)
   const billing = stripeBillingPlugin()
   const claimInitialSuperAdmin = async () => {
     await database.run(sql`
@@ -158,10 +159,11 @@ export function createAuth(
     `)
   }
   // The first account must always be creatable, so a fresh install never locks itself out.
-  const selfSignupOpen = async () =>
-    !options?.selfSignupAllowed ||
-    (await options.selfSignupAllowed()) ||
-    !(await database.select({ id: userTable.id }).from(userTable).limit(1).get())
+  const firstAccount = async () => !(await database.select({ id: userTable.id }).from(userTable).limit(1).get())
+  const selfSignupOpen = async () => !options?.selfSignupAllowed || (await options.selfSignupAllowed()) || (await firstAccount())
+  // Enforced here rather than with the provider's disableSignUp, which would also block the first account and invites.
+  const signupOpen = async (context: { path?: string; params?: Record<string, string | undefined> } | null) =>
+    !oidcAllowSignup && context?.path === '/callback/:id' && context.params?.id === 'oidc' ? await firstAccount() : await selfSignupOpen()
   const authInstance = betterAuth({
     database: drizzleAdapter(database, { provider: databaseProvider(database), schema }),
     secret,
@@ -214,10 +216,10 @@ export function createAuth(
     databaseHooks: {
       user: {
         create: {
-          before: async (user) => {
+          before: async (user, context) => {
             if (authProvisioningAllowed()) return { data: withBoundedName(user) }
             const invite = options?.claimInvite ? await claimAuthInvite(options.claimInvite, normalizeEmail(user.email)) : undefined
-            if (!invite && !(await selfSignupOpen()))
+            if (!invite && !(await signupOpen(context)))
               throw new APIError('FORBIDDEN', { message: serverMessages().server.auth.signUpClosed })
             return { data: { ...withBoundedName(user), role: 'requester' } }
           },

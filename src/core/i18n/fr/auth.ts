@@ -10,6 +10,7 @@ export const auth: typeof en = {
   working: 'En cours…',
   haveAccount: 'Vous avez déjà un compte ? Connectez-vous',
   continueWith: (provider) => `Continuer avec ${provider}`,
+  socialSignInFailed: 'Impossible de terminer la connexion. Réessayez ou contactez votre administrateur.',
   continueFailed: (provider) => `Impossible de continuer avec ${provider}.`,
   passwordDivider: 'ou utilisez un mot de passe',
   introduction: {

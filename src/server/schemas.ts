@@ -190,6 +190,7 @@ export const socialProviderSettingsSchema = z.discriminatedUnion('provider', [
   z.object({ provider: z.enum(['google', 'discord']), ...socialProviderCredentials }),
   z.object({
     provider: z.literal('oidc'),
+    allowSignup: z.boolean().optional(),
     ...socialProviderCredentials,
     issuer: z
       .string()

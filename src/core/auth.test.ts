@@ -11,6 +11,8 @@ import {
   signInFailureMessage,
   signInFailureReason,
   socialProviderName,
+  socialProviderCredentialsChanged,
+  socialProviderNeedsRetest,
 } from './auth'
 
 describe('signInFailureReason', () => {
@@ -123,5 +125,49 @@ describe('OpenID Connect settings', () => {
     expect(linkedAccountActive(link, 'https://auth.example.com/realms/mai')).toBe(false)
     expect(linkedAccountActive(link, undefined)).toBe(false)
     expect(linkedAccountActive({ providerId: 'google', accountId: '42' }, undefined)).toBe(true)
+  })
+})
+
+describe('social provider retesting', () => {
+  const current = {
+    enabled: true,
+    clientId: 'id',
+    clientSecret: 'secret',
+    issuer: 'https://id.example.com',
+    scopes: ['openid', 'email'],
+    name: 'SSO',
+    allowSignup: true,
+  }
+  it('keeps a tested provider enabled when only account creation changes', () => {
+    expect(socialProviderNeedsRetest(current, { ...current, clientSecret: '' })).toBe(false)
+  })
+  it('requires testing new credentials, issuer, or scopes', () => {
+    expect(socialProviderNeedsRetest(current, { ...current, clientSecret: 'replacement' })).toBe(true)
+    expect(socialProviderNeedsRetest(current, { ...current, issuer: 'https://other.example.com' })).toBe(true)
+    expect(socialProviderNeedsRetest(current, { ...current, scopes: ['openid'] })).toBe(true)
+  })
+})
+
+describe('social provider credentials', () => {
+  it('requires another sign-in when social provider credentials change', () => {
+    const current = { enabled: false, clientId: 'client', clientSecret: 'secret' }
+
+    expect(socialProviderCredentialsChanged(current, 'client', 'replacement')).toBe(true)
+    expect(socialProviderCredentialsChanged(current, 'replacement', '')).toBe(true)
+    expect(socialProviderCredentialsChanged(current, 'client', '')).toBe(false)
+  })
+
+  it('requires another sign-in when the OIDC issuer changes', () => {
+    const current = {
+      enabled: true,
+      clientId: 'client',
+      clientSecret: 'secret',
+      issuer: 'https://a.example.com',
+      scopes: ['openid'],
+      name: 'SSO',
+    }
+
+    expect(socialProviderCredentialsChanged(current, 'client', '', 'https://b.example.com')).toBe(true)
+    expect(socialProviderCredentialsChanged(current, 'client', '', 'https://a.example.com')).toBe(false)
   })
 })

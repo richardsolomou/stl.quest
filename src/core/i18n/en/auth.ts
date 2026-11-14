@@ -8,6 +8,7 @@ export const auth = {
   working: 'Working…',
   haveAccount: 'Already have an account? Sign in',
   continueWith: (provider: string) => `Continue with ${provider}`,
+  socialSignInFailed: 'Could not complete sign-in. Try again or contact your administrator.',
   continueFailed: (provider: string) => `Could not continue with ${provider}.`,
   passwordDivider: 'or use a password',
   introduction: {

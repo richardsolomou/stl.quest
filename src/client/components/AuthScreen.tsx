@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { useLocation } from '@tanstack/react-router'
+import { hasSocialSignInError } from '../socialSignIn'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { SignInCapabilities } from '../../core/auth'
@@ -22,7 +24,8 @@ export function AuthScreen({
   const { t } = useI18n()
   const { data: currentAuth } = useQuery({ ...authCapabilitiesQuery(), initialData: auth })
   const [hydrated, setHydrated] = useState(false)
-  const [showIntroduction, setShowIntroduction] = useState(setupRequired)
+  const search = useLocation({ select: (location) => location.searchStr })
+  const [showIntroduction, setShowIntroduction] = useState(setupRequired && !hasSocialSignInError(search))
   const [creatingAccount, setCreatingAccount] = useState(initialCreatingAccount)
   useEffect(() => setHydrated(true), [])
   const signingUp = setupRequired || (creatingAccount && currentAuth.selfSignup)

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { startSocialSignIn } from './socialSignIn'
+import { hasSocialSignInError, socialSignInErrorCode, startSocialSignIn } from './socialSignIn'
 
 const social = vi.hoisted(() => vi.fn())
 vi.mock('./authClient', () => ({ authClient: { signIn: { social } } }))
@@ -28,5 +28,26 @@ describe('social sign-in', () => {
     social.mockRejectedValue(new TypeError('Failed to fetch'))
 
     await expect(startSocialSignIn(options)).resolves.toBe(false)
+  })
+})
+
+describe('social sign-in callbacks', () => {
+  it.each(['?error=access_denied', '?error=signup_disabled', '?error=unknown&error_description=private', '?error='])(
+    'recognizes a failed callback without exposing its details: %s',
+    (search) => {
+      expect(hasSocialSignInError(search)).toBe(true)
+    },
+  )
+  it.each(['', '?signup=true', '?error_description=private'])('does not report failure without an error parameter: %s', (search) => {
+    expect(hasSocialSignInError(search)).toBe(false)
+  })
+})
+
+describe('public social sign-in error codes', () => {
+  it('shows a short error code without provider descriptions', () => {
+    expect(socialSignInErrorCode('?error=signup_disabled&error_description=private')).toBe('signup_disabled')
+  })
+  it.each(['', '?error=', '?error=not%20a%20code', `?error=${'a'.repeat(101)}`])('does not show malformed error codes: %s', (search) => {
+    expect(socialSignInErrorCode(search)).toBeUndefined()
   })
 })

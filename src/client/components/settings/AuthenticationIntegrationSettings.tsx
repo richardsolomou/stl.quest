@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
+import { useLocation, useRouter } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -8,7 +9,12 @@ import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
 import { OIDC_DEFAULT_SCOPES, OIDC_NAME_MAX_LENGTH, type PublicIntegrationConfig, type SocialAuthProvider } from '../../../core/auth'
 import { saveSocialProvider, updatePasswordAuth, updateSocialProviderEnabled } from '../../../server/fns'
-import { authClient } from '../../authClient'
+import {
+  socialProviderTestErrorCode,
+  socialProviderTestFailure,
+  socialProviderTestResult,
+  startSocialProviderTest,
+} from '../../socialProviderTest'
 import { invalidateQueries } from '../../queryState'
 import { SOCIAL_PROVIDER_OPTIONS, SOCIAL_PROVIDER_SETTINGS } from '../../socialProviderSettings'
 import { AuthMethodIcon } from '../AuthMethodIcon'
@@ -21,6 +27,12 @@ import { useI18n } from '../../i18n'
 
 const refreshIntegrationSettings = (queryClient: ReturnType<typeof useQueryClient>) =>
   invalidateQueries(queryClient, 'integrations', 'session', 'auth-capabilities')
+
+/** A provider test result lives in the callback URL, so any provider change makes it stale. */
+function useClearProviderTestResult() {
+  const router = useRouter()
+  return () => router.history.replace(router.state.location.pathname)
+}
 
 export function AuthenticationSettings({
   data,
@@ -72,12 +84,26 @@ function ProviderRow({
   onConfigure: () => void
 }) {
   const queryClient = useQueryClient()
+  const clearTestResult = useClearProviderTestResult()
   const mutation = useMutation({
     mutationFn: useServerFn(updateSocialProviderEnabled),
-    onSuccess: () => refreshIntegrationSettings(queryClient),
+    onSuccess: async () => {
+      clearTestResult()
+      await refreshIntegrationSettings(queryClient)
+    },
   })
   const { t } = useI18n()
   const copy = t.settings.signIn
+  const search = useLocation({ select: (location) => location.searchStr })
+  const result = socialProviderTestResult(search, item.id)
+  const testMutation = useMutation({
+    mutationFn: () => startSocialProviderTest(item.id, copy.provider.testFailed),
+  })
+  const callbackFailure =
+    socialProviderTestFailure(search, item.id, copy.provider) ??
+    (result === 'returned' && !config.linked ? copy.provider.testErrors.linking : undefined)
+  const failure = mutation.error?.message ?? testMutation.error?.message ?? callbackFailure
+  const errorCode = socialProviderTestErrorCode(search, item.id)
   const description = t.settings.socialProviders[item.id].description
   const status = config.enabled
     ? { label: copy.status.enabled, tone: 'on' as const }
@@ -92,26 +118,28 @@ function ProviderRow({
       name={item.name}
       status={status}
       detail={config.configured && !config.linked ? `${description} ${copy.provider.testHint(item.name)}` : description}
-      problem={mutation.error?.message}
+      success={result === 'returned' && config.linked ? copy.provider.testSucceeded : undefined}
+      problem={
+        failure ? (
+          <div className="min-w-0 space-y-2">
+            <p>{failure}</p>
+            {errorCode && !mutation.error && !testMutation.error && (
+              <pre className="overflow-x-auto rounded-md bg-muted p-2 text-xs">
+                <code>{errorCode}</code>
+              </pre>
+            )}
+          </div>
+        ) : undefined
+      }
       actions={
         <>
           <Button type="button" variant="outline" size="sm" onClick={onConfigure}>
             {config.configured ? copy.provider.editApp : copy.provider.setUpApp}
           </Button>
           {config.configured && !config.linked && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                void authClient.linkSocial({
-                  provider: item.id,
-                  callbackURL: '/admin/integrations',
-                  errorCallbackURL: '/admin/integrations',
-                })
-              }
-            >
-              {copy.provider.test}
+            <Button type="button" variant="outline" size="sm" disabled={testMutation.isPending} onClick={() => testMutation.mutate()}>
+              {testMutation.isPending && <Spinner />}
+              {testMutation.isPending ? copy.provider.testing : copy.provider.test}
             </Button>
           )}
           <Switch
@@ -143,9 +171,12 @@ export function ProviderDialog({
   const [issuer, setIssuer] = useState(current.issuer ?? '')
   const [scopes, setScopes] = useState((current.scopes ?? OIDC_DEFAULT_SCOPES).join(' '))
   const [buttonName, setButtonName] = useState(current.name ?? '')
+  const [allowSignup, setAllowSignup] = useState(current.allowSignup ?? true)
+  const clearTestResult = useClearProviderTestResult()
   const mutation = useMutation({
     mutationFn: useServerFn(saveSocialProvider),
     onSuccess: async () => {
+      clearTestResult()
       await queryClient.invalidateQueries({ queryKey: ['integrations'] })
       onDone()
     },
@@ -192,6 +223,22 @@ export function ProviderDialog({
                 />
                 <FieldDescription>{copy.issuerHint}</FieldDescription>
               </Field>
+              <Field>
+                <div className="flex items-center justify-between gap-3">
+                  <FieldLabel htmlFor="provider-allow-signup">{copy.allowSignup}</FieldLabel>
+                  <Switch
+                    id="provider-allow-signup"
+                    checked={allowSignup}
+                    disabled={current.allowSignupSource === 'environment' || current.source === 'environment'}
+                    onCheckedChange={setAllowSignup}
+                  />
+                </div>
+                <FieldDescription>
+                  {current.allowSignupSource === 'environment' || current.source === 'environment'
+                    ? copy.allowSignupManaged
+                    : copy.allowSignupHint}
+                </FieldDescription>
+              </Field>
               <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
                 <Field>
                   <FieldLabel htmlFor="provider-scopes">{copy.scopes}</FieldLabel>
@@ -223,12 +270,24 @@ export function ProviderDialog({
             {t.common.cancel}
           </Button>
           <Button
-            disabled={!clientId || (oidc && !issuer) || mutation.isPending}
+            disabled={
+              !clientId ||
+              (oidc && !issuer) ||
+              mutation.isPending ||
+              (current.configured &&
+                clientId === current.clientId &&
+                clientSecret === '' &&
+                (!oidc ||
+                  (issuer === (current.issuer ?? '') &&
+                    scopes === (current.scopes ?? OIDC_DEFAULT_SCOPES).join(' ') &&
+                    buttonName === (current.name ?? '') &&
+                    allowSignup === (current.allowSignup ?? true))))
+            }
             onClick={() =>
               mutation.mutate({
                 data:
                   provider === 'oidc'
-                    ? { provider, clientId, clientSecret, issuer, scopes, name: buttonName }
+                    ? { provider, clientId, clientSecret, issuer, scopes, name: buttonName, allowSignup }
                     : { provider, clientId, clientSecret },
               })
             }
