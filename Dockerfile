@@ -6,7 +6,7 @@ FROM node:24-alpine AS build
 WORKDIR /app
 # A native module with no prebuilt binary for the image's platform and libc compiles from source.
 RUN apk add --no-cache python3 make g++
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ras.config.ts ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN corepack enable && corepack install
 RUN pnpm install --frozen-lockfile
 COPY src ./src

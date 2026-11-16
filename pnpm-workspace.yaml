@@ -5,8 +5,6 @@ allowBuilds:
   core-js: false
   esbuild: true
   protobufjs: false
-  sharp: false
-  workerd: true
 
 minimumReleaseAge: 10080
 peerDependencyRules:
@@ -29,26 +27,3 @@ minimumReleaseAgeExclude:
   - 'posthog-*'
   - '@posthog/*'
   - ras-stack
-  - ras-stack@5.0.0
-  - ras-stack@5.1.0
-  - ras-stack@5.4.0
-  - ras-stack@5.5.0
-  - ras-stack@5.5.1
-  - ras-stack@5.5.3
-  # Reviewed exact versions from the RAS candidate; retain the seven-day gate for other packages.
-  - '@better-auth/core@1.7.10'
-  - '@better-auth/drizzle-adapter@1.7.10'
-  - '@better-auth/kysely-adapter@1.7.10'
-  - '@better-auth/memory-adapter@1.7.10'
-  - '@better-auth/mongo-adapter@1.7.10'
-  - '@better-auth/prisma-adapter@1.7.10'
-  - '@better-auth/telemetry@1.7.10'
-  - '@better-auth/stripe@1.7.10'
-  - '@posthog/browser-common@0.9.5'
-  - '@posthog/core@1.59.1'
-  - better-auth@1.7.10
-  - posthog-js@1.438.12
-  - posthog-node@5.56.2
-configDependencies:
-  ras-stack: 5.5.3
-pnpmfile: node_modules/.pnpm-config/ras-stack/pnpmfile.mjs
