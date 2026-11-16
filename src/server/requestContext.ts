@@ -1,9 +1,9 @@
 import crypto from 'node:crypto'
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { postHogRequestContext } from 'ras-stack/posthog'
 import type { Identity } from '../core/types'
 import { withRequestLocale } from './locale'
 import { logger } from './logger'
+import { requestContext as postHogRequestContext } from './telemetry'
 
 type LogContext = {
   request_id: string
@@ -31,7 +31,7 @@ export function currentRequestLogContext() {
 export function setRequestIdentity(identity: Identity) {
   const store = storage.getStore()
   if (!store) return
-  const { distinctId } = postHogRequestContext(store.request, { authenticatedDistinctId: identity.id })
+  const { distinctId } = postHogRequestContext(store.request, identity.id)
   if (distinctId) store.log.posthogDistinctId = distinctId
   if (identity.workspaceId) store.log.workspace_id = identity.workspaceId
 }
