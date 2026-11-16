@@ -15,5 +15,8 @@
         "allow_presence_for_subscriber": true
       }
     ]
+  },
+  "health": {
+    "enabled": true
   }
 }

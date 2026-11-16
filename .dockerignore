@@ -6,5 +6,10 @@ node_modules
 .env
 .env.local
 prints-dev
-.ras
 .capture
+.github
+.wrangler
+dist
+.data
+.env.*
+*.log

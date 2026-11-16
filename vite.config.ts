@@ -1,9 +1,11 @@
+import tailwindcss from '@tailwindcss/vite'
+import { tanstackStart } from '@tanstack/react-start/plugin/vite'
+import viteReact from '@vitejs/plugin-react'
+import { nitro } from 'nitro/vite'
 import type { Plugin } from 'vite'
-import { loadEnv } from 'vite'
-import { defineViteConfig } from 'ras-stack/vite'
-import { postHogEnvironment } from 'ras-stack/posthog'
-import { postHogIngestProxy } from 'ras-stack/posthog/proxy'
+import { defineConfig, loadEnv } from 'vite'
 import packageJson from './package.json' with { type: 'json' }
+import { postHogSourceMaps } from './scripts/posthogSourceMaps.ts'
 
 // Dev-only: the dev server skips SSR handling for requests with
 // Sec-Fetch-Dest: image, so <img> tags pointing at /api/* 404. Dropping the
@@ -19,39 +21,31 @@ const devApiImages: Plugin = {
   },
 }
 
-export default defineViteConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
-  const posthog = postHogEnvironment({ projectToken: env.VITE_POSTHOG_PROJECT_TOKEN, host: env.VITE_POSTHOG_HOST })
-  const posthogProxy = posthog ? postHogIngestProxy(posthog) : undefined
+export default defineConfig(({ mode }) => {
+  const sourceMaps = postHogSourceMaps({ ...loadEnv(mode, process.cwd(), ''), ...process.env })
   return {
+    resolve: { tsconfigPaths: true },
     // Prebundle the upload client's CommonJS dependencies before serving them to the browser.
-    optimizeDeps: { include: ['ras-stack > tus-js-client'] },
+    optimizeDeps: { include: ['tus-js-client'] },
     server: {
       port: 3000,
-      proxy: {
-        '/connection': { target: 'http://127.0.0.1:8000', ws: true },
-        ...posthogProxy?.vite,
-      },
+      proxy: { '/connection': { target: 'http://127.0.0.1:8000', ws: true } },
     },
     define: { __APP_VERSION__: JSON.stringify(packageJson.version) },
-    plugins: [devApiImages],
-    ras: {
-      nitro: {
-        routeRules: {
-          ...posthogProxy?.nitro,
-          '/api/**': { headers: { 'X-Robots-Tag': 'noindex, nofollow' } },
-          '/**': {
-            headers: {
-              'Content-Security-Policy':
-                "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://www.gravatar.com https://cdn.discordapp.com https://*.googleusercontent.com; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
-              'Referrer-Policy': 'strict-origin-when-cross-origin',
-              'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
-              'X-Content-Type-Options': 'nosniff',
-              'X-Frame-Options': 'DENY',
-            },
-          },
-        },
-      },
-    },
+    plugins: [
+      devApiImages,
+      tanstackStart(),
+      nitro({
+        preset: 'node-server',
+        plugins: ['./src/server/shutdown.ts'],
+        // The server bundle inlines React Query, whose `'use client'` directives mean nothing on the server.
+        rolldownConfig: { checks: { moduleLevelDirective: false } },
+        routeRules: { '/api/**': { headers: { 'X-Robots-Tag': 'noindex, nofollow' } } },
+      }),
+      viteReact(),
+      tailwindcss(),
+      sourceMaps?.client,
+    ],
+    ...(sourceMaps ? { worker: { plugins: () => [sourceMaps.worker()] } } : {}),
   }
 })

@@ -2,7 +2,7 @@ import { useLocation } from '@tanstack/react-router'
 import { RefreshCw } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { ButtonLink } from '@/components/ui/button'
-import { chunkLoadFailureNoticeId } from '../chunkRecovery'
+import { updateNoticeId } from '../chunkRecovery'
 import { useI18n } from '../i18n'
 import { clientNeedsRefresh } from '../updateNotices'
 
@@ -18,7 +18,7 @@ export function UpdateNotices({ serverVersion }: { serverVersion: string }) {
   return (
     <>
       {/* Revealed by the inline chunk recovery script when the app cannot hydrate. */}
-      <RefreshNotice id={chunkLoadFailureNoticeId} hidden message={t.shell.updates.couldNotLoad} />
+      <RefreshNotice id={updateNoticeId} hidden message={t.shell.updates.couldNotLoad} />
       {(chunkLoadFailed || clientNeedsRefresh(serverVersion, __APP_VERSION__)) && <RefreshNotice message={t.shell.updates.updated} />}
     </>
   )

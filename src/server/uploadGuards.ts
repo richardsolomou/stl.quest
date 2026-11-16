@@ -1,4 +1,4 @@
-import { validSameOriginRequest } from './sameOrigin'
+import { isSameOriginRequest } from './origins'
 
 export class UploadRequestLimiter {
   private total = 0
@@ -27,5 +27,5 @@ export class UploadRequestLimiter {
 }
 
 export function validSameOrigin(request: Request) {
-  return validSameOriginRequest(request, request.method === 'HEAD')
+  return isSameOriginRequest(request, { allowReferer: request.method === 'HEAD' })
 }

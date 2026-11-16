@@ -1,6 +1,7 @@
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { Sql } from 'postgres'
-import { openDrizzlePostgres } from 'ras-stack/database/postgres'
+import { drizzle } from 'drizzle-orm/postgres-js'
+import postgres from 'postgres'
 import { schema } from './schema'
 import { registerDatabaseProvider, type STLQuestDatabase } from './connection'
 
@@ -11,7 +12,17 @@ export type PostgreSQLConnection = {
 }
 
 export function openPostgreSQL(url: string): PostgreSQLConnection {
-  const { client, database: drizzleDatabase } = openDrizzlePostgres({ url, schema })
+  const client = postgres(url, {
+    max: 10,
+    // Migrations raise a notice on every start, which Postgres.js would print.
+    onnotice: () => undefined,
+    // Postgres.js returns int8 and numeric as strings, which compare and add wrongly against numbers.
+    types: {
+      bigint: { to: 20, from: [20], serialize: (value: number) => String(value), parse: Number },
+      numeric: { to: 1700, from: [1700], serialize: (value: number) => String(value), parse: Number },
+    },
+  })
+  const drizzleDatabase = drizzle(client, { schema })
   return { database: registerDatabaseProvider(compatibleDatabase(drizzleDatabase), 'pg'), drizzle: drizzleDatabase, client }
 }
 

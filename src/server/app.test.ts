@@ -67,8 +67,8 @@ describe('app initialization', () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-publisher-shutdown-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
     process.env.PRINTS_DIR = path.join(temporary, 'prints')
-    const { RealtimePublisher } = await import('../adapters/events')
-    const closed = vi.spyOn(RealtimePublisher.prototype, 'close')
+    const { CentrifugoPublisher } = await import('./realtimePublisher')
+    const closed = vi.spyOn(CentrifugoPublisher.prototype, 'close')
     try {
       const { app } = await import('./app')
       const instance = await app()
@@ -153,7 +153,7 @@ describe('app initialization', () => {
 
     const { UploadStaging } = await import('../adapters/staging')
     const { TusUploadStore } = await import('../adapters/tus')
-    const { OptionalPostHogTelemetry } = await import('../adapters/telemetry')
+    const { OptionalPostHogTelemetry } = await import('./optionalTelemetry')
     const staging = new UploadStaging(process.env.DATA_DIR)
     await staging.initialize()
 
@@ -251,9 +251,8 @@ describe('app initialization', () => {
     const reconcileWorkflow = vi.spyOn(DrizzleRepository.prototype, 'reconcileWorkflow')
     const { app } = await import('./app')
     await app()
-    const { peekGlobalSingleton } = await import('ras-stack/server')
-    const lifecycle = peekGlobalSingleton('stlquest.lifecycle') as { workflowVersion?: string }
-    lifecycle.workflowVersion = 'older-workflow'
+    const state = (globalThis as Record<symbol, { workflowVersion?: string } | undefined>)[Symbol.for('stlquest.app')]
+    state!.workflowVersion = 'older-workflow'
 
     await app()
 
@@ -263,7 +262,7 @@ describe('app initialization', () => {
   it('shuts down telemetry when the application closes', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-telemetry-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
-    const { OptionalPostHogTelemetry } = await import('../adapters/telemetry')
+    const { OptionalPostHogTelemetry } = await import('./optionalTelemetry')
     const shutdown = vi.spyOn(OptionalPostHogTelemetry.prototype, 'shutdown')
     const { app } = await import('./app')
     const instance = await app()
@@ -1100,13 +1099,13 @@ describe('app initialization', () => {
     })
 
     it('tells connected members the workspace was deleted', async () => {
-      const { RealtimePublisher } = await import('../adapters/events')
-      const publish = vi.spyOn(RealtimePublisher.prototype, 'publish')
+      const { CentrifugoPublisher } = await import('./realtimePublisher')
+      const publish = vi.spyOn(CentrifugoPublisher.prototype, 'publish')
       const { instance, adminHeaders, maker } = await superAdminAndMaker()
 
       await instance.deleteWorkspaceAsSuperAdmin(adminHeaders, maker.workspace.id, maker.workspace.name)
 
-      expect(publish).toHaveBeenLastCalledWith(maker.workspace.id, 'workspace.deleted')
+      expect(publish.mock.lastCall?.slice(0, 2)).toEqual([`workspace:${maker.workspace.id}`, { event: 'workspace.deleted' }])
     })
 
     it('records the deletion as made by a super admin', async () => {

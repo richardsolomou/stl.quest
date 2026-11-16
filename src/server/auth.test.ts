@@ -112,7 +112,6 @@ async function oidcLinkUnderPreviousIssuer(options?: { selfSignup?: boolean; oid
   const authFor = (issuer: string) =>
     createAuth(repository.database, SECRET, {
       baseURL: 'http://localhost:3000',
-      trustedOrigins: ['http://localhost:3000'],
       selfSignupAllowed: async () => options?.selfSignup !== false,
       auth: {
         password: true,
@@ -173,7 +172,6 @@ describe('better-auth integration', () => {
     const errors: unknown[] = []
     const auth = createAuth(repository.database, SECRET, {
       baseURL: 'http://localhost',
-      trustedOrigins: ['http://localhost'],
       onUserCreated: () => {
         throw failure
       },
@@ -677,7 +675,6 @@ describe('better-auth integration', () => {
     const auth = createAuth(repository.database, SECRET, {
       email,
       baseURL: 'https://cloud.stlquest.example',
-      trustedOrigins: ['https://cloud.stlquest.example'],
     })
     await auth.api.signUpEmail({ body: { email: 'user@example.com', password: 'password1234', name: 'User' } })
 

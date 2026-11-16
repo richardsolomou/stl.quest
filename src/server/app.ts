@@ -1,7 +1,6 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import { clearGlobalSingleton, globalAsyncSingleton, globalSingleton, peekGlobalSingleton } from 'ras-stack/server'
 import { DrizzleRepository } from '../db/repository'
 import { LocalAssetStore } from '../adapters/filesystem'
 import { S3AssetStore } from '../adapters/s3'
@@ -13,8 +12,8 @@ import { GoogleDriveAssetStore } from '../adapters/googleDrive'
 import { OneDriveAssetStore } from '../adapters/oneDrive'
 import { UploadStaging } from '../adapters/staging'
 import { TusUploadStore } from '../adapters/tus'
-import { RealtimeEventBus, RealtimePublisher } from '../adapters/events'
-import { OptionalPostHogTelemetry, setRpcTelemetry, withTelemetryContext } from '../adapters/telemetry'
+import { publishWorkspaceEvent, RealtimeEventBus, type RealtimePublish } from '../adapters/events'
+import { OptionalPostHogTelemetry, setRpcTelemetry, withTelemetryContext } from './optionalTelemetry'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig, type EmailDelivery } from '../adapters/email'
 import { cloudStorageProviderName } from '../core/auth'
@@ -72,7 +71,8 @@ import { assertDistributedWorkspaceReadiness, resolveDistributedConfig } from '.
 import { createDistributedRuntime, type DistributedRuntime } from './distributedRuntime'
 import { isMissingObject } from '../adapters/distributedUploads'
 import { isAssetMissing } from '../adapters/missingFile'
-import { realtimeConfig } from './realtime'
+import { createRealtime, type RealtimeViewerLookup } from './realtime'
+import { channelPolicy } from './realtimeChannels'
 import { withWorkLease, type WorkLocker, type WorkLockOptions } from './workLock'
 import { startLeasedSweep } from './leasedSweep'
 import { WorkspaceRuntimeRegistry } from './workspaceRuntimeRegistry'
@@ -87,13 +87,10 @@ const workflowVersion = workflow.statuses.map((status) => status.id).join(':')
 const RECOVERY_LEASE_OPTIONS: WorkLockOptions = { acquireTimeout: Number.POSITIVE_INFINITY, retryInterval: 1_000 }
 const DISTRIBUTED_RUNTIME_MODE_SETTING = 'distributed-runtime-mode'
 const LEGACY_DISTRIBUTED_RUNTIME_SETTING = 'distributed-runtime-enabled'
-const REALTIME_SHUTDOWN_TIMEOUT_MS = 5_000
 const NOTIFICATION_SHUTDOWN_TIMEOUT_MS = 5_000
 const AUTO_ARCHIVE_INTERVAL_MS = 60 * 60_000
 const STORAGE_FAILURE_RECOVERY_INTERVAL_MS = 10 * 60_000
 const STORAGE_FAILURE_RECOVERY_BATCH = 25
-type AppLifecycle = { workflowVersion?: string; reconciliation?: Promise<void> }
-const appLifecycle = () => globalSingleton<AppLifecycle>('stlquest.lifecycle', () => ({}))
 type CloudStorageConfig = Extract<StorageConfig, { adapter: 'dropbox' | 'google-drive' | 'onedrive' | 'box' }>
 
 function isCloudStorageConfig(config: StorageConfig): config is CloudStorageConfig {
@@ -242,8 +239,9 @@ async function createApp() {
   let telemetry: OptionalPostHogTelemetry | undefined
   let distributedRuntime: DistributedRuntime | undefined
   const authUrl = resolveAuthUrl()
-  const realtime = realtimeConfig()
-  const realtimePublisher = new RealtimePublisher(realtime.apiUrl, realtime.apiKey)
+  // Assigned once the workspace lookup exists; requests reach the token route only after the app has started.
+  let realtimeViewer: RealtimeViewerLookup = () => undefined
+  const realtime = createRealtime((request) => realtimeViewer(request), channelPolicy)
   const dataDirectory = path.resolve(process.env.DATA_DIR ?? '/data')
   const distributedConfig = resolveDistributedConfig()
   const lease = distributedConfig ? undefined : acquireDataDirectoryLease(dataDirectory)
@@ -303,7 +301,6 @@ async function createApp() {
       deployment_type: deploymentType(),
     })
     telemetry = appTelemetry
-    await appTelemetry.start()
     setRpcTelemetry(appTelemetry)
     setTelemetryExporters({
       exception: (error, properties) => void appTelemetry.exception(error, properties),
@@ -367,7 +364,6 @@ async function createApp() {
       auth: { ...authConfig, passwordReset: authConfig.password && email !== undefined },
       email,
       baseURL: authUrl,
-      trustedOrigins: authUrl ? [new URL(authUrl).origin] : undefined,
       onError: (error) => {
         const request = currentRequest()
         logger.error(
@@ -394,7 +390,7 @@ async function createApp() {
           tusUploads,
           telemetry: appTelemetry,
           workLocker: distributedRuntime?.workLocker,
-          publisher: realtimePublisher,
+          publish: realtime.publish,
           replicaEvents: distributedRuntime?.events,
           notifications: { email, appUrl: () => authUrl ?? currentRequestOrigin(), deliveries: notificationDeliveries },
           invalidate: async () => await runtimeRegistry.invalidate(workspace.id),
@@ -483,6 +479,26 @@ async function createApp() {
       return { ...workspaceRuntime, workspace: membership, identity: workspaceIdentity }
     }
 
+    realtimeViewer = async (request) => {
+      let context: Awaited<ReturnType<typeof workspace>>
+      try {
+        context = await workspace(request.headers)
+      } catch (error) {
+        if (error instanceof Response) return undefined
+        throw error
+      }
+      const viewer = context.identity
+      return {
+        id: viewer.id,
+        info: { id: viewer.id, name: viewer.name, image: viewer.image },
+        workspace: {
+          id: context.workspace.id,
+          slug: context.workspace.slug,
+          boardPresence: !(await memberSeesOnlyOwnRequests(context.repository, viewer)),
+        },
+      }
+    }
+
     const setActiveWorkspace = async (workspaceId: string, headers: Headers) => {
       headers = normalizeAuthHeaders(headers)
       const baseIdentity = await requireIdentity(headers)
@@ -566,7 +582,7 @@ async function createApp() {
       await runtimeRegistry.invalidate(workspaceId)
       await scopedRepository.refundManagedStorageUsage()
       await deleteRecord()
-      realtimePublisher.publish(workspaceId, 'workspace.deleted')
+      publishWorkspaceEvent(realtime.publish, workspaceId, 'workspace.deleted')
       distributedRuntime?.events.publish(workspaceId)
       if (storage.adapter === 'managed') await processManagedStorageDeletionQueue(repository!, workspaceId)
       if (storage.adapter === 'local' && storageNamespaced) {
@@ -628,7 +644,7 @@ async function createApp() {
         if (!(await notificationDeliveries.drain(NOTIFICATION_SHUTDOWN_TIMEOUT_MS))) {
           logger.warn({ event: 'notification_shutdown_timed_out' }, 'notification emails did not finish sending before shutdown')
         }
-        await closeRealtimePublisher(realtimePublisher)
+        await closeRealtime(realtime)
         try {
           await appTelemetry.shutdown()
         } finally {
@@ -655,6 +671,7 @@ async function createApp() {
     return {
       repository,
       staging,
+      realtime,
       uploadDatastore,
       uploadLocker,
       telemetry: appTelemetry,
@@ -685,7 +702,7 @@ async function createApp() {
     }
   } catch (error) {
     logger.error({ err: error, event: 'application_start_failed' }, 'application startup failed')
-    await closeRealtimePublisher(realtimePublisher)
+    await closeRealtime(realtime)
     try {
       await telemetry?.shutdown()
     } finally {
@@ -704,9 +721,9 @@ function currentRequestOrigin() {
   return request ? new URL(request.url).origin : undefined
 }
 
-async function closeRealtimePublisher(publisher: RealtimePublisher) {
+async function closeRealtime(realtime: Pick<ReturnType<typeof createRealtime>, 'close'>) {
   try {
-    await publisher.close(AbortSignal.timeout(REALTIME_SHUTDOWN_TIMEOUT_MS))
+    await realtime.close()
   } catch (error) {
     logger.warn({ err: error, event: 'realtime_shutdown_timed_out' }, 'realtime publisher did not drain before shutdown')
   }
@@ -720,7 +737,7 @@ type WorkspaceRuntimeOptions = {
   telemetry: OptionalPostHogTelemetry
   invalidate: () => Promise<void>
   workLocker?: WorkLocker
-  publisher?: RealtimePublisher
+  publish?: RealtimePublish
   replicaEvents?: import('../adapters/replicaEvents').ReplicaStorageEvents
   notifications?: { email?: EmailDelivery; appUrl: () => string | undefined; deliveries: DeliveryTracker }
 }
@@ -759,9 +776,7 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
   }
   const assets = await buildAssetStore(storage, repository, workspace.id, workLocker)
   const uploadStaging = assets instanceof QuotaAssetStore ? new QuotaUploadStaging(staging, assets) : staging
-  const realtime = realtimeConfig()
-  const publisher = options.publisher ?? new RealtimePublisher(realtime.apiUrl, realtime.apiKey)
-  const events = new RealtimeEventBus(publisher, workspace.id, replicaEvents)
+  const events = new RealtimeEventBus(options.publish ?? (() => false), workspace.id, replicaEvents)
   let assertAssetsMutable: () => Promise<void> = async () => undefined
   const workspaceTelemetry = withTelemetryContext(telemetry, { workspace_id: workspace.id })
   const notifications = options.notifications
@@ -927,12 +942,8 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
     close: async () => {
       if (closed) return
       closed = true
-      try {
-        await Promise.all([autoArchive.stop(), storageFailureRecovery.stop()])
-        await assetQueue.shutdown()
-      } finally {
-        if (!options.publisher) await publisher.close()
-      }
+      await Promise.all([autoArchive.stop(), storageFailureRecovery.stop()])
+      await assetQueue.shutdown()
     },
   }
 }
@@ -951,41 +962,70 @@ async function mapConcurrent<T, R>(items: T[], concurrency: number, operation: (
   return results
 }
 
+type App = Awaited<ReturnType<typeof createApp>>
+export type AppState = { app?: Promise<App>; workflowVersion?: string; reconciliation?: Promise<void> }
+
+// The state lives on `globalThis`, so Vite's development module reloads reuse the running app instead of opening another.
+const appKey = Symbol.for('stlquest.app')
+
+function appState() {
+  const scope = globalThis as typeof globalThis & { [appKey]?: AppState }
+  return (scope[appKey] ??= {})
+}
+
+/** Starts the app, forgetting a failed start so the next call retries from scratch. */
+function startApp(state: AppState) {
+  const started: Promise<App> = Promise.resolve()
+    .then(createApp)
+    .catch((error: unknown) => {
+      if (state.app === started) delete state.app
+      throw error
+    })
+  return started
+}
+
 export function app() {
-  const existing = peekGlobalSingleton('stlquest.app') as ReturnType<typeof createApp> | undefined
-  const running = globalAsyncSingleton('stlquest.app', createApp)
-  const lifecycle = appLifecycle()
+  const state = appState()
+  const existing = state.app
+  const running = (state.app ??= startApp(state))
   if (existing) {
-    if (lifecycle.workflowVersion === workflowVersion) return running
+    if (state.workflowVersion === workflowVersion) return running
     const reconciliation =
-      lifecycle.reconciliation ??
+      state.reconciliation ??
       running.then(async (instance) => {
         for (const workspace of await instance.repository.listWorkspaces())
           await (await instance.repository.scoped(workspace.id)).reconcileWorkflow()
-        lifecycle.workflowVersion = workflowVersion
+        state.workflowVersion = workflowVersion
       })
-    lifecycle.reconciliation = reconciliation
+    state.reconciliation = reconciliation
     const clearReconciliation = () => {
-      if (lifecycle.reconciliation === reconciliation) delete lifecycle.reconciliation
+      if (state.reconciliation === reconciliation) delete state.reconciliation
     }
     void reconciliation.then(clearReconciliation, clearReconciliation)
     return Promise.all([running, reconciliation]).then(([instance]) => instance)
   }
   void running.then(
     () => {
-      lifecycle.workflowVersion = workflowVersion
+      state.workflowVersion = workflowVersion
     },
     () => undefined,
   )
   return running
 }
 
-export async function resetApp() {
-  const running = peekGlobalSingleton('stlquest.app') as ReturnType<typeof createApp> | undefined
-  await clearGlobalSingleton('stlquest.app')
-  await clearGlobalSingleton('stlquest.lifecycle')
+/** Forgets the running app, so the next `app()` call starts a fresh one, and closes it. */
+async function forgetApp() {
+  const state = appState()
+  const running = state.app
+  delete state.app
+  delete state.workflowVersion
+  delete state.reconciliation
   const instance = running ? await running.catch(() => undefined) : undefined
   await instance?.close()
+}
+
+export async function resetApp() {
+  await forgetApp()
   logger.info({ event: 'application_singleton_reset' }, 'application singleton reset')
 }
 
@@ -1020,20 +1060,7 @@ export async function localActiveUploads(
   return false
 }
 
-export async function shutdownApp() {
-  const running = peekGlobalSingleton('stlquest.app') as ReturnType<typeof createApp> | undefined
-  await clearGlobalSingleton('stlquest.app')
-  await clearGlobalSingleton('stlquest.lifecycle')
-  const instance = running ? await running.catch(() => undefined) : undefined
-  await instance?.close()
+/** Closes the current instance, if any; the next `app()` call creates a fresh one. Nitro's close hook calls it on shutdown. */
+export async function closeApp() {
+  await forgetApp()
 }
-
-if (process.env.NODE_ENV !== 'test')
-  globalSingleton('stlquest.signals', () => {
-    for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-      process.once(signal, () => {
-        void shutdownApp().finally(() => process.exit(0))
-      })
-    }
-    return true
-  })

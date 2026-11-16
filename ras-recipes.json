@@ -1,0 +1,288 @@
+{
+  "source": "https://github.com/richardsolomou/ras-stack",
+  "recipes": {
+    "auth": {
+      "version": 2,
+      "commit": "0184a1e1bc4ababa9b89b4455014ba13be436df2",
+      "files": {
+        "src/client/auth.ts": "src/client/authClient.ts",
+        "src/client/authFailures.test.ts": "src/core/authFailures.test.ts",
+        "src/client/authFailures.ts": "src/core/authFailures.ts",
+        "src/client/localRedirect.test.ts": null,
+        "src/client/localRedirect.ts": null,
+        "src/client/useAuthAction.test.ts": "src/client/useAuthAction.test.ts",
+        "src/client/useAuthAction.ts": "src/client/useAuthAction.ts",
+        "src/db/authSchema.ts": "src/db/schema/auth.ts",
+        "src/routes/api/auth.$.ts": "src/routes/api/auth.$.ts",
+        "src/server/auth.test.ts": "src/server/auth.test.ts",
+        "src/server/auth.ts": "src/server/auth.ts",
+        "src/server/random.test.ts": null,
+        "src/server/random.ts": null,
+        "src/server/session.ts": null
+      },
+      "notes": [
+        "`createAuth` keeps the application's configuration: the admin, organization, two-factor, generic OIDC, and Stripe plugins, argon2 password hashing, invitations and the self-signup policy, translated email copy, workspace hand-over on account deletion, and its account management helpers.",
+        "The secret stays the one each deployment generated on first start and keeps in the `authSecret` deployment setting, passed to `createAuth`, instead of `BETTER_AUTH_SECRET`: replacing it would sign everyone out and make stored OAuth tokens unreadable.",
+        "`baseURL` is `BETTER_AUTH_URL`, the name deployments already set; without it, `handler` moves each request to its public origin so OAuth redirect URIs stay public behind a proxy.",
+        "Sign-in allows 10 attempts a minute and sign-up 5, tighter than the recipe, and sessions last 30 days, refreshed daily.",
+        "`useSecureCookies` is off because `src/server/authCookies.ts` marks cookies secure per request, since self-hosted installs serve both HTTP and HTTPS.",
+        "`tanstackStartCookies()` is not used: server functions whose `auth.api` call sets cookies, such as impersonation, ask for `returnHeaders` and copy them through `src/server/authCookies.ts`, which also decides the `Secure` flag per request.",
+        "Social providers come from `AUTH_<PROVIDER>_CLIENT_ID` and `AUTH_<PROVIDER>_CLIENT_SECRET`, optionally `AUTH_<PROVIDER>_ENABLED`, or from the super admin settings, and include OIDC, in `src/adapters/auth.ts`.",
+        "`src/db/schema/auth.ts` holds the auth tables with the organization, admin, two-factor, and Stripe columns, in SQLite and, in `src/db/schema-postgres/auth.ts`, PostgreSQL.",
+        "`src/core/authFailures.ts` holds the failure classifiers in the domain layer, because `src/core/auth.ts` builds the translated sign-in messages from them.",
+        "`src/server/session.ts` and `src/server/random.ts` are left out: the composition root's `identity`, `requireIdentity`, and `workspace` own session lookups, and invite tokens use `node:crypto` directly.",
+        "`localRedirectPath` is left out because sign-in has no `next` destination.",
+        "`better-auth` stays at 1.7.14, the version `@better-auth/stripe` is pinned to; Dependabot moves them together."
+      ]
+    },
+    "ci": {
+      "version": 1,
+      "commit": "8e4dfdee6afeeaa1f05804e38888a171f9ebe722",
+      "files": {
+        ".github/dependabot.yml": ".github/dependabot.yml",
+        ".github/workflows/ci.yml": null
+      },
+      "notes": [
+        "`ci.yml` is left out: `.github/workflows/docker.yml` runs `pnpm check:ci` with a PostgreSQL service so both database targets are tested, splits the unit tests and end-to-end suites into shards, scans the image, and releases, so one workflow carries checks, release, and deploy.",
+        "Dependabot ignores `@better-auth/stripe`, which must move with `better-auth`."
+      ]
+    },
+    "database-sqlite": {
+      "version": 2,
+      "commit": "0184a1e1bc4ababa9b89b4455014ba13be436df2",
+      "files": {
+        "drizzle.config.ts": "drizzle.config.ts",
+        "scripts/database.test.ts": null,
+        "scripts/database.ts": null,
+        "scripts/databaseFile.ts": null,
+        "src/db/database.test.ts": null,
+        "src/db/database.ts": null,
+        "src/server/database.test.ts": null
+      },
+      "notes": [
+        "SQLite is the default target and PostgreSQL the other, chosen by `DATABASE_URL` in `src/db/config.ts`; `database-postgres` is not adopted because its own RECIPE.md leaves a dual target to the application, and the PostgreSQL side (`src/db/backends/postgres.ts`, `src/db/postgresConnection.ts`, `src/db/schema-postgres/`, `drizzle-postgres/`, `drizzle.postgres.config.ts`) is application code that follows the same decisions: ten lazy connections, numeric parsers, dropped notices, and migrations from the working directory.",
+        "`src/db/database.ts` and its tests are left out: both targets sit behind `DatabaseBackend` in `src/db/backends/`, and SQLite is wrapped in a serialized async facade (`src/db/connection.ts`) so repository code is the same on both. `SQLiteBackend` sets the same pragmas, writes `backups/stlquest-pre-migration-<time>.sqlite` before pending migrations, migrates with foreign keys off, runs `PRAGMA foreign_key_check`, and runs `quick_check` at start; review each change to `src/db/database.ts` against it.",
+        "The database file stays `$DATA_DIR/stlquest.sqlite`, the migrations stay in `drizzle/` with their history, and `drizzle.config.ts` reads the schema from `src/db/schema/index.ts`.",
+        "`scripts/database.ts` is left out: `scripts/backup.ts` (`pnpm backup`) writes a checked `VACUUM INTO` copy and the integration key beside it, and restores are documented operator steps.",
+        "Migrations are read from the working directory for both dialects, and the image copies `drizzle/` and `drizzle-postgres/` to `/app`; `.oxfmtrc.json` ignores both `meta/` directories.",
+        "`DATA_DIR` defaults to `/data` everywhere, and development uses `data-dev/` through `just dev`.",
+        "`better-sqlite3` stays on 13, the major the application already ran.",
+        "`scripts/databaseFile.ts` is left out: `src/db/paths.ts` already names `stlquest.sqlite` once for both the application and `scripts/backup.ts`, and every recipe file that reads `databaseFileName` is left out."
+      ]
+    },
+    "deploy-dokploy": {
+      "version": 2,
+      "commit": "0184a1e1bc4ababa9b89b4455014ba13be436df2",
+      "files": {
+        ".dockerignore": ".dockerignore",
+        ".github/workflows/deploy.yml": null,
+        ".github/workflows/preview-deploy.yml": ".github/workflows/preview-deploy.yml",
+        ".github/workflows/preview-prune.yml": ".github/workflows/preview-prune.yml",
+        ".github/workflows/preview.yml": ".github/workflows/preview.yml",
+        "Dockerfile": "Dockerfile",
+        "src/server/shutdown.test.ts": "src/server/shutdown.test.ts",
+        "src/server/shutdown.ts": "src/server/shutdown.ts"
+      },
+      "notes": [
+        "`deploy.yml` is left out: `.github/workflows/docker.yml` builds one multi-architecture release candidate on `main`, runs the end-to-end suites against it, releases with Changesets, publishes `latest`, `vX.Y.Z`, and `sha-<commit>` for self-hosters, and deploys that digest to Dokploy with `deploy-dokploy-image`.",
+        "The image is also the self-hosted product: it keeps OCI labels, the licences, `/prints` with `PRINTS_DIR`, and a health check every 30 seconds on `${PORT}`, so Unraid and TrueNAS installs that change the port stay healthy.",
+        "The build stage copies only the sources, catalogs, migrations, and scripts the build reads instead of `COPY . .`, so documentation changes keep the install and build layers cached.",
+        "`src/server/shutdown.ts` reads the `AppState` that `app.ts` keeps under `Symbol.for('stlquest.app')` and closes its instance once the start promise settles, because the composition root is asynchronous; it replaces the signal handlers that exited before requests in flight finished, and logs a failure through pino.",
+        "Previews keep their `pr-<number>.stl.quest` host behind the shared preview basic auth, a seeded account, and `scripts/previewDeploy.ts` as the deploy script, which sets their environment.",
+        "`vite.config.ts` keeps the `X-Robots-Tag` route rule for `/api/**` on the Nitro plugin."
+      ]
+    },
+    "email-smtp": {
+      "version": 1,
+      "commit": "ec2a7bdc97f8534e2fe0d9a0581b3b1898e05327",
+      "files": {
+        "src/adapters/email.deadline.test.ts": "src/adapters/email.deadline.test.ts",
+        "src/adapters/email.test.ts": "src/adapters/email.test.ts",
+        "src/adapters/email.ts": "src/adapters/email.ts"
+      },
+      "notes": [
+        "`authEmails` and `PRODUCT_NAME` are left out: `src/server/auth.ts` writes the reset and verification emails in the account's language around `send`.",
+        "`emailDelivery` is left out: `resolveSmtpConfig` uses `SMTP_HOST` and its companions only when `SMTP_HOST` is set and otherwise the mail server saved in the super admin settings, and `buildEmailDelivery` turns either into a delivery.",
+        "`workspaceEmailDelivery` sends through a workspace's own mail server; on the hosted service it resolves the host for every exchange, refuses private addresses, and passes the name as `servername`.",
+        "`brandedEmailParts` attaches a workspace logo as a `cid` image and sets the workspace's display name and reply-to address.",
+        "`src/adapters/workspaceEmailDelivery.test.ts` covers the hosted workspace path against a mocked transport.",
+        "`SMTP_SECURE` accepts `1`, `yes`, and `on` as well as `true`, through the application's `environmentFlag`, because existing self-hosted deployments set it that way."
+      ]
+    },
+    "posthog-auth-identity": {
+      "version": 2,
+      "commit": "0184a1e1bc4ababa9b89b4455014ba13be436df2",
+      "files": {
+        "src/client/postHogIdentity.test.tsx": "src/client/postHogIdentity.test.tsx",
+        "src/client/postHogIdentity.tsx": "src/client/postHogIdentity.tsx"
+      },
+      "notes": [
+        "`PostHogIdentity` takes `properties`, which the root route fills with the member's role and whether they are a super admin, read when identifying so a role change alone does not identify again.",
+        "`PostHogIdentity` renders in the root route's content inside `PostHogIntegration`, and does nothing while the deployment has telemetry off, because PostHog is then never loaded.",
+        "`rpc` does not look up the session to pass `authenticatedDistinctId` to `observeServerFunction`, which would add a session query to every server function: server function spans carry the browser session, and their logs and exceptions carry the verified person through the request log context that `requireIdentity` and `workspace` set."
+      ]
+    },
+    "posthog-server": {
+      "version": 3,
+      "commit": "0184a1e1bc4ababa9b89b4455014ba13be436df2",
+      "files": {
+        "src/server/rpcTelemetry.test.ts": "src/server/rpcTelemetry.test.ts",
+        "src/server/rpcTelemetry.ts": "src/server/rpcTelemetry.ts",
+        "src/server/telemetry.test.ts": "src/server/telemetry.test.ts",
+        "src/server/telemetry.ts": "src/server/telemetry.ts"
+      },
+      "notes": [
+        "`src/server/optionalTelemetry.ts` wraps `createTelemetry` in `OptionalPostHogTelemetry`, which honours the deployment's telemetry setting: with telemetry off at startup it creates the client without a token, so nothing is sent and exception autocapture installs no handlers, and every capture checks the setting again.",
+        "The composition root creates the telemetry inside its own asynchronous `createApp` after reading that setting, and closes it after the workspaces, notifications, and realtime publisher.",
+        "Server functions are observed through `observeRpc`, which runs `observeServerFunction` only while an application instance owns telemetry, so `rpc` works before `app()` starts and in tests.",
+        "`reportServerFunctionFailure` is removed: `rpc` logs failures through the pino logger, whose hooks already send every error-level record with an `err` to PostHog as an exception and every record as a log, so the recipe's reporter would report each failure twice.",
+        "Pino records reach `telemetry.log` with their attributes, which already carry the request id, session, person, and workspace from the request context; Pino's trace and fatal levels map to debug and error."
+      ]
+    },
+    "posthog-web": {
+      "version": 4,
+      "commit": "0184a1e1bc4ababa9b89b4455014ba13be436df2",
+      "files": {
+        "scripts/posthogSourceMaps.test.ts": "scripts/posthogSourceMaps.test.ts",
+        "scripts/posthogSourceMaps.ts": "scripts/posthogSourceMaps.ts",
+        "src/client/posthog.test.tsx": "src/client/posthog.test.tsx",
+        "src/client/posthog.tsx": "src/client/posthog.tsx",
+        "src/client/posthogOptions.test.ts": "src/client/posthogOptions.test.ts",
+        "src/client/posthogOptions.ts": "src/client/posthogOptions.ts",
+        "src/contracts/posthog.test.ts": "src/contracts/posthog.test.ts",
+        "src/contracts/posthog.ts": "src/contracts/posthog.ts",
+        "src/routes/t/$.ts": "src/routes/t/$.ts",
+        "src/server/posthogProxy.test.ts": "src/server/posthogProxy.test.ts",
+        "src/server/posthogProxy.ts": "src/server/posthogProxy.ts"
+      },
+      "notes": [
+        "`serviceName` is `stlquest`, so browser logs and metrics report as `stlquest-web`, with the release as `serviceVersion`.",
+        "PostHog starts while the first enabled `PostHogIntegration` renders instead of when `src/client/posthog.tsx` loads, and `PostHogIntegration` takes `enabled`, because each deployment can turn telemetry off in its settings and the published image carries the project token; it still starts before any child's effect runs.",
+        "`PostHogIntegration` takes the translated `fallback` the root route renders.",
+        "`postHogOptions` in `src/client/posthogOptions.ts` adds the application's `before_send` filters (expected storage rejections, duplicate server function exceptions, opaque cross-origin script errors), turns off console error capture, masks all text and element attributes, and blocks `.ph-no-capture` in replay, because workspaces hold names, filenames, and notes.",
+        "The Docker build maps the existing repository variables `POSTHOG_PROJECT_ID` and `POSTHOG_HOST` and secret `POSTHOG_API_KEY` onto the `POSTHOG_CLI_*` names in `.github/workflows/docker.yml`, which is this application's deploy workflow, and keeps the `GITHUB_*` build arguments that name the uploaded release.",
+        "`vitest.config.ts` defines `__APP_VERSION__`, which `postHogOptions` reads."
+      ]
+    },
+    "realtime": {
+      "version": 2,
+      "commit": "0184a1e1bc4ababa9b89b4455014ba13be436df2",
+      "files": {
+        "centrifugo.json": "centrifugo.json",
+        "scripts/realtime.test.ts": "scripts/realtime.test.ts",
+        "scripts/realtime.ts": "scripts/realtime.ts",
+        "src/client/realtime.test.ts": "src/client/realtime.test.ts",
+        "src/client/realtime.ts": "src/client/realtime.ts",
+        "src/client/useRealtime.test.tsx": "src/client/useRealtime.test.tsx",
+        "src/client/useRealtime.tsx": "src/client/useRealtime.tsx",
+        "src/routes/api/realtime.token.ts": "src/routes/api/realtime/token.ts",
+        "src/server/realtime.test.ts": "src/server/realtime.test.ts",
+        "src/server/realtime.ts": "src/server/realtime.ts",
+        "src/server/realtimePublisher.test.ts": "src/server/realtimePublisher.test.ts",
+        "src/server/realtimePublisher.ts": "src/server/realtimePublisher.ts"
+      },
+      "notes": [
+        "Channels are the application's `channelPolicy` in `src/server/realtimeChannels.ts`, tested in `src/server/realtimeChannels.test.ts`: each connection token grants the server-side `workspace:<id>` channel of the workspace the session is in, and `board:<slug>` presence takes a subscription token only for members who see the whole board; `centrifugo.json` defines those two namespaces.",
+        "`RealtimeViewer` carries the viewer's `workspace`, and the composition root looks it up through `workspace(headers)`, so a signed-out caller or a missing workspace answers 401.",
+        "The secret keeps the deployed names: `STLQUEST_REALTIME_SECRET`, generated into `$DATA_DIR/realtime-secret` or the file `STLQUEST_REALTIME_SECRET_FILE` names, with `stlquest-development-realtime-secret` outside production; `STLQUEST_REALTIME_API_KEY` and `STLQUEST_REALTIME_API_URL` set a separate Centrifugo key and address, which the fast end-to-end server uses, and tests publish nowhere.",
+        "The supervisor seeds a preview before starting when `STLQUEST_SEED_PREVIEW=true`, and with `STLQUEST_DISTRIBUTED=true` gives Centrifugo the Redis engine at `REDIS_URL`, so replicas share publications and presence.",
+        "Centrifugo accepts any origin unless `APP_URL` is set, which self-hosted deployments do not set because they are reached by several names; Caddy still refuses a WebSocket whose `Origin` names another host.",
+        "The event bus in `src/adapters/events.ts` publishes each workspace event as `{ event }` on its workspace channel through `app().realtime.publish`, and storage changes to the other replicas.",
+        "The token route keeps its path at `src/routes/api/realtime/token.ts` and runs inside the request context for logs.",
+        "`src/client/workspaceUpdates.ts` refreshes every active query on a workspace publication or an unrecovered reconnect and leaves a deleted workspace; the root route keys `RealtimeProvider` by the workspace.",
+        "`just dev` starts `pnpm realtime` in the background and removes its container when Vite exits."
+      ]
+    },
+    "start-app": {
+      "version": 3,
+      "commit": "0184a1e1bc4ababa9b89b4455014ba13be436df2",
+      "files": {
+        "src/client/chunkRecovery.test.ts": "src/client/chunkRecovery.test.ts",
+        "src/client/chunkRecovery.ts": "src/client/chunkRecovery.ts",
+        "src/client/queryClient.test.ts": "src/client/queryClient.test.ts",
+        "src/client/queryClient.ts": "src/client/queryClient.ts",
+        "src/router.tsx": "src/router.tsx",
+        "src/routes/__root.tsx": "src/routes/__root.tsx",
+        "src/routes/api/health.ts": "src/routes/api/health.ts",
+        "src/server/app.test.ts": "src/server/app.test.ts",
+        "src/server/app.ts": "src/server/app.ts",
+        "src/server/health.test.ts": "src/server/health.test.ts",
+        "src/server/health.ts": "src/server/health.ts",
+        "src/server/middleware.test.ts": "src/server/middleware.test.ts",
+        "src/server/middleware.ts": "src/server/middleware.ts",
+        "src/server/origins.test.ts": "src/server/origins.test.ts",
+        "src/server/origins.ts": "src/server/origins.ts",
+        "src/server/rpc.test.ts": "src/server/rpc.test.ts",
+        "src/server/rpc.ts": "src/server/rpc.ts",
+        "src/server/serverFunction.test.ts": "src/server/serverFunction.test.ts",
+        "src/server/serverFunction.ts": "src/server/serverFunction.ts",
+        "src/start.ts": "src/start.ts",
+        "src/styles.css": "src/styles.css",
+        "vite.config.ts": "vite.config.ts"
+      },
+      "notes": [
+        "`src/server/app.ts` keeps the application's asynchronous composition root: `app()` returns a promise, because opening the repository, distributed coordination, and storage recovery are asynchronous, and the instance reconciles workflow changes and closes its resources in its own order. It lives on `globalThis` under `Symbol.for('stlquest.app')`.",
+        "`src/server/origins.ts` reads `BETTER_AUTH_URL` and `BETTER_AUTH_TRUSTED_ORIGINS` instead of `APP_URL`, the names self-hosted deployments already set, and always accepts the forwarded origin instead of requiring `TRUST_PROXY`, because self-hosted installs run behind whatever proxy the operator chose and rejecting it would break every mutation there.",
+        "`isSameOriginRequest` takes `allowReferer`, which the tus `HEAD` check uses because browsers send no `Origin` on it.",
+        "`src/server/middleware.ts` drops `canonicalHost`: a self-hosted install is reached by LAN names and addresses as well as `BETTER_AUTH_URL`, and redirecting those would lock operators out.",
+        "The stale server function message is the application's English copy, which the browser matches to show the translated message.",
+        "`src/server/contentSecurityPolicy.ts` adds `'wasm-unsafe-eval'` for meshoptimizer, `blob:` workers and images, and the Gravatar, Discord, and Google avatar hosts.",
+        "`/api/**` responses keep `X-Robots-Tag: noindex, nofollow` from a Nitro route rule in `vite.config.ts`.",
+        "`rpc` and `mutationRpc` run inside the request's locale and log failures through the application's pino logger.",
+        "`healthResponse` logs a failed check as a warning through the pino logger, so a restart loop does not report an exception per probe; the health route checks the repository and upload staging inside one `checkDependency` reported as `service_unavailable`.",
+        "The Query client keeps `staleTime: 0`, because realtime invalidation refetches every active query, and shows mutation failures as toasts.",
+        "Chunk recovery keeps the `stlquest:chunk-reload` storage key and reveals the application's translated `chunk-load-failure` notice in `UpdateNotices`.",
+        "The root route keeps the document in `component`, because `<html lang>` follows the session's locale from a suspense query, and keeps its own head tags, theme and translation guard scripts, and providers.",
+        "The router keeps the application's `RouteError` and translated not-found page, and leaves scroll restoration off.",
+        "`src/styles.css` imports `tw-animate-css` and the application's theme stylesheets after Tailwind.",
+        "`vite.config.ts` keeps the development `/api` image workaround, the `__APP_VERSION__` define, and resolves the `@/*` alias with `resolve.tsconfigPaths`."
+      ]
+    },
+    "tooling": {
+      "version": 2,
+      "commit": "82fce4523ec914bd2e70aefd4bff84c10fb278c6",
+      "files": {
+        ".gitignore": ".gitignore",
+        ".oxfmtrc.json": ".oxfmtrc.json",
+        ".oxlintrc.json": ".oxlintrc.json",
+        "AGENTS.md": "CLAUDE.md",
+        "package.json": "package.json",
+        "pnpm-workspace.yaml": "pnpm-workspace.yaml",
+        "tsconfig.json": "tsconfig.json",
+        "vitest.config.ts": "vitest.config.ts"
+      },
+      "notes": [
+        "`AGENTS.md` is a symlink to `CLAUDE.md`, which keeps the application's agent guide and carries the recipe paragraph under **Recipes**.",
+        "`tsconfig.json` keeps `noUncheckedIndexedAccess: false`, `resolveJsonModule`, and the `@/*` path alias, because the codebase predates the strict preset and indexes arrays throughout.",
+        "`.oxlintrc.json` turns off `typescript/no-unnecessary-type-assertion` in tests, because recipe tests assert indexes with `!` and the application's `noUncheckedIndexedAccess: false` makes those assertions redundant.",
+        "`.oxlintrc.json` also extends the `domain.json` preset, which keeps `src/core` free of IO and framework imports, and turns off the rules the codebase does not follow.",
+        "`.oxfmtrc.json` keeps its schema and ignores generated catalogs, deploy templates, and `CHANGELOG.md`.",
+        "`vitest.config.ts` resolves the `@` alias, runs files one at a time in forks because tests share the `globalThis` app singleton and SQLite state, and keeps the node environment.",
+        "`check` runs `check:ci` and then the tests, and `check:ci` keeps the application's extra gates: Changesets, Markdown links, both Drizzle dialects, the equipment catalogs, Unraid metadata, and the backup CLI.",
+        "`pnpm-workspace.yaml` keeps the application's overrides and peer rules, and allows builds for `argon2`, which it installs.",
+        "`vitest` stays on 5, the major the application already ran.",
+        "`changesets:check` runs `scripts/checkChangesets.mjs`, copied from ras-stack, because the application releases with Changesets."
+      ]
+    },
+    "uploads": {
+      "version": 1,
+      "commit": "8e4dfdee6afeeaa1f05804e38888a171f9ebe722",
+      "files": {
+        "src/client/uploads.test.ts": "src/client/uploads.test.ts",
+        "src/client/uploads.ts": "src/client/uploads.ts",
+        "src/routes/api/uploads.$.ts": null,
+        "src/server/uploadPolicy.test.ts": null,
+        "src/server/uploadPolicy.ts": null,
+        "src/server/uploads.test.ts": null,
+        "src/server/uploads.ts": null
+      },
+      "notes": [
+        "The server side is the application's own and its recipe files are left out: `src/server/uploads.ts` and `src/adapters/tus.ts` run the tus server per workspace at `/api/upload` (`src/routes/api/upload.$.ts`), stamp the workspace into metadata, store on disk under `$DATA_DIR` or in shared S3 staging in distributed mode, validate model metadata, create or complete a print request when an upload finishes, and keep their limits and storage quotas in `src/server/uploadGuards.ts` and `src/server/storagePolicy.ts`; review each change to the recipe's server files against them.",
+        "Upload storage paths and the S3 staging layout are unchanged.",
+        "`uploadFile` posts to `/api/upload`, the path the server and in-flight uploads already use.",
+        "`uploadFile` takes `fingerprint`, which the upload form scopes to the workspace and request fields so uploads already in flight keep resuming, and `shouldRetry`, which stops retrying a 423 while a storage migration pauses uploads.",
+        "`vite.config.ts` prebundles `tus-js-client`, whose CommonJS dependencies the browser cannot load unbundled in development."
+      ]
+    }
+  }
+}

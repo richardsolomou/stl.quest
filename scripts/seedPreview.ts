@@ -46,7 +46,6 @@ export async function seedPreview() {
     if (!owner) {
       const auth = createAuth(repository.database, 'stlquest-disposable-preview-secret', {
         baseURL: 'http://preview.local',
-        trustedOrigins: ['http://preview.local'],
       })
       await auth.api.signUpEmail({ body: { email: PREVIEW_EMAIL, password: PREVIEW_PASSWORD, name: 'Preview owner' } })
       owner = await repository.database.select().from(user).where(eq(user.email, PREVIEW_EMAIL)).get()

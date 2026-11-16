@@ -1,10 +1,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { sql } from 'drizzle-orm'
-import { errorHasCode } from 'ras-stack/server'
 import type { DatabaseBackend } from '../backend'
 import { backupDatabase } from '../backup'
 import { closeDatabase, databaseFile, openDatabase, rawDatabase, type STLQuestDatabase } from '../connection'
+import { errorHasCode } from '../errors'
 import { migrateDatabase } from '../migrations'
 
 export class SQLiteBackend implements DatabaseBackend<STLQuestDatabase> {

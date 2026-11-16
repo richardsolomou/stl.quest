@@ -1,10 +1,8 @@
-import { createTusUpload, startTusUpload } from 'ras-stack/uploads'
+import { uploadFile } from '../uploads'
 import type { UploadEntry } from './uploadTypes'
 import { normalizeRequestQuantity } from '../../core/request'
 import { errorMessage } from '../../core/error'
 import type { Messages } from '../../core/i18n'
-
-const CHUNK_BYTES = 32 * 1024 * 1024
 
 export async function uploadPrint(
   workspaceSlug: string,
@@ -12,19 +10,14 @@ export async function uploadPrint(
   onProgress: (sent: number, total: number) => void,
   signal?: AbortSignal,
 ) {
-  const metadata = uploadMetadata(entry)
-  const upload = createTusUpload({
-    file: entry.file,
-    endpoint: '/api/upload',
-    chunkSize: CHUNK_BYTES,
-    retryDelays: [0, 1000, 3000, 5000],
-    shouldRetry: (status) => status !== 423,
-    removeFingerprintOnSuccess: true,
-    fingerprint: async (file) => uploadFingerprint(workspaceSlug, entry, file),
-    metadata,
+  return uploadFile(entry.file, {
+    metadata: uploadMetadata(entry),
     onProgress: ({ sent, total }) => onProgress(sent, total),
+    signal,
+    // A storage migration answers 423 until it finishes, so retrying would only fail again.
+    shouldRetry: (status) => status !== 423,
+    fingerprint: async (file) => uploadFingerprint(workspaceSlug, entry, file),
   })
-  return startTusUpload(upload, { ...(signal ? { signal } : {}), terminateOnAbort: true })
 }
 
 export function isUploadCancelled(error: unknown) {

@@ -1,5 +1,5 @@
 import { parentPort } from 'node:worker_threads'
-import { app, shutdownApp } from './app'
+import { app, closeApp } from './app'
 import { STORAGE_RUNTIME_REVISION_SETTING } from './storageMigration'
 
 if (!parentPort) throw new Error('distributed replica worker requires a parent port')
@@ -8,7 +8,7 @@ const instance = await app()
 parentPort.postMessage('ready')
 parentPort.on('message', async (message: { id: string; type: string; revision?: string }) => {
   if (message.type === 'close') {
-    await shutdownApp()
+    await closeApp()
     parentPort!.postMessage({ id: message.id, value: 'closed' })
     return
   }

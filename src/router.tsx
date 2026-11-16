@@ -1,6 +1,7 @@
 import { createRouter } from '@tanstack/react-router'
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query'
 import { RouteError } from './client/components/RouteError'
+import { captureRenderError } from './client/posthog'
 import { routeTree } from './routeTree.gen'
 import { createQueryClient } from './client/queryClient'
 import { useI18n } from './client/i18n'
@@ -27,6 +28,7 @@ export function getRouter() {
     defaultPreload: 'intent',
     defaultErrorComponent: RouteError,
     defaultNotFoundComponent: NotFound,
+    defaultOnCatch: captureRenderError,
   })
   setupRouterSsrQueryIntegration({ router, queryClient })
   return router

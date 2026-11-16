@@ -5,11 +5,8 @@ import { isUploadCancelled, uploadErrorMessage, uploadFingerprint, uploadMetadat
 
 const t = messagesFor('en').requests
 
-const tus = vi.hoisted(() => ({ start: vi.fn() }))
-vi.mock('ras-stack/uploads', () => ({
-  createTusUpload: () => ({ upload: true }),
-  startTusUpload: tus.start,
-}))
+const uploads = vi.hoisted(() => ({ uploadFile: vi.fn() }))
+vi.mock('../uploads', () => uploads)
 
 const entry = {
   key: 'entry',
@@ -26,7 +23,7 @@ const entry = {
 
 describe('upload metadata', () => {
   beforeEach(() => {
-    tus.start.mockReset()
+    uploads.uploadFile.mockReset()
   })
 
   it('normalizes request fields for the upload protocol', () => {
@@ -73,14 +70,21 @@ describe('upload metadata', () => {
   })
 })
 
-describe('upload cancellation', () => {
-  it('asks the shared upload lifecycle to terminate on cancellation', async () => {
-    tus.start.mockRejectedValue(new DOMException('Upload cancelled', 'AbortError'))
+describe('upload transport', () => {
+  it('passes cancellation to the upload, which deletes it on the server', async () => {
+    uploads.uploadFile.mockRejectedValue(new DOMException('Upload cancelled', 'AbortError'))
     const controller = new AbortController()
     const result = uploadPrint('workspace', entry, () => undefined, controller.signal)
 
     await expect(result).rejects.toSatisfy(isUploadCancelled)
-    expect(tus.start).toHaveBeenCalledWith({ upload: true }, { signal: controller.signal, terminateOnAbort: true })
+    expect(uploads.uploadFile).toHaveBeenCalledWith(entry.file, expect.objectContaining({ signal: controller.signal }))
+  })
+
+  it('stops retrying while a storage migration pauses uploads', async () => {
+    uploads.uploadFile.mockResolvedValue('/api/upload/one')
+    await uploadPrint('workspace', entry, () => undefined)
+    const { shouldRetry } = uploads.uploadFile.mock.calls[0]![1] as { shouldRetry: (status: number) => boolean }
+    expect([shouldRetry(423), shouldRetry(500)]).toEqual([false, true])
   })
 })
 

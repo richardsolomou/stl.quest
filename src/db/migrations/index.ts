@@ -1,18 +1,13 @@
+import path from 'node:path'
 import { sql } from 'drizzle-orm'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { readMigrationFiles } from 'drizzle-orm/migrator'
-import { bundledDirectory } from 'ras-stack/database'
 import type { rawDatabase } from '../connection'
 
 type SQLiteDatabase = ReturnType<typeof rawDatabase>
 
-const migrationConfig = {
-  migrationsFolder: bundledDirectory({
-    developmentUrl: new URL('../../../drizzle', import.meta.url),
-    production: import.meta.env?.PROD,
-    name: 'drizzle',
-  }),
-}
+// Read from the working directory: the repository in development and tests, and `/app` in the image, which copies them from the commit.
+const migrationConfig = { migrationsFolder: path.resolve('drizzle') }
 
 export function migrateDatabase(database: SQLiteDatabase, beforeMigrate: () => void) {
   const migrations = readMigrationFiles(migrationConfig)
