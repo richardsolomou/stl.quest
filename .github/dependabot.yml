@@ -15,6 +15,12 @@ updates:
           - version-update:semver-minor
           - version-update:semver-patch
     groups:
+      # Better Auth's plugins pin its core version, so they must move with it; Dependabot puts a package in its first matching group.
+      better-auth:
+        applies-to: version-updates
+        patterns:
+          - better-auth
+          - '@better-auth/*'
       patch-updates:
         applies-to: version-updates
         patterns:
@@ -27,8 +33,6 @@ updates:
           - '*'
         update-types:
           - minor
-    ignore:
-      - dependency-name: '@better-auth/stripe' # Must match the better-auth version.
   - package-ecosystem: github-actions
     directory: /
     schedule:
