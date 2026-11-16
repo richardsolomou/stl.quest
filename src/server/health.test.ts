@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { healthResponse } from './health'
+import { checkDependency, healthResponse } from './health'
 import { logger } from './logger'
 
 beforeEach(() => {
@@ -24,10 +24,21 @@ it('reports a failed check as unavailable without exposing the cause', async () 
   })
 })
 
-it('reports the stable code a failure maps to', async () => {
-  const response = await healthResponse(
-    () => Promise.reject(new Error('password=secret')),
-    () => ({ code: 'database_unavailable', message: 'database unavailable' }),
+it('reports the stable code of a failed dependency', async () => {
+  const response = await healthResponse(() =>
+    checkDependency('database_unavailable', 'database unavailable', () => Promise.reject(new Error('password=secret'))),
   )
   expect(await response.json()).toEqual({ ok: false, error: 'database unavailable', code: 'database_unavailable' })
+})
+
+it('does not blame a dependency for a failure outside its check', async () => {
+  // As `app()` throws for a missing secret before any dependency is checked.
+  const missingSecret = (): { ping: () => void } => {
+    throw new Error('BETTER_AUTH_SECRET is required in production')
+  }
+  const response = await healthResponse(() => {
+    const database = missingSecret()
+    return checkDependency('database_unavailable', 'database unavailable', () => database.ping())
+  })
+  expect(await response.json()).toEqual({ ok: false, error: 'health check failed' })
 })

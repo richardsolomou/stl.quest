@@ -192,8 +192,8 @@
       ]
     },
     "start-app": {
-      "version": 2,
-      "commit": "82fce4523ec914bd2e70aefd4bff84c10fb278c6",
+      "version": 3,
+      "commit": "0184a1e1bc4ababa9b89b4455014ba13be436df2",
       "files": {
         "src/client/chunkRecovery.test.ts": "src/client/chunkRecovery.test.ts",
         "src/client/chunkRecovery.ts": "src/client/chunkRecovery.ts",
@@ -227,7 +227,7 @@
         "`src/server/contentSecurityPolicy.ts` adds `'wasm-unsafe-eval'` for meshoptimizer, `blob:` workers and images, and the Gravatar, Discord, and Google avatar hosts.",
         "`/api/**` responses keep `X-Robots-Tag: noindex, nofollow` from a Nitro route rule in `vite.config.ts`.",
         "`rpc` and `mutationRpc` run inside the request's locale and log failures through the application's pino logger.",
-        "`healthResponse` logs a failed check as a warning through the pino logger, so a restart loop does not report an exception per probe; the health route checks the repository and upload staging and maps failures to `service_unavailable`.",
+        "`healthResponse` logs a failed check as a warning through the pino logger, so a restart loop does not report an exception per probe; the health route checks the repository and upload staging inside one `checkDependency` reported as `service_unavailable`.",
         "The Query client keeps `staleTime: 0`, because realtime invalidation refetches every active query, and shows mutation failures as toasts.",
         "Chunk recovery keeps the `stlquest:chunk-reload` storage key and reveals the application's translated `chunk-load-failure` notice in `UpdateNotices`.",
         "The root route keeps the document in `component`, because `<html lang>` follows the session's locale from a suspense query, and keeps its own head tags, theme and translation guard scripts, and providers.",
