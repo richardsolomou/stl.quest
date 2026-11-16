@@ -1,4 +1,6 @@
-import { act, create, type ReactTestRenderer } from 'react-test-renderer'
+// @vitest-environment happy-dom
+import { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PostHogIdentity } from './postHogIdentity'
 
@@ -14,31 +16,26 @@ vi.mock('./authClient', () => ({ authClient: { useSession } }))
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-let rendered: ReactTestRenderer | undefined
+let root: Root | undefined
 
 async function render(state: SessionState) {
   useSession.mockReturnValue(state)
-  await act(async () => {
-    if (rendered) rendered.update(<PostHogIdentity />)
-    else rendered = create(<PostHogIdentity />)
-  })
+  root ??= createRoot(document.createElement('div'))
+  await act(async () => root?.render(<PostHogIdentity />))
 }
 
 const signedIn = (id: string): SessionState => ({ data: { user: { id } }, isPending: false })
 const signedOut: SessionState = { data: null, isPending: false }
 
 beforeEach(() => {
-  // react-test-renderer logs its deprecation through console.error.
-  vi.spyOn(console, 'error').mockImplementation(() => undefined)
   posthog.__loaded = true
   posthog.get_property.mockReturnValue(undefined)
 })
 
 afterEach(async () => {
-  await act(async () => rendered?.unmount())
-  rendered = undefined
+  await act(async () => root?.unmount())
+  root = undefined
   vi.clearAllMocks()
-  vi.restoreAllMocks()
 })
 
 describe('PostHogIdentity', () => {
@@ -49,9 +46,8 @@ describe('PostHogIdentity', () => {
 
   it('adds the product-safe properties it is given', async () => {
     useSession.mockReturnValue(signedIn('user-1'))
-    await act(async () => {
-      rendered = create(<PostHogIdentity properties={{ role: 'admin' }} />)
-    })
+    root = createRoot(document.createElement('div'))
+    await act(async () => root?.render(<PostHogIdentity properties={{ role: 'admin' }} />))
     expect(posthog.identify.mock.calls).toEqual([['user-1', { role: 'admin' }]])
   })
 
