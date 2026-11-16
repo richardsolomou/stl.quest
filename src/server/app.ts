@@ -963,7 +963,7 @@ async function mapConcurrent<T, R>(items: T[], concurrency: number, operation: (
 }
 
 type App = Awaited<ReturnType<typeof createApp>>
-type AppState = { app?: Promise<App>; workflowVersion?: string; reconciliation?: Promise<void> }
+export type AppState = { app?: Promise<App>; workflowVersion?: string; reconciliation?: Promise<void> }
 
 // The state lives on `globalThis`, so Vite's development module reloads reuse the running app instead of opening another.
 const appKey = Symbol.for('stlquest.app')

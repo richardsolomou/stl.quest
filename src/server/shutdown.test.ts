@@ -1,9 +1,10 @@
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import type { NitroApp } from 'nitro/types'
-import { expect, it, vi } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
+import { app, resetApp } from './app'
 import shutdown from './shutdown'
-
-const { closeApp } = vi.hoisted(() => ({ closeApp: vi.fn(async () => undefined) }))
-vi.mock('./app', () => ({ closeApp }))
 
 function closeHooks() {
   const hooks: Array<() => unknown> = []
@@ -13,7 +14,22 @@ function closeHooks() {
   return hooks
 }
 
+let temporary: string | undefined
+
+afterEach(async () => {
+  await resetApp()
+  vi.unstubAllEnvs()
+  if (temporary) await fs.promises.rm(temporary, { recursive: true, force: true })
+})
+
 it('closes the app when Nitro closes', async () => {
+  temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-shutdown-'))
+  vi.stubEnv('DATA_DIR', temporary)
+  const close = vi.spyOn(await app(), 'close')
   await Promise.all(closeHooks().map((hook) => hook()))
-  expect(closeApp).toHaveBeenCalledOnce()
+  expect(close).toHaveBeenCalledOnce()
+})
+
+it('does nothing when no app is running', async () => {
+  await expect(Promise.all(closeHooks().map((hook) => hook()))).resolves.toBeDefined()
 })

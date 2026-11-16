@@ -71,8 +71,8 @@
       ]
     },
     "deploy-dokploy": {
-      "version": 1,
-      "commit": "8e4dfdee6afeeaa1f05804e38888a171f9ebe722",
+      "version": 2,
+      "commit": "0184a1e1bc4ababa9b89b4455014ba13be436df2",
       "files": {
         ".dockerignore": ".dockerignore",
         ".github/workflows/deploy.yml": null,
@@ -87,7 +87,7 @@
         "`deploy.yml` is left out: `.github/workflows/docker.yml` builds one multi-architecture release candidate on `main`, runs the end-to-end suites against it, releases with Changesets, publishes `latest`, `vX.Y.Z`, and `sha-<commit>` for self-hosters, and deploys that digest to Dokploy with `deploy-dokploy-image`.",
         "The image is also the self-hosted product: it keeps OCI labels, the licences, `/prints` with `PRINTS_DIR`, and a health check every 30 seconds on `${PORT}`, so Unraid and TrueNAS installs that change the port stay healthy.",
         "The build stage copies only the sources, catalogs, migrations, and scripts the build reads instead of `COPY . .`, so documentation changes keep the install and build layers cached.",
-        "`closeApp` closes the application's asynchronous composition root from Nitro's close hook, replacing the signal handlers that exited before requests in flight finished, and logs a failure through pino.",
+        "`src/server/shutdown.ts` reads the `AppState` that `app.ts` keeps under `Symbol.for('stlquest.app')` and closes its instance once the start promise settles, because the composition root is asynchronous; it replaces the signal handlers that exited before requests in flight finished, and logs a failure through pino.",
         "Previews keep their `pr-<number>.stl.quest` host behind the shared preview basic auth, a seeded account, and `scripts/previewDeploy.ts` as the deploy script, which sets their environment.",
         "`vite.config.ts` keeps the `X-Robots-Tag` route rule for `/api/**` on the Nitro plugin."
       ]
