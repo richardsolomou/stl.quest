@@ -2,12 +2,14 @@ import { SeverityNumber } from '@opentelemetry/api-logs'
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http'
 import { resourceFromAttributes } from '@opentelemetry/resources'
 import { BatchLogRecordProcessor, LoggerProvider } from '@opentelemetry/sdk-logs'
-import { PostHog } from 'posthog-node'
+import { PostHog, type BeforeSendFn } from 'posthog-node'
 import { hostVariable, postHogEnvironment, projectTokenVariable, serviceName } from '../contracts/posthog'
 import { currentServerFunction } from './serverFunction'
 
 export type Telemetry = ReturnType<typeof createTelemetry>
 export type LogSeverity = keyof typeof severities
+/** What the application adds: its release as `service.version`, resource attributes such as the deployment's host, and an event filter. */
+export type TelemetryOptions = { serviceVersion?: string; resourceAttributes?: Record<string, string>; beforeSend?: BeforeSendFn }
 
 const severities = { debug: SeverityNumber.DEBUG, info: SeverityNumber.INFO, warn: SeverityNumber.WARN, error: SeverityNumber.ERROR }
 
@@ -15,11 +17,17 @@ const severities = { debug: SeverityNumber.DEBUG, info: SeverityNumber.INFO, war
  * Server analytics, exceptions, metrics, and spans through `posthog`, plus OTLP logs through `log`. Without
  * the project token it sends nothing, and `withSpan` still runs its work.
  */
-export function createTelemetry(env: Record<string, string | undefined> = process.env) {
+export function createTelemetry(env: Record<string, string | undefined> = process.env, options: TelemetryOptions = {}) {
   const environment = postHogEnvironment({ projectToken: env[projectTokenVariable], host: env[hostVariable] })
-  const service = { serviceName: `${serviceName}-server`, environment: env.NODE_ENV ?? 'development' }
+  const service = {
+    serviceName: `${serviceName}-server`,
+    environment: env.NODE_ENV ?? 'development',
+    serviceVersion: options.serviceVersion,
+    resourceAttributes: options.resourceAttributes,
+  }
   const posthog = new PostHog(environment?.projectToken ?? 'disabled', {
     host: environment?.host,
+    before_send: options.beforeSend,
     disabled: !environment,
     enableExceptionAutocapture: Boolean(environment),
     metrics: service,
@@ -28,7 +36,12 @@ export function createTelemetry(env: Record<string, string | undefined> = proces
   const logs =
     environment &&
     new LoggerProvider({
-      resource: resourceFromAttributes({ 'service.name': service.serviceName, 'deployment.environment': service.environment }),
+      resource: resourceFromAttributes({
+        ...options.resourceAttributes,
+        'service.name': service.serviceName,
+        'deployment.environment': service.environment,
+        ...(options.serviceVersion ? { 'service.version': options.serviceVersion } : {}),
+      }),
       // Bounds what one careless attribute, such as a whole request body, can add to a record.
       logRecordLimits: { attributeCountLimit: 64, attributeValueLengthLimit: 2_048 },
       processors: [
@@ -69,7 +82,7 @@ export function createTelemetry(env: Record<string, string | undefined> = proces
 
     /**
      * Sends what is queued; the log exporter gets its own deadline because it can wait on a stalled connection. The default
-     * is this resource's share of the shutdown budget in start-app's RECIPE.md.
+     * is this resource's share of the shutdown budget in start-app's README.
      */
     async shutdown(timeoutMs = 2_000) {
       try {

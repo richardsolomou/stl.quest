@@ -4,7 +4,7 @@ import { gunzipSync } from 'node:zlib'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { withServerFunction } from './serverFunction'
 import { hostVariable, projectTokenVariable, serviceName } from '../contracts/posthog'
-import { createTelemetry, requestContext } from './telemetry'
+import { createTelemetry, requestContext, type TelemetryOptions } from './telemetry'
 
 type Received = { path: string; authorization: string | undefined; body: any }
 
@@ -41,7 +41,9 @@ beforeEach(() => {
   stallLogs = false
 })
 
-const enabled = () => createTelemetry({ [projectTokenVariable]: 'phc_test', [hostVariable]: host, NODE_ENV: 'production' })
+const enabledWith = (options: TelemetryOptions) =>
+  createTelemetry({ [projectTokenVariable]: 'phc_test', [hostVariable]: host, NODE_ENV: 'production' }, options)
+const enabled = () => enabledWith({})
 const sent = (path: string) => received.filter((request) => request.path === path)
 const logRecords = () => sent('/i/v1/logs').flatMap(({ body }) => body.resourceLogs[0].scopeLogs[0].logRecords)
 const attributes = (record: { attributes: { key: string; value: Record<string, unknown> }[] }) =>
@@ -149,6 +151,36 @@ describe('createTelemetry with a project token', () => {
     await telemetry.posthog.withSpan('work', async () => 'done')
     await telemetry.shutdown()
     expect(attributes(sent('/i/v1/traces')[0]!.body.resourceSpans[0].resource)['service.name']).toBe(`${serviceName}-server`)
+  })
+
+  it('adds the service version and resource attributes to logs', async () => {
+    const telemetry = enabledWith({ serviceVersion: '1.2.3', resourceAttributes: { 'deployment.host': 'app.example' } })
+    telemetry.log('info', 'count incremented')
+    await telemetry.shutdown()
+    expect(attributes(sent('/i/v1/logs')[0]!.body.resourceLogs[0].resource)).toEqual({
+      'deployment.host': 'app.example',
+      'service.name': `${serviceName}-server`,
+      'deployment.environment': 'production',
+      'service.version': '1.2.3',
+    })
+  })
+
+  it('adds the service version and resource attributes to spans', async () => {
+    const telemetry = enabledWith({ serviceVersion: '1.2.3', resourceAttributes: { 'deployment.host': 'app.example' } })
+    await telemetry.posthog.withSpan('work', async () => 'done')
+    await telemetry.shutdown()
+    expect(attributes(sent('/i/v1/traces')[0]!.body.resourceSpans[0].resource)).toMatchObject({
+      'deployment.host': 'app.example',
+      'service.version': '1.2.3',
+    })
+  })
+
+  it('drops the events beforeSend drops', async () => {
+    const telemetry = enabledWith({ beforeSend: (event) => (event?.event === 'internal' ? null : event) })
+    telemetry.posthog.capture({ distinctId: 'person-1', event: 'internal' })
+    telemetry.posthog.capture({ distinctId: 'person-1', event: 'count_incremented' })
+    await telemetry.shutdown()
+    expect(sent('/batch/').flatMap(({ body }) => body.batch.map(({ event }: { event: string }) => event))).toEqual(['count_incremented'])
   })
 
   it('sends queued events once when shut down twice', async () => {
