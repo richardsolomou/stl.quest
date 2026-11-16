@@ -1,24 +1,21 @@
-import { createElement } from 'react'
-import { act, create, type ReactTestRenderer } from 'react-test-renderer'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+// @vitest-environment happy-dom
+import { act, createElement } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { useAuthAction } from './useAuthAction'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 let action: ReturnType<typeof useAuthAction>
-let rendered: ReactTestRenderer
+let root: Root
 
 beforeEach(async () => {
-  // react-test-renderer warns that it is deprecated on every render.
-  vi.spyOn(console, 'error').mockImplementation(() => undefined)
-  await act(async () => {
-    rendered = create(createElement(() => ((action = useAuthAction()), null)))
-  })
+  root = createRoot(document.createElement('div'))
+  await act(async () => root.render(createElement(() => ((action = useAuthAction()), null))))
 })
 
 afterEach(async () => {
-  await act(async () => rendered.unmount())
-  vi.restoreAllMocks()
+  await act(async () => root.unmount())
 })
 
 describe('useAuthAction', () => {

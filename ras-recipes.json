@@ -2,8 +2,8 @@
   "source": "https://github.com/richardsolomou/ras-stack",
   "recipes": {
     "auth": {
-      "version": 1,
-      "commit": "82fce4523ec914bd2e70aefd4bff84c10fb278c6",
+      "version": 2,
+      "commit": "0184a1e1bc4ababa9b89b4455014ba13be436df2",
       "files": {
         "src/client/auth.ts": "src/client/authClient.ts",
         "src/client/authFailures.test.ts": "src/core/authFailures.test.ts",

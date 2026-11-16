@@ -20,6 +20,7 @@ describe('classifyAuthCallbackFailure', () => {
     ['access_denied', 'cancelled'],
     ['user_cancelled_authorize', 'cancelled'],
     ['account_not_linked', 'account_not_linked'],
+    ['account not linked', 'account_not_linked'],
     ['unable_to_link_account', 'account_not_linked'],
     ['email_does_not_match', 'email_mismatch'],
     ['account_already_linked_to_different_user', 'account_already_linked'],
