@@ -3,6 +3,7 @@ import { createTransport, type Transporter } from 'nodemailer'
 import type { IntegrationConfig, SmtpEmailConfig } from '../core/auth'
 import { EMAIL_LOGO_CID, senderDisplayName, type EmailBranding } from '../core/email'
 import { resolvePublicAddress } from './outbound'
+import { environmentFlag } from './environment'
 
 const SMTP_TIMEOUT_MS = 20_000
 
@@ -56,7 +57,7 @@ export function smtpConfigFromEnvironment(environment: NodeJS.ProcessEnv = proce
     from,
     host,
     port,
-    secure: environment.SMTP_SECURE?.trim().toLowerCase() === 'true',
+    secure: environmentFlag(environment.SMTP_SECURE),
     ...(user && password ? { user, password } : {}),
   }
 }

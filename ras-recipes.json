@@ -105,7 +105,8 @@
         "`emailDelivery` is left out: `resolveSmtpConfig` uses `SMTP_HOST` and its companions only when `SMTP_HOST` is set and otherwise the mail server saved in the super admin settings, and `buildEmailDelivery` turns either into a delivery.",
         "`workspaceEmailDelivery` sends through a workspace's own mail server; on the hosted service it resolves the host for every exchange, refuses private addresses, and passes the name as `servername`.",
         "`brandedEmailParts` attaches a workspace logo as a `cid` image and sets the workspace's display name and reply-to address.",
-        "`src/adapters/workspaceEmailDelivery.test.ts` covers the hosted workspace path against a mocked transport."
+        "`src/adapters/workspaceEmailDelivery.test.ts` covers the hosted workspace path against a mocked transport.",
+        "`SMTP_SECURE` accepts `1`, `yes`, and `on` as well as `true`, through the application's `environmentFlag`, because existing self-hosted deployments set it that way."
       ]
     },
     "posthog-auth-identity": {

@@ -25,7 +25,9 @@ export class OptionalPostHogTelemetry implements Telemetry {
     private readonly enabled: () => boolean,
     private readonly context: Record<string, unknown> = {},
   ) {
-    this.telemetry = createTelemetry(enabled() ? process.env : { NODE_ENV: process.env.NODE_ENV })
+    this.telemetry = createTelemetry(enabled() ? process.env : { NODE_ENV: process.env.NODE_ENV }, {
+      serviceVersion: typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'development',
+    })
     this.rpcObserver = (request, work) => (this.enabled() ? observeServerFunction(this.telemetry, request, work) : work())
   }
 

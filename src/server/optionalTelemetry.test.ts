@@ -11,8 +11,8 @@ const { capture, captureException, log, observe, shutdown, construct } = vi.hois
 }))
 
 vi.mock('./telemetry', () => ({
-  createTelemetry: (env: Record<string, string | undefined>) => {
-    construct(env)
+  createTelemetry: (env: Record<string, string | undefined>, options?: unknown) => {
+    construct(env, options)
     return { posthog: { capture, captureException }, log, shutdown }
   },
 }))
@@ -23,6 +23,11 @@ describe('OptionalPostHogTelemetry', () => {
     vi.clearAllMocks()
     setRpcTelemetry(undefined)
     vi.stubEnv('VITE_POSTHOG_PROJECT_TOKEN', 'test-token')
+  })
+
+  it('reports the release version on server telemetry', () => {
+    expect(new OptionalPostHogTelemetry(() => true)).toBeInstanceOf(OptionalPostHogTelemetry)
+    expect(construct).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ serviceVersion: expect.any(String) }))
   })
 
   it('activates server function telemetry only while an application owns it', async () => {

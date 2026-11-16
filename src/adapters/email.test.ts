@@ -33,6 +33,13 @@ describe('smtpConfigFromEnvironment', () => {
     ).toEqual({ from: 'mail@example.com', host: 'smtp.example.com', port: 465, secure: true, user: 'user', password: 'secret' })
   })
 
+  it.each(['1', 'yes', 'on'])('treats SMTP_SECURE=%s as TLS from the start', (value) => {
+    expect(
+      smtpConfigFromEnvironment({ SMTP_HOST: 'smtp.example.com', SMTP_PORT: '465', SMTP_SECURE: value, EMAIL_FROM: 'mail@example.com' })
+        ?.secure,
+    ).toBe(true)
+  })
+
   it('defaults to port 587 without TLS from the start', () => {
     expect(smtpConfigFromEnvironment({ SMTP_HOST: 'smtp.example.com', EMAIL_FROM: 'mail@example.com' })).toEqual({
       from: 'mail@example.com',
