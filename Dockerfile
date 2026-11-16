@@ -4,10 +4,10 @@ FROM ghcr.io/richardsolomou/ras-stack-runtime-binaries:runtime-v1.0.9@sha256:b72
 
 FROM node:24-alpine AS build
 WORKDIR /app
+# A native module with no prebuilt binary for the image's platform and libc compiles from source.
 RUN apk add --no-cache python3 make g++
-RUN corepack enable && corepack install --global pnpm@12.13.0
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ras.config.ts ./
-RUN pnpm fetch
+RUN corepack enable && corepack install
 RUN pnpm install --frozen-lockfile
 COPY src ./src
 COPY public ./public
@@ -29,8 +29,9 @@ LABEL org.opencontainers.image.title="STL Quest" \
       org.opencontainers.image.licenses="AGPL-3.0-only"
 WORKDIR /app
 RUN apk upgrade --no-cache \
-    && rm -rf /usr/local/lib/node_modules/npm \
-    && rm -f /usr/local/bin/npm /usr/local/bin/npx \
+    && apk add --no-cache tini \
+    && rm -rf /usr/local/lib/node_modules/corepack /usr/local/lib/node_modules/npm /opt/yarn-* \
+    && rm -f /usr/local/bin/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/yarn /usr/local/bin/yarnpkg \
     && mkdir -p /data /prints \
     && chown -R node:node /app /data /prints
 COPY --from=build --chown=node:node /app/.output ./.output
@@ -51,4 +52,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -q --spider "http://127.0.0.1:${PORT}/api/health" || exit 1
 USER node
+ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["node", "scripts/realtime.ts", "container"]

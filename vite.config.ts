@@ -36,6 +36,10 @@ export default defineConfig(({ mode }) => {
       devApiImages,
       tanstackStart(),
       nitro({
+        preset: 'node-server',
+        plugins: ['./src/server/shutdown.ts'],
+        // The server bundle inlines React Query, whose `'use client'` directives mean nothing on the server.
+        rolldownConfig: { checks: { moduleLevelDirective: false } },
         routeRules: { '/api/**': { headers: { 'X-Robots-Tag': 'noindex, nofollow' } } },
       }),
       viteReact(),

@@ -8,3 +8,9 @@ node_modules
 prints-dev
 .ras
 .capture
+.github
+.wrangler
+dist
+.data
+.env.*
+*.log

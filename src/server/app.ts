@@ -962,7 +962,7 @@ async function mapConcurrent<T, R>(items: T[], concurrency: number, operation: (
 }
 
 type App = Awaited<ReturnType<typeof createApp>>
-type AppState = { app?: Promise<App>; workflowVersion?: string; reconciliation?: Promise<void>; signals?: boolean }
+type AppState = { app?: Promise<App>; workflowVersion?: string; reconciliation?: Promise<void> }
 
 // The state lives on `globalThis`, so Vite's development module reloads reuse the running app instead of opening another.
 const appKey = Symbol.for('stlquest.app')
@@ -1059,15 +1059,7 @@ export async function localActiveUploads(
   return false
 }
 
-export async function shutdownApp() {
+/** Closes the current instance, if any; the next `app()` call creates a fresh one. Nitro's close hook calls it on shutdown. */
+export async function closeApp() {
   await forgetApp()
-}
-
-if (process.env.NODE_ENV !== 'test' && !appState().signals) {
-  appState().signals = true
-  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-    process.once(signal, () => {
-      void shutdownApp().finally(() => process.exit(0))
-    })
-  }
 }
