@@ -137,13 +137,15 @@
       ]
     },
     "posthog-web": {
-      "version": 2,
-      "commit": "82fce4523ec914bd2e70aefd4bff84c10fb278c6",
+      "version": 3,
+      "commit": "8e4dfdee6afeeaa1f05804e38888a171f9ebe722",
       "files": {
         "scripts/posthogSourceMaps.test.ts": "scripts/posthogSourceMaps.test.ts",
         "scripts/posthogSourceMaps.ts": "scripts/posthogSourceMaps.ts",
         "src/client/posthog.test.tsx": "src/client/posthog.test.tsx",
         "src/client/posthog.tsx": "src/client/posthog.tsx",
+        "src/client/posthogOptions.test.ts": "src/client/posthogOptions.test.ts",
+        "src/client/posthogOptions.ts": "src/client/posthogOptions.ts",
         "src/contracts/posthog.test.ts": "src/contracts/posthog.test.ts",
         "src/contracts/posthog.ts": "src/contracts/posthog.ts",
         "src/routes/t/$.ts": "src/routes/t/$.ts",
@@ -154,7 +156,7 @@
         "`serviceName` is `stlquest`, so browser logs and metrics report as `stlquest-web`, with the release as `serviceVersion`.",
         "PostHog starts while the first enabled `PostHogIntegration` renders instead of when `src/client/posthog.tsx` loads, and `PostHogIntegration` takes `enabled`, because each deployment can turn telemetry off in its settings and the published image carries the project token; it still starts before any child's effect runs.",
         "`PostHogIntegration` takes the translated `fallback` the root route renders.",
-        "`postHogOptions` adds the application's `before_send` filters (expected storage rejections, duplicate server function exceptions, opaque cross-origin script errors), turns off console error capture, masks all text and element attributes, and blocks `.ph-no-capture` in replay, because workspaces hold names, filenames, and notes.",
+        "`postHogOptions` in `src/client/posthogOptions.ts` adds the application's `before_send` filters (expected storage rejections, duplicate server function exceptions, opaque cross-origin script errors), turns off console error capture, masks all text and element attributes, and blocks `.ph-no-capture` in replay, because workspaces hold names, filenames, and notes.",
         "The Docker build maps the existing repository variables `POSTHOG_PROJECT_ID` and `POSTHOG_HOST` and secret `POSTHOG_API_KEY` onto the `POSTHOG_CLI_*` names in `.github/workflows/docker.yml`, which is this application's deploy workflow, and keeps the `GITHUB_*` build arguments that name the uploaded release.",
         "`vitest.config.ts` defines `__APP_VERSION__`, which `postHogOptions` reads."
       ]

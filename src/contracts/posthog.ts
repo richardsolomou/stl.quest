@@ -14,8 +14,8 @@ export const defaultHost = 'https://us.i.posthog.com'
 export type PostHogEnvironment = { projectToken: string; host: string; uiHost: string; assetsHost: string }
 
 /**
- * PostHog's project and hosts; undefined with neither set, which keeps PostHog off. A host
- * without a token throws, since it means analytics were meant to be on and a missing token would turn them off silently.
+ * PostHog's project and hosts; undefined with neither set, which keeps PostHog off. A host without a token throws, since it
+ * means analytics were meant to be on and a missing token would turn them off silently.
  */
 export function postHogEnvironment(input: {
   projectToken?: string | undefined
