@@ -1,6 +1,9 @@
+import tailwindcss from '@tailwindcss/vite'
+import { tanstackStart } from '@tanstack/react-start/plugin/vite'
+import viteReact from '@vitejs/plugin-react'
+import { nitro } from 'nitro/vite'
 import type { Plugin } from 'vite'
-import { loadEnv } from 'vite'
-import { defineViteConfig } from 'ras-stack/vite'
+import { defineConfig, loadEnv } from 'vite'
 import { postHogEnvironment } from 'ras-stack/posthog'
 import { postHogIngestProxy } from 'ras-stack/posthog/proxy'
 import packageJson from './package.json' with { type: 'json' }
@@ -19,11 +22,12 @@ const devApiImages: Plugin = {
   },
 }
 
-export default defineViteConfig(({ mode }) => {
+export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const posthog = postHogEnvironment({ projectToken: env.VITE_POSTHOG_PROJECT_TOKEN, host: env.VITE_POSTHOG_HOST })
   const posthogProxy = posthog ? postHogIngestProxy(posthog) : undefined
   return {
+    resolve: { tsconfigPaths: true },
     // Prebundle the upload client's CommonJS dependencies before serving them to the browser.
     optimizeDeps: { include: ['ras-stack > tus-js-client'] },
     server: {
@@ -34,24 +38,17 @@ export default defineViteConfig(({ mode }) => {
       },
     },
     define: { __APP_VERSION__: JSON.stringify(packageJson.version) },
-    plugins: [devApiImages],
-    ras: {
-      nitro: {
+    plugins: [
+      devApiImages,
+      tanstackStart(),
+      nitro({
         routeRules: {
           ...posthogProxy?.nitro,
           '/api/**': { headers: { 'X-Robots-Tag': 'noindex, nofollow' } },
-          '/**': {
-            headers: {
-              'Content-Security-Policy':
-                "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://www.gravatar.com https://cdn.discordapp.com https://*.googleusercontent.com; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
-              'Referrer-Policy': 'strict-origin-when-cross-origin',
-              'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
-              'X-Content-Type-Options': 'nosniff',
-              'X-Frame-Options': 'DENY',
-            },
-          },
         },
-      },
-    },
+      }),
+      viteReact(),
+      tailwindcss(),
+    ],
   }
 })

@@ -1,16 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { healthResponse as sharedHealthResponse } from 'ras-stack/server'
 import { app } from '../../server/app'
+import { healthResponse as checkedResponse } from '../../server/health'
 import { withRequestContext } from '../../server/requestContext'
 
 export async function healthResponse() {
-  return sharedHealthResponse(
+  return checkedResponse(
     async () => {
       const instance = await app()
       await instance.repository.countUsers()
       await instance.staging.writable()
     },
-    { failure: () => ({ code: 'service_unavailable', message: 'service unavailable' }) },
+    () => ({ code: 'service_unavailable', message: 'service unavailable' }),
   )
 }
 

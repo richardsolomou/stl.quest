@@ -137,7 +137,7 @@ import { systemDiagnostics } from './operations'
 import { checkForReleaseUpdate } from './releases'
 import { storageDirectories } from './storageDirectories'
 import { resolveStorageInput, storageChangeRequiresMigration, storageConfigurationKind, storageLocationChanged } from './storageConfig'
-import { publicOrigin } from './sameOrigin'
+import { publicOrigin } from './origins'
 import {
   buildStorageCandidate,
   emptyStorageInventory,

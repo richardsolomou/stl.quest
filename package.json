@@ -12,8 +12,9 @@
   },
   "type": "module",
   "scripts": {
-    "dev": "ras dev",
-    "build": "ras build && tsx scripts/checkBuiltAssets.ts && esbuild src/server/assets/worker.ts --bundle --platform=node --format=esm --target=node24 --outfile=.output/server/assets-worker.mjs --log-level=warning && esbuild scripts/seedPreview.ts --bundle --external:better-sqlite3 --external:argon2 --platform=node --format=esm --target=node24 --define:import.meta.env.PROD=true --banner:js='import { createRequire } from \"node:module\"; const require = createRequire(import.meta.url);' --outfile=.output/server/seed-preview.mjs --log-level=warning && esbuild scripts/containerRuntime.ts --bundle --platform=node --format=esm --target=node24 --outfile=.output/server/container-runtime.mjs --log-level=warning && ras assets sync",
+    "dev": "vite dev",
+    "build": "vite build && tsx scripts/checkBuiltAssets.ts && esbuild src/server/assets/worker.ts --bundle --platform=node --format=esm --target=node24 --outfile=.output/server/assets-worker.mjs --log-level=warning && esbuild scripts/seedPreview.ts --bundle --external:better-sqlite3 --external:argon2 --platform=node --format=esm --target=node24 --define:import.meta.env.PROD=true --banner:js='import { createRequire } from \"node:module\"; const require = createRequire(import.meta.url);' --outfile=.output/server/seed-preview.mjs --log-level=warning && esbuild scripts/containerRuntime.ts --bundle --platform=node --format=esm --target=node24 --outfile=.output/server/container-runtime.mjs --log-level=warning && ras assets sync",
+    "preview": "vite preview",
     "start": "node .output/server/index.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint --type-aware --deny-warnings .",

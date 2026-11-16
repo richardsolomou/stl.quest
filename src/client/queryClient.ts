@@ -1,11 +1,12 @@
-import { MutationCache } from '@tanstack/react-query'
-import { createQueryClient as configuredQueryClient } from 'ras-stack/query'
+import { MutationCache, QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { errorMessage } from '../core/error'
 import { messagesFor, resolveLocale, type Messages } from '../core/i18n'
 
+/** One client per browser session and one per server request, so cached data never crosses between users. */
 export function createQueryClient() {
-  return configuredQueryClient({
+  // Realtime invalidation refetches every active query, so data is stale at once rather than for a fixed window.
+  return new QueryClient({
     defaultOptions: { queries: { staleTime: 0 } },
     mutationCache: new MutationCache({
       onError: (error) => toast.error(mutationErrorMessage(error, documentMessages())),

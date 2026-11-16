@@ -1,7 +1,6 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import { clearGlobalSingleton, globalAsyncSingleton, globalSingleton, peekGlobalSingleton } from 'ras-stack/server'
 import { DrizzleRepository } from '../db/repository'
 import { LocalAssetStore } from '../adapters/filesystem'
 import { S3AssetStore } from '../adapters/s3'
@@ -92,8 +91,6 @@ const NOTIFICATION_SHUTDOWN_TIMEOUT_MS = 5_000
 const AUTO_ARCHIVE_INTERVAL_MS = 60 * 60_000
 const STORAGE_FAILURE_RECOVERY_INTERVAL_MS = 10 * 60_000
 const STORAGE_FAILURE_RECOVERY_BATCH = 25
-type AppLifecycle = { workflowVersion?: string; reconciliation?: Promise<void> }
-const appLifecycle = () => globalSingleton<AppLifecycle>('stlquest.lifecycle', () => ({}))
 type CloudStorageConfig = Extract<StorageConfig, { adapter: 'dropbox' | 'google-drive' | 'onedrive' | 'box' }>
 
 function isCloudStorageConfig(config: StorageConfig): config is CloudStorageConfig {
@@ -951,41 +948,70 @@ async function mapConcurrent<T, R>(items: T[], concurrency: number, operation: (
   return results
 }
 
+type App = Awaited<ReturnType<typeof createApp>>
+type AppState = { app?: Promise<App>; workflowVersion?: string; reconciliation?: Promise<void>; signals?: boolean }
+
+// The state lives on `globalThis`, so Vite's development module reloads reuse the running app instead of opening another.
+const appKey = Symbol.for('stlquest.app')
+
+function appState() {
+  const scope = globalThis as typeof globalThis & { [appKey]?: AppState }
+  return (scope[appKey] ??= {})
+}
+
+/** Starts the app, forgetting a failed start so the next call retries from scratch. */
+function startApp(state: AppState) {
+  const started: Promise<App> = Promise.resolve()
+    .then(createApp)
+    .catch((error: unknown) => {
+      if (state.app === started) delete state.app
+      throw error
+    })
+  return started
+}
+
 export function app() {
-  const existing = peekGlobalSingleton('stlquest.app') as ReturnType<typeof createApp> | undefined
-  const running = globalAsyncSingleton('stlquest.app', createApp)
-  const lifecycle = appLifecycle()
+  const state = appState()
+  const existing = state.app
+  const running = (state.app ??= startApp(state))
   if (existing) {
-    if (lifecycle.workflowVersion === workflowVersion) return running
+    if (state.workflowVersion === workflowVersion) return running
     const reconciliation =
-      lifecycle.reconciliation ??
+      state.reconciliation ??
       running.then(async (instance) => {
         for (const workspace of await instance.repository.listWorkspaces())
           await (await instance.repository.scoped(workspace.id)).reconcileWorkflow()
-        lifecycle.workflowVersion = workflowVersion
+        state.workflowVersion = workflowVersion
       })
-    lifecycle.reconciliation = reconciliation
+    state.reconciliation = reconciliation
     const clearReconciliation = () => {
-      if (lifecycle.reconciliation === reconciliation) delete lifecycle.reconciliation
+      if (state.reconciliation === reconciliation) delete state.reconciliation
     }
     void reconciliation.then(clearReconciliation, clearReconciliation)
     return Promise.all([running, reconciliation]).then(([instance]) => instance)
   }
   void running.then(
     () => {
-      lifecycle.workflowVersion = workflowVersion
+      state.workflowVersion = workflowVersion
     },
     () => undefined,
   )
   return running
 }
 
-export async function resetApp() {
-  const running = peekGlobalSingleton('stlquest.app') as ReturnType<typeof createApp> | undefined
-  await clearGlobalSingleton('stlquest.app')
-  await clearGlobalSingleton('stlquest.lifecycle')
+/** Forgets the running app, so the next `app()` call starts a fresh one, and closes it. */
+async function forgetApp() {
+  const state = appState()
+  const running = state.app
+  delete state.app
+  delete state.workflowVersion
+  delete state.reconciliation
   const instance = running ? await running.catch(() => undefined) : undefined
   await instance?.close()
+}
+
+export async function resetApp() {
+  await forgetApp()
   logger.info({ event: 'application_singleton_reset' }, 'application singleton reset')
 }
 
@@ -1021,19 +1047,14 @@ export async function localActiveUploads(
 }
 
 export async function shutdownApp() {
-  const running = peekGlobalSingleton('stlquest.app') as ReturnType<typeof createApp> | undefined
-  await clearGlobalSingleton('stlquest.app')
-  await clearGlobalSingleton('stlquest.lifecycle')
-  const instance = running ? await running.catch(() => undefined) : undefined
-  await instance?.close()
+  await forgetApp()
 }
 
-if (process.env.NODE_ENV !== 'test')
-  globalSingleton('stlquest.signals', () => {
-    for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-      process.once(signal, () => {
-        void shutdownApp().finally(() => process.exit(0))
-      })
-    }
-    return true
-  })
+if (process.env.NODE_ENV !== 'test' && !appState().signals) {
+  appState().signals = true
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    process.once(signal, () => {
+      void shutdownApp().finally(() => process.exit(0))
+    })
+  }
+}

@@ -251,9 +251,8 @@ describe('app initialization', () => {
     const reconcileWorkflow = vi.spyOn(DrizzleRepository.prototype, 'reconcileWorkflow')
     const { app } = await import('./app')
     await app()
-    const { peekGlobalSingleton } = await import('ras-stack/server')
-    const lifecycle = peekGlobalSingleton('stlquest.lifecycle') as { workflowVersion?: string }
-    lifecycle.workflowVersion = 'older-workflow'
+    const state = (globalThis as Record<symbol, { workflowVersion?: string } | undefined>)[Symbol.for('stlquest.app')]
+    state!.workflowVersion = 'older-workflow'
 
     await app()
 

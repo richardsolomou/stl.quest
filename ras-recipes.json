@@ -1,6 +1,51 @@
 {
   "source": "https://github.com/richardsolomou/ras-stack",
   "recipes": {
+    "start-app": {
+      "version": 2,
+      "commit": "82fce4523ec914bd2e70aefd4bff84c10fb278c6",
+      "files": {
+        "src/client/chunkRecovery.test.ts": "src/client/chunkRecovery.test.ts",
+        "src/client/chunkRecovery.ts": "src/client/chunkRecovery.ts",
+        "src/client/queryClient.test.ts": "src/client/queryClient.test.ts",
+        "src/client/queryClient.ts": "src/client/queryClient.ts",
+        "src/router.tsx": "src/router.tsx",
+        "src/routes/__root.tsx": "src/routes/__root.tsx",
+        "src/routes/api/health.ts": "src/routes/api/health.ts",
+        "src/server/app.test.ts": "src/server/app.test.ts",
+        "src/server/app.ts": "src/server/app.ts",
+        "src/server/health.test.ts": "src/server/health.test.ts",
+        "src/server/health.ts": "src/server/health.ts",
+        "src/server/middleware.test.ts": "src/server/middleware.test.ts",
+        "src/server/middleware.ts": "src/server/middleware.ts",
+        "src/server/origins.test.ts": "src/server/origins.test.ts",
+        "src/server/origins.ts": "src/server/origins.ts",
+        "src/server/rpc.test.ts": "src/server/rpc.test.ts",
+        "src/server/rpc.ts": "src/server/rpc.ts",
+        "src/server/serverFunction.test.ts": "src/server/serverFunction.test.ts",
+        "src/server/serverFunction.ts": "src/server/serverFunction.ts",
+        "src/start.ts": "src/start.ts",
+        "src/styles.css": "src/styles.css",
+        "vite.config.ts": "vite.config.ts"
+      },
+      "notes": [
+        "`src/server/app.ts` keeps the application's asynchronous composition root: `app()` returns a promise, because opening the repository, distributed coordination, and storage recovery are asynchronous, and the instance reconciles workflow changes and closes its resources in its own order. It lives on `globalThis` under `Symbol.for('stlquest.app')`.",
+        "`src/server/origins.ts` reads `BETTER_AUTH_URL` and `BETTER_AUTH_TRUSTED_ORIGINS` instead of `APP_URL`, the names self-hosted deployments already set, and always accepts the forwarded origin instead of requiring `TRUST_PROXY`, because self-hosted installs run behind whatever proxy the operator chose and rejecting it would break every mutation there.",
+        "`isSameOriginRequest` takes `allowReferer`, which the tus `HEAD` check uses because browsers send no `Origin` on it.",
+        "`src/server/middleware.ts` drops `canonicalHost`: a self-hosted install is reached by LAN names and addresses as well as `BETTER_AUTH_URL`, and redirecting those would lock operators out.",
+        "The stale server function message is the application's English copy, which the browser matches to show the translated message.",
+        "`src/server/contentSecurityPolicy.ts` adds `'wasm-unsafe-eval'` for meshoptimizer, `blob:` workers and images, and the Gravatar, Discord, and Google avatar hosts.",
+        "`/api/**` responses keep `X-Robots-Tag: noindex, nofollow` from a Nitro route rule in `vite.config.ts`.",
+        "`rpc` and `mutationRpc` run inside the request's locale and log failures through the application's pino logger.",
+        "`healthResponse` logs a failed check as a warning through the pino logger, so a restart loop does not report an exception per probe; the health route checks the repository and upload staging and maps failures to `service_unavailable`.",
+        "The Query client keeps `staleTime: 0`, because realtime invalidation refetches every active query, and shows mutation failures as toasts.",
+        "Chunk recovery keeps the `stlquest:chunk-reload` storage key and reveals the application's translated `chunk-load-failure` notice in `UpdateNotices`.",
+        "The root route keeps the document in `component`, because `<html lang>` follows the session's locale from a suspense query, and keeps its own head tags, theme and translation guard scripts, and providers.",
+        "The router keeps the application's `RouteError` and translated not-found page, and leaves scroll restoration off.",
+        "`src/styles.css` imports `tw-animate-css` and the application's theme stylesheets after Tailwind.",
+        "`vite.config.ts` keeps the development `/api` image workaround, the `__APP_VERSION__` define, and resolves the `@/*` alias with `resolve.tsconfigPaths`."
+      ]
+    },
     "tooling": {
       "version": 2,
       "commit": "82fce4523ec914bd2e70aefd4bff84c10fb278c6",
