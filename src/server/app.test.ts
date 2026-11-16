@@ -1105,7 +1105,7 @@ describe('app initialization', () => {
 
       await instance.deleteWorkspaceAsSuperAdmin(adminHeaders, maker.workspace.id, maker.workspace.name)
 
-      expect(publish).toHaveBeenLastCalledWith(`workspace:${maker.workspace.id}`, { event: 'workspace.deleted' })
+      expect(publish.mock.lastCall?.slice(0, 2)).toEqual([`workspace:${maker.workspace.id}`, { event: 'workspace.deleted' }])
     })
 
     it('records the deletion as made by a super admin', async () => {
