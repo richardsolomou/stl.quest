@@ -363,7 +363,6 @@ async function createApp() {
       auth: { ...authConfig, passwordReset: authConfig.password && email !== undefined },
       email,
       baseURL: authUrl,
-      trustedOrigins: authUrl ? [new URL(authUrl).origin] : undefined,
       onError: (error) => {
         const request = currentRequest()
         logger.error(

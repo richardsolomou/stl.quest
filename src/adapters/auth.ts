@@ -10,14 +10,17 @@ import {
   type SocialProviderConfig,
   type SocialProviderConfigs,
 } from '../core/auth'
-import { providerCredentials } from 'ras-stack/auth'
 import { environmentFlag, environmentFlagSet } from './environment'
 
+// A provider with only one of its credentials throws, so a typo cannot hide its button.
 function environmentProvider(provider: SocialAuthProvider, environment: NodeJS.ProcessEnv): SocialProviderConfig | undefined {
-  const credentials = providerCredentials(provider, environment, { prefix: 'AUTH_' })
-  if (!credentials) return undefined
-  const enabled = environmentFlag(environment[`AUTH_${provider.toUpperCase()}_ENABLED`], true)
-  return { enabled, ...credentials }
+  const name = `AUTH_${provider.toUpperCase()}`
+  const clientId = environment[`${name}_CLIENT_ID`]?.trim()
+  const clientSecret = environment[`${name}_CLIENT_SECRET`]?.trim()
+  if (Boolean(clientId) !== Boolean(clientSecret))
+    throw new Error(`${name}_CLIENT_ID and ${name}_CLIENT_SECRET must be configured together`)
+  if (!clientId || !clientSecret) return undefined
+  return { enabled: environmentFlag(environment[`${name}_ENABLED`], true), clientId, clientSecret }
 }
 
 function environmentOidcProvider(environment: NodeJS.ProcessEnv): OidcProviderConfig | undefined {

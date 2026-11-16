@@ -67,7 +67,6 @@ it('promotes the preview account even when it is not the first user', async () =
   const first = await DrizzleRepository.open()
   const auth = createAuth(first.database, 'secret-secret-secret', {
     baseURL: 'http://preview.local',
-    trustedOrigins: ['http://preview.local'],
   })
   await auth.api.signUpEmail({ body: { email: 'someone@example.com', password: 'password1234', name: 'Someone' } })
   await first.close()

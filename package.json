@@ -99,9 +99,11 @@
     "@types/archiver": "^8.0.0",
     "@types/canvas-confetti": "1.9.0",
     "@types/qrcode": "^1.5.6",
+    "@types/react-test-renderer": "^19.3.1",
     "@types/three": "^0.187.0",
     "drizzle-kit": "^0.31.11",
     "esbuild": "^0.28.2",
+    "react-test-renderer": "19.3.0",
     "tsx": "^4.23.15"
   },
   "engines": {

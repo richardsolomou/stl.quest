@@ -4,13 +4,6 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { APIError, createAuthMiddleware, isAPIError } from 'better-auth/api'
 import { admin as superAdminPlugin, genericOAuth, organization, twoFactor } from 'better-auth/plugins'
 import PQueue from 'p-queue'
-import {
-  forwardedOrigin,
-  standardAccountOptions,
-  standardEmailAndPasswordOptions,
-  standardRateLimitOptions,
-  standardSessionOptions,
-} from 'ras-stack/auth'
 import { and, eq, ne, sql } from 'drizzle-orm'
 import type { STLQuestDatabase } from '../db'
 import { databaseProvider } from '../db/connection'
@@ -34,6 +27,7 @@ import { copyRequest } from './copyRequest'
 import { hostedDeployment } from './hosted'
 import { stripeBillingPlugin } from './billing'
 import { OIDC_DISCOVERY_TIMEOUT_MS } from './integrations'
+import { publicOrigin, trustedOrigins } from './origins'
 import { requestLocale, serverMessages } from './locale'
 import { isLocale, messagesFor } from '../core/i18n'
 
@@ -81,9 +75,9 @@ function oidcPlugin(config: OidcProviderConfig | undefined, allowSignup: boolean
 // Without a configured base URL, Better Auth reads it from the request URL, which is http behind a TLS-terminating proxy.
 // Moving the request to the forwarded origin that the origin check already trusts keeps OAuth redirect URIs on the public URL.
 function atPublicOrigin(request: Request) {
-  const origin = forwardedOrigin(request)
+  const origin = publicOrigin(request)
   const url = new URL(request.url)
-  if (!origin || origin === url.origin) return request
+  if (origin === url.origin) return request
   return copyRequest(request, `${origin}${url.pathname}${url.search}`, request.headers)
 }
 
@@ -131,7 +125,6 @@ export function createAuth(
     auth?: AuthAdapterConfig
     email?: EmailDelivery
     baseURL?: string
-    trustedOrigins?: string[]
     onError?: (error: unknown) => void
   },
 ) {
@@ -168,23 +161,31 @@ export function createAuth(
     database: drizzleAdapter(database, { provider: databaseProvider(database), schema }),
     secret,
     baseURL: options?.baseURL,
-    advanced: { useSecureCookies: false },
-    rateLimit: standardRateLimitOptions({
-      '/sign-in/email': { window: 60, max: 10 },
-      '/sign-up/email': { window: 60, max: 5 },
-    }),
-    trustedOrigins:
-      options?.trustedOrigins ??
-      ((request) =>
-        request ? [new URL(request.url).origin, forwardedOrigin(request)].filter((origin): origin is string => Boolean(origin)) : []),
+    // Better Auth skips its origin check under test unless this is set, so tests exercise the check production runs.
+    advanced: { useSecureCookies: false, disableOriginCheck: false },
+    rateLimit: {
+      enabled: true,
+      storage: 'database',
+      window: 60,
+      max: 120,
+      customRules: {
+        '/sign-in/email': { window: 60, max: 10 },
+        '/sign-up/email': { window: 60, max: 5 },
+        '/request-password-reset': { window: 60, max: 5 },
+        '/send-verification-email': { window: 60, max: 5 },
+        '/admin/set-user-password': { window: 60, max: 10 },
+      },
+    },
+    trustedOrigins,
     disabledPaths: ['/change-email', '/unlink-account'],
     onAPIError: {
       onError: (error) => {
         if (!isAPIError(error) || error.status === 'INTERNAL_SERVER_ERROR') options?.onError?.(error)
       },
     },
-    emailAndPassword: standardEmailAndPasswordOptions({
+    emailAndPassword: {
       enabled: auth.password,
+      revokeSessionsOnPasswordReset: true,
       minPasswordLength: PASSWORD_MIN_LENGTH,
       maxPasswordLength: PASSWORD_MAX_LENGTH,
       password: {
@@ -192,17 +193,18 @@ export function createAuth(
         verify: ({ hash, password }: { hash: string; password: string }) => argon2.verify(hash, password),
       },
       ...(emails ? { sendResetPassword: emails.sendResetPassword } : {}),
-    }),
+    },
     emailVerification: emails ? { sendVerificationEmail: emails.sendVerificationEmail } : undefined,
     socialProviders,
-    account: standardAccountOptions({
+    account: {
+      encryptOAuthTokens: true,
       accountLinking: {
         disableImplicitLinking: true,
         allowDifferentEmails: true,
         updateUserInfoOnLink: true,
       },
-    }),
-    session: standardSessionOptions({ expiresIn: 30 * 24 * 60 * 60 }),
+    },
+    session: { expiresIn: 30 * 24 * 60 * 60, updateAge: 24 * 60 * 60 },
     user: {
       additionalFields: {
         color: { type: 'string', required: false, input: false },

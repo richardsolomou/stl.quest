@@ -1,4 +1,4 @@
-import { authFailureMessage, classifySignInFailure, type SignInFailureReason } from 'ras-stack/auth/client'
+import { authFailureMessage, classifySignInFailure, type SignInFailureReason } from './authFailures'
 import type { Messages } from './i18n'
 
 export const SOCIAL_AUTH_PROVIDERS = ['google', 'discord', 'oidc'] as const
