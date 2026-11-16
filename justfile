@@ -12,9 +12,11 @@ dev:
     #!/usr/bin/env bash
     set -euo pipefail
     mkdir -p data-dev prints-dev
-    just realtime --detach
+    pnpm realtime &
+    realtime=$!
     cleanup() {
-        docker rm --force stlquest-realtime-dev >/dev/null 2>&1 || true
+        kill "$realtime" 2>/dev/null || true
+        docker rm --force "$(basename "$PWD")-realtime" >/dev/null 2>&1 || true
     }
     trap cleanup EXIT INT TERM
     DATA_DIR=./data-dev PRINTS_DIR=./prints-dev BETTER_AUTH_URL=http://localhost:3000 pnpm dev

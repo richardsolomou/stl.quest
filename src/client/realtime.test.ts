@@ -1,62 +1,78 @@
 import { EventEmitter } from 'node:events'
-import type { Centrifuge } from 'centrifuge'
+import { Centrifuge } from 'centrifuge'
 import { describe, expect, it, vi } from 'vitest'
-import { watchWorkspaceUpdates } from './realtime'
+import { createRealtimeClient, realtimeToken, watchServerChannel } from './realtime'
 
-describe('workspace realtime updates', () => {
-  it('refreshes for workspace publications', () => {
-    const client = new EventEmitter() as unknown as Centrifuge
-    const refresh = vi.fn()
-    watchWorkspaceUpdates(client, 'one', refresh, vi.fn())
+vi.mock('centrifuge', async (importOriginal) => ({ ...(await importOriginal<typeof import('centrifuge')>()), Centrifuge: vi.fn() }))
 
-    client.emit('publication', { channel: 'workspace:one', data: {} })
-    client.emit('publication', { channel: 'workspace:two', data: {} })
+const answering = (response: Response) => vi.fn<typeof fetch>().mockResolvedValue(response)
 
-    expect(refresh).toHaveBeenCalledOnce()
+describe('realtime client', () => {
+  it('connects to a secure WebSocket on the page’s own origin', () => {
+    createRealtimeClient({ protocol: 'https:', host: 'example.com' })
+    expect(Centrifuge).toHaveBeenLastCalledWith('wss://example.com/connection/websocket', { getToken: expect.any(Function) })
   })
 
-  it('leaves a deleted workspace instead of refreshing it', () => {
-    const client = new EventEmitter() as unknown as Centrifuge
-    const refresh = vi.fn()
-    const leave = vi.fn()
-    watchWorkspaceUpdates(client, 'one', refresh, leave)
+  it('keeps a development origin on an insecure WebSocket', () => {
+    createRealtimeClient({ protocol: 'http:', host: 'localhost:3000' })
+    expect(Centrifuge).toHaveBeenLastCalledWith('ws://localhost:3000/connection/websocket', { getToken: expect.any(Function) })
+  })
+})
 
-    client.emit('publication', { channel: 'workspace:one', data: { event: 'workspace.deleted' } })
-
-    expect([leave.mock.calls.length, refresh.mock.calls.length]).toEqual([1, 0])
+describe('realtime token', () => {
+  it('asks for a subscription token for a channel', async () => {
+    const request = answering(Response.json({ token: 'signed' }))
+    await expect(realtimeToken('updates:one', request)).resolves.toBe('signed')
+    expect(request).toHaveBeenCalledWith('/api/realtime/token', expect.objectContaining({ body: '{"channel":"updates:one"}' }))
   })
 
-  it('refreshes when a reconnect cannot recover its workspace stream', () => {
-    const client = new EventEmitter() as unknown as Centrifuge
-    const refresh = vi.fn()
-    watchWorkspaceUpdates(client, 'one', refresh, vi.fn())
-
-    client.emit('subscribed', {
-      channel: 'workspace:one',
-      recoverable: true,
-      positioned: true,
-      wasRecovering: true,
-      recovered: false,
-      hasRecoveredPublications: false,
+  it('turns a refusal into an unauthorized error so the client stops retrying', async () => {
+    await expect(realtimeToken(undefined, answering(new Response(null, { status: 403 })))).rejects.toMatchObject({
+      name: 'UnauthorizedError',
     })
-
-    expect(refresh).toHaveBeenCalledOnce()
   })
 
-  it('does not refresh after successful recovery without missed publications', () => {
+  it('reports any other failure so the client retries', async () => {
+    await expect(realtimeToken(undefined, answering(new Response(null, { status: 503 })))).rejects.toThrow(
+      'Realtime authentication failed with status 503',
+    )
+  })
+})
+
+describe('server channel', () => {
+  const subscribed = (recovered: boolean) => ({
+    channel: 'user:one',
+    recoverable: true,
+    positioned: false,
+    wasRecovering: true,
+    recovered,
+    hasRecoveredPublications: recovered,
+  })
+
+  it('delivers only its channel’s publications until cleaned up', () => {
     const client = new EventEmitter() as unknown as Centrifuge
-    const refresh = vi.fn()
-    watchWorkspaceUpdates(client, 'one', refresh, vi.fn())
+    const publication = vi.fn()
+    const cleanup = watchServerChannel(client, 'user:one', { publication })
+    client.emit('publication', { channel: 'user:one', data: {} })
+    client.emit('publication', { channel: 'user:two', data: {} })
+    cleanup()
+    client.emit('publication', { channel: 'user:one', data: {} })
+    expect(publication).toHaveBeenCalledOnce()
+  })
 
-    client.emit('subscribed', {
-      channel: 'workspace:one',
-      recoverable: true,
-      positioned: true,
-      wasRecovering: true,
-      recovered: true,
-      hasRecoveredPublications: false,
-    })
+  it('reports a reconnect that lost publications', () => {
+    const client = new EventEmitter() as unknown as Centrifuge
+    const unrecovered = vi.fn()
+    watchServerChannel(client, 'user:one', { unrecovered })
+    client.emit('subscribed', subscribed(false))
+    expect(unrecovered).toHaveBeenCalledOnce()
+  })
 
-    expect(refresh).not.toHaveBeenCalled()
+  it('stays quiet when a reconnect recovered what it missed', () => {
+    const client = new EventEmitter() as unknown as Centrifuge
+    const unrecovered = vi.fn()
+    watchServerChannel(client, 'user:one', { unrecovered })
+    client.emit('subscribed', subscribed(true))
+    expect(unrecovered).not.toHaveBeenCalled()
   })
 })

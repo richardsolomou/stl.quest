@@ -15,7 +15,7 @@ COPY catalogs/printers/catalog.generated.json ./catalogs/printers/catalog.genera
 COPY catalogs/resins/catalog.generated.json ./catalogs/resins/catalog.generated.json
 COPY catalogs/electricity/catalog.generated.json ./catalogs/electricity/catalog.generated.json
 COPY catalogs/equipment/catalog.json ./catalogs/equipment/catalog.json
-COPY scripts/checkBuiltAssets.ts scripts/containerRuntime.ts scripts/containerRuntimeConfig.ts scripts/previewModels.ts scripts/seedPreview.ts ./scripts/
+COPY scripts/checkBuiltAssets.ts scripts/previewModels.ts scripts/seedPreview.ts ./scripts/
 COPY tsconfig.json vite.config.ts ./
 ARG VITE_POSTHOG_PROJECT_TOKEN VITE_POSTHOG_HOST POSTHOG_UPLOAD_SOURCEMAPS POSTHOG_CLI_PROJECT_ID POSTHOG_CLI_HOST
 # posthog-cli reads the commit and repository for the uploaded release from these.
@@ -37,9 +37,10 @@ COPY --from=build --chown=node:node /app/.output ./.output
 # Migrations are read from the working directory, straight from the commit.
 COPY --chown=node:node drizzle ./drizzle
 COPY --chown=node:node drizzle-postgres ./drizzle-postgres
-COPY --from=runtime-binaries /usr/local/bin/centrifugo /usr/local/bin/centrifugo
 COPY --from=runtime-binaries /usr/local/bin/caddy /usr/local/bin/caddy
-COPY --chown=node:node realtime.json ./realtime.json
+COPY --from=runtime-binaries /usr/local/bin/centrifugo /usr/local/bin/centrifugo
+COPY --chown=node:node centrifugo.json ./
+COPY --chown=node:node scripts/realtime.ts ./scripts/
 COPY --chown=node:node LICENSE THIRD_PARTY_NOTICES.md ./
 COPY --chown=node:node LICENSES ./LICENSES
 ARG VITE_POSTHOG_HOST
@@ -50,4 +51,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -q --spider "http://127.0.0.1:${PORT}/api/health" || exit 1
 USER node
-CMD ["node", ".output/server/container-runtime.mjs"]
+CMD ["node", "scripts/realtime.ts", "container"]

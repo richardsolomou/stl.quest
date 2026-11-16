@@ -1,31 +1,91 @@
-import { realtimeEnvironment, signRealtimeToken } from 'ras-stack/realtime'
-import type { Identity } from '../core/types'
+import crypto from 'node:crypto'
+import { logger } from './logger'
+import { isSameOriginRequest } from './origins'
+import { canSubscribe, serverChannels } from './realtimeChannels'
+import { CentrifugoPublisher } from './realtimePublisher'
 
-export function realtimeConfig(environment: NodeJS.ProcessEnv = process.env) {
-  const realtime = realtimeEnvironment(environment, { prefix: 'STLQUEST_', developmentSecret: 'stlquest-development-realtime-secret' })
-  if (!realtime) throw new Error('Realtime secret is not configured')
-  // Tests publish to nothing rather than to a Centrifugo that is not running.
-  return process.env.NODE_ENV === 'test' ? { ...realtime, apiUrl: '' } : realtime
+/**
+ * Who a realtime connection belongs to. An empty `id` is an anonymous connection; `info` reaches presence and join events.
+ * `workspace` is the workspace the connection follows, and whether the viewer may join its board's presence.
+ */
+export type RealtimeViewer = {
+  id: string
+  info?: Record<string, unknown>
+  workspace?: { id: string; slug: string; boardPresence: boolean }
 }
 
-export function connectionToken(identity: Identity, secret: string, now = Math.floor(Date.now() / 1000)) {
-  if (!identity.workspaceId) throw new Error('Realtime identity has no workspace')
-  return signRealtimeToken(identity.id, { channels: [`workspace:${identity.workspaceId}`] }, { secret, now })
+/** Decides who may connect: the viewer for this request, or undefined to refuse with 401. */
+export type RealtimeViewerLookup = (request: Request) => Promise<RealtimeViewer | undefined> | RealtimeViewer | undefined
+
+// `scripts/realtime.ts dev` starts Centrifugo with this secret, so the two must match.
+const developmentSecret = 'stlquest-development-realtime-secret'
+const tokenLifetimeSeconds = 5 * 60
+// Part of the shutdown budget in start-app's RECIPE.md; publications still queued after it are dropped.
+const shutdownDeadlineMs = 1_000
+
+export function realtimeSecret(environment: NodeJS.ProcessEnv = process.env) {
+  const secret = environment.STLQUEST_REALTIME_SECRET?.trim()
+  if (secret) return secret
+  if (environment.NODE_ENV === 'production') throw new Error('STLQUEST_REALTIME_SECRET is required in production')
+  return developmentSecret
 }
 
-export function subscriptionToken(identity: Identity, channel: string, secret: string, now = Math.floor(Date.now() / 1000)) {
-  return signRealtimeToken(
-    identity.id,
-    {
-      channel,
-      expire_at: 0,
-      info: { id: identity.id, name: identity.name, image: identity.image },
-    },
-    { secret, now },
-  )
+/**
+ * Centrifugo's HTTP API: on loopback beside the app in the container, and published on the same port in development. Tests
+ * publish to nothing rather than to a Centrifugo that is not running.
+ */
+export function realtimeApi(environment: NodeJS.ProcessEnv = process.env) {
+  return {
+    url: environment.NODE_ENV === 'test' ? '' : environment.STLQUEST_REALTIME_API_URL?.trim() || 'http://127.0.0.1:8000/api',
+    key: environment.STLQUEST_REALTIME_API_KEY?.trim() || realtimeSecret(environment),
+  }
 }
 
-/** Board presence exposes who else is on the board, so a member scoped to their own requests stays off the channel. */
-export function canSubscribeToBoard(channel: unknown, workspaceSlug: string, ownRequestsOnly: boolean): channel is string {
-  return channel === `board:${workspaceSlug}` && !ownRequestsOnly
+export function createRealtime(viewer: RealtimeViewerLookup) {
+  const secret = realtimeSecret()
+  const api = realtimeApi()
+  const publisher = new CentrifugoPublisher({
+    apiUrl: api.url,
+    apiKey: api.key,
+    onError: (error, channel) => logger.warn({ err: error, event: 'realtime_publish_failed', channel }, 'realtime publish failed'),
+  })
+  return {
+    /** Sends `data` to everyone subscribed to `channel`, in the background; see `CentrifugoPublisher.publish`. */
+    publish: (channel: string, data: unknown) => publisher.publish(channel, data),
+    /** Answers `POST /api/realtime/token`. */
+    ticket: (request: Request) => realtimeTicket(request, viewer, secret),
+    close: () => publisher.close(AbortSignal.timeout(shutdownDeadlineMs)),
+  }
+}
+
+/**
+ * Mints a connection token, or a subscription token when the body names a `channel`. Answers 401 when `viewer` refuses the
+ * request and 403 for a channel `canSubscribe` refuses; the browser client treats both as final instead of retrying.
+ */
+export async function realtimeTicket(request: Request, viewer: RealtimeViewerLookup, secret: string, now = Date.now()) {
+  if (!isSameOriginRequest(request)) return new Response('cross-origin mutation rejected', { status: 403 })
+  const body: unknown = await request.json().catch(() => ({}))
+  const channel = body && typeof body === 'object' && 'channel' in body ? body.channel : undefined
+  if (channel !== undefined && typeof channel !== 'string') return Response.json({ error: 'invalid channel' }, { status: 400 })
+  const current = await viewer(request)
+  if (!current) return Response.json({ error: 'unauthenticated' }, { status: 401 })
+  const headers = { 'cache-control': 'no-store' }
+  if (channel === undefined) {
+    return Response.json({ token: signRealtimeToken(current, { channels: serverChannels(current) }, secret, now) }, { headers })
+  }
+  if (!canSubscribe(current, channel)) return Response.json({ error: 'channel not found' }, { status: 403 })
+  return Response.json({ token: signRealtimeToken(current, { channel }, secret, now) }, { headers })
+}
+
+/** An HS256 JWT Centrifugo verifies with the shared secret; the subject and expiry always override `claims`. */
+export function signRealtimeToken(viewer: RealtimeViewer, claims: Record<string, unknown>, secret: string, now = Date.now()) {
+  const payload = {
+    ...claims,
+    ...(viewer.info ? { info: viewer.info } : {}),
+    sub: viewer.id,
+    exp: Math.floor(now / 1000) + tokenLifetimeSeconds,
+  }
+  const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url')
+  const unsigned = `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode(payload)}`
+  return `${unsigned}.${crypto.createHmac('sha256', secret).update(unsigned).digest('base64url')}`
 }

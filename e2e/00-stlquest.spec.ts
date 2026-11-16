@@ -1964,7 +1964,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await screenshot(page, 'create-account-link')
 })
 
-test('health and protected routes expose security and correlation headers', async ({ request }) => {
+test('health and protected routes expose security and correlation headers', async ({ request, baseURL }) => {
   const root = await request.get('/')
   expect(root.headers()['content-security-policy']).toContain("default-src 'self'")
   expect(root.headers()['x-content-type-options']).toBe('nosniff')
@@ -1976,8 +1976,8 @@ test('health and protected routes expose security and correlation headers', asyn
   expect(health.headers()['x-robots-tag']).toBe('noindex, nofollow')
   expect((await request.get('/api/files/missing')).status()).toBe(401)
   expect((await request.get('/api/files/batch?id=first&id=second')).status()).toBe(401)
-  expect((await request.get('/api/realtime/token')).status()).toBe(401)
-  expect((await request.post('/api/realtime/token', { data: { channel: 'workspace:other' } })).status()).toBe(401)
+  expect((await request.post('/api/realtime/token')).status()).toBe(403)
+  expect((await request.post('/api/realtime/token', { headers: { origin: new URL(baseURL!).origin }, data: {} })).status()).toBe(401)
   expect((await request.get('/%E0')).status()).toBe(400)
   expect((await request.get('/api/health')).ok()).toBeTruthy()
 })

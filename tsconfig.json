@@ -2,8 +2,6 @@
   "extends": "./node_modules/ras-stack/config/typescript/vite.json",
   "compilerOptions": {
     "allowImportingTsExtensions": true,
-    "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "noUncheckedIndexedAccess": false,
     "resolveJsonModule": true,
     "paths": {

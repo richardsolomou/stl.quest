@@ -110,6 +110,36 @@
         "`vitest.config.ts` defines `__APP_VERSION__`, which `postHogOptions` reads."
       ]
     },
+    "realtime": {
+      "version": 1,
+      "commit": "8e4dfdee6afeeaa1f05804e38888a171f9ebe722",
+      "files": {
+        "centrifugo.json": "centrifugo.json",
+        "scripts/realtime.test.ts": "scripts/realtime.test.ts",
+        "scripts/realtime.ts": "scripts/realtime.ts",
+        "src/client/realtime.test.ts": "src/client/realtime.test.ts",
+        "src/client/realtime.ts": "src/client/realtime.ts",
+        "src/client/useRealtime.test.tsx": "src/client/useRealtime.test.tsx",
+        "src/client/useRealtime.tsx": "src/client/useRealtime.tsx",
+        "src/routes/api/realtime.token.ts": "src/routes/api/realtime/token.ts",
+        "src/server/realtime.test.ts": "src/server/realtime.test.ts",
+        "src/server/realtime.ts": "src/server/realtime.ts",
+        "src/server/realtimeChannels.ts": "src/server/realtimeChannels.ts",
+        "src/server/realtimePublisher.test.ts": "src/server/realtimePublisher.test.ts",
+        "src/server/realtimePublisher.ts": "src/server/realtimePublisher.ts"
+      },
+      "notes": [
+        "Channels are the application's: each connection token grants the server-side `workspace:<id>` channel of the workspace the session is in, and `board:<slug>` presence takes a subscription token only for members who see the whole board; `centrifugo.json` defines those two namespaces.",
+        "`RealtimeViewer` carries the viewer's `workspace`, and the composition root looks it up through `workspace(headers)`, so a signed-out caller or a missing workspace answers 401.",
+        "The secret keeps the deployed names: `STLQUEST_REALTIME_SECRET`, generated into `$DATA_DIR/realtime-secret` or the file `STLQUEST_REALTIME_SECRET_FILE` names, with `stlquest-development-realtime-secret` outside production; `STLQUEST_REALTIME_API_KEY` and `STLQUEST_REALTIME_API_URL` set a separate Centrifugo key and address, which the fast end-to-end server uses, and tests publish nowhere.",
+        "The supervisor seeds a preview before starting when `STLQUEST_SEED_PREVIEW=true`, and with `STLQUEST_DISTRIBUTED=true` gives Centrifugo the Redis engine at `REDIS_URL`, so replicas share publications and presence.",
+        "Centrifugo accepts any origin unless `APP_URL` is set, which self-hosted deployments do not set because they are reached by several names; Caddy still refuses a WebSocket whose `Origin` names another host.",
+        "The event bus in `src/adapters/events.ts` publishes each workspace event as `{ event }` on its workspace channel through `app().realtime.publish`, and storage changes to the other replicas.",
+        "The token route keeps its path at `src/routes/api/realtime/token.ts` and runs inside the request context for logs.",
+        "`src/client/workspaceUpdates.ts` refreshes every active query on a workspace publication or an unrecovered reconnect and leaves a deleted workspace; the root route keys `RealtimeProvider` by the workspace.",
+        "`just dev` starts `pnpm realtime` in the background and removes its container when Vite exits."
+      ]
+    },
     "start-app": {
       "version": 2,
       "commit": "82fce4523ec914bd2e70aefd4bff84c10fb278c6",
@@ -170,7 +200,7 @@
       },
       "notes": [
         "`AGENTS.md` is a symlink to `CLAUDE.md`, which keeps the application's agent guide and carries the recipe paragraph under **Recipes**.",
-        "`tsconfig.json` keeps `target` ES2022, `noUncheckedIndexedAccess: false`, `resolveJsonModule`, and the `@/*` path alias, because the codebase predates the strict preset and indexes arrays throughout.",
+        "`tsconfig.json` keeps `noUncheckedIndexedAccess: false`, `resolveJsonModule`, and the `@/*` path alias, because the codebase predates the strict preset and indexes arrays throughout.",
         "`.oxlintrc.json` turns off `typescript/no-unnecessary-type-assertion` in tests, because recipe tests assert indexes with `!` and the application's `noUncheckedIndexedAccess: false` makes those assertions redundant.",
         "`.oxlintrc.json` also extends the `domain.json` preset, which keeps `src/core` free of IO and framework imports, and turns off the rules the codebase does not follow.",
         "`.oxfmtrc.json` keeps its schema and ignores generated catalogs, deploy templates, and `CHANGELOG.md`.",

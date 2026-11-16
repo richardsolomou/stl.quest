@@ -18,7 +18,8 @@ import { UpdateNotices } from '../client/components/UpdateNotices'
 import { authClient } from '../client/authClient'
 import { chunkRecoveryScript } from '../client/chunkRecovery'
 import { preloadSessionQueries, sessionQuery } from '../client/queries'
-import { RealtimeProvider, useWorkspaceUpdates } from '../client/realtime'
+import { RealtimeProvider } from '../client/useRealtime'
+import { useWorkspaceUpdates } from '../client/workspaceUpdates'
 import { translationGuardScript } from '../client/translationGuard'
 import { PostHogIntegration } from '../client/posthog'
 import { themeScript } from '../client/theme'
@@ -118,7 +119,8 @@ function RootComponent() {
       }
     >
       {identity?.workspaceId && storageConfigured ? (
-        <RealtimeProvider workspaceId={identity.workspaceId}>
+        // The connection token follows the workspace, so a switch reconnects.
+        <RealtimeProvider key={identity.workspaceId}>
           <LiveUpdates />
           {content}
         </RealtimeProvider>

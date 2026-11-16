@@ -1,40 +1,23 @@
-import { CentrifugoPublisher } from 'ras-stack/realtime'
 import type { AppEvent, EventBus } from '../core/types'
-import { logger } from '../server/logger'
 import type { ReplicaStorageEvents } from './replicaEvents'
 
-export class RealtimePublisher {
-  private readonly publisher: CentrifugoPublisher
+/** Queues a realtime publication in the background; false when it was refused. */
+export type RealtimePublish = (channel: string, data: unknown) => boolean
 
-  constructor(apiUrl: string, apiKey: string, timeoutMs = 5_000, retryMs = 1_000) {
-    this.publisher = new CentrifugoPublisher({
-      apiUrl,
-      apiKey,
-      timeoutMs,
-      retryMs,
-      onError: (error, channel) => logger.warn({ err: error, event: 'realtime_publish_failed', channel }, 'realtime publish failed'),
-      onRetry: (error, channel) => logger.warn({ err: error, event: 'realtime_publish_retry', channel }, 'retrying realtime publish'),
-    })
-  }
-
-  publish(workspaceId: string, event: AppEvent) {
-    return this.publisher.publish(`workspace:${workspaceId}`, { event })
-  }
-
-  close(signal?: AbortSignal) {
-    return this.publisher.close({ signal })
-  }
-}
-
+/** Publishes a workspace's events to its realtime channel, and storage changes to the other replicas. */
 export class RealtimeEventBus implements EventBus {
   constructor(
-    private publisher: RealtimePublisher,
+    private publish_: RealtimePublish,
     private workspaceId: string,
     private replicas?: ReplicaStorageEvents,
   ) {}
 
   publish(event: AppEvent) {
-    this.publisher.publish(this.workspaceId, event)
+    publishWorkspaceEvent(this.publish_, this.workspaceId, event)
     if (event === 'storage.changed') this.replicas?.publish(this.workspaceId)
   }
+}
+
+export function publishWorkspaceEvent(publish: RealtimePublish, workspaceId: string, event: AppEvent) {
+  return publish(`workspace:${workspaceId}`, { event })
 }

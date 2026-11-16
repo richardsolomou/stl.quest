@@ -67,8 +67,8 @@ describe('app initialization', () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-publisher-shutdown-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
     process.env.PRINTS_DIR = path.join(temporary, 'prints')
-    const { RealtimePublisher } = await import('../adapters/events')
-    const closed = vi.spyOn(RealtimePublisher.prototype, 'close')
+    const { CentrifugoPublisher } = await import('./realtimePublisher')
+    const closed = vi.spyOn(CentrifugoPublisher.prototype, 'close')
     try {
       const { app } = await import('./app')
       const instance = await app()
@@ -1099,13 +1099,13 @@ describe('app initialization', () => {
     })
 
     it('tells connected members the workspace was deleted', async () => {
-      const { RealtimePublisher } = await import('../adapters/events')
-      const publish = vi.spyOn(RealtimePublisher.prototype, 'publish')
+      const { CentrifugoPublisher } = await import('./realtimePublisher')
+      const publish = vi.spyOn(CentrifugoPublisher.prototype, 'publish')
       const { instance, adminHeaders, maker } = await superAdminAndMaker()
 
       await instance.deleteWorkspaceAsSuperAdmin(adminHeaders, maker.workspace.id, maker.workspace.name)
 
-      expect(publish).toHaveBeenLastCalledWith(maker.workspace.id, 'workspace.deleted')
+      expect(publish).toHaveBeenLastCalledWith(`workspace:${maker.workspace.id}`, { event: 'workspace.deleted' })
     })
 
     it('records the deletion as made by a super admin', async () => {
