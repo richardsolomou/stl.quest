@@ -15,7 +15,7 @@ COPY catalogs/printers/catalog.generated.json ./catalogs/printers/catalog.genera
 COPY catalogs/resins/catalog.generated.json ./catalogs/resins/catalog.generated.json
 COPY catalogs/electricity/catalog.generated.json ./catalogs/electricity/catalog.generated.json
 COPY catalogs/equipment/catalog.json ./catalogs/equipment/catalog.json
-COPY scripts/checkBuiltAssets.ts scripts/previewModels.ts scripts/seedPreview.ts ./scripts/
+COPY scripts/checkBuiltAssets.ts scripts/posthogSourceMaps.ts scripts/previewModels.ts scripts/seedPreview.ts ./scripts/
 COPY tsconfig.json vite.config.ts ./
 ARG VITE_POSTHOG_PROJECT_TOKEN VITE_POSTHOG_HOST POSTHOG_UPLOAD_SOURCEMAPS POSTHOG_CLI_PROJECT_ID POSTHOG_CLI_HOST
 # posthog-cli reads the commit and repository for the uploaded release from these.
