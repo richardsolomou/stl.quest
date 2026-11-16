@@ -34,6 +34,18 @@
         "`localRedirectPath` is left out because sign-in has no `next` destination."
       ]
     },
+    "ci": {
+      "version": 1,
+      "commit": "8e4dfdee6afeeaa1f05804e38888a171f9ebe722",
+      "files": {
+        ".github/dependabot.yml": ".github/dependabot.yml",
+        ".github/workflows/ci.yml": null
+      },
+      "notes": [
+        "`ci.yml` is left out: `.github/workflows/docker.yml` runs `pnpm check:ci` with a PostgreSQL service so both database targets are tested, splits the unit tests and end-to-end suites into shards, scans the image, and releases, so one workflow carries checks, release, and deploy.",
+        "Dependabot ignores `@better-auth/stripe`, which must move with `better-auth`."
+      ]
+    },
     "database-sqlite": {
       "version": 1,
       "commit": "ec2a7bdc97f8534e2fe0d9a0581b3b1898e05327",
