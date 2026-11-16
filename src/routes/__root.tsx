@@ -2,7 +2,6 @@ import type { QueryClient } from '@tanstack/react-query'
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext, useRouterState } from '@tanstack/react-router'
 import { useCallback } from 'react'
-import { PostHogBetterAuthIdentity } from 'ras-stack/posthog/react'
 import '@fontsource/oswald/500.css'
 import '@fontsource/oswald/700.css'
 import '@fontsource/zilla-slab/400.css'
@@ -15,13 +14,13 @@ import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ImpersonationBanner } from '../client/components/ImpersonationBanner'
 import { UpdateNotices } from '../client/components/UpdateNotices'
-import { authClient } from '../client/authClient'
 import { chunkRecoveryScript } from '../client/chunkRecovery'
 import { preloadSessionQueries, sessionQuery } from '../client/queries'
 import { RealtimeProvider } from '../client/useRealtime'
 import { useWorkspaceUpdates } from '../client/workspaceUpdates'
 import { translationGuardScript } from '../client/translationGuard'
 import { PostHogIntegration } from '../client/posthog'
+import { PostHogIdentity } from '../client/postHogIdentity'
 import { themeScript } from '../client/theme'
 import { WorkspaceProvider } from '../client/workspace'
 import { faviconHref } from '../favicon'
@@ -74,18 +73,6 @@ function LiveUpdates() {
 // The server moves the session to another workspace, or a new personal one, on the next page load.
 const leaveDeletedWorkspace = () => window.location.assign('/')
 
-function PostHogIdentify() {
-  const {
-    data: { identity },
-  } = useSuspenseQuery(sessionQuery())
-  return (
-    <PostHogBetterAuthIdentity
-      authClient={authClient}
-      properties={() => (identity ? { role: identity.role, super_admin: identity.superAdmin ?? false } : {})}
-    />
-  )
-}
-
 function RootComponent() {
   const { data: session } = useSuspenseQuery(sessionQuery())
   const { identity, serverVersion, storageConfigured, telemetryEnabled } = session
@@ -101,7 +88,7 @@ function RootComponent() {
   )
   const content = (
     <>
-      {telemetryEnabled && <PostHogIdentify />}
+      <PostHogIdentity properties={identity ? { role: identity.role, super_admin: identity.superAdmin ?? false } : undefined} />
       <TooltipProvider>
         {outlet}
         {identity?.impersonatedBy && <ImpersonationBanner identity={identity} />}

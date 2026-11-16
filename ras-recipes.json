@@ -70,6 +70,19 @@
         "`src/adapters/workspaceEmailDelivery.test.ts` covers the hosted workspace path against a mocked transport."
       ]
     },
+    "posthog-auth-identity": {
+      "version": 1,
+      "commit": "8e4dfdee6afeeaa1f05804e38888a171f9ebe722",
+      "files": {
+        "src/client/postHogIdentity.test.tsx": "src/client/postHogIdentity.test.tsx",
+        "src/client/postHogIdentity.tsx": "src/client/postHogIdentity.tsx"
+      },
+      "notes": [
+        "`PostHogIdentity` takes `properties`, which the root route fills with the member's role and whether they are a super admin, read when identifying so a role change alone does not identify again.",
+        "`PostHogIdentity` renders in the root route's content inside `PostHogIntegration`, and does nothing while the deployment has telemetry off, because PostHog is then never loaded.",
+        "`rpc` does not look up the session to pass `authenticatedDistinctId` to `observeServerFunction`, which would add a session query to every server function: server function spans carry the browser session, and their logs and exceptions carry the verified person through the request log context that `requireIdentity` and `workspace` set."
+      ]
+    },
     "posthog-server": {
       "version": 2,
       "commit": "82fce4523ec914bd2e70aefd4bff84c10fb278c6",
