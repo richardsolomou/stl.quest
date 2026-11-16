@@ -1,16 +1,13 @@
+import path from 'node:path'
 import { sql } from 'drizzle-orm'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
-import { bundledDirectory } from 'ras-stack/database'
-import { errorHasCode } from 'ras-stack/server'
 import type { DatabaseBackend } from '../backend'
 import type { STLQuestDatabase } from '../connection'
+import { errorHasCode } from '../errors'
 import { openPostgreSQL } from '../postgresConnection'
 
-const migrationsFolder = bundledDirectory({
-  developmentUrl: new URL('../../../drizzle-postgres', import.meta.url),
-  production: import.meta.env?.PROD,
-  name: 'drizzle-postgres',
-})
+// Read from the working directory: the repository in development and tests, and `/app` in the image, which copies them from the commit.
+const migrationsFolder = path.resolve('drizzle-postgres')
 
 export class PostgreSQLBackend implements DatabaseBackend<STLQuestDatabase> {
   private lastHealth = { integrity: 'unknown', checkedAt: 0 }

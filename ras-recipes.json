@@ -34,6 +34,26 @@
         "`localRedirectPath` is left out because sign-in has no `next` destination."
       ]
     },
+    "database-sqlite": {
+      "version": 1,
+      "commit": "ec2a7bdc97f8534e2fe0d9a0581b3b1898e05327",
+      "files": {
+        "drizzle.config.ts": "drizzle.config.ts",
+        "scripts/database.test.ts": null,
+        "scripts/database.ts": null,
+        "src/db/database.test.ts": null,
+        "src/db/database.ts": null,
+        "src/server/database.test.ts": null
+      },
+      "notes": [
+        "SQLite is the default target and PostgreSQL the other, chosen by `DATABASE_URL` in `src/db/config.ts`; `database-postgres` is not adopted because its own RECIPE.md leaves a dual target to the application, and the PostgreSQL side (`src/db/backends/postgres.ts`, `src/db/postgresConnection.ts`, `src/db/schema-postgres/`, `drizzle-postgres/`, `drizzle.postgres.config.ts`) is application code that follows the same decisions: ten lazy connections, numeric parsers, dropped notices, and migrations from the working directory.",
+        "`src/db/database.ts` and its tests are left out: both targets sit behind `DatabaseBackend` in `src/db/backends/`, and SQLite is wrapped in a serialized async facade (`src/db/connection.ts`) so repository code is the same on both. `SQLiteBackend` sets the same pragmas, writes `backups/stlquest-pre-migration-<time>.sqlite` before pending migrations, migrates with foreign keys off, runs `PRAGMA foreign_key_check`, and runs `quick_check` at start; review each change to `src/db/database.ts` against it.",
+        "The database file stays `$DATA_DIR/stlquest.sqlite`, the migrations stay in `drizzle/` with their history, and `drizzle.config.ts` reads the schema from `src/db/schema/index.ts`.",
+        "`scripts/database.ts` is left out: `scripts/backup.ts` (`pnpm backup`) writes a checked `VACUUM INTO` copy and the integration key beside it, and restores are documented operator steps.",
+        "Migrations are read from the working directory for both dialects, and the image copies `drizzle/` and `drizzle-postgres/` to `/app`; `.oxfmtrc.json` ignores both `meta/` directories.",
+        "`DATA_DIR` defaults to `/data` everywhere, and development uses `data-dev/` through `just dev`."
+      ]
+    },
     "email-smtp": {
       "version": 1,
       "commit": "ec2a7bdc97f8534e2fe0d9a0581b3b1898e05327",

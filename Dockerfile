@@ -15,10 +15,8 @@ COPY catalogs/printers/catalog.generated.json ./catalogs/printers/catalog.genera
 COPY catalogs/resins/catalog.generated.json ./catalogs/resins/catalog.generated.json
 COPY catalogs/electricity/catalog.generated.json ./catalogs/electricity/catalog.generated.json
 COPY catalogs/equipment/catalog.json ./catalogs/equipment/catalog.json
-COPY drizzle ./drizzle
-COPY drizzle-postgres ./drizzle-postgres
 COPY scripts/checkBuiltAssets.ts scripts/containerRuntime.ts scripts/containerRuntimeConfig.ts scripts/previewModels.ts scripts/seedPreview.ts ./scripts/
-COPY ras-stack.assets.json tsconfig.json vite.config.ts ./
+COPY tsconfig.json vite.config.ts ./
 ARG VITE_POSTHOG_PROJECT_TOKEN VITE_POSTHOG_HOST POSTHOG_UPLOAD_SOURCEMAPS POSTHOG_CLI_PROJECT_ID POSTHOG_CLI_HOST
 # posthog-cli reads the commit and repository for the uploaded release from these.
 ARG GITHUB_ACTIONS GITHUB_SHA GITHUB_REF_NAME GITHUB_REPOSITORY GITHUB_SERVER_URL
@@ -36,6 +34,9 @@ RUN apk upgrade --no-cache \
     && mkdir -p /data /prints \
     && chown -R node:node /app /data /prints
 COPY --from=build --chown=node:node /app/.output ./.output
+# Migrations are read from the working directory, straight from the commit.
+COPY --chown=node:node drizzle ./drizzle
+COPY --chown=node:node drizzle-postgres ./drizzle-postgres
 COPY --from=runtime-binaries /usr/local/bin/centrifugo /usr/local/bin/centrifugo
 COPY --from=runtime-binaries /usr/local/bin/caddy /usr/local/bin/caddy
 COPY --chown=node:node realtime.json ./realtime.json

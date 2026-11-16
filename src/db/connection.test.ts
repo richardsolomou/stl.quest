@@ -1,6 +1,9 @@
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { closeDatabase, createDatabase, type STLQuestDatabase } from './connection'
+import { closeDatabase, createDatabase, openDatabase, rawDatabase, type STLQuestDatabase } from './connection'
 
 describe('async SQLite connection', () => {
   let database: STLQuestDatabase
@@ -49,5 +52,19 @@ describe('async SQLite connection', () => {
     continueTransaction()
     await transaction
     expect(await outsideQuery).toEqual({ count: 2 })
+  })
+})
+
+describe('SQLite file connection', () => {
+  it('sets the safety pragmas on its connection', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stlquest-pragmas-'))
+    const database = openDatabase(path.join(directory, 'nested', 'stlquest.sqlite'))
+    try {
+      const pragma = (name: string) => rawDatabase(database).$client.pragma(name, { simple: true }) as unknown
+      expect([pragma('journal_mode'), pragma('synchronous'), pragma('busy_timeout'), pragma('foreign_keys')]).toEqual(['wal', 2, 5000, 1])
+    } finally {
+      closeDatabase(database)
+      fs.rmSync(directory, { recursive: true, force: true })
+    }
   })
 })

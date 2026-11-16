@@ -3,7 +3,8 @@ import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import type { ExtractTablesWithRelations } from 'drizzle-orm/relations'
 import type { BaseSQLiteDatabase, SQLiteTransaction } from 'drizzle-orm/sqlite-core'
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { openSqliteClient } from 'ras-stack/database/sqlite'
+import fs from 'node:fs'
+import path from 'node:path'
 import { schema } from './schema'
 
 type SQLiteDatabase = BetterSQLite3Database<typeof schema> & { $client: Database.Database }
@@ -36,8 +37,24 @@ export function databaseProvider(database: object): DatabaseProvider {
   return databaseProviders.get(database) ?? 'sqlite'
 }
 
+/** Opens a SQLite file with the safety pragmas set on its one connection; a read-only copy, such as a backup being checked, keeps its own. */
 export function openDatabase(file: string, options?: Database.Options) {
-  return createDatabase(openSqliteClient(file, { database: options, pragmas: options?.readonly ? false : undefined }))
+  if (file !== ':memory:') fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true })
+  const client = new Database(file, options)
+  try {
+    if (!options?.readonly) {
+      // WAL so readers never block the writer, FULL so a committed write survives power loss, and a busy timeout so the backup
+      // command waits instead of failing with SQLITE_BUSY.
+      client.pragma('journal_mode = WAL')
+      client.pragma('synchronous = FULL')
+      client.pragma('busy_timeout = 5000')
+      client.pragma('foreign_keys = ON')
+    }
+    return createDatabase(client)
+  } catch (error) {
+    client.close()
+    throw error
+  }
 }
 
 export function closeDatabase(database: STLQuestDatabase) {
