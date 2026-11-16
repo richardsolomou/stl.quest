@@ -2,8 +2,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext, useRouterState } from '@tanstack/react-router'
 import { useCallback } from 'react'
-import { postHogEnvironment } from 'ras-stack/posthog'
-import { PostHogBetterAuthIdentity, PostHogIntegration } from 'ras-stack/posthog/react'
+import { PostHogBetterAuthIdentity } from 'ras-stack/posthog/react'
 import '@fontsource/oswald/500.css'
 import '@fontsource/oswald/700.css'
 import '@fontsource/zilla-slab/400.css'
@@ -21,7 +20,7 @@ import { chunkRecoveryScript } from '../client/chunkRecovery'
 import { preloadSessionQueries, sessionQuery } from '../client/queries'
 import { RealtimeProvider, useWorkspaceUpdates } from '../client/realtime'
 import { translationGuardScript } from '../client/translationGuard'
-import { dropDuplicateServerFunctionException, dropExpectedStorageProblems, dropOpaqueScriptError } from '../client/telemetry'
+import { PostHogIntegration } from '../client/posthog'
 import { themeScript } from '../client/theme'
 import { WorkspaceProvider } from '../client/workspace'
 import { faviconHref } from '../favicon'
@@ -56,11 +55,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   // react-query like all other server state, so realtime invalidation reaches it.
   loader: ({ context }) => preloadSessionQueries(context.queryClient),
   component: RootComponent,
-})
-
-const posthog = postHogEnvironment({
-  projectToken: import.meta.env.VITE_POSTHOG_PROJECT_TOKEN,
-  host: import.meta.env.VITE_POSTHOG_HOST,
 })
 
 // One live subscription for the whole app: any change event re-fetches every
@@ -106,7 +100,7 @@ function RootComponent() {
   )
   const content = (
     <>
-      {telemetryEnabled && posthog && <PostHogIdentify />}
+      {telemetryEnabled && <PostHogIdentify />}
       <TooltipProvider>
         {outlet}
         {identity?.impersonatedBy && <ImpersonationBanner identity={identity} />}
@@ -115,19 +109,7 @@ function RootComponent() {
   )
   const observedContent = (
     <PostHogIntegration
-      environment={telemetryEnabled ? posthog : undefined}
-      service={{ name: 'stlquest', version: __APP_VERSION__, environment: import.meta.env.MODE }}
-      options={{
-        before_send: [dropExpectedStorageProblems, dropDuplicateServerFunctionException, dropOpaqueScriptError],
-        capture_exceptions: {
-          capture_console_errors: false,
-          capture_unhandled_errors: true,
-          capture_unhandled_rejections: true,
-        },
-        mask_all_element_attributes: true,
-        mask_all_text: true,
-        session_recording: { maskAllInputs: true, blockSelector: '.ph-no-capture' },
-      }}
+      enabled={telemetryEnabled}
       fallback={
         <main className="mx-auto mt-[15vh] p-6 text-center">
           <h1>{t.common.somethingWentWrong}</h1>

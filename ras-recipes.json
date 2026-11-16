@@ -1,6 +1,29 @@
 {
   "source": "https://github.com/richardsolomou/ras-stack",
   "recipes": {
+    "posthog-web": {
+      "version": 2,
+      "commit": "82fce4523ec914bd2e70aefd4bff84c10fb278c6",
+      "files": {
+        "scripts/posthogSourceMaps.test.ts": "scripts/posthogSourceMaps.test.ts",
+        "scripts/posthogSourceMaps.ts": "scripts/posthogSourceMaps.ts",
+        "src/client/posthog.test.tsx": "src/client/posthog.test.tsx",
+        "src/client/posthog.tsx": "src/client/posthog.tsx",
+        "src/contracts/posthog.test.ts": "src/contracts/posthog.test.ts",
+        "src/contracts/posthog.ts": "src/contracts/posthog.ts",
+        "src/routes/t/$.ts": "src/routes/t/$.ts",
+        "src/server/posthogProxy.test.ts": "src/server/posthogProxy.test.ts",
+        "src/server/posthogProxy.ts": "src/server/posthogProxy.ts"
+      },
+      "notes": [
+        "`serviceName` is `stlquest`, so browser logs and metrics report as `stlquest-web`, with the release as `serviceVersion`.",
+        "PostHog starts while the first enabled `PostHogIntegration` renders instead of when `src/client/posthog.tsx` loads, and `PostHogIntegration` takes `enabled`, because each deployment can turn telemetry off in its settings and the published image carries the project token; it still starts before any child's effect runs.",
+        "`PostHogIntegration` takes the translated `fallback` the root route renders.",
+        "`postHogOptions` adds the application's `before_send` filters (expected storage rejections, duplicate server function exceptions, opaque cross-origin script errors), turns off console error capture, masks all text and element attributes, and blocks `.ph-no-capture` in replay, because workspaces hold names, filenames, and notes.",
+        "The Docker build maps the existing repository variables `POSTHOG_PROJECT_ID` and `POSTHOG_HOST` and secret `POSTHOG_API_KEY` onto the `POSTHOG_CLI_*` names in `.github/workflows/docker.yml`, which is this application's deploy workflow, and keeps the `GITHUB_*` build arguments that name the uploaded release.",
+        "`vitest.config.ts` defines `__APP_VERSION__`, which `postHogOptions` reads."
+      ]
+    },
     "start-app": {
       "version": 2,
       "commit": "82fce4523ec914bd2e70aefd4bff84c10fb278c6",
@@ -62,6 +85,7 @@
       "notes": [
         "`AGENTS.md` is a symlink to `CLAUDE.md`, which keeps the application's agent guide and carries the recipe paragraph under **Recipes**.",
         "`tsconfig.json` keeps `target` ES2022, `noUncheckedIndexedAccess: false`, `resolveJsonModule`, and the `@/*` path alias, because the codebase predates the strict preset and indexes arrays throughout.",
+        "`.oxlintrc.json` turns off `typescript/no-unnecessary-type-assertion` in tests, because recipe tests assert indexes with `!` and the application's `noUncheckedIndexedAccess: false` makes those assertions redundant.",
         "`.oxlintrc.json` also extends the `domain.json` preset, which keeps `src/core` free of IO and framework imports, and turns off the rules the codebase does not follow.",
         "`.oxfmtrc.json` keeps its schema and ignores generated catalogs, deploy templates, and `CHANGELOG.md`.",
         "`vitest.config.ts` resolves the `@` alias, runs files one at a time in forks because tests share the `globalThis` app singleton and SQLite state, and keeps the node environment.",

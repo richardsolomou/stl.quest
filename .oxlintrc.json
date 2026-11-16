@@ -19,5 +19,13 @@
   "ignorePatterns": ["src/routeTree.gen.ts", ".output/**", "node_modules/**", "deploy/**"],
   "env": {
     "builtin": true
-  }
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx"],
+      "rules": {
+        "typescript/no-unnecessary-type-assertion": "off"
+      }
+    }
+  ]
 }

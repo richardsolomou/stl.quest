@@ -28,13 +28,3 @@ jobs:
       build-args: |
         VITE_POSTHOG_HOST=${{ vars.VITE_POSTHOG_HOST }}
         VITE_POSTHOG_PROJECT_TOKEN=${{ vars.VITE_POSTHOG_PROJECT_TOKEN }}
-        POSTHOG_PROJECT_ID=${{ vars.POSTHOG_PROJECT_ID }}
-        POSTHOG_HOST=${{ vars.POSTHOG_HOST }}
-        GITHUB_ACTIONS=true
-        GITHUB_SHA=${{ github.event.pull_request.head.sha }}
-        GITHUB_REF_NAME=${{ github.head_ref }}
-        GITHUB_REPOSITORY=${{ github.repository }}
-        GITHUB_SERVER_URL=${{ github.server_url }}
-      build-secret-id: POSTHOG_API_KEY
-    secrets:
-      build-secret: ${{ secrets.POSTHOG_API_KEY }}

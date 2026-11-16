@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1
+# check=skip=SecretsUsedInArgOrEnv
 FROM ghcr.io/richardsolomou/ras-stack-runtime-binaries:runtime-v1.0.9@sha256:b72916b0db314c9cdaab83142b845e3cba77777c44ecefaaf9e2661c24b5e164 AS runtime-binaries
 
 FROM node:24-alpine AS build
@@ -18,23 +19,10 @@ COPY drizzle ./drizzle
 COPY drizzle-postgres ./drizzle-postgres
 COPY scripts/checkBuiltAssets.ts scripts/containerRuntime.ts scripts/containerRuntimeConfig.ts scripts/previewModels.ts scripts/seedPreview.ts ./scripts/
 COPY ras-stack.assets.json tsconfig.json vite.config.ts ./
-ARG VITE_POSTHOG_HOST
-ARG VITE_POSTHOG_PROJECT_TOKEN
-ARG POSTHOG_PROJECT_ID
-ARG POSTHOG_HOST
-ARG GITHUB_ACTIONS
-ARG GITHUB_SHA
-ARG GITHUB_REF_NAME
-ARG GITHUB_REPOSITORY
-ARG GITHUB_SERVER_URL
-ENV POSTHOG_PROJECT_ID=$POSTHOG_PROJECT_ID \
-    POSTHOG_HOST=$POSTHOG_HOST \
-    GITHUB_ACTIONS=$GITHUB_ACTIONS \
-    GITHUB_SHA=$GITHUB_SHA \
-    GITHUB_REF_NAME=$GITHUB_REF_NAME \
-    GITHUB_REPOSITORY=$GITHUB_REPOSITORY \
-    GITHUB_SERVER_URL=$GITHUB_SERVER_URL
-RUN --mount=type=secret,id=POSTHOG_API_KEY,env=POSTHOG_API_KEY pnpm build
+ARG VITE_POSTHOG_PROJECT_TOKEN VITE_POSTHOG_HOST POSTHOG_UPLOAD_SOURCEMAPS POSTHOG_CLI_PROJECT_ID POSTHOG_CLI_HOST
+# posthog-cli reads the commit and repository for the uploaded release from these.
+ARG GITHUB_ACTIONS GITHUB_SHA GITHUB_REF_NAME GITHUB_REPOSITORY GITHUB_SERVER_URL
+RUN --mount=type=secret,id=posthog_cli_api_key,env=POSTHOG_CLI_API_KEY pnpm build
 
 FROM node:24-alpine AS runtime
 LABEL org.opencontainers.image.title="STL Quest" \
