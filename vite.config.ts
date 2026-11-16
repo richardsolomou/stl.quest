@@ -26,7 +26,7 @@ export default defineConfig(({ mode }) => {
   return {
     resolve: { tsconfigPaths: true },
     // Prebundle the upload client's CommonJS dependencies before serving them to the browser.
-    optimizeDeps: { include: ['ras-stack > tus-js-client'] },
+    optimizeDeps: { include: ['tus-js-client'] },
     server: {
       port: 3000,
       proxy: { '/connection': { target: 'http://127.0.0.1:8000', ws: true } },

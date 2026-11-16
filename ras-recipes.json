@@ -208,6 +208,26 @@
         "`check` runs `check:ci` and then the tests, and `check:ci` keeps the application's extra gates: Changesets, Markdown links, both Drizzle dialects, the equipment catalogs, Unraid metadata, and the backup CLI.",
         "`pnpm-workspace.yaml` keeps the application's overrides and peer rules, and allows builds for `argon2` and `workerd`, which it installs."
       ]
+    },
+    "uploads": {
+      "version": 1,
+      "commit": "8e4dfdee6afeeaa1f05804e38888a171f9ebe722",
+      "files": {
+        "src/client/uploads.test.ts": "src/client/uploads.test.ts",
+        "src/client/uploads.ts": "src/client/uploads.ts",
+        "src/routes/api/uploads.$.ts": null,
+        "src/server/uploadPolicy.test.ts": null,
+        "src/server/uploadPolicy.ts": null,
+        "src/server/uploads.test.ts": null,
+        "src/server/uploads.ts": null
+      },
+      "notes": [
+        "The server side is the application's own and its recipe files are left out: `src/server/uploads.ts` and `src/adapters/tus.ts` run the tus server per workspace at `/api/upload` (`src/routes/api/upload.$.ts`), stamp the workspace into metadata, store on disk under `$DATA_DIR` or in shared S3 staging in distributed mode, validate model metadata, create or complete a print request when an upload finishes, and keep their limits and storage quotas in `src/server/uploadGuards.ts` and `src/server/storagePolicy.ts`; review each change to the recipe's server files against them.",
+        "Upload storage paths and the S3 staging layout are unchanged.",
+        "`uploadFile` posts to `/api/upload`, the path the server and in-flight uploads already use.",
+        "`uploadFile` takes `fingerprint`, which the upload form scopes to the workspace and request fields so uploads already in flight keep resuming, and `shouldRetry`, which stops retrying a 423 while a storage migration pauses uploads.",
+        "`vite.config.ts` prebundles `tus-js-client`, whose CommonJS dependencies the browser cannot load unbundled in development."
+      ]
     }
   }
 }
