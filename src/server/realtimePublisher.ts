@@ -10,17 +10,23 @@ export type CentrifugoPublisherOptions = {
   maxPendingChannels?: number
 }
 
-type PendingPublication = { dirty: boolean; data: unknown }
+/** `coalesce: false` sends this publication even when a newer one follows, such as a typing ping beside a change. */
+export type PublishOptions = { coalesce?: boolean }
+
+type PendingChannel = { queued: { data: unknown; coalesce: boolean }[] }
 
 const requestTimeoutMs = 5_000
 const maxRetries = 3
+// Bounds the publications that do not coalesce, since each one waits for its own request.
+const maxQueuedPerChannel = 64
 
 /**
- * Publishes to Centrifugo's HTTP API in the background. Publications to one channel keep their order and coalesce to the
- * latest while one is in flight, so payloads should say what changed rather than carry state a client must not miss.
+ * Publishes to Centrifugo's HTTP API in the background. Publications to one channel keep their order, and while one is in
+ * flight a newer publication replaces the one still queued, so payloads should say what changed rather than carry state a
+ * client must not miss. A publication with `coalesce: false` is never replaced.
  */
 export class CentrifugoPublisher {
-  private readonly pending = new Map<string, PendingPublication>()
+  private readonly pending = new Map<string, PendingChannel>()
   private readonly queue: string[] = []
   private readonly idleWaiters = new Set<() => void>()
   private readonly options: CentrifugoPublisherOptions
@@ -35,23 +41,29 @@ export class CentrifugoPublisher {
     this.publishUrl = `${options.apiUrl.replace(/\/$/, '')}/publish`
   }
 
-  /** Queues a publication; false when the publisher is closed or too many channels are waiting, after reporting why. */
-  publish(channel: string, data: unknown) {
+  /** Queues a publication; false when the publisher is closed or too many are waiting, after reporting why. */
+  publish(channel: string, data: unknown, { coalesce = true }: PublishOptions = {}) {
     if (this.closed) {
       this.reportError(new Error('Realtime publisher is closed'), channel)
       return false
     }
     const pending = this.pending.get(channel)
     if (pending) {
-      pending.dirty = true
-      pending.data = data
+      const replaced = coalesce ? pending.queued.findIndex((publication) => publication.coalesce) : -1
+      if (replaced !== -1) pending.queued.splice(replaced, 1)
+      // A coalescing publication holds at most one slot, so only the ones that never coalesce can fill the queue.
+      else if (!coalesce && pending.queued.length >= maxQueuedPerChannel) {
+        this.reportError(new Error('Realtime publisher queue is full'), channel)
+        return false
+      }
+      pending.queued.push({ data, coalesce })
       return true
     }
     if (this.pending.size >= (this.options.maxPendingChannels ?? 1_024)) {
       this.reportError(new Error('Realtime publisher queue is full'), channel)
       return false
     }
-    this.pending.set(channel, { dirty: true, data })
+    this.pending.set(channel, { queued: [{ data, coalesce }] })
     this.queue.push(channel)
     this.pump()
     return true
@@ -95,27 +107,19 @@ export class CentrifugoPublisher {
     }
   }
 
-  private async flush(channel: string, state: PendingPublication) {
-    let failure: unknown
+  private async flush(channel: string, state: PendingChannel) {
     try {
-      while (state.dirty) {
-        state.dirty = false
-        // Publications for one channel must keep their order.
-        await this.deliver(channel, state.data)
-      }
+      // Publications for one channel must keep their order.
+      for (let next = state.queued.shift(); next; next = state.queued.shift()) await this.deliver(channel, next.data)
+      this.pending.delete(channel)
     } catch (error) {
-      failure = error
-    } finally {
-      if (this.pending.get(channel) === state) this.pending.delete(channel)
+      // Publications queued while the failing one was in flight are newer, so they still go out.
+      if (state.queued.length > 0) {
+        this.queue.push(channel)
+        this.pump()
+      } else this.pending.delete(channel)
+      this.reportError(error, channel)
     }
-    if (failure === undefined) return
-    // A publication queued while the failing one was in flight is newer, so it still goes out.
-    if (state.dirty) {
-      this.pending.set(channel, { dirty: true, data: state.data })
-      this.queue.push(channel)
-      this.pump()
-    }
-    this.reportError(failure, channel)
   }
 
   private async deliver(channel: string, data: unknown) {

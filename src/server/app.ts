@@ -72,6 +72,7 @@ import { createDistributedRuntime, type DistributedRuntime } from './distributed
 import { isMissingObject } from '../adapters/distributedUploads'
 import { isAssetMissing } from '../adapters/missingFile'
 import { createRealtime, type RealtimeViewerLookup } from './realtime'
+import { channelPolicy } from './realtimeChannels'
 import { withWorkLease, type WorkLocker, type WorkLockOptions } from './workLock'
 import { startLeasedSweep } from './leasedSweep'
 import { WorkspaceRuntimeRegistry } from './workspaceRuntimeRegistry'
@@ -240,7 +241,7 @@ async function createApp() {
   const authUrl = resolveAuthUrl()
   // Assigned once the workspace lookup exists; requests reach the token route only after the app has started.
   let realtimeViewer: RealtimeViewerLookup = () => undefined
-  const realtime = createRealtime((request) => realtimeViewer(request))
+  const realtime = createRealtime((request) => realtimeViewer(request), channelPolicy)
   const dataDirectory = path.resolve(process.env.DATA_DIR ?? '/data')
   const distributedConfig = resolveDistributedConfig()
   const lease = distributedConfig ? undefined : acquireDataDirectoryLease(dataDirectory)

@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { realtimeApi, realtimeSecret, realtimeTicket, signRealtimeToken, type RealtimeViewer } from './realtime'
+import { realtimeApi, realtimeSecret, realtimeTicket, signRealtimeToken, type RealtimePolicy, type RealtimeViewer } from './realtime'
 
 beforeEach(() => {
   vi.stubEnv('BETTER_AUTH_URL', undefined)
@@ -48,56 +48,49 @@ describe('realtime tokens', () => {
 })
 
 describe('realtime ticket', () => {
-  const viewer = () => ada
+  // The tests' own policy, so the application's rules in realtimeChannels.ts can change without breaking these tests.
+  const policy: RealtimePolicy = {
+    serverChannels: async (viewer) => [`own:${viewer.id}`],
+    canSubscribe: async (_viewer, channel) => channel === 'open:one',
+  }
+  const options = { viewer: () => ada, policy, secret }
 
   it('grants a connection token with the viewer’s server-side channels', async () => {
-    const response = await realtimeTicket(ticketRequest({}), viewer, secret, now)
-    expect((await tokenIn(response)).payload).toEqual({
-      channels: ['workspace:workspace-1'],
-      info: { name: 'Ada' },
-      sub: 'user-1',
-      exp: 400,
-    })
+    const response = await realtimeTicket(ticketRequest({}), options, now)
+    expect((await tokenIn(response)).payload).toEqual({ channels: ['own:user-1'], info: { name: 'Ada' }, sub: 'user-1', exp: 400 })
   })
 
   it('grants a subscription token for a channel the policy allows', async () => {
-    const response = await realtimeTicket(ticketRequest({ channel: 'board:farm' }), viewer, secret, now)
-    expect((await tokenIn(response)).payload).toMatchObject({ channel: 'board:farm', sub: 'user-1' })
+    const response = await realtimeTicket(ticketRequest({ channel: 'open:one' }), options, now)
+    expect((await tokenIn(response)).payload).toMatchObject({ channel: 'open:one', sub: 'user-1' })
   })
 
   it('keeps tokens out of caches', async () => {
-    const response = await realtimeTicket(ticketRequest({}), viewer, secret, now)
+    const response = await realtimeTicket(ticketRequest({}), options, now)
     expect(response.headers.get('cache-control')).toBe('no-store')
   })
 
   it('refuses a channel the policy does not allow', async () => {
-    const response = await realtimeTicket(ticketRequest({ channel: 'board:another-farm' }), viewer, secret, now)
-    expect(response.status).toBe(403)
-  })
-
-  it('keeps a member who only sees their own requests off the board', async () => {
-    const scoped = () => ({ ...ada, workspace: { id: 'workspace-1', slug: 'farm', boardPresence: false } })
-    const response = await realtimeTicket(ticketRequest({ channel: 'board:farm' }), scoped, secret, now)
+    const response = await realtimeTicket(ticketRequest({ channel: 'open:two' }), options, now)
     expect(response.status).toBe(403)
   })
 
   it('refuses a viewer the lookup rejects', async () => {
-    const response = await realtimeTicket(ticketRequest({}), () => undefined, secret, now)
+    const response = await realtimeTicket(ticketRequest({}), { ...options, viewer: () => undefined }, now)
     expect(response.status).toBe(401)
   })
 
   it('refuses a request from another site', async () => {
     const response = await realtimeTicket(
       ticketRequest({}, { origin: 'https://attacker.example', 'sec-fetch-site': 'cross-site' }),
-      viewer,
-      secret,
+      options,
       now,
     )
     expect(response.status).toBe(403)
   })
 
   it('rejects a channel that is not a string', async () => {
-    const response = await realtimeTicket(ticketRequest({ channel: ['board:farm'] }), viewer, secret, now)
+    const response = await realtimeTicket(ticketRequest({ channel: ['open:one'] }), options, now)
     expect(response.status).toBe(400)
   })
 })

@@ -164,8 +164,8 @@
       ]
     },
     "realtime": {
-      "version": 1,
-      "commit": "8e4dfdee6afeeaa1f05804e38888a171f9ebe722",
+      "version": 2,
+      "commit": "0184a1e1bc4ababa9b89b4455014ba13be436df2",
       "files": {
         "centrifugo.json": "centrifugo.json",
         "scripts/realtime.test.ts": "scripts/realtime.test.ts",
@@ -177,12 +177,11 @@
         "src/routes/api/realtime.token.ts": "src/routes/api/realtime/token.ts",
         "src/server/realtime.test.ts": "src/server/realtime.test.ts",
         "src/server/realtime.ts": "src/server/realtime.ts",
-        "src/server/realtimeChannels.ts": "src/server/realtimeChannels.ts",
         "src/server/realtimePublisher.test.ts": "src/server/realtimePublisher.test.ts",
         "src/server/realtimePublisher.ts": "src/server/realtimePublisher.ts"
       },
       "notes": [
-        "Channels are the application's: each connection token grants the server-side `workspace:<id>` channel of the workspace the session is in, and `board:<slug>` presence takes a subscription token only for members who see the whole board; `centrifugo.json` defines those two namespaces.",
+        "Channels are the application's `channelPolicy` in `src/server/realtimeChannels.ts`, tested in `src/server/realtimeChannels.test.ts`: each connection token grants the server-side `workspace:<id>` channel of the workspace the session is in, and `board:<slug>` presence takes a subscription token only for members who see the whole board; `centrifugo.json` defines those two namespaces.",
         "`RealtimeViewer` carries the viewer's `workspace`, and the composition root looks it up through `workspace(headers)`, so a signed-out caller or a missing workspace answers 401.",
         "The secret keeps the deployed names: `STLQUEST_REALTIME_SECRET`, generated into `$DATA_DIR/realtime-secret` or the file `STLQUEST_REALTIME_SECRET_FILE` names, with `stlquest-development-realtime-secret` outside production; `STLQUEST_REALTIME_API_KEY` and `STLQUEST_REALTIME_API_URL` set a separate Centrifugo key and address, which the fast end-to-end server uses, and tests publish nowhere.",
         "The supervisor seeds a preview before starting when `STLQUEST_SEED_PREVIEW=true`, and with `STLQUEST_DISTRIBUTED=true` gives Centrifugo the Redis engine at `REDIS_URL`, so replicas share publications and presence.",

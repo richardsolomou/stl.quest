@@ -115,6 +115,59 @@ describe('Centrifugo publisher', () => {
     ])
   })
 
+  it('sends a publication that does not coalesce between the ones that do', async () => {
+    let release!: () => void
+    const first = new Promise<Response>((resolve) => (release = () => resolve(Response.json({}))))
+    const request = vi.fn<typeof fetch>(ok).mockImplementationOnce(() => first)
+    const publisher = publisherWith(request)
+    publisher.publish('one', { version: 1 })
+    publisher.publish('one', { version: 2 })
+    publisher.publish('one', { typing: true }, { coalesce: false })
+    publisher.publish('one', { version: 3 })
+    release()
+    await publisher.idle()
+    expect(bodies(request)).toEqual([
+      publication('one', { version: 1 }),
+      publication('one', { typing: true }),
+      publication('one', { version: 3 }),
+    ])
+  })
+
+  it('keeps every publication that does not coalesce', async () => {
+    let release!: () => void
+    const first = new Promise<Response>((resolve) => (release = () => resolve(Response.json({}))))
+    const request = vi.fn<typeof fetch>(ok).mockImplementationOnce(() => first)
+    const publisher = publisherWith(request)
+    publisher.publish('one', { version: 1 })
+    publisher.publish('one', { typing: 'a' }, { coalesce: false })
+    publisher.publish('one', { typing: 'b' }, { coalesce: false })
+    release()
+    await publisher.idle()
+    expect(bodies(request)).toEqual([
+      publication('one', { version: 1 }),
+      publication('one', { typing: 'a' }),
+      publication('one', { typing: 'b' }),
+    ])
+  })
+
+  it('bounds the publications waiting on one channel', () => {
+    const onError = vi.fn()
+    const publisher = publisherWith(
+      vi.fn<typeof fetch>(() => new Promise<Response>(() => undefined)),
+      { onError },
+    )
+    publisher.publish('one', {})
+    const accepted = Array.from({ length: 65 }, (_, index) => publisher.publish('one', { index }, { coalesce: false }))
+    expect(accepted.indexOf(false)).toBe(64)
+  })
+
+  it('accepts a change behind a full queue of publications that do not coalesce', () => {
+    const publisher = publisherWith(vi.fn<typeof fetch>(() => new Promise<Response>(() => undefined)))
+    publisher.publish('one', {})
+    for (let index = 0; index < 64; index++) publisher.publish('one', { index }, { coalesce: false })
+    expect(publisher.publish('one', { type: 'message.created' })).toBe(true)
+  })
+
   it('does not lose a publication queued by the error handler', async () => {
     const request = vi.fn<typeof fetch>(ok).mockResolvedValueOnce(new Response('{}', { status: 400 }))
     const publisher: CentrifugoPublisher = publisherWith(request, { onError: () => publisher.publish('one', { version: 2 }) })

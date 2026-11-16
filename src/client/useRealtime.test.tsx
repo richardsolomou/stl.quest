@@ -1,7 +1,8 @@
+// @vitest-environment happy-dom
 import { EventEmitter } from 'node:events'
 import type { Centrifuge, Subscription } from 'centrifuge'
-import type { ReactElement } from 'react'
-import { act, create, type ReactTestRenderer } from 'react-test-renderer'
+import { act, type ReactElement } from 'react'
+import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RealtimeProvider, useConnectedRealtimeClient, useRealtimeSubscription } from './useRealtime'
 
@@ -15,14 +16,11 @@ vi.mock('./realtime', async (importOriginal) => ({
 
 const reported: unknown[] = []
 
-// react-test-renderer logs its deprecation through console.error.
 beforeEach(() => {
-  vi.spyOn(console, 'error').mockImplementation(() => undefined)
   reported.length = 0
   vi.stubGlobal('reportError', (error: unknown) => reported.push(error))
 })
 afterEach(() => {
-  vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
 
@@ -38,11 +36,9 @@ function eventClient(calls: string[] = []) {
 }
 
 async function render(node: ReactElement) {
-  let rendered!: ReactTestRenderer
-  await act(async () => {
-    rendered = create(node)
-  })
-  return rendered
+  const root = createRoot(document.createElement('div'))
+  await act(async () => root.render(node))
+  return { update: (next: ReactElement) => root.render(next), unmount: () => root.unmount() }
 }
 
 describe('connected client', () => {

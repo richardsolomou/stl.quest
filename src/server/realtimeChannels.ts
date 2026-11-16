@@ -1,13 +1,9 @@
-import type { RealtimeViewer } from './realtime'
+import type { RealtimePolicy } from './realtime'
 
-// Application policy: keep `centrifugo.json`'s namespaces in step with these channels.
-
-/** Channels the connection token subscribes the viewer to on the server, so the browser can neither leave nor forge them. */
-export function serverChannels(viewer: RealtimeViewer) {
-  return viewer.workspace ? [`workspace:${viewer.workspace.id}`] : []
-}
-
-/** Board presence exposes who else is on the board, so a member who only sees their own requests stays off the channel. */
-export function canSubscribe(viewer: RealtimeViewer, channel: string) {
-  return Boolean(viewer.workspace?.boardPresence) && channel === `board:${viewer.workspace?.slug}`
+// Keep `centrifugo.json`'s namespaces in step with these channels.
+export const channelPolicy: RealtimePolicy = {
+  /** The workspace channel is a server-side subscription, so the browser can neither leave nor forge it. */
+  serverChannels: (viewer) => (viewer.workspace ? [`workspace:${viewer.workspace.id}`] : []),
+  /** Board presence exposes who else is on the board, so a member who only sees their own requests stays off the channel. */
+  canSubscribe: (viewer, channel) => Boolean(viewer.workspace?.boardPresence) && channel === `board:${viewer.workspace?.slug}`,
 }
