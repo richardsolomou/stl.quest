@@ -31,10 +31,13 @@ export function postHogEnvironment(input: {
   return { projectToken, host: host.toString().replace(/\/$/, ''), uiHost: uiHost(host), assetsHost: assetsHost(host) }
 }
 
-/** The project this build's browser bundle reports to, fixed when Vite builds it; the ingest proxy forwards to the same hosts. */
+/**
+ * The project this build's browser bundle reports to, fixed when Vite builds it; the ingest proxy forwards to the same hosts.
+ * Scripts run by Node or tsx have no `import.meta.env`, and see PostHog off.
+ */
 export const bundledPostHog = postHogEnvironment({
-  projectToken: import.meta.env[projectTokenVariable],
-  host: import.meta.env[hostVariable],
+  projectToken: import.meta.env?.[projectTokenVariable],
+  host: import.meta.env?.[hostVariable],
 })
 
 function httpUrl(value: string) {

@@ -392,8 +392,8 @@ importers:
         specifier: 1.64.0
         version: 1.64.0
       '@posthog/rollup-plugin':
-        specifier: 1.6.3
-        version: 1.6.3(rollup@4.64.5)
+        specifier: 1.6.4
+        version: 1.6.4(rollup@4.64.5)
       '@tailwindcss/vite':
         specifier: 4.3.5
         version: 4.3.5(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
@@ -1763,8 +1763,8 @@ packages:
   '@posthog/browser-common@0.10.8':
     resolution: {integrity: sha512-TQmqLVNFoKaL4dDV5Q8AScX2dIwdq8By2cj2KU1hMGe88tn7Usbf3U/hv5okhobEojntqJeslPIRBrG79Su+vg==}
 
-  '@posthog/cli@0.18.12':
-    resolution: {integrity: sha512-/eT9riWOkBb9uwsdOxQgW3fan/T3hwT8rvwZCzPl3DAgSBEhzpP59usD0fyFS++X2967E5AQe74nrBw1rywf6A==}
+  '@posthog/cli@0.19.4':
+    resolution: {integrity: sha512-wDS1yNMfKYEVpWJNX0DVdmQA9//zQV6+I7Eq2NcgRL30g2TKzN/wAzob0iAI/ysibcON7D6o/LtBxfh+8JTGDw==}
     engines: {node: '>=14.14', npm: '>=6'}
     hasBin: true
 
@@ -1784,8 +1784,8 @@ packages:
       '@types/react':
         optional: true
 
-  '@posthog/rollup-plugin@1.6.3':
-    resolution: {integrity: sha512-Z+S78boVxU9I/FthoJLi1Ql743WL9QMn/UK+kUNadHbTzlB9BHN37aLjBWGYWi56RrOTjfAWtb5j8l8TVzEQXg==}
+  '@posthog/rollup-plugin@1.6.4':
+    resolution: {integrity: sha512-T2BnNw9wqodg+Xx75Aq7Nm0wtHanvD4amlc1KJnJ/oTE76bN3okl+Cwm30WvoGSVFnrzumDYF2lrsJejplCmgw==}
     peerDependencies:
       rollup: '>= 4.0.0'
 
@@ -5544,7 +5544,7 @@ snapshots:
     transitivePeerDependencies:
       - preact-render-to-string
 
-  '@posthog/cli@0.18.12':
+  '@posthog/cli@0.19.4':
     dependencies:
       detect-libc: 2.1.2
 
@@ -5563,9 +5563,9 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.3.0
 
-  '@posthog/rollup-plugin@1.6.3(rollup@4.64.5)':
+  '@posthog/rollup-plugin@1.6.4(rollup@4.64.5)':
     dependencies:
-      '@posthog/cli': 0.18.12
+      '@posthog/cli': 0.19.4
       '@posthog/plugin-utils': 2.0.1
       magic-string: 0.30.21
       rollup: 4.64.5

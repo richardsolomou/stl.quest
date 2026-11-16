@@ -118,7 +118,7 @@
     "@changesets/cli": "3.0.3",
     "@changesets/get-release-plan": "^5.0.2",
     "@playwright/test": "1.64.0",
-    "@posthog/rollup-plugin": "1.6.3",
+    "@posthog/rollup-plugin": "1.6.4",
     "@tailwindcss/vite": "4.3.5",
     "@types/archiver": "^8.0.0",
     "@types/better-sqlite3": "9.6.0",

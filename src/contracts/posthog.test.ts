@@ -1,5 +1,14 @@
+import { execFileSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 import { defaultHost, hostVariable, postHogEnvironment, projectTokenVariable } from './posthog'
+
+describe('bundledPostHog', () => {
+  it('loads outside Vite, with PostHog off', () => {
+    const module = JSON.stringify(new URL('posthog.ts', import.meta.url).href)
+    const script = `const { bundledPostHog } = await import(${module}); process.stdout.write(String(bundledPostHog))`
+    expect(execFileSync(process.execPath, ['--input-type=module', '--eval', script], { encoding: 'utf8' })).toBe('undefined')
+  })
+})
 
 describe('postHogEnvironment', () => {
   it('stays off without a project token or host', () => {
