@@ -1,6 +1,5 @@
 {
-  "extends": "./.ras/tsconfig.json",
-  "include": ["src", "scripts", "vite.config.ts", "vitest.config.ts"],
+  "extends": "./node_modules/ras-stack/config/typescript/vite.json",
   "compilerOptions": {
     "allowImportingTsExtensions": true,
     "target": "ES2022",
@@ -10,5 +9,6 @@
     "paths": {
       "@/*": ["./src/*"]
     }
-  }
+  },
+  "include": ["src", "scripts", "e2e", "*.ts"]
 }

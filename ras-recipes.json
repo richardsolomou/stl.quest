@@ -1,0 +1,28 @@
+{
+  "source": "https://github.com/richardsolomou/ras-stack",
+  "recipes": {
+    "tooling": {
+      "version": 2,
+      "commit": "82fce4523ec914bd2e70aefd4bff84c10fb278c6",
+      "files": {
+        ".gitignore": ".gitignore",
+        ".oxfmtrc.json": ".oxfmtrc.json",
+        ".oxlintrc.json": ".oxlintrc.json",
+        "AGENTS.md": "CLAUDE.md",
+        "package.json": "package.json",
+        "pnpm-workspace.yaml": "pnpm-workspace.yaml",
+        "tsconfig.json": "tsconfig.json",
+        "vitest.config.ts": "vitest.config.ts"
+      },
+      "notes": [
+        "`AGENTS.md` is a symlink to `CLAUDE.md`, which keeps the application's agent guide and carries the recipe paragraph under **Recipes**.",
+        "`tsconfig.json` keeps `target` ES2022, `noUncheckedIndexedAccess: false`, `resolveJsonModule`, and the `@/*` path alias, because the codebase predates the strict preset and indexes arrays throughout.",
+        "`.oxlintrc.json` also extends the `domain.json` preset, which keeps `src/core` free of IO and framework imports, and turns off the rules the codebase does not follow.",
+        "`.oxfmtrc.json` keeps its schema and ignores generated catalogs, deploy templates, and `CHANGELOG.md`.",
+        "`vitest.config.ts` resolves the `@` alias, runs files one at a time in forks because tests share the `globalThis` app singleton and SQLite state, and keeps the node environment.",
+        "`check` runs `check:ci` and then the tests, and `check:ci` keeps the application's extra gates: Changesets, Markdown links, both Drizzle dialects, the equipment catalogs, Unraid metadata, and the backup CLI.",
+        "`pnpm-workspace.yaml` keeps the application's overrides and peer rules, and allows builds for `argon2` and `workerd`, which it installs."
+      ]
+    }
+  }
+}

@@ -26,6 +26,9 @@ overrides:
   webdav>minimatch: 10.2.6
   'brace-expansion@>=4.0.0 <5.0.12': 5.0.12
 minimumReleaseAgeExclude:
+  - 'posthog-*'
+  - '@posthog/*'
+  - ras-stack
   - ras-stack@5.0.0
   - ras-stack@5.1.0
   - ras-stack@5.4.0
