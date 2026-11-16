@@ -13,7 +13,7 @@ import { OneDriveAssetStore } from '../adapters/oneDrive'
 import { UploadStaging } from '../adapters/staging'
 import { TusUploadStore } from '../adapters/tus'
 import { RealtimeEventBus, RealtimePublisher } from '../adapters/events'
-import { OptionalPostHogTelemetry, setRpcTelemetry, withTelemetryContext } from '../adapters/telemetry'
+import { OptionalPostHogTelemetry, setRpcTelemetry, withTelemetryContext } from './optionalTelemetry'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig, type EmailDelivery } from '../adapters/email'
 import { cloudStorageProviderName } from '../core/auth'
@@ -300,7 +300,6 @@ async function createApp() {
       deployment_type: deploymentType(),
     })
     telemetry = appTelemetry
-    await appTelemetry.start()
     setRpcTelemetry(appTelemetry)
     setTelemetryExporters({
       exception: (error, properties) => void appTelemetry.exception(error, properties),

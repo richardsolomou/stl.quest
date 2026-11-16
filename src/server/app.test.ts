@@ -153,7 +153,7 @@ describe('app initialization', () => {
 
     const { UploadStaging } = await import('../adapters/staging')
     const { TusUploadStore } = await import('../adapters/tus')
-    const { OptionalPostHogTelemetry } = await import('../adapters/telemetry')
+    const { OptionalPostHogTelemetry } = await import('./optionalTelemetry')
     const staging = new UploadStaging(process.env.DATA_DIR)
     await staging.initialize()
 
@@ -262,7 +262,7 @@ describe('app initialization', () => {
   it('shuts down telemetry when the application closes', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-telemetry-'))
     process.env.DATA_DIR = path.join(temporary, 'data')
-    const { OptionalPostHogTelemetry } = await import('../adapters/telemetry')
+    const { OptionalPostHogTelemetry } = await import('./optionalTelemetry')
     const shutdown = vi.spyOn(OptionalPostHogTelemetry.prototype, 'shutdown')
     const { app } = await import('./app')
     const instance = await app()

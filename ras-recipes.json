@@ -1,6 +1,23 @@
 {
   "source": "https://github.com/richardsolomou/ras-stack",
   "recipes": {
+    "posthog-server": {
+      "version": 2,
+      "commit": "82fce4523ec914bd2e70aefd4bff84c10fb278c6",
+      "files": {
+        "src/server/rpcTelemetry.test.ts": "src/server/rpcTelemetry.test.ts",
+        "src/server/rpcTelemetry.ts": "src/server/rpcTelemetry.ts",
+        "src/server/telemetry.test.ts": "src/server/telemetry.test.ts",
+        "src/server/telemetry.ts": "src/server/telemetry.ts"
+      },
+      "notes": [
+        "`src/server/optionalTelemetry.ts` wraps `createTelemetry` in `OptionalPostHogTelemetry`, which honours the deployment's telemetry setting: with telemetry off at startup it creates the client without a token, so nothing is sent and exception autocapture installs no handlers, and every capture checks the setting again.",
+        "The composition root creates the telemetry inside its own asynchronous `createApp` after reading that setting, and closes it after the workspaces, notifications, and realtime publisher.",
+        "Server functions are observed through `observeRpc`, which runs `observeServerFunction` only while an application instance owns telemetry, so `rpc` works before `app()` starts and in tests.",
+        "`reportServerFunctionFailure` is removed: `rpc` logs failures through the pino logger, whose hooks already send every error-level record with an `err` to PostHog as an exception and every record as a log, so the recipe's reporter would report each failure twice.",
+        "Pino records reach `telemetry.log` with their attributes, which already carry the request id, session, person, and workspace from the request context; Pino's trace and fatal levels map to debug and error."
+      ]
+    },
     "posthog-web": {
       "version": 2,
       "commit": "82fce4523ec914bd2e70aefd4bff84c10fb278c6",

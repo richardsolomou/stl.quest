@@ -1,5 +1,5 @@
 import { getRequest } from '@tanstack/react-start/server'
-import { observeRpc } from '../adapters/telemetry'
+import { observeRpc } from './optionalTelemetry'
 import { withRequestLocale } from './locale'
 import { logger } from './logger'
 import { requireSameOrigin } from './origins'
