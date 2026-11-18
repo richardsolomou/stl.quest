@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.49.1
+
+### Patch Changes
+
+- 20dc4e1: Preserve verification status and sign-in state when confirming email changes.
+
 ## 1.49.0
 
 ### Minor Changes
