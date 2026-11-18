@@ -32,7 +32,7 @@
         "`src/core/authFailures.ts` holds the failure classifiers in the domain layer, because `src/core/auth.ts` builds the translated sign-in messages from them.",
         "`src/server/session.ts` and `src/server/random.ts` are left out: the composition root's `identity`, `requireIdentity`, and `workspace` own session lookups, and invite tokens use `node:crypto` directly.",
         "`localRedirectPath` is left out because sign-in has no `next` destination.",
-        "`better-auth` stays at 1.7.14, the version `@better-auth/stripe` is pinned to; Dependabot moves them together."
+        "`better-auth` and `@better-auth/stripe` are pinned to the same version and grouped in Dependabot because the Stripe plugin pins the core version."
       ]
     },
     "ci": {
