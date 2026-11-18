@@ -1,5 +1,5 @@
 import { Brand } from '@/client/components/Brand'
-import { ISSUES_URL } from './site'
+import { ISSUES_URL } from '@/client/sourceCode'
 
 const effectiveDate = '29 July 2026'
 

@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { messagesFor } from './i18n'
-import {
-  automaticPrintEstimate,
-  effectivePrintEstimate,
-  estimatePending,
-  formatEstimateMaterial,
-  formatEstimateTime,
-} from './printEstimates'
+import { automaticPrintEstimate, estimatePending, formatEstimateMaterial, formatEstimateTime } from './printEstimates'
 
 describe('print estimates', () => {
   it('combines a dense shell with 15% internal infill', () => {
@@ -53,17 +47,6 @@ describe('print estimates', () => {
       materialUnit: 'ml',
       minutes: 59,
     })
-  })
-
-  it('uses editable values without losing their provenance', () => {
-    expect(
-      effectivePrintEstimate({
-        printType: 'filament',
-        modelVolumeMm3: 10_000,
-        materialOverride: 7,
-        minutesOverride: 45,
-      }),
-    ).toMatchObject({ material: 7, minutes: 45, materialAdjusted: true, minutesAdjusted: true })
   })
 
   it('treats only queued or running geometry as a pending estimate', () => {

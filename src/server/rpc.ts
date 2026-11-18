@@ -6,7 +6,7 @@ import { requireSameOrigin } from './origins'
 import { currentServerFunction } from './serverFunction'
 
 /** Where a failure happened: the request, the server function it ran, and the status of a thrown `Response`. */
-export type RpcErrorContext = { method?: string; path?: string; function?: string; status?: number }
+type RpcErrorContext = { method?: string; path?: string; function?: string; status?: number }
 
 /** Runs a server function's work, turning a thrown `Response` into an error whose message reaches the client. */
 export function rpc<T>(work: () => Promise<T> | T): Promise<T> {

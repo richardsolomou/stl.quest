@@ -71,20 +71,15 @@ type DataTableProps<TData extends RowData> = {
   emptyMessage: string
   itemLabel: { singular: string; plural: string }
   search?: { label: string; placeholder: string }
-  filters?: DataTableFilter[]
-  initialSorting?: SortingState
-  initialPageSize?: number
-  pageSizeOptions?: readonly number[]
-  alignLastColumnRight?: boolean
+  filters: DataTableFilter[]
+  initialSorting: SortingState
   onRowClick?: (row: TData) => void
   getRowLabel?: (row: TData) => string
   columnVisibility?: { storageKey: string; labels: Record<string, string>; initial?: ColumnVisibilityState }
   sortingStorageKey?: string
 }
 
-const EMPTY_FILTERS: DataTableFilter[] = []
-const EMPTY_SORTING: SortingState = []
-const DEFAULT_PAGE_SIZE_OPTIONS = [10, 25, 50] as const
+const PAGE_SIZE_OPTIONS = [10, 25, 50] as const
 
 function DataTable<TData extends RowData>({
   columns,
@@ -92,11 +87,8 @@ function DataTable<TData extends RowData>({
   emptyMessage,
   itemLabel,
   search,
-  filters = EMPTY_FILTERS,
-  initialSorting = EMPTY_SORTING,
-  initialPageSize = 10,
-  pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
-  alignLastColumnRight = false,
+  filters,
+  initialSorting,
   onRowClick,
   getRowLabel,
   columnVisibility: columnVisibilityOptions,
@@ -151,7 +143,7 @@ function DataTable<TData extends RowData>({
         return next
       })
     },
-    initialState: { pagination: { pageIndex: 0, pageSize: initialPageSize } },
+    initialState: { pagination: { pageIndex: 0, pageSize: PAGE_SIZE_OPTIONS[0] } },
   })
   const filteredCount = table.getFilteredRowModel().rows.length
 
@@ -225,10 +217,7 @@ function DataTable<TData extends RowData>({
                 {group.headers.map((header, index) => (
                   <TableHead
                     key={header.id}
-                    className={cn(
-                      header.column.columnDef.meta?.className,
-                      alignLastColumnRight && index === group.headers.length - 1 && 'text-right',
-                    )}
+                    className={cn(header.column.columnDef.meta?.className, index === group.headers.length - 1 && 'text-right')}
                   >
                     {header.isPlaceholder ? null : header.column.getCanSort() ? (
                       <Button type="button" variant="ghost" size="sm" className="-ml-2" onClick={header.column.getToggleSortingHandler()}>
@@ -280,10 +269,7 @@ function DataTable<TData extends RowData>({
                   {row.getVisibleCells().map((cell, index) => (
                     <TableCell
                       key={cell.id}
-                      className={cn(
-                        cell.column.columnDef.meta?.className,
-                        alignLastColumnRight && index === row.getVisibleCells().length - 1 && 'text-right',
-                      )}
+                      className={cn(cell.column.columnDef.meta?.className, index === row.getVisibleCells().length - 1 && 'text-right')}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
@@ -304,7 +290,7 @@ function DataTable<TData extends RowData>({
         <span>{t.shell.ui.itemCount(filteredCount, filteredCount === 1 ? itemLabel.singular : itemLabel.plural)}</span>
         <div className="flex flex-wrap items-center gap-2">
           <Select
-            items={pageSizeOptions.map((size) => ({ value: String(size), label: t.shell.ui.perPage(size) }))}
+            items={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: t.shell.ui.perPage(size) }))}
             value={String(table.state.pagination.pageSize)}
             onValueChange={(value) => table.setPageSize(Number(value))}
           >
@@ -312,7 +298,7 @@ function DataTable<TData extends RowData>({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {pageSizeOptions.map((size) => (
+              {PAGE_SIZE_OPTIONS.map((size) => (
                 <SelectItem key={size} value={String(size)}>
                   {t.shell.ui.perPage(size)}
                 </SelectItem>

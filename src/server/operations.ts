@@ -4,8 +4,6 @@ import type { DrizzleRepository } from '../db/repository'
 import { filesystemCapacity } from '../adapters/filesystemCapacity'
 import { errorMessage } from '../core/error'
 
-export { assertUploadCapacity, filesystemCapacity } from '../adapters/filesystemCapacity'
-
 export async function diagnostics(repository: DrizzleRepository, storage: StorageConfig, assets: AssetStore) {
   const system = await systemDiagnostics(repository)
   let storageCapacity: Awaited<ReturnType<typeof filesystemCapacity>> | undefined

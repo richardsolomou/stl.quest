@@ -1,5 +1,5 @@
 import type { Messages } from './i18n'
-import { storagePlans, type StoragePlan } from './plans'
+import type { StoragePlan } from './plans'
 import type { Account, WorkspaceRole } from './types'
 
 export type AdminWorkspaceOwner = {
@@ -92,8 +92,4 @@ export function adminWorkspaceAttentionReasons(workspace: AdminWorkspace, t: Mes
 
 export function adminWorkspaceHealth(workspace: AdminWorkspace): 'healthy' | 'attention' {
   return attentionIssues(workspace).length ? 'attention' : 'healthy'
-}
-
-export function managedStorageSummary(plan: StoragePlan, usedBytes: number) {
-  return { plan, usedBytes, quotaBytes: storagePlans[plan].quotaBytes }
 }

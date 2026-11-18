@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { ButtonLink } from '@/components/ui/button'
 import { updateNoticeId } from '../chunkRecovery'
 import { useI18n } from '../i18n'
-import { clientNeedsRefresh } from '../updateNotices'
 
 export function UpdateNotices({ serverVersion }: { serverVersion: string }) {
   const { t } = useI18n()
@@ -19,7 +18,7 @@ export function UpdateNotices({ serverVersion }: { serverVersion: string }) {
     <>
       {/* Revealed by the inline chunk recovery script when the app cannot hydrate. */}
       <RefreshNotice id={updateNoticeId} hidden message={t.shell.updates.couldNotLoad} />
-      {(chunkLoadFailed || clientNeedsRefresh(serverVersion, __APP_VERSION__)) && <RefreshNotice message={t.shell.updates.updated} />}
+      {(chunkLoadFailed || serverVersion !== __APP_VERSION__) && <RefreshNotice message={t.shell.updates.updated} />}
     </>
   )
 }

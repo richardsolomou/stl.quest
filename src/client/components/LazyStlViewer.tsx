@@ -3,14 +3,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { RequestAssets } from '../boardDownload'
 import { useI18n } from '../i18n'
 
-const loadStlViewer = () => import('./StlViewer')
-const StlViewer = lazy(loadStlViewer)
+const StlViewer = lazy(() => import('./StlViewer'))
 
 type Props = { request?: RequestAssets; file?: File; hasPreview?: boolean }
-
-export function preloadStlViewer() {
-  void loadStlViewer()
-}
 
 export function LazyStlViewer(viewerProps: Props) {
   const { t } = useI18n()

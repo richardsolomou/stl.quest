@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { errorMessage } from '../core/error'
 import { inviteIsActive } from '../core/invites'
 import { createServerFn } from '@tanstack/react-start'
-import { getRequest as getRawRequest, setCookie } from '@tanstack/react-start/server'
+import { getRequest, setCookie } from '@tanstack/react-start/server'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import {
   brandedEmailParts,
@@ -52,7 +52,6 @@ import {
   oidcDisplayName,
   parseOidcScopes,
   SOCIAL_AUTH_PROVIDERS,
-  type IntegrationConfig,
   type SmtpEmailConfig,
   type SignInCapabilities,
   socialProviderCredentialsChanged,
@@ -65,6 +64,7 @@ import { memberRequestVisibility, visiblePeople, withMemberRequestVisibility } f
 import {
   encryptSetting,
   getStoredIntegrationConfig,
+  integrationConfig,
   publicIntegrationConfig,
   publicSmtpConfig,
   setStoredIntegrationConfig,
@@ -95,7 +95,6 @@ import {
   moveCopiesSchema,
   moveCopiesBatchSchema,
   movePrintGroupSchema,
-  renamePrintGroupSchema,
   workspaceNameConfirmationSchema,
   workspaceNameSchema,
   updatePrintGroupSchema,
@@ -149,7 +148,7 @@ import {
 import { assertStorageAllowed, hostedStorageRequiresRemote, localStorageEnabled, storageConfigured } from './storagePolicy'
 import { HOSTED_OWNED_WORKSPACE_LIMIT, hostedDeployment } from './hosted'
 import { cloudStorageApp, requireCloudStorageApp, setCloudStorageApp } from './cloudStorage'
-import { normalizeAuthHeaders, writeAuthCookies } from './authCookies'
+import { INVITE_COOKIE, normalizeAuthHeaders, writeAuthCookies } from './authCookies'
 import { mutationRpc, rpc } from './rpc'
 import { requestLocale, serverMessages } from './locale'
 import { LOCALES } from '../core/i18n/locales'
@@ -160,8 +159,7 @@ const INVITE_TTL = 7 * 24 * 60 * 60 * 1000
 
 export const canViewManagedStorageUsage = (role: Role) => role === 'admin'
 
-const getRequest = getRawRequest
-const getRequestHeaders = () => normalizeAuthHeaders(getRawRequest().headers)
+const getRequestHeaders = () => normalizeAuthHeaders(getRequest().headers)
 const errors = () => serverMessages().server
 
 const me = async (instance: Awaited<ReturnType<typeof app>>) => instance.requireIdentity(getRequestHeaders())
@@ -169,10 +167,6 @@ const superAdmin = async (instance: Awaited<ReturnType<typeof app>>) => {
   const identity = await me(instance)
   if (!identity.superAdmin) throw new Response(errors().access.forbidden, { status: 403 })
   return identity
-}
-
-async function integrationConfig(instance: Awaited<ReturnType<typeof app>>): Promise<IntegrationConfig> {
-  return (await getStoredIntegrationConfig(deploymentSettings(instance.repository))) ?? { passwordEnabled: true }
 }
 
 async function currentAuthCapabilities(instance: Awaited<ReturnType<typeof app>>): Promise<SignInCapabilities> {
@@ -253,15 +247,15 @@ export const reportRouteError = createServerFn({ method: 'POST' })
   .handler(async ({ data }) =>
     mutationRpc(async () => {
       const instance = await app()
-      await captureRouteError(instance.telemetry, data)
+      captureRouteError(instance.telemetry, data)
     }),
   )
 
-export async function captureRouteError(telemetry: Pick<Telemetry, 'exception'>, data: z.infer<typeof routeErrorSchema>) {
+export function captureRouteError(telemetry: Pick<Telemetry, 'exception'>, data: z.infer<typeof routeErrorSchema>) {
   const error = new Error(data.message)
   error.name = data.name
   if (data.stack) error.stack = data.stack
-  await telemetry.exception(error, { action: 'route_error' })
+  telemetry.exception(error, { action: 'route_error' })
 }
 export const createWorkspace = createServerFn({ method: 'POST' })
   .validator(z.object({ name: workspaceNameSchema }))
@@ -410,12 +404,10 @@ export const savePrinterProfiles = createServerFn({ method: 'POST' })
       if (activeProfiles.length)
         await recordOnboardingTask(instance.repository, context.identity.id, 'printers', context.workspace.id).catch(() => undefined)
       context.events.publish('settings.changed')
-      void instance.telemetry
-        .capture(context.identity.id, 'printer_saved', {
-          printer_count: activeProfiles.length,
-          ...printerProfileChanges(previous, data.profiles),
-        })
-        .catch(() => undefined)
+      instance.telemetry.capture(context.identity.id, 'printer_saved', {
+        printer_count: activeProfiles.length,
+        ...printerProfileChanges(previous, data.profiles),
+      })
       return { saved: true, profiles: await storedPrinterProfiles(context.repository) }
     }),
   )
@@ -483,7 +475,7 @@ export const setOwnPassword = createServerFn({ method: 'POST' })
         throw new Response(errors().account.alreadyHasPassword, { status: 409 })
       }
       await instance.auth.api.setPassword({ body: { newPassword: data.password }, headers: getRequestHeaders() })
-      void instance.telemetry.capture(identity.id, 'sign_in_method_added', { provider: 'password' }).catch(() => undefined)
+      instance.telemetry.capture(identity.id, 'sign_in_method_added', { provider: 'password' })
       return { configured: true }
     }),
   )
@@ -503,7 +495,7 @@ export const changeOwnEmail = createServerFn({ method: 'POST' })
         newEmail: data.email,
         password: data.password,
       })
-      void instance.telemetry.capture(identity.id, 'account_email_change_requested').catch(() => undefined)
+      instance.telemetry.capture(identity.id, 'account_email_change_requested')
       return { requested: true }
     }),
   )
@@ -515,7 +507,7 @@ export const unlinkOwnAccount = createServerFn({ method: 'POST' })
       const instance = await app()
       const identity = await me(instance)
       await instance.auth.manageAccount.unlinkAccount({ headers: getRequestHeaders(), providerId: data.provider })
-      void instance.telemetry.capture(identity.id, 'sign_in_method_removed', { provider: data.provider }).catch(() => undefined)
+      instance.telemetry.capture(identity.id, 'sign_in_method_removed', { provider: data.provider })
       return { removed: true }
     }),
   )
@@ -544,7 +536,7 @@ export const updatePasswordAuth = createServerFn({ method: 'POST' })
       if (process.env.AUTH_PASSWORD_ENABLED !== undefined || process.env.AUTH_PASSWORD_RECOVERY !== undefined) {
         throw new Response(errors().auth.passwordControlledByEnvironment, { status: 409 })
       }
-      const config = await integrationConfig(instance)
+      const config = await integrationConfig(deploymentSettings(instance.repository))
       if (!data.enabled) {
         const enabledProviders = instance.authCapabilities.socialProviders
         if (enabledProviders.length === 0) throw new Response(errors().auth.socialProviderBeforeDisablingPasswords, { status: 409 })
@@ -554,9 +546,7 @@ export const updatePasswordAuth = createServerFn({ method: 'POST' })
         }
       }
       await setStoredIntegrationConfig(deploymentSettings(instance.repository), { ...config, passwordEnabled: data.enabled })
-      void instance.telemetry
-        .capture(identity.id, 'auth_provider_configured', { provider: 'password', enabled: data.enabled })
-        .catch(() => undefined)
+      instance.telemetry.capture(identity.id, 'auth_provider_configured', { provider: 'password', enabled: data.enabled })
       await resetApp()
       return { enabled: data.enabled }
     }),
@@ -569,7 +559,7 @@ export const saveSocialProvider = createServerFn({ method: 'POST' })
       const instance = await app()
       await superAdmin(instance)
       assertSocialProviderMutable(data.provider)
-      const config = await integrationConfig(instance)
+      const config = await integrationConfig(deploymentSettings(instance.repository))
       const current = config[data.provider]
       const issuer = data.provider === 'oidc' ? data.issuer : undefined
       const requiresRetest = socialProviderNeedsRetest(current, {
@@ -623,7 +613,7 @@ export const updateSocialProviderEnabled = createServerFn({ method: 'POST' })
       const instance = await app()
       const identity = await superAdmin(instance)
       assertSocialProviderMutable(data.provider)
-      const config = await integrationConfig(instance)
+      const config = await integrationConfig(deploymentSettings(instance.repository))
       const provider = config[data.provider]
       if (!provider) throw new Response(errors().auth.providerNotConfigured(data.provider), { status: 400 })
       if (data.enabled) {
@@ -639,9 +629,7 @@ export const updateSocialProviderEnabled = createServerFn({ method: 'POST' })
         ...config,
         [data.provider]: { ...provider, enabled: data.enabled },
       })
-      void instance.telemetry
-        .capture(identity.id, 'auth_provider_configured', { provider: data.provider, enabled: data.enabled })
-        .catch(() => undefined)
+      instance.telemetry.capture(identity.id, 'auth_provider_configured', { provider: data.provider, enabled: data.enabled })
       await resetApp()
       return { provider: data.provider, enabled: data.enabled }
     }),
@@ -654,7 +642,7 @@ export const saveSmtpSettings = createServerFn({ method: 'POST' })
       const instance = await app()
       const identity = await superAdmin(instance)
       assertSmtpMutable()
-      const config = await integrationConfig(instance)
+      const config = await integrationConfig(deploymentSettings(instance.repository))
       const current = resolveSmtpConfig(config, {})
       const smtp = nextSmtpConfig(current, data)
       await verifySmtp(buildEmailDelivery(smtp)!, {
@@ -667,7 +655,7 @@ export const saveSmtpSettings = createServerFn({ method: 'POST' })
         ...config,
         smtp,
       })
-      void instance.telemetry.capture(identity.id, 'auth_provider_configured', { provider: 'smtp', enabled: true }).catch(() => undefined)
+      instance.telemetry.capture(identity.id, 'auth_provider_configured', { provider: 'smtp', enabled: true })
       await resetApp()
       return { configured: true }
     }),
@@ -678,7 +666,7 @@ export const removeSmtpSettings = createServerFn({ method: 'POST' }).handler(asy
     const instance = await app()
     await superAdmin(instance)
     assertSmtpMutable()
-    const config = await integrationConfig(instance)
+    const config = await integrationConfig(deploymentSettings(instance.repository))
     await setStoredIntegrationConfig(deploymentSettings(instance.repository), {
       ...config,
       smtp: undefined,
@@ -834,9 +822,7 @@ export const deleteAccount = createServerFn({ method: 'POST' })
       const identity = await superAdmin(instance)
       if (identity.id === data.id) throw new Response(errors().account.cannotDeleteSelf, { status: 409 })
       const result = await instance.deleteAccount(getRequestHeaders(), data.id)
-      void instance.telemetry
-        .capture(identity.id, 'account_deleted', { deleted_workspace_count: result.deletedWorkspaceCount })
-        .catch(() => undefined)
+      instance.telemetry.capture(identity.id, 'account_deleted', { deleted_workspace_count: result.deletedWorkspaceCount })
       return result
     }),
   )
@@ -849,7 +835,7 @@ export const updateWorkspaceMemberRole = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       await context.repository.setWorkspaceMemberRole(data.userId, data.role)
       context.events.publish('user.created')
-      void instance.telemetry.capture(context.identity.id, 'workspace_member_role_changed', { role: data.role }).catch(() => undefined)
+      instance.telemetry.capture(context.identity.id, 'workspace_member_role_changed', { role: data.role })
     }),
   )
 
@@ -896,9 +882,7 @@ export const createInvite = createServerFn({ method: 'POST' })
           throw new Response(errors().invite.sendFailed(errorMessage(error, errors().unknownError)), { status: 502 })
         }
       }
-      void instance.telemetry
-        .capture(context.identity.id, 'invite_created', { role: data.role, emailed: Boolean(data.email) })
-        .catch(() => undefined)
+      instance.telemetry.capture(context.identity.id, 'invite_created', { role: data.role, emailed: Boolean(data.email) })
       return { token, emailed: Boolean(data.email) }
     }),
   )
@@ -923,9 +907,7 @@ export const revokeInvite = createServerFn({ method: 'POST' })
       const invite = (await context.repository.listInvites()).find((candidate) => candidate.id === data.id)
       await context.repository.deleteInvite(data.id)
       if (invite) {
-        void instance.telemetry
-          .capture(context.identity.id, 'invite_revoked', { role: invite.role, emailed: Boolean(invite.recipientEmail) })
-          .catch(() => undefined)
+        instance.telemetry.capture(context.identity.id, 'invite_revoked', { role: invite.role, emailed: Boolean(invite.recipientEmail) })
       }
     }),
   )
@@ -965,7 +947,7 @@ export const beginProviderInvite = createServerFn({ method: 'POST' })
       if (!instance.authCapabilities.socialProviders.includes(data.provider)) {
         throw new Response(errors().auth.providerNotEnabled(data.provider), { status: 400 })
       }
-      setCookie('stlquest_invite', data.token, {
+      setCookie(INVITE_COOKIE, data.token, {
         httpOnly: true,
         sameSite: 'lax',
         secure: new URL(getRequest().url).protocol === 'https:',
@@ -999,7 +981,7 @@ export const acceptInvite = createServerFn({ method: 'POST' })
       )
       writeAuthCookies(created.headers)
       await instance.repository.ensurePersonalWorkspace(created.response.user, serverMessages().common)
-      void instance.telemetry.capture(created.response.user.id, 'invite_accepted', {}).catch(() => undefined)
+      instance.telemetry.capture(created.response.user.id, 'invite_accepted', {})
       return { workspaceId: workspace.id }
     }),
   )
@@ -1019,7 +1001,7 @@ export const acceptWorkspaceInvite = createServerFn({ method: 'POST' })
       if (!accepted) throw new Response(errors().invite.invalid, { status: 410 })
       await instance.setActiveWorkspace(workspace.id, headers)
       context.events.publish('user.created')
-      void instance.telemetry.capture(identity.id, 'invite_accepted', {}).catch(() => undefined)
+      instance.telemetry.capture(identity.id, 'invite_accepted', {})
       return { workspaceId: workspace.id }
     }),
   )
@@ -1083,9 +1065,7 @@ export const updateLocale = createServerFn({ method: 'POST' })
       const instance = await app()
       const identity = await instance.requireIdentity(getRequestHeaders())
       await instance.repository.setUserLocale(identity.id, data.locale)
-      void instance.telemetry
-        .capture(identity.id, 'interface_language_changed', { locale: data.locale ?? 'browser' })
-        .catch(() => undefined)
+      instance.telemetry.capture(identity.id, 'interface_language_changed', { locale: data.locale ?? 'browser' })
     }),
   )
 
@@ -1117,7 +1097,7 @@ export const updateSelfSignupSettings = createServerFn({ method: 'POST' })
       const identity = await superAdmin(instance)
       const config = { enabled: data.enabled }
       await instance.repository.setDeploymentSetting(SELF_SIGNUP_SETTING, config)
-      void instance.telemetry.capture(identity.id, 'self_signup_configured', { enabled: data.enabled }).catch(() => undefined)
+      instance.telemetry.capture(identity.id, 'self_signup_configured', { enabled: data.enabled })
       return config
     }),
   )
@@ -1155,14 +1135,12 @@ export const savePriceCalculatorSettings = createServerFn({ method: 'POST' })
       const { workspaceSlug: _, ...settings } = data
       await context.repository.setSetting(PRICE_CALCULATOR_SETTING, settings)
       context.events.publish('settings.changed')
-      void instance.telemetry
-        .capture(context.identity.id, 'price_calculator_settings_saved', {
-          currency: settings.currency,
-          resin_preset: Boolean(settings.resinPresetId),
-          electricity_preset: Boolean(settings.electricityCountryCode),
-          equipment_preset_count: settings.resinEquipment.presetIds.length + settings.filamentEquipment.presetIds.length,
-        })
-        .catch(() => undefined)
+      instance.telemetry.capture(context.identity.id, 'price_calculator_settings_saved', {
+        currency: settings.currency,
+        resin_preset: Boolean(settings.resinPresetId),
+        electricity_preset: Boolean(settings.electricityCountryCode),
+        equipment_preset_count: settings.resinEquipment.presetIds.length + settings.filamentEquipment.presetIds.length,
+      })
       return settings
     }),
   )
@@ -1193,7 +1171,7 @@ export const saveEmailLogo = createServerFn({ method: 'POST' })
       if (logo) await context.repository.setSetting(EMAIL_LOGO_SETTING, logo)
       else await context.repository.deleteSetting(EMAIL_LOGO_SETTING)
       context.events.publish('settings.changed')
-      void instance.telemetry.capture(context.identity.id, 'email_logo_updated', { has_logo: Boolean(logo) }).catch(() => undefined)
+      instance.telemetry.capture(context.identity.id, 'email_logo_updated', { has_logo: Boolean(logo) })
       return { logo }
     }),
   )
@@ -1208,9 +1186,10 @@ export const saveEmailSender = createServerFn({ method: 'POST' })
       if (sender.name || sender.replyTo) await context.repository.setSetting(EMAIL_SENDER_SETTING, sender)
       else await context.repository.deleteSetting(EMAIL_SENDER_SETTING)
       context.events.publish('settings.changed')
-      void instance.telemetry
-        .capture(context.identity.id, 'email_sender_updated', { has_name: Boolean(sender.name), has_reply_to: Boolean(sender.replyTo) })
-        .catch(() => undefined)
+      instance.telemetry.capture(context.identity.id, 'email_sender_updated', {
+        has_name: Boolean(sender.name),
+        has_reply_to: Boolean(sender.replyTo),
+      })
       return { sender }
     }),
   )
@@ -1234,9 +1213,10 @@ export const saveWorkspaceSmtp = createServerFn({ method: 'POST' })
       })
       await context.repository.setSetting(WORKSPACE_SMTP_SETTING, encryptSetting(smtp))
       context.events.publish('settings.changed')
-      void instance.telemetry
-        .capture(context.identity.id, 'workspace_smtp_configured', { secure: smtp.secure, authenticated: Boolean(smtp.user) })
-        .catch(() => undefined)
+      instance.telemetry.capture(context.identity.id, 'workspace_smtp_configured', {
+        secure: smtp.secure,
+        authenticated: Boolean(smtp.user),
+      })
       return publicSmtpConfig(smtp)
     }),
   )
@@ -1269,9 +1249,7 @@ export const saveEmailTemplate = createServerFn({ method: 'POST' })
       if (Object.keys(templates).length) await context.repository.setSetting(EMAIL_TEMPLATES_SETTING, templates)
       else await context.repository.deleteSetting(EMAIL_TEMPLATES_SETTING)
       context.events.publish('settings.changed')
-      void instance.telemetry
-        .capture(context.identity.id, 'email_template_saved', { kind: data.kind, customized: Boolean(data.template) })
-        .catch(() => undefined)
+      instance.telemetry.capture(context.identity.id, 'email_template_saved', { kind: data.kind, customized: Boolean(data.template) })
       return { templates }
     }),
   )
@@ -1301,7 +1279,7 @@ export const removeWorkspaceSmtp = createServerFn({ method: 'POST' })
       const context = await workspaceAdmin(instance, data.workspaceSlug)
       await context.repository.deleteSetting(WORKSPACE_SMTP_SETTING)
       context.events.publish('settings.changed')
-      void instance.telemetry.capture(context.identity.id, 'workspace_smtp_removed').catch(() => undefined)
+      instance.telemetry.capture(context.identity.id, 'workspace_smtp_removed')
       return publicSmtpConfig(undefined)
     }),
   )
@@ -1382,13 +1360,11 @@ export const updateBoardSettings = createServerFn({ method: 'POST' })
       // Boards refetch through the workspace realtime channel so requester views update immediately.
       context.events.publish('board.changed')
       if (data.privateRequests !== undefined)
-        void instance.telemetry
-          .capture(context.identity.id, 'board_visibility_changed', {
-            private_requests: config.privateRequests,
-            workspace_id: context.workspace.id,
-            member_overrides: Object.keys(config.memberVisibility).length,
-          })
-          .catch(() => undefined)
+        instance.telemetry.capture(context.identity.id, 'board_visibility_changed', {
+          private_requests: config.privateRequests,
+          workspace_id: context.workspace.id,
+          member_overrides: Object.keys(config.memberVisibility).length,
+        })
       // Sweep straight away so newly eligible prints leave the board without waiting for the hourly round.
       if (data.autoArchiveDays) await context.sweepAutoArchive()
       return config
@@ -1407,13 +1383,11 @@ export const updateMemberRequestVisibility = createServerFn({ method: 'POST' })
       await context.repository.setSetting('board', config)
       // The member's own board, people list, and realtime subscription all rescope on the next fetch.
       context.events.publish('board.changed')
-      void instance.telemetry
-        .capture(context.identity.id, 'board_member_visibility_changed', {
-          visibility: data.visibility,
-          workspace_id: context.workspace.id,
-          member_overrides: Object.keys(config.memberVisibility).length,
-        })
-        .catch(() => undefined)
+      instance.telemetry.capture(context.identity.id, 'board_member_visibility_changed', {
+        visibility: data.visibility,
+        workspace_id: context.workspace.id,
+        member_overrides: Object.keys(config.memberVisibility).length,
+      })
       return config
     }),
   )
@@ -1577,7 +1551,7 @@ export const removeCloudConnection = createServerFn({ method: 'POST' })
       if ((await context.repository.getSetting<StorageMigration>(STORAGE_MIGRATION_SETTING))?.state === 'running')
         throw new Response(errors().storage.waitForMigration, { status: 409 })
       await disconnectCloudStorage(context.repository, data.provider)
-      void instance.telemetry.capture(context.identity.id, 'cloud_storage_disconnected', { provider: data.provider }).catch(() => undefined)
+      instance.telemetry.capture(context.identity.id, 'cloud_storage_disconnected', { provider: data.provider })
     }),
   )
 
@@ -1602,9 +1576,7 @@ export const startStorageMigration = createServerFn({ method: 'POST' })
         if (claimedManagedStorage) await context.repository.releaseManagedStorage()
         throw error
       }
-      void instance.telemetry
-        .capture(context.identity.id, 'storage_migration_started', { from: context.storage.adapter, to: config.adapter })
-        .catch(() => undefined)
+      instance.telemetry.capture(context.identity.id, 'storage_migration_started', { from: context.storage.adapter, to: config.adapter })
       return (await maskStorageMigration(migration))!
     }),
   )
@@ -1618,9 +1590,7 @@ export const retryStorageMigration = createServerFn({ method: 'POST' })
       const migration = await context.storageMigration.status()
       if (migration) await assertStorageAllowed(migration.destination)
       const retried = await context.storageMigration.retry()
-      void instance.telemetry
-        .capture(context.identity.id, 'storage_migration_retried', { adapter: retried.destination.adapter })
-        .catch(() => undefined)
+      instance.telemetry.capture(context.identity.id, 'storage_migration_retried', { adapter: retried.destination.adapter })
       return (await maskStorageMigration(retried))!
     }),
   )
@@ -1637,12 +1607,10 @@ export const cancelStorageMigration = createServerFn({ method: 'POST' })
         context = await workspaceAdmin(instance, data.workspaceSlug)
       }
       const cancelled = await context.storageMigration.cancel()
-      void instance.telemetry
-        .capture(context.identity.id, 'storage_migration_cancelled', {
-          adapter: cancelled.destination.adapter,
-          files_copied: cancelled.copiedFiles,
-        })
-        .catch(() => undefined)
+      instance.telemetry.capture(context.identity.id, 'storage_migration_cancelled', {
+        adapter: cancelled.destination.adapter,
+        files_copied: cancelled.copiedFiles,
+      })
       return (await maskStorageMigration(cancelled))!
     }),
   )
@@ -1722,13 +1690,11 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
           if (claimedManagedStorage) await context.repository.releaseManagedStorage()
           throw error
         }
-        void instance.telemetry
-          .capture(context.identity.id, 'storage_configured', {
-            previous_adapter: alreadyConfigured ? context.storage.adapter : undefined,
-            adapter: config.adapter,
-            configuration_kind: storageConfigurationKind(alreadyConfigured, context.storage, config),
-          })
-          .catch(() => undefined)
+        instance.telemetry.capture(context.identity.id, 'storage_configured', {
+          previous_adapter: alreadyConfigured ? context.storage.adapter : undefined,
+          adapter: config.adapter,
+          configuration_kind: storageConfigurationKind(alreadyConfigured, context.storage, config),
+        })
         await recordOnboardingTask(instance.repository, context.identity.id, 'storage', context.workspace.id).catch(() => undefined)
         const storage = await maskStorage(config)
         // Publish before reset so current streams refetch and reconnect to the replacement bus.
@@ -1773,12 +1739,6 @@ export const movePrintGroup = createServerFn({ method: 'POST' })
   .validator(inWorkspace(movePrintGroupSchema))
   .handler(async ({ data }) =>
     workspaceMutation(data.workspaceSlug, (context) => context.service.moveGroup(data.id, data.from, data.to, context.identity)),
-  )
-
-export const renamePrintGroup = createServerFn({ method: 'POST' })
-  .validator(inWorkspace(renamePrintGroupSchema))
-  .handler(async ({ data }) =>
-    workspaceMutation(data.workspaceSlug, (context) => context.service.renameGroup(data.id, data.name, context.identity)),
   )
 
 export const updatePrintGroup = createServerFn({ method: 'POST' })

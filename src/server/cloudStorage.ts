@@ -9,16 +9,19 @@ import type {
 } from '../core/auth'
 import type { DrizzleRepository } from '../db/repository'
 import { deploymentSettings, resolveStorageConfig } from './app'
-import { decryptSetting, encryptSetting, getStoredIntegrationConfig, setStoredIntegrationConfig, type SettingStore } from './integrations'
+import {
+  decryptSetting,
+  encryptSetting,
+  getStoredIntegrationConfig,
+  integrationConfig,
+  setStoredIntegrationConfig,
+  type SettingStore,
+} from './integrations'
 import type { EncryptedSetting } from './integrations'
 import { serverMessages } from './locale'
 import { logger } from './logger'
 
 export const CLOUD_STORAGE_SETTING = 'cloudStorageEncrypted'
-
-export function isCloudStorageProvider(adapter: string): adapter is CloudStorageProvider {
-  return (CLOUD_STORAGE_PROVIDERS as readonly string[]).includes(adapter)
-}
 
 export async function cloudStorageApp(deployment: SettingStore, provider: CloudStorageProvider) {
   const app = (await getStoredIntegrationConfig(deployment))?.[CLOUD_STORAGE_APP_KEYS[provider]]
@@ -37,7 +40,7 @@ export async function requireCloudStorageApp(deployment: SettingStore, provider:
 }
 
 export async function setCloudStorageApp(deployment: SettingStore, provider: CloudStorageProvider, app: CloudStorageApp | undefined) {
-  const config = (await getStoredIntegrationConfig(deployment)) ?? { passwordEnabled: true }
+  const config = await integrationConfig(deployment)
   await setStoredIntegrationConfig(deployment, { ...config, [CLOUD_STORAGE_APP_KEYS[provider]]: app })
 }
 

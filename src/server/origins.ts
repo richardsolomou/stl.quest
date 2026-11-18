@@ -1,5 +1,5 @@
 /** The configured public address, such as `https://example.com`, or undefined when unset or invalid. */
-export function configuredOrigin() {
+function configuredOrigin() {
   return parseOrigin(process.env.BETTER_AUTH_URL)
 }
 

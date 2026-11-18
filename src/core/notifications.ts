@@ -16,18 +16,12 @@ type EmailMessages = Messages['email']
 export const notificationKinds = [
   {
     id: 'print-ready',
-    name: 'Prints ready',
-    description: 'Email me when copies of my requests reach Ready.',
     enabledByDefault: true,
   },
 ] as const
 
 export type NotificationKind = (typeof notificationKinds)[number]['id']
 export type NotificationPreferences = Record<NotificationKind, boolean>
-
-export function isNotificationKind(value: string): value is NotificationKind {
-  return notificationKinds.some((kind) => kind.id === value)
-}
 
 export function notificationPreferences(stored: { kind: string; enabled: boolean }[]): NotificationPreferences {
   const overrides = new Map(stored.map(({ kind, enabled }) => [kind, enabled]))

@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { formatBytes } from '../../../core/format'
 import { adminWorkspaceHealth, type AdminWorkspace } from '../../../core/admin'
 import type { Locale, Messages } from '../../../core/i18n'
+import { LocalDate } from '../LocalDate'
 
 const columnHelper = createColumnHelper<DataTableFeatures, AdminWorkspace>()
 const secondaryColumn = { className: '@max-3xl:hidden' }
@@ -59,14 +60,14 @@ export function superAdminWorkspaceColumns({
     columnHelper.accessor('printerCount', { header: copy.columns.printers, meta: secondaryColumn }),
     columnHelper.accessor('createdAt', {
       header: copy.columns.created,
-      cell: ({ getValue }) => <DateCell value={getValue()} locale={locale} />,
+      cell: ({ getValue }) => <LocalDate value={getValue()} locale={locale} />,
       meta: secondaryColumn,
     }),
     columnHelper.accessor('lastRequestAt', {
       header: copy.columns.lastRequestChange,
       cell: ({ getValue }) => {
         const value = getValue()
-        return value ? <DateCell value={value} locale={locale} /> : <span className="text-muted-foreground">{copy.noRequests}</span>
+        return value ? <LocalDate value={value} locale={locale} /> : <span className="text-muted-foreground">{copy.noRequests}</span>
       },
       sortUndefined: 'last',
       meta: secondaryColumn,
@@ -151,8 +152,4 @@ function WorkspaceActions({
       </PopoverContent>
     </Popover>
   )
-}
-
-function DateCell({ value, locale }: { value: number; locale: Locale }) {
-  return <time dateTime={new Date(value).toISOString()}>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(value)}</time>
 }

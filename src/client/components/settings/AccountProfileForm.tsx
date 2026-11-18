@@ -13,7 +13,7 @@ import { changeOwnEmail } from '../../../server/fns'
 import { authClient } from '../../authClient'
 import { useI18n } from '../../i18n'
 import { DialogProblem } from '../DialogProblem'
-import type { Notice } from '../SettingNotice'
+import { successNotice, type Notice } from '../SettingNotice'
 
 export function AccountProfileForm({
   name,
@@ -61,15 +61,7 @@ export function AccountProfileForm({
         }
       }
       posthog.capture('account_profile_updated', { name_changed: nextName !== name, email_change_requested: nextEmail !== email })
-      await onDone(
-        nextEmail === email
-          ? undefined
-          : {
-              tone: 'success',
-              title: copy.emailRequestedTitle,
-              hint: copy.emailRequestedHint(nextEmail),
-            },
-      )
+      await onDone(nextEmail === email ? undefined : successNotice(copy.emailRequestedTitle, copy.emailRequestedHint(nextEmail)))
     },
   })
   return (

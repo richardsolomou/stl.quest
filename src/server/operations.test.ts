@@ -2,7 +2,8 @@ import fs from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DrizzleRepository } from '../db/repository'
 import type { AssetStore } from '../core/types'
-import { assertUploadCapacity, diagnostics, filesystemCapacity, systemDiagnostics } from './operations'
+import { assertUploadCapacity, filesystemCapacity } from '../adapters/filesystemCapacity'
+import { diagnostics, systemDiagnostics } from './operations'
 
 describe('operational disk safeguards', () => {
   afterEach(() => vi.restoreAllMocks())

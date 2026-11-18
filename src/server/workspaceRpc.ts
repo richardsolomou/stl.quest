@@ -1,11 +1,10 @@
 import { getRequest } from '@tanstack/react-start/server'
 import { app } from './app'
-import { normalizeAuthHeaders } from './authCookies'
 import { mutationRpc } from './rpc'
 
 const workspaceContext = async (workspaceSlug: string) => {
   const instance = await app()
-  return instance.workspace(normalizeAuthHeaders(getRequest().headers), workspaceSlug)
+  return instance.workspace(getRequest().headers, workspaceSlug)
 }
 
 type WorkspaceContext = Awaited<ReturnType<typeof workspaceContext>>

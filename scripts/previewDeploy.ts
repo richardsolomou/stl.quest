@@ -1,6 +1,7 @@
 // Deploys PR previews by driving the Dokploy API. A replacement backend only has to
 // implement deploy/delete/prune and emit the preview-url output.
 import { dokployPreviewFromEnvironment, loadPreviewAppSecrets, pullRequestNumber } from 'ras-stack/preview/dokploy'
+import { Stripe } from 'stripe'
 
 import { S3AssetStore } from '../src/adapters/s3'
 import { previewEnv, previewStorageConfig } from './previewEnv'
@@ -8,18 +9,12 @@ import { deletePreviewCustomers } from './previewStripe'
 
 // Better Auth's Stripe plugin mounts its webhook below the Better Auth handler.
 const webhookPath = '/api/auth/stripe/webhook'
-const webhookEvents = [
+const webhookEvents: Stripe.WebhookEndpointCreateParams.EnabledEvent[] = [
   'checkout.session.completed',
   'customer.subscription.created',
   'customer.subscription.updated',
   'customer.subscription.deleted',
 ]
-
-interface WebhookEndpoint {
-  id: string
-  url: string
-  secret?: string
-}
 
 loadPreviewAppSecrets([
   'STLQUEST_HOSTED_STORAGE_BUCKET',
@@ -45,23 +40,8 @@ function requireEnv(name: string): string {
   return value
 }
 
-function billingConfigured() {
-  return Boolean(process.env.STRIPE_SECRET_KEY?.trim())
-}
-
-async function stripeApi<T = unknown>(path: string, options: { method?: string; body?: Record<string, string> } = {}): Promise<T> {
-  const response = await fetch(`https://api.stripe.com/v1/${path}`, {
-    method: options.method ?? (options.body === undefined ? 'GET' : 'POST'),
-    headers: {
-      authorization: `Bearer ${requireEnv('STRIPE_SECRET_KEY')}`,
-      ...(options.body !== undefined && { 'content-type': 'application/x-www-form-urlencoded' }),
-    },
-    body: options.body === undefined ? undefined : new URLSearchParams(options.body),
-  })
-  const text = await response.text()
-  if (!response.ok) throw new Error(`Stripe ${path} failed with ${response.status}: ${text.slice(0, 500)}`)
-  return JSON.parse(text) as T
-}
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY?.trim()
+const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : undefined
 
 // Returns the pull request a preview hostname belongs to, so pruning never touches other endpoints.
 function webhookPrNumber(url: string): string | undefined {
@@ -78,43 +58,42 @@ function webhookPrNumber(url: string): string | undefined {
     : undefined
 }
 
-async function listWebhookEndpoints() {
-  const { data } = await stripeApi<{ data: WebhookEndpoint[] }>('webhook_endpoints?limit=100')
-  return data
+async function listWebhookEndpoints(client: Stripe) {
+  const endpoints: Stripe.WebhookEndpoint[] = []
+  for await (const endpoint of client.webhookEndpoints.list({ limit: 100 })) endpoints.push(endpoint)
+  return endpoints
 }
 
 async function deleteWebhookEndpoints(keep: (prNumber: string) => boolean) {
-  if (!billingConfigured()) return
-  for (const endpoint of await listWebhookEndpoints()) {
+  if (!stripe) return
+  for (const endpoint of await listWebhookEndpoints(stripe)) {
     const prNumber = webhookPrNumber(endpoint.url)
     if (!prNumber || keep(prNumber)) continue
-    await stripeApi(`webhook_endpoints/${endpoint.id}`, { method: 'DELETE' })
+    await stripe.webhookEndpoints.del(endpoint.id)
     console.log(`deleted webhook for pr-${prNumber}`)
   }
 }
 
 async function deleteStripeCustomers(prNumber: string) {
-  if (!billingConfigured()) return
-  const deleted = await deletePreviewCustomers(prNumber, stripeApi)
+  if (!stripe) return
+  const deleted = await deletePreviewCustomers(prNumber, stripe)
   console.log(`deleted ${deleted} Stripe customer(s) for pr-${prNumber}`)
 }
 
 // Stripe reveals a signing secret only when an endpoint is created, so every deploy replaces it.
 async function syncWebhookEndpoint(prNumber: string, host: string) {
-  if (!billingConfigured()) {
+  if (!stripe) {
     console.log('STRIPE_SECRET_KEY is unset; deploying the preview without billing')
     return undefined
   }
   const url = `https://${host}${webhookPath}`
-  for (const endpoint of await listWebhookEndpoints()) {
-    if (endpoint.url === url) await stripeApi(`webhook_endpoints/${endpoint.id}`, { method: 'DELETE' })
+  for (const endpoint of await listWebhookEndpoints(stripe)) {
+    if (endpoint.url === url) await stripe.webhookEndpoints.del(endpoint.id)
   }
-  const created = await stripeApi<WebhookEndpoint>('webhook_endpoints', {
-    body: {
-      url,
-      description: `STL Quest preview pr-${prNumber}`,
-      ...Object.fromEntries(webhookEvents.map((event, index) => [`enabled_events[${index}]`, event])),
-    },
+  const created = await stripe.webhookEndpoints.create({
+    url,
+    description: `STL Quest preview pr-${prNumber}`,
+    enabled_events: webhookEvents,
   })
   return created.secret
 }

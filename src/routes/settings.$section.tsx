@@ -1,6 +1,6 @@
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
-import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
+import { createFileRoute, redirect, useNavigate, useHydrated } from '@tanstack/react-router'
+import { useEffect } from 'react'
 import { AppRail } from '../client/components/AppRail'
 import { SettingsPanes, isSettingsSection } from '../client/components/SettingsPanes'
 import { peopleQuery, requestsQuery, sessionQuery } from '../client/queries'
@@ -22,7 +22,7 @@ function SettingsPage() {
   const { section } = Route.useParams()
   const { data: session } = useSuspenseQuery(sessionQuery())
   const queryClient = useQueryClient()
-  const [hydrated, setHydrated] = useState(false)
+  const hydrated = useHydrated()
   const navigate = useNavigate()
   const { t } = useI18n()
   useEscape(() => navigate({ to: '/' }))
@@ -30,9 +30,6 @@ function SettingsPage() {
   const workspaceSlug = identity?.workspaceSlug
   const validSection = isSettingsSection(section) ? section : undefined
   const authorized = Boolean(identity?.role === 'admin' && validSection)
-  useEffect(() => {
-    setHydrated(true)
-  }, [])
   useEffect(() => {
     if (!authorized) void navigate({ to: '/' })
   }, [authorized, navigate])

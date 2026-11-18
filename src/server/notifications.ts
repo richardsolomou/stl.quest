@@ -136,12 +136,10 @@ export function emailNotifier(options: {
         template,
       })
       await mailer.delivery.send({ to: recipient.email, ...brandedMessage(email, parts) })
-      void options.telemetry
-        .capture(recipient.id, 'print_ready_email_sent', {
-          request_count: prints.length,
-          copy_count: prints.reduce((sum, print) => sum + print.count, 0),
-        })
-        .catch(() => undefined)
+      options.telemetry.capture(recipient.id, 'print_ready_email_sent', {
+        request_count: prints.length,
+        copy_count: prints.reduce((sum, print) => sum + print.count, 0),
+      })
     } catch (error) {
       logger.warn(
         { err: error, event: 'print_ready_email_failed', workspace_id: options.workspaceId },

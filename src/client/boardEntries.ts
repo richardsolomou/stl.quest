@@ -11,11 +11,6 @@ export type BoardStatusEntries = {
 
 export type BoardRequestEntry = { request: PublicPrintRequest; count: number; key: string; groupId?: string }
 
-export type BoardGroupEntries = {
-  group: PrintGroup
-  items: Array<{ request: PublicPrintRequest; count: number }>
-}
-
 export function boardTagCopyCounts(groups: PrintGroup[]) {
   return new Map(
     groups.flatMap((group) => {
@@ -59,27 +54,6 @@ export function boardRequestCohorts(request: PublicPrintRequest, status: StatusI
       ...(ids.length === 1 ? { groupId: ids[0] } : {}),
     }
   })
-}
-
-export function boardGroupsByStatus(requests: PublicPrintRequest[], groups: PrintGroup[]) {
-  const requestsById = new Map(requests.map((request) => [request.id, request]))
-  const result = new Map<StatusId, BoardGroupEntries[]>()
-  for (const group of groups) {
-    const statuses = new Set(group.items.map((item) => item.status))
-    if (group.items.length === 0) statuses.add(group.status)
-    for (const status of statuses) {
-      const entries = result.get(status) ?? []
-      entries.push({
-        group,
-        items: group.items.flatMap((item) => {
-          const request = requestsById.get(item.requestId)
-          return item.status === status && request ? [{ request, count: item.count }] : []
-        }),
-      })
-      result.set(status, entries)
-    }
-  }
-  return result
 }
 
 export function boardPrioritiesByStatus(

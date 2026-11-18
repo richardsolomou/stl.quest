@@ -1,22 +1,17 @@
 import { BoxAssetStore } from '../adapters/box'
 import type { CloudStorageApp } from '../core/auth'
-import { beginCloudAuthorization, completeCloudAuthorization, requireCloudAuthorizationCallback } from './cloudConnectionState'
+import {
+  beginCloudAuthorization,
+  completeCloudAuthorization,
+  requireCloudAuthorizationCallback,
+  verifyConnectionWritable,
+} from './cloudConnectionState'
 import type { SettingStore } from './integrations'
 import { exchangeOAuthAuthorizationCode, fetchOAuthProfile } from './oauthConnection'
 
 const AUTHORIZE_URL = 'https://account.box.com/api/oauth2/authorize'
 const TOKEN_URL = 'https://api.box.com/oauth2/token'
 const PROFILE_URL = 'https://api.box.com/2.0/users/me?fields=id,name,login'
-
-export class BoxPermissionError extends Error {
-  constructor(readonly returnTo: string) {
-    super('Box did not grant read and write access')
-  }
-}
-
-export function boxCallbackUrl(origin: string) {
-  return `${origin}/api/storage/box/callback`
-}
 
 export async function beginBoxAuthorization(
   app: CloudStorageApp,
@@ -25,8 +20,7 @@ export async function beginBoxAuthorization(
   origin: string,
   returnTo: string,
 ) {
-  const redirectUri = boxCallbackUrl(origin)
-  return beginCloudAuthorization(workspace, 'box', adminId, redirectUri, returnTo, AUTHORIZE_URL, {
+  return beginCloudAuthorization(workspace, 'box', adminId, origin, returnTo, AUTHORIZE_URL, {
     client_id: app.clientId,
     response_type: 'code',
   })
@@ -44,11 +38,10 @@ export async function completeBoxAuthorization(app: CloudStorageApp, workspace: 
     accountEmail: account.login,
     connectedAt: Date.now(),
   }
-  try {
-    await new BoxAssetStore('', { ...app, refreshToken: tokens.refresh_token }, undefined, true).writable()
-  } catch (error) {
-    if ([401, 403].includes((error as { status?: number }).status ?? 0)) throw new BoxPermissionError(pending.returnTo)
-    throw error
-  }
+  await verifyConnectionWritable(
+    new BoxAssetStore('', { ...app, refreshToken: tokens.refresh_token }, undefined, true),
+    pending.returnTo,
+    'Box did not grant read and write access',
+  )
   return completeCloudAuthorization(workspace, 'box', pending, next, adminId)
 }

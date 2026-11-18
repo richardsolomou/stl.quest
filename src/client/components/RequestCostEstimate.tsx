@@ -23,7 +23,7 @@ export function RequestCostEstimate({ request }: { request: PublicPrintRequest }
   const { currency } = query.data.settings
   return (
     <DetailRow label={t.requests.cost.label}>
-      <strong>{formatMoney(quote.result.costPrice, currency, locale)}</strong>{' '}
+      <strong>{formatMoney(quote.result.estimatedCost, currency, locale)}</strong>{' '}
       <span className="text-muted-foreground">
         · {t.requests.cost.suggested(formatMoney(quote.result.standardPrice, currency, locale), request.quantity)}
       </span>

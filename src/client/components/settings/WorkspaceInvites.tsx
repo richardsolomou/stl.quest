@@ -17,7 +17,7 @@ import { signalProductTourProgress } from '../../productTour'
 import { DialogProblem } from '../DialogProblem'
 import { DialogShell } from '../DialogShell'
 import { QueryState } from '../QueryState'
-import { SettingNotice, noticeDetail } from '../SettingNotice'
+import { SettingNotice, errorNotice, successNotice, noticeDetail } from '../SettingNotice'
 import { CopyButtonLabel, useCopied } from '../useCopied'
 import { SettingsSection } from './SettingsLayout'
 import { useI18n } from '../../i18n'
@@ -56,7 +56,7 @@ export function InviteDialog({ smtpConfigured, onDone }: { smtpConfigured: boole
     return (
       <DialogShell title={text.link.title} onClose={onDone}>
         <p className="text-sm text-muted-foreground">{text.link.description}</p>
-        {emailedTo && <SettingNotice notice={{ tone: 'success', title: text.link.emailed, hint: text.link.emailedHint(emailedTo) }} />}
+        {emailedTo && <SettingNotice notice={successNotice(text.link.emailed, text.link.emailedHint(emailedTo))} />}
         <Field>
           <FieldLabel htmlFor="invite-link">{text.link.label}</FieldLabel>
           <InputGroup>
@@ -210,16 +210,7 @@ export function PendingInvites() {
           </Item>
         ))}
       </ItemGroup>
-      {mutation.error && (
-        <SettingNotice
-          notice={{
-            tone: 'error',
-            title: text.notRevoked,
-            hint: text.notRevokedHint,
-            detail: noticeDetail(mutation.error),
-          }}
-        />
-      )}
+      {mutation.error && <SettingNotice notice={errorNotice(text.notRevoked, text.notRevokedHint, mutation.error)} />}
     </SettingsSection>
   )
 }

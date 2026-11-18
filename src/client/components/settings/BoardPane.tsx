@@ -2,16 +2,6 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -24,8 +14,9 @@ import { deleteWorkspace, updateBoardSettings } from '../../../server/fns'
 import { boardQuery } from '../../queries'
 import { reloadAfterWorkspaceChange, useWorkspaceSlug } from '../../workspace'
 import { signalProductTourProgress } from '../../productTour'
+import { ConfirmDialog } from '../ConfirmDialog'
 import { QueryState } from '../QueryState'
-import { SettingNotice, noticeDetail } from '../SettingNotice'
+import { SettingNotice, errorNotice } from '../SettingNotice'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 import { useI18n } from '../../i18n'
@@ -107,16 +98,7 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
             {overrideCount > 0 && ` ${copy.visibility.overrides(overrideCount)}`}
           </FieldDescription>
         </Field>
-        {mutation.error && (
-          <SettingNotice
-            notice={{
-              tone: 'error',
-              title: copy.visibility.notSaved,
-              hint: copy.previousSettingKept,
-              detail: noticeDetail(mutation.error),
-            }}
-          />
-        )}
+        {mutation.error && <SettingNotice notice={errorNotice(copy.visibility.notSaved, copy.previousSettingKept, mutation.error)} />}
       </SettingsSection>
       <AutoArchiveSection autoArchiveDays={current.autoArchiveDays} />
       {canDeleteWorkspace && (
@@ -132,20 +114,11 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
           </div>
         </SettingsSection>
       )}
-      <AlertDialog
+      <ConfirmDialog
         open={deleteOpen}
-        onOpenChange={(open) => {
-          if (open || deleteMutation.isPending) return
-          setDeleteOpen(false)
-          setConfirmation('')
-          deleteMutation.reset()
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{copy.danger.dialogTitle(workspaceName)}</AlertDialogTitle>
-            <AlertDialogDescription>{copy.danger.dialogDescription}</AlertDialogDescription>
-          </AlertDialogHeader>
+        title={copy.danger.dialogTitle(workspaceName)}
+        description={copy.danger.dialogDescription}
+        details={
           <Field>
             <FieldLabel htmlFor="delete-workspace-confirmation">{copy.danger.nameLabel}</FieldLabel>
             <Input
@@ -158,19 +131,19 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
             <FieldDescription>{copy.danger.nameHint(workspaceName)}</FieldDescription>
             <FieldError>{deleteMutation.error?.message}</FieldError>
           </Field>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>{t.common.cancel}</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              disabled={confirmation !== workspaceName || deleteMutation.isPending}
-              onClick={() => deleteMutation.mutate({ data: { workspaceSlug, confirmation } })}
-            >
-              {deleteMutation.isPending && <Spinner />}
-              {deleteMutation.isPending ? copy.danger.deleting : copy.danger.action}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        }
+        confirmLabel={copy.danger.action}
+        pendingLabel={copy.danger.deleting}
+        destructive
+        pending={deleteMutation.isPending}
+        confirmDisabled={confirmation !== workspaceName}
+        onConfirm={() => deleteMutation.mutate({ data: { workspaceSlug, confirmation } })}
+        onCancel={() => {
+          setDeleteOpen(false)
+          setConfirmation('')
+          deleteMutation.reset()
+        }}
+      />
     </SettingsPage>
   )
 }
@@ -239,16 +212,7 @@ function AutoArchiveSection({ autoArchiveDays }: { autoArchiveDays?: number }) {
         </form>
       )}
       {enabled && !valid && <FieldError>{copy.archive.invalidDays(MAX_AUTO_ARCHIVE_DAYS)}</FieldError>}
-      {mutation.error && (
-        <SettingNotice
-          notice={{
-            tone: 'error',
-            title: copy.archive.notSaved,
-            hint: copy.previousSettingKept,
-            detail: noticeDetail(mutation.error),
-          }}
-        />
-      )}
+      {mutation.error && <SettingNotice notice={errorNotice(copy.archive.notSaved, copy.previousSettingKept, mutation.error)} />}
     </SettingsSection>
   )
 }

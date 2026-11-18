@@ -1,5 +1,7 @@
-import { authFailureMessage, classifySignInFailure, type SignInFailureReason } from './authFailures'
+import { classifySignInFailure } from './authFailures'
+import { errorMessage } from './error'
 import type { Messages } from './i18n'
+import type { StorageConfig } from './types'
 
 export const SOCIAL_AUTH_PROVIDERS = ['google', 'discord', 'oidc'] as const
 export type SocialAuthProvider = (typeof SOCIAL_AUTH_PROVIDERS)[number]
@@ -57,8 +59,6 @@ export function linkedAccountActive(account: { providerId: string; accountId: st
   return account.providerId !== 'oidc' || (oidcIssuer !== undefined && account.accountId.startsWith(oidcAccountId(oidcIssuer, '')))
 }
 
-export const signInFailureReason = classifySignInFailure
-
 type AuthMessages = Messages['auth']
 type AuthFailure = { status?: number; code?: string; message?: string } | null | undefined
 
@@ -66,11 +66,11 @@ type AuthFailure = { status?: number; code?: string; message?: string } | null |
 export function authErrorMessage(t: AuthMessages, failed: unknown, fallback: string): string {
   const code = failed && typeof failed === 'object' ? (failed as { code?: unknown }).code : undefined
   const known = typeof code === 'string' ? (t.errors as Record<string, string | undefined>)[code] : undefined
-  return known ?? authFailureMessage(failed, fallback)
+  return known ?? errorMessage(failed, fallback)
 }
 
 export function signInFailureMessage(t: AuthMessages, failed: AuthFailure): string {
-  switch (signInFailureReason(failed)) {
+  switch (classifySignInFailure(failed)) {
     case 'rate_limited':
       return t.signInFailure.rateLimited
     case 'invalid_credentials':
@@ -79,8 +79,6 @@ export function signInFailureMessage(t: AuthMessages, failed: AuthFailure): stri
       return authErrorMessage(t, failed, t.signInFailure.fallback)
   }
 }
-
-export type { SignInFailureReason }
 
 export type AuthCapabilities = {
   password: boolean
@@ -153,6 +151,14 @@ export const CLOUD_STORAGE_PROVIDER_NAMES = {
   box: 'Box',
 } as const satisfies Record<CloudStorageProvider, string>
 
+export function isCloudStorageProvider(adapter: string): adapter is CloudStorageProvider {
+  return (CLOUD_STORAGE_PROVIDERS as readonly string[]).includes(adapter)
+}
+
+export function isCloudStorageConfig(config: StorageConfig): config is Extract<StorageConfig, { adapter: CloudStorageProvider }> {
+  return isCloudStorageProvider(config.adapter)
+}
+
 export function cloudStorageProviderName(provider: CloudStorageProvider) {
   return CLOUD_STORAGE_PROVIDER_NAMES[provider]
 }
@@ -207,8 +213,6 @@ export const CLOUD_STORAGE_APP_KEYS = {
 
 export type AuthAdapterConfig = AuthCapabilities &
   SocialProviderConfigs & { oidcAllowSignup?: boolean; oidcAllowSignupSource?: 'database' | 'environment' }
-export type EmailCapabilities = { configured: boolean }
-
 export type PublicSocialProviderConfig = {
   configured: boolean
   enabled: boolean

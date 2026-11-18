@@ -27,7 +27,7 @@ function landingFilter(marks: Marks) {
 }
 
 async function encodeLanding(input: string, marks: Marks) {
-  const output = path.join(config.outputDirectory, 'landing.mp4')
+  const output = path.join(config.outputDirectory, 'product-tour.mp4')
   await run('ffmpeg', [
     '-y',
     '-ss',
@@ -64,11 +64,11 @@ async function encodeLanding(input: string, marks: Marks) {
     '-b:v',
     '0',
     '-an',
-    path.join(config.outputDirectory, 'landing.webm'),
+    path.join(config.outputDirectory, 'product-tour.webm'),
   ])
   const poster = path.join(config.workDirectory, 'landing-poster.png')
   await run('ffmpeg', ['-y', '-ss', '1', '-i', output, '-frames:v', '1', '-vf', 'scale=1200:-1:flags=lanczos', poster])
-  await run('cwebp', ['-quiet', '-q', '82', poster, '-o', path.join(config.outputDirectory, 'landing.webp')])
+  await run('cwebp', ['-quiet', '-q', '82', poster, '-o', path.join(config.outputDirectory, 'product-tour.webp')])
   return output
 }
 

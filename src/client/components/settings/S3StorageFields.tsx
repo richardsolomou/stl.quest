@@ -12,41 +12,41 @@ export function S3StorageFields({ form, current }: { form: StorageConfigFormApi;
   const t = useI18n().t.storage.s3
   const providers = S3_PROVIDERS.map((value) => ({ value, label: t.providers[value] }))
   return (
-    <>
-      <form.Field name="provider">
-        {(field) => (
-          <Field>
-            <FieldLabel htmlFor="storage-provider">{t.provider}</FieldLabel>
-            <Select
-              items={providers}
-              value={field.state.value}
-              onValueChange={(provider) => {
-                const next = provider as S3Provider
-                field.handleChange(next)
-                const region = s3RegionForProviderChange(next, form.getFieldValue('region'))
-                if (region) form.setFieldValue('region', region)
-              }}
-            >
-              <SelectTrigger className="w-full" id="storage-provider">
-                <SelectValue>
-                  <StorageProviderIcon provider={field.state.value} />
-                  <span>{t.providers[field.state.value]}</span>
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent align="start" alignItemWithTrigger={false} className="min-w-64">
-                {providers.map((provider) => (
-                  <SelectItem key={provider.value} value={provider.value}>
-                    <StorageProviderIcon provider={provider.value} />
-                    <span>{provider.label}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-        )}
-      </form.Field>
-      <form.Subscribe selector={(state) => state.values.provider}>
-        {(provider) => (
+    <form.Subscribe selector={(state) => state.values.provider}>
+      {(provider) => (
+        <>
+          <form.Field name="provider">
+            {(field) => (
+              <Field>
+                <FieldLabel htmlFor="storage-provider">{t.provider}</FieldLabel>
+                <Select
+                  items={providers}
+                  value={field.state.value}
+                  onValueChange={(value) => {
+                    const next = value as S3Provider
+                    field.handleChange(next)
+                    const region = s3RegionForProviderChange(next, form.getFieldValue('region'))
+                    if (region) form.setFieldValue('region', region)
+                  }}
+                >
+                  <SelectTrigger className="w-full" id="storage-provider">
+                    <SelectValue>
+                      <StorageProviderIcon provider={field.state.value} />
+                      <span>{t.providers[field.state.value]}</span>
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent align="start" alignItemWithTrigger={false} className="min-w-64">
+                    {providers.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        <StorageProviderIcon provider={option.value} />
+                        <span>{option.label}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+          </form.Field>
           <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
             <p>{t.help[provider].description}</p>
             <a
@@ -58,11 +58,7 @@ export function S3StorageFields({ form, current }: { form: StorageConfigFormApi;
               {t.setupGuide}
             </a>
           </div>
-        )}
-      </form.Subscribe>
-      <form.Subscribe selector={(state) => state.values.provider}>
-        {(provider) =>
-          provider === 'cloudflare' ? (
+          {provider === 'cloudflare' ? (
             <form.Field name="accountId">
               {(field) => (
                 <Field>
@@ -92,29 +88,25 @@ export function S3StorageFields({ form, current }: { form: StorageConfigFormApi;
                 </Field>
               )}
             </form.Field>
-          ) : null
-        }
-      </form.Subscribe>
-      <FieldSet>
-        <FieldLegend>{t.bucket}</FieldLegend>
-        <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
-          <form.Field name="bucket">
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor="storage-bucket">{t.bucketName}</FieldLabel>
-                <Input
-                  id="storage-bucket"
-                  value={field.state.value}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  placeholder="stlquest-models"
-                  required
-                />
-              </Field>
-            )}
-          </form.Field>
-          <form.Subscribe selector={(state) => state.values.provider}>
-            {(provider) =>
-              provider !== 'cloudflare' && provider !== 'google-cloud' ? (
+          ) : null}
+          <FieldSet>
+            <FieldLegend>{t.bucket}</FieldLegend>
+            <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
+              <form.Field name="bucket">
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor="storage-bucket">{t.bucketName}</FieldLabel>
+                    <Input
+                      id="storage-bucket"
+                      value={field.state.value}
+                      onChange={(event) => field.handleChange(event.target.value)}
+                      placeholder="stlquest-models"
+                      required
+                    />
+                  </Field>
+                )}
+              </form.Field>
+              {provider !== 'cloudflare' && provider !== 'google-cloud' ? (
                 <form.Field name="region">
                   {(field) => (
                     <Field>
@@ -129,68 +121,60 @@ export function S3StorageFields({ form, current }: { form: StorageConfigFormApi;
                     </Field>
                   )}
                 </form.Field>
-              ) : null
-            }
-          </form.Subscribe>
-        </div>
-        <form.Field name="prefix">
-          {(field) => (
-            <Field>
-              <FieldLabel htmlFor="storage-prefix">{t.prefix}</FieldLabel>
-              <Input
-                id="storage-prefix"
-                value={field.state.value}
-                onChange={(event) => field.handleChange(event.target.value)}
-                placeholder="stlquest"
-              />
-              <FieldDescription>{t.prefixDescription}</FieldDescription>
-            </Field>
-          )}
-        </form.Field>
-      </FieldSet>
-      <FieldSet>
-        <FieldLegend>{t.accessKeys}</FieldLegend>
-        <FieldDescription>{t.accessKeysDescription}</FieldDescription>
-        <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
-          <form.Field name="accessKeyId">
-            {(field) => (
-              <Field>
-                <form.Subscribe selector={(state) => state.values.provider}>
-                  {(provider) => <FieldLabel htmlFor="storage-access">{t.help[provider].accessKey}</FieldLabel>}
-                </form.Subscribe>
-                <Input
-                  id="storage-access"
-                  value={field.state.value}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  autoComplete="off"
-                  required
-                />
-              </Field>
-            )}
-          </form.Field>
-          <form.Field name="secretAccessKey">
-            {(field) => (
-              <Field>
-                <form.Subscribe selector={(state) => state.values.provider}>
-                  {(provider) => <FieldLabel htmlFor="storage-secret">{t.help[provider].secretKey}</FieldLabel>}
-                </form.Subscribe>
-                <Input
-                  id="storage-secret"
-                  type="password"
-                  value={field.state.value}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  placeholder={current ? t.keepSecret : ''}
-                  autoComplete="off"
-                  required={!current}
-                />
-              </Field>
-            )}
-          </form.Field>
-        </div>
-      </FieldSet>
-      <form.Subscribe selector={(state) => state.values.provider}>
-        {(provider) =>
-          provider === 'custom' ? (
+              ) : null}
+            </div>
+            <form.Field name="prefix">
+              {(field) => (
+                <Field>
+                  <FieldLabel htmlFor="storage-prefix">{t.prefix}</FieldLabel>
+                  <Input
+                    id="storage-prefix"
+                    value={field.state.value}
+                    onChange={(event) => field.handleChange(event.target.value)}
+                    placeholder="stlquest"
+                  />
+                  <FieldDescription>{t.prefixDescription}</FieldDescription>
+                </Field>
+              )}
+            </form.Field>
+          </FieldSet>
+          <FieldSet>
+            <FieldLegend>{t.accessKeys}</FieldLegend>
+            <FieldDescription>{t.accessKeysDescription}</FieldDescription>
+            <div className="flex flex-col gap-3 sm:flex-row [&>[data-slot=field]]:flex-1">
+              <form.Field name="accessKeyId">
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor="storage-access">{t.help[provider].accessKey}</FieldLabel>
+                    <Input
+                      id="storage-access"
+                      value={field.state.value}
+                      onChange={(event) => field.handleChange(event.target.value)}
+                      autoComplete="off"
+                      required
+                    />
+                  </Field>
+                )}
+              </form.Field>
+              <form.Field name="secretAccessKey">
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor="storage-secret">{t.help[provider].secretKey}</FieldLabel>
+                    <Input
+                      id="storage-secret"
+                      type="password"
+                      value={field.state.value}
+                      onChange={(event) => field.handleChange(event.target.value)}
+                      placeholder={current ? t.keepSecret : ''}
+                      autoComplete="off"
+                      required={!current}
+                    />
+                  </Field>
+                )}
+              </form.Field>
+            </div>
+          </FieldSet>
+          {provider === 'custom' ? (
             <form.Field name="forcePathStyle">
               {(field) => (
                 <Field orientation="horizontal">
@@ -202,9 +186,9 @@ export function S3StorageFields({ form, current }: { form: StorageConfigFormApi;
                 </Field>
               )}
             </form.Field>
-          ) : null
-        }
-      </form.Subscribe>
-    </>
+          ) : null}
+        </>
+      )}
+    </form.Subscribe>
   )
 }

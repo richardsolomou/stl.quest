@@ -64,25 +64,6 @@ export function estimatePending(request: Pick<PublicPrintRequest, 'estimateGeome
   return request.estimateGeometryStatus === 'pending' || request.estimateGeometryStatus === 'running'
 }
 
-export function effectivePrintEstimate(input: {
-  printType?: PrintType
-  modelVolumeMm3?: number
-  modelSurfaceAreaMm2?: number
-  modelHeightMm?: number
-  materialOverride?: number
-  minutesOverride?: number
-}) {
-  const automatic = automaticPrintEstimate(input)
-  if (!automatic) return undefined
-  return {
-    material: input.materialOverride ?? automatic.material,
-    materialUnit: automatic.materialUnit,
-    minutes: input.minutesOverride ?? automatic.minutes,
-    materialAdjusted: input.materialOverride !== undefined,
-    minutesAdjusted: input.minutesOverride !== undefined,
-  }
-}
-
 export function formatEstimateMaterial(value: number, locale: Locale = DEFAULT_LOCALE) {
   const [minimumFractionDigits, maximumFractionDigits] = value >= 100 ? [0, 0] : value >= 10 ? [1, 1] : [0, 2]
   return new Intl.NumberFormat(locale, { minimumFractionDigits, maximumFractionDigits, useGrouping: false }).format(value)

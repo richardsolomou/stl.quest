@@ -1,14 +1,4 @@
 import { Check } from 'lucide-react'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { cn } from '@/lib/utils'
@@ -16,8 +6,9 @@ import type { StorageConfig, StorageInventory } from '../../../core/types'
 import { formatBytes } from '../../../core/format'
 import { storageLabel } from '../../storageProviders'
 import { useI18n } from '../../i18n'
+import { ConfirmDialog } from '../ConfirmDialog'
 
-export type DestinationAction = 'preserve' | 'clear-all'
+type DestinationAction = 'preserve' | 'clear-all'
 
 export function StorageChangeDialog({
   change,
@@ -47,22 +38,17 @@ export function StorageChangeDialog({
   const kind = change?.config.adapter === 's3' ? 'bucket' : 'folder'
   const deleting = occupied && action === 'clear-all'
   return (
-    <AlertDialog
+    <ConfirmDialog
       open={!!change}
-      onOpenChange={(next) => {
-        if (!next) onCancel()
-      }}
-    >
-      <AlertDialogContent size="lg" className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
-        <AlertDialogHeader>
-          <AlertDialogTitle>{occupied ? t.notEmptyTitle(kind) : t.moveTitle}</AlertDialogTitle>
-          <AlertDialogDescription>
-            {occupied && inventory
-              ? t.occupiedDescription(inventory.files, inventory.folders, formatBytes(inventory.bytes, locale))
-              : t.moveDescription}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        {change && (
+      size="lg"
+      title={occupied ? t.notEmptyTitle(kind) : t.moveTitle}
+      description={
+        occupied && inventory
+          ? t.occupiedDescription(inventory.files, inventory.folders, formatBytes(inventory.bytes, locale))
+          : t.moveDescription
+      }
+      details={
+        change && (
           <div className="flex flex-col gap-3">
             <div className="rounded-lg border bg-muted/30 p-3 text-sm">
               <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5">
@@ -121,15 +107,14 @@ export function StorageChangeDialog({
             )}
             <p className="text-xs leading-relaxed text-muted-foreground">{migrationWillRun ? t.migrationNote : t.immediateNote}</p>
           </div>
-        )}
-        <AlertDialogFooter>
-          <AlertDialogCancel>{messages.common.cancel}</AlertDialogCancel>
-          <AlertDialogAction variant={deleting ? 'destructive' : 'default'} disabled={deleting && !acknowledged} onClick={onConfirm}>
-            {deleting ? t.deleteAndSwitch : migrationWillRun ? t.copyAndSwitch : t.startUsing}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+        )
+      }
+      confirmLabel={deleting ? t.deleteAndSwitch : migrationWillRun ? t.copyAndSwitch : t.startUsing}
+      destructive={deleting}
+      confirmDisabled={deleting && !acknowledged}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+    />
   )
 }
 

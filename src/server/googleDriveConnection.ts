@@ -1,6 +1,11 @@
 import { GoogleDriveAssetStore } from '../adapters/googleDrive'
 import type { CloudStorageApp } from '../core/auth'
-import { beginCloudAuthorization, completeCloudAuthorization, requireCloudAuthorizationCallback } from './cloudConnectionState'
+import {
+  beginCloudAuthorization,
+  completeCloudAuthorization,
+  requireCloudAuthorizationCallback,
+  verifyConnectionWritable,
+} from './cloudConnectionState'
 import type { SettingStore } from './integrations'
 import { exchangeOAuthAuthorizationCode, fetchOAuthProfile } from './oauthConnection'
 
@@ -9,16 +14,6 @@ const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const USER_INFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo'
 const SCOPES = ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/drive.file']
 
-export class GoogleDrivePermissionError extends Error {
-  constructor(readonly returnTo: string) {
-    super('Google Drive did not grant the required drive.file permission')
-  }
-}
-
-export function googleDriveCallbackUrl(origin: string) {
-  return `${origin}/api/storage/google-drive/callback`
-}
-
 export async function beginGoogleDriveAuthorization(
   app: CloudStorageApp,
   workspace: SettingStore,
@@ -26,8 +21,7 @@ export async function beginGoogleDriveAuthorization(
   origin: string,
   returnTo: string,
 ) {
-  const redirectUri = googleDriveCallbackUrl(origin)
-  return beginCloudAuthorization(workspace, 'google-drive', adminId, redirectUri, returnTo, AUTHORIZE_URL, {
+  return beginCloudAuthorization(workspace, 'google-drive', adminId, origin, returnTo, AUTHORIZE_URL, {
     client_id: app.clientId,
     response_type: 'code',
     access_type: 'offline',
@@ -56,11 +50,10 @@ export async function completeGoogleDriveAuthorization(app: CloudStorageApp, wor
     accountEmail: account.email,
     connectedAt: Date.now(),
   }
-  try {
-    await new GoogleDriveAssetStore('', { ...app, refreshToken }, true).writable()
-  } catch (error) {
-    if ([401, 403].includes((error as { status?: number }).status ?? 0)) throw new GoogleDrivePermissionError(pending.returnTo)
-    throw error
-  }
+  await verifyConnectionWritable(
+    new GoogleDriveAssetStore('', { ...app, refreshToken }, true),
+    pending.returnTo,
+    'Google Drive did not grant the required drive.file permission',
+  )
   return completeCloudAuthorization(workspace, 'google-drive', pending, next, adminId)
 }

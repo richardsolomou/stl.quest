@@ -1,11 +1,13 @@
 import type { CloudStorageApp, CloudStorageProvider } from '../core/auth'
-import { beginBoxAuthorization, BoxPermissionError, completeBoxAuthorization } from './boxConnection'
+import { beginBoxAuthorization, completeBoxAuthorization } from './boxConnection'
 import { app, deploymentSettings } from './app'
 import { requireCloudStorageApp } from './cloudStorage'
-import { beginDropboxAuthorization, completeDropboxAuthorization, DropboxPermissionError } from './dropboxConnection'
-import { beginGoogleDriveAuthorization, completeGoogleDriveAuthorization, GoogleDrivePermissionError } from './googleDriveConnection'
+import { CloudPermissionError } from './cloudConnectionState'
+import { beginDropboxAuthorization, completeDropboxAuthorization } from './dropboxConnection'
+import { beginGoogleDriveAuthorization, completeGoogleDriveAuthorization } from './googleDriveConnection'
 import type { SettingStore } from './integrations'
-import { beginOneDriveAuthorization, completeOneDriveAuthorization, OneDrivePermissionError } from './oneDriveConnection'
+import { logger } from './logger'
+import { beginOneDriveAuthorization, completeOneDriveAuthorization } from './oneDriveConnection'
 import { withRequestContext } from './requestContext'
 
 type BeginAuthorization = (
@@ -52,12 +54,14 @@ export function cloudStorageAuthorizationCallback(request: Request, provider: Cl
       if (context.identity.workspaceRole !== 'owner' && identity.role !== 'admin') throw new Response('forbidden', { status: 403 })
       const cloudApp = await requireCloudStorageApp(deploymentSettings(instance.repository), provider)
       returnTo = await COMPLETE_AUTHORIZATION[provider](cloudApp, context.repository, request, identity.id)
-      void instance.telemetry.capture(identity.id, 'cloud_storage_connected', { provider }).catch(() => undefined)
+      instance.telemetry.capture(identity.id, 'cloud_storage_connected', { provider })
       outcome = 'connected'
     } catch (error) {
-      if (isPermissionError(error, provider)) {
+      if (error instanceof CloudPermissionError) {
         returnTo = error.returnTo
         outcome = 'missing-permissions'
+      } else {
+        logger.warn({ err: error, event: 'cloud_authorization_failed', provider }, 'cloud authorization failed')
       }
     }
     const url = new URL(returnTo, request.url)
@@ -65,11 +69,4 @@ export function cloudStorageAuthorizationCallback(request: Request, provider: Cl
     url.searchParams.set('outcome', outcome)
     return Response.redirect(url)
   })
-}
-
-function isPermissionError(error: unknown, provider: CloudStorageProvider): error is { returnTo: string } {
-  if (provider === 'dropbox') return error instanceof DropboxPermissionError
-  if (provider === 'google-drive') return error instanceof GoogleDrivePermissionError
-  if (provider === 'box') return error instanceof BoxPermissionError
-  return error instanceof OneDrivePermissionError
 }

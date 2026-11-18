@@ -18,7 +18,7 @@ export const STORAGE_RUNTIME_REVISION_SETTING = 'storage-runtime-revision'
 export const MANAGED_STORAGE_CLEANUP_SETTING = 'managed-storage-cleanup'
 export const LEGACY_CLOUD_STORAGE_CLEANUP_SETTING = 'legacy-cloud-storage-cleanup'
 
-export type ManagedStorageCleanup = { purpose: 'release' } | { purpose: 'abandon-migration'; migrationId: string }
+type ManagedStorageCleanup = { purpose: 'release' } | { purpose: 'abandon-migration'; migrationId: string }
 export type LegacyCloudStorageCleanup = { source: StorageConfig }
 
 export async function completeManagedStorageCleanup(repository: Repository, store: AssetStore) {
@@ -326,9 +326,10 @@ export class StorageMigrationCoordinator {
         } else {
           logger.error({ err: error, event: 'storage_migration_failed', migration_id: migration.id }, 'storage migration failed')
         }
-        void this.telemetry
-          .capture('server', 'storage_migration_failed', { adapter: migration.destination.adapter, files_copied: migration.copiedFiles })
-          .catch(() => undefined)
+        this.telemetry.capture('server', 'storage_migration_failed', {
+          adapter: migration.destination.adapter,
+          files_copied: migration.copiedFiles,
+        })
         await this.activate()
       })
       .finally(() => {
@@ -480,13 +481,11 @@ export class StorageMigrationCoordinator {
       { event: 'storage_migration_completed', migration_id: completed.id, files: completed.totalFiles, bytes: completed.totalBytes },
       'storage migration completed',
     )
-    void this.telemetry
-      .capture('server', 'storage_migration_completed', {
-        adapter: completed.destination.adapter,
-        files: completed.totalFiles,
-        bytes: completed.totalBytes,
-      })
-      .catch(() => undefined)
+    this.telemetry.capture('server', 'storage_migration_completed', {
+      adapter: completed.destination.adapter,
+      files: completed.totalFiles,
+      bytes: completed.totalBytes,
+    })
     await this.activate()
   }
 

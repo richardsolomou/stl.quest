@@ -16,7 +16,7 @@ import {
   printerProfilesValidationError,
 } from '../../../core/printers'
 import { getPrinterPreset, PRINTER_PRESETS, type PrinterPreset } from '../../../core/printerPresets'
-import type { PrinterProfile, PrintType } from '../../../core/types'
+import { PRINT_TYPES, type PrinterProfile, type PrintType } from '../../../core/types'
 import { savePrinterProfiles } from '../../../server/fns'
 import { createId } from '../../id'
 import { errorMessage } from '../../../core/error'
@@ -32,8 +32,7 @@ import { PrinterPresetPicker } from './PrinterPresetPicker'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { useI18n } from '../../i18n'
 
-const printTypeOptions = (labels: Record<PrintType, string>) =>
-  (['resin', 'filament'] as const).map((value) => ({ value, label: labels[value] }))
+const printTypeOptions = (labels: Record<PrintType, string>) => PRINT_TYPES.map((value) => ({ value, label: labels[value] }))
 
 export function PrintersPane({
   onboarding = false,

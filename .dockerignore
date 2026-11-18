@@ -8,8 +8,6 @@ node_modules
 prints-dev
 .capture
 .github
-.wrangler
 dist
-.data
 .env.*
 *.log

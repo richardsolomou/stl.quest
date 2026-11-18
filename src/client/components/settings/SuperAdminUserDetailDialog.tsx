@@ -2,10 +2,10 @@ import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Badge } from '@/components/ui/badge'
 import { SOCIAL_AUTH_PROVIDER_NAMES, SOCIAL_AUTH_PROVIDERS, type SocialAuthProvider } from '../../../core/auth'
-import type { Locale, Messages } from '../../../core/i18n'
+import type { Messages } from '../../../core/i18n'
 import type { Account } from '../../../core/types'
 import type { AdminAccountDetails } from '../../../core/admin'
-import { formatBytes } from '../../../core/format'
+import { formatBytes, formatDateTime } from '../../../core/format'
 import { storagePlans } from '../../../core/plans'
 import { useI18n } from '../../i18n'
 import { adminAccountQuery } from '../../queries'
@@ -37,7 +37,6 @@ export function SuperAdminUserDetailDialog({ user, hosted, onDone }: { user: Acc
 function AccountDetails({ account, hosted }: { account: AdminAccountDetails; hosted: boolean }) {
   const { t, locale } = useI18n()
   const copy = t.superAdmin.userDetails
-  const formatDateTime = (value: number) => dateTime(value, locale)
   const planEntries: Array<[string, string]> = []
   if (hosted) {
     const plan = account.plan ?? 'free'
@@ -66,9 +65,9 @@ function AccountDetails({ account, hosted }: { account: AdminAccountDetails; hos
       [
         copy.renewsOrEnds,
         account.subscription.cancelAt
-          ? formatDateTime(account.subscription.cancelAt)
+          ? formatDateTime(account.subscription.cancelAt, locale)
           : account.subscription.periodEnd
-            ? formatDateTime(account.subscription.periodEnd)
+            ? formatDateTime(account.subscription.periodEnd, locale)
             : copy.notAvailable,
       ],
     )
@@ -81,9 +80,9 @@ function AccountDetails({ account, hosted }: { account: AdminAccountDetails; hos
           <DetailList
             entries={[
               [copy.accountId, account.id],
-              [copy.created, formatDateTime(account.createdAt)],
-              [copy.updated, formatDateTime(account.updatedAt)],
-              [copy.lastOnline, account.lastOnlineAt ? formatDateTime(account.lastOnlineAt) : t.superAdmin.never],
+              [copy.created, formatDateTime(account.createdAt, locale)],
+              [copy.updated, formatDateTime(account.updatedAt, locale)],
+              [copy.lastOnline, account.lastOnlineAt ? formatDateTime(account.lastOnlineAt, locale) : t.superAdmin.never],
             ]}
           />
         </DetailSection>
@@ -150,10 +149,6 @@ function DetailList({ entries }: { entries: Array<[string, string]> }) {
       ))}
     </dl>
   )
-}
-
-function dateTime(value: number, locale: Locale) {
-  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(value)
 }
 
 function authProviderLabel(provider: string, t: Messages) {

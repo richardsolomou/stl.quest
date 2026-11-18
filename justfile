@@ -71,7 +71,7 @@ e2e-distributed-run:
     sh scripts/e2eLock.sh pnpm exec playwright test --config playwright.distributed.config.ts
 
 e2e-ci:
-    sh scripts/e2eLock.sh sh -c 'just e2e-run e2e/00-stlquest.spec.ts e2e/account-settings.spec.ts e2e/chunk-recovery.spec.ts e2e/request-ordering.spec.ts && just e2e-run --project hosted-managed --project self-hosted-http --project self-hosted-https --project preview-seed && just e2e-distributed-run'
+    sh scripts/e2eLock.sh sh -c 'just e2e-run && just e2e-distributed-run'
 
 e2e-screenshots *args:
     sh scripts/e2eLock.sh sh -c 'just e2e-build && CAPTURE_E2E_SCREENSHOTS=1 just e2e-run "$@"' e2e {{ args }}

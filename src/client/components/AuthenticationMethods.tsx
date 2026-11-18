@@ -12,11 +12,11 @@ import { Spinner } from '@/components/ui/spinner'
 import {
   authErrorMessage,
   signInFailureMessage,
-  signInFailureReason,
   socialProviderName,
   type SignInCapabilities,
   type SocialAuthProvider,
 } from '../../core/auth'
+import { classifySignInFailure } from '../../core/authFailures'
 import { PASSWORD_MIN_LENGTH } from '../../core/security'
 import { authClient } from '../authClient'
 import { useI18n } from '../i18n'
@@ -114,7 +114,7 @@ export function AuthenticationMethods({
                   setError(authErrorMessage(t.auth, failed, t.auth.methods.createAccountFailed))
                 } else {
                   setError(signInFailureMessage(t.auth, failed))
-                  posthog.capture('user_sign_in_failed', { reason: signInFailureReason(failed) })
+                  posthog.capture('user_sign_in_failed', { reason: classifySignInFailure(failed) })
                 }
                 return
               }

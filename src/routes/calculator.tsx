@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
+import { createFileRoute, useNavigate, useHydrated } from '@tanstack/react-router'
+import { useEffect } from 'react'
 import { AppRail } from '../client/components/AppRail'
 import { calculatorPrefill, validateCalculatorSearch } from '../client/calculatorSearch'
 import { PriceCalculator } from '../client/components/PriceCalculator'
@@ -12,12 +12,11 @@ export const Route = createFileRoute('/calculator')({ validateSearch: validateCa
 function PriceCalculatorPage() {
   const { data: session } = useSuspenseQuery(sessionQuery())
   const search = Route.useSearch()
-  const [hydrated, setHydrated] = useState(false)
+  const hydrated = useHydrated()
   const navigate = useNavigate()
   useEscape(() => navigate({ to: '/' }))
   const identity = session.identity
   const authorized = Boolean(identity?.role === 'admin' && identity.workspaceSlug)
-  useEffect(() => setHydrated(true), [])
   useEffect(() => {
     if (!authorized) void navigate({ to: '/' })
   }, [authorized, navigate])

@@ -3,7 +3,7 @@ import { useServerFn } from '@tanstack/react-start'
 import { Field, FieldContent, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Switch } from '@/components/ui/switch'
 import { updateSelfSignupSettings } from '../../../server/fns'
-import { SettingNotice, noticeDetail } from '../SettingNotice'
+import { SettingNotice, errorNotice } from '../SettingNotice'
 import { SettingsSection } from './SettingsLayout'
 import { useI18n } from '../../i18n'
 
@@ -33,16 +33,7 @@ export function SelfSignupSetting({ enabled }: { enabled: boolean }) {
           onCheckedChange={(checked) => mutation.mutate({ data: { enabled: checked } })}
         />
       </Field>
-      {mutation.error && (
-        <SettingNotice
-          notice={{
-            tone: 'error',
-            title: copy.notSaved,
-            hint: copy.notSavedHint,
-            detail: noticeDetail(mutation.error),
-          }}
-        />
-      )}
+      {mutation.error && <SettingNotice notice={errorNotice(copy.notSaved, copy.notSavedHint, mutation.error)} />}
     </SettingsSection>
   )
 }

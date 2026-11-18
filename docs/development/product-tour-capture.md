@@ -4,11 +4,11 @@
 
 ## Outputs
 
-| Command            | Output                                                                   | Destination                                                                                       |
-| ------------------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `pnpm tour:video`  | `.capture/landing.mp4`, `.capture/landing.webm`, `.capture/landing.webp` | Copy to the corresponding `public/product-tour.*` files.                                          |
-| `pnpm tour:gif`    | `.capture/product-tour.gif`                                              | Copy to `public/product-tour.gif`; the README loads it from `https://stl.quest/product-tour.gif`. |
-| `pnpm tour:verify` | `.capture/verify/*.png`                                                  | Inspect locally before recording; do not commit these screenshots.                                |
+| Command            | Output                                  | Destination                                                                       |
+| ------------------ | --------------------------------------- | --------------------------------------------------------------------------------- |
+| `pnpm tour:video`  | `.capture/product-tour.{mp4,webm,webp}` | Copy to `public/`.                                                                |
+| `pnpm tour:gif`    | `.capture/product-tour.gif`             | Copy to `public/`; the README loads it from `https://stl.quest/product-tour.gif`. |
+| `pnpm tour:verify` | `.capture/verify/*.png`                 | Inspect locally before recording; do not commit these screenshots.                |
 
 The scripts target `http://localhost:3001` by default. Override that with `BASE`. Demo credentials default to `richard@stl.quest` and `demo-demo-demo`; `DEMO_EMAIL` and `DEMO_PASSWORD` override them.
 
@@ -23,7 +23,7 @@ Recording changes the board. Reseed and restart the instance between the two cap
 
 ## Publishing
 
-Copy `.capture/landing.mp4`, `.capture/landing.webm`, and `.capture/landing.webp` over the corresponding `public/product-tour.*` files, then run `pnpm build` and inspect the rendered page at desktop and mobile widths through a complete playback cycle.
+Copy `.capture/product-tour.mp4`, `.webm`, and `.webp` into `public/`, then run `pnpm build` and inspect the rendered page at desktop and mobile widths through a complete playback cycle.
 
 Copy `.capture/product-tour.gif` to `public/product-tour.gif`. Deploying the hosted service updates the animation shown in the README.
 

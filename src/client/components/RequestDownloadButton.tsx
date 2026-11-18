@@ -1,6 +1,5 @@
 import { usePostHog } from '@posthog/react'
-import { buttonVariants } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { ButtonLink } from '@/components/ui/button'
 import type { PublicPrintRequest } from '../../core/types'
 import { requestDownloadHref } from '../boardDownload'
 import { signalProductTourProgress } from '../productTour'
@@ -10,8 +9,8 @@ export function RequestDownloadButton({ request }: { request: PublicPrintRequest
   const { t } = useI18n()
   const posthog = usePostHog()
   return (
-    <a
-      className={cn(buttonVariants({ variant: 'outline' }))}
+    <ButtonLink
+      variant="outline"
       href={requestDownloadHref([request])}
       download
       onClick={() => {
@@ -20,6 +19,6 @@ export function RequestDownloadButton({ request }: { request: PublicPrintRequest
       }}
     >
       {t.requests.downloadModel}
-    </a>
+    </ButtonLink>
   )
 }

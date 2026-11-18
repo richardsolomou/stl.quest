@@ -26,9 +26,9 @@ describe('managed storage usage', () => {
 
 describe('route errors', () => {
   it('reports the original browser error through server telemetry', async () => {
-    const exception = vi.fn(async () => undefined)
+    const exception = vi.fn()
 
-    await captureRouteError(
+    captureRouteError(
       { exception },
       { name: 'TypeError', message: 'workspace failed', stack: 'TypeError: workspace failed\n    at route.tsx:1:1' },
     )

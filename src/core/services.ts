@@ -14,7 +14,6 @@ import type {
   Notifier,
   PendingOperation,
   PrintRequest,
-  PrinterProfile,
   PrintType,
   PublicPrintRequest,
   PublicRequestQueryResult,
@@ -27,9 +26,9 @@ import type {
   UploadStagingArea,
 } from './types'
 import { recordOnboardingTask, type OnboardingTaskId } from './onboarding'
-import { initialStatus, isReadyStatus, statusById, workflow } from './workflow'
+import { initialStatus, isReadyStatus, requestStarted, statusById } from './workflow'
 import { readyPrintsByRequester, type NotificationKind, type NotificationPreferences } from './notifications'
-import { automaticallyAssignedPrinter, normalizePrinterProfile, printerFitsModel, storedPrinterProfiles } from './printers'
+import { automaticallyAssignedPrinter, printerFitsModel, storedPrinterProfiles } from './printers'
 import {
   MAX_REQUEST_NAME_LENGTH,
   MAX_REQUEST_NOTES_LENGTH,
@@ -81,16 +80,16 @@ export class STLQuestService {
     // Clear overrides so they cannot silently apply if this account rejoins.
     const board = normalizeBoardConfig(await this.repository.getSetting<Partial<BoardConfig>>('board'))
     if (board.memberVisibility[userId]) await this.repository.setSetting('board', withMemberRequestVisibility(board, userId, 'default'))
-    this.events.publish('user.created')
-    void this.telemetry.capture(actor.id, 'workspace_member_removed', {}).catch(() => undefined)
+    this.changed('user.created')
+    this.capture(actor.id, 'workspace_member_removed', {})
   }
 
   async addWorkspaceMember(actor: Identity, userId: string, role: AssignableWorkspaceRole) {
     if (!actor.superAdmin) throw new Response(this.text.access.forbidden, { status: 403 })
     if (!(await this.repository.userExists(userId))) throw new Response(this.text.account.notFound, { status: 404 })
     if (!(await this.repository.addWorkspaceMember(userId, role))) return
-    this.events.publish('user.created')
-    void this.telemetry.capture(actor.id, 'workspace_member_added', { role }).catch(() => undefined)
+    this.changed('user.created')
+    this.capture(actor.id, 'workspace_member_added', { role })
   }
 
   async listRequests(identity: Identity, ownRequestsOnly = false, filters: RequestFilters = {}): Promise<PublicRequestQueryResult> {
@@ -124,7 +123,7 @@ export class STLQuestService {
         ...request
       }) => {
         const mine = ownerUserId === identity.id
-        const started = workflow.statuses.slice(1).some((status) => request.counts[status.id] > 0)
+        const started = requestStarted(request.counts)
         const printer = request.printerId ? printers.get(request.printerId) : undefined
         const printType = printer?.printType ?? requestedPrintType
         const automaticEstimate = automaticPrintEstimate({
@@ -212,7 +211,7 @@ export class STLQuestService {
       ownerUserId: identity.id,
       ...target,
     })
-    const printType = target.printerId ? printerPrintType((await this.printer(target.printerId))!) : target.requestedPrintType
+    const printType = await this.requestPrintType(target)
     this.changed('request.created')
     this.capture(identity.id, 'request_created', {
       print_type: printType,
@@ -245,7 +244,7 @@ export class STLQuestService {
       sourceImageUrl: input.sourceImageUrl,
       ...target,
     })
-    const printType = target.printerId ? printerPrintType((await this.printer(target.printerId))!) : target.requestedPrintType
+    const printType = await this.requestPrintType(target)
     this.changed('request.created')
     this.capture(identity.id, 'request_created', {
       print_type: printType,
@@ -265,7 +264,7 @@ export class STLQuestService {
       ownerUserId: identity.id,
       ...target,
     }
-    const printType = request.printerId ? printerPrintType((await this.printer(request.printerId))!) : request.requestedPrintType
+    const printType = await this.requestPrintType(request)
     const requestId = crypto.randomUUID()
     const filePath = this.assets.createPath(requestId, request.fileName)
     const operation: UploadOperation = {
@@ -306,7 +305,7 @@ export class STLQuestService {
     if (completed) return completed
     const request = await this.requiredRequest(requestId)
     if (identity.role !== 'admin') {
-      const started = workflow.statuses.slice(1).some((status) => request.counts[status.id] > 0)
+      const started = requestStarted(request.counts)
       if (request.ownerUserId !== identity.id || started) throw new Response(this.text.access.forbidden, { status: 403 })
     }
     const printType = await this.requestPrintType(request)
@@ -504,16 +503,6 @@ export class STLQuestService {
     return { name: requestedName ?? `Tag ${sequence}`, color }
   }
 
-  async renameGroup(id: string, name: string, identity: Identity) {
-    this.requireAdmin(identity)
-    const normalized = name.trim()
-    if (!validPrintGroupName(normalized)) throw new Response(this.text.request.invalidGroup, { status: 400 })
-    if (!(await this.repository.getGroup(id))) throw new Response(this.text.request.groupNotFound, { status: 404 })
-    await this.repository.renameGroup(id, normalized)
-    this.changed('board.changed')
-    this.capture(identity.id, 'print_group_renamed')
-  }
-
   async updateGroup(
     id: string,
     fields: { name?: string; color?: (typeof printGroupColors)[number]; parentId?: string | null },
@@ -697,10 +686,10 @@ export class STLQuestService {
       fields.requestedPrintType = requestedPrintType ?? null
       automaticPrinterAssignment = target.automaticPrinterAssignment
     }
-    const printType = printerId ? printerPrintType((await this.printer(printerId))!) : requestedPrintType
+    const printType = await this.requestPrintType({ printerId, requestedPrintType })
     const printTypeChanged = printType !== previousPrintType
     if (identity.role !== 'admin') {
-      const started = workflow.statuses.slice(1).some((status) => request.counts[status.id] > 0)
+      const started = requestStarted(request.counts)
       if (request.ownerUserId !== identity.id || started) throw new Response(this.text.access.forbidden, { status: 403 })
       fields = {
         name: fields.name,
@@ -778,7 +767,7 @@ export class STLQuestService {
       if (identity.role !== 'admin') {
         if (request.ownerUserId !== identity.id) throw new Response(this.text.access.forbidden, { status: 403 })
         // Like deletion, requesters may not hide a request once a copy starts — active work stays visible to operators.
-        const started = archive && workflow.statuses.slice(1).some((status) => (request.counts[status.id] ?? 0) > 0)
+        const started = archive && requestStarted(request.counts)
         if (started) throw new Response(this.text.access.forbidden, { status: 403 })
       }
       if (archive === (request.archivedAt !== undefined)) continue
@@ -817,7 +806,7 @@ export class STLQuestService {
     if (request.filePath) await this.assertAssetsMutable()
     if (identity.role !== 'admin') {
       // Requesters may withdraw their own request until a copy starts.
-      const started = workflow.statuses.slice(1).some((status) => request.counts[status.id] > 0)
+      const started = requestStarted(request.counts)
       if (request.ownerUserId !== identity.id || started) throw new Response(this.text.access.forbidden, { status: 403 })
     }
     await this.removeRequest(request)
@@ -1195,7 +1184,7 @@ export class STLQuestService {
 
   private async requestPrintType(request: { requestedPrintType?: PrintType; printerId?: string }) {
     const printer = request.printerId ? await this.printer(request.printerId) : undefined
-    return printer ? printerPrintType(printer) : request.requestedPrintType
+    return printer ? printer.printType : request.requestedPrintType
   }
 
   async notificationPreferences(identity: Identity): Promise<NotificationPreferences> {
@@ -1235,7 +1224,7 @@ export class STLQuestService {
   }
 
   private capture(identity: string, event: string, properties?: Record<string, unknown>) {
-    void this.telemetry.capture(identity, event, properties).catch(() => undefined)
+    this.telemetry.capture(identity, event, properties)
   }
 }
 
@@ -1243,10 +1232,6 @@ function unique<T extends string | undefined>(values: T[]) {
   return [...new Set(values)]
     .filter((value): value is Exclude<T, undefined> => value !== undefined)
     .sort((left, right) => left.localeCompare(right))
-}
-
-function printerPrintType(printer: PrinterProfile): PrintType {
-  return normalizePrinterProfile(printer).printType
 }
 
 function filterAndSortEstimates(requests: PublicPrintRequest[], filters: RequestFilters) {

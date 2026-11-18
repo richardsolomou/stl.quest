@@ -1,14 +1,14 @@
 import type { ReactNode } from 'react'
-import { Check, ChevronRight, Cloud, Folder } from 'lucide-react'
+import { Check, ChevronRight, Cloud, Folder, FolderSync } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import type { StorageConfig } from '../../../core/types'
 import type { StoragePlan } from '../../../core/plans'
-import { storageLabel, type CloudProvider, type StorageMessages } from '../../storageProviders'
+import type { CloudStorageProvider } from '../../../core/auth'
+import { storageLabel, type StorageMessages } from '../../storageProviders'
 import { useI18n } from '../../i18n'
 import { CloudProviderIcon } from '../CloudProviderIcon'
-import { StorageAdapterIcon } from '../StorageAdapterIcon'
 import { ManagedStorageUsage, type ManagedStorageUsageValue } from './ManagedStorageUsage'
 import { includedStorageOnboardingCopy } from './planCopy'
 
@@ -44,7 +44,7 @@ export function StorageProviderPicker({
   settings = false,
   onChoose,
 }: {
-  cloudProviders: { value: CloudProvider; label: string; available: boolean }[]
+  cloudProviders: { value: CloudStorageProvider; label: string; available: boolean }[]
   canSetUpCloud?: boolean
   serverFolder?: string
   managedStorage?: boolean
@@ -69,7 +69,7 @@ export function StorageProviderPicker({
             value: 'local' as const,
             label: t.picker.localLabel,
             requires: t.picker.localRequires(serverFolder),
-            icon: <StorageAdapterIcon adapter="local" className="size-5" />,
+            icon: <Folder className="size-5" aria-hidden="true" />,
           },
         ]
       : []),
@@ -77,13 +77,13 @@ export function StorageProviderPicker({
       value: 's3',
       label: t.picker.s3Label,
       requires: t.picker.s3Requires,
-      icon: <StorageAdapterIcon adapter="s3" className="size-5" />,
+      icon: <Cloud className="size-5" aria-hidden="true" />,
     },
     {
       value: 'webdav',
       label: t.picker.webdavLabel,
       requires: t.picker.webdavRequires,
-      icon: <StorageAdapterIcon adapter="webdav" className="size-5" />,
+      icon: <FolderSync className="size-5" aria-hidden="true" />,
     },
   ]
   const description = storageDescription(t, inUse, settings, serverFolder, managedStorage)

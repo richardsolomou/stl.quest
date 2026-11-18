@@ -1,6 +1,6 @@
-import type { Centrifuge, ServerPublicationContext, ServerSubscribedContext, Subscription } from 'centrifuge'
+import type { Centrifuge, Subscription } from 'centrifuge'
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { channelSubscriptionOptions, createRealtimeClient, watchServerChannel } from './realtime'
+import { channelSubscriptionOptions, createRealtimeClient } from './realtime'
 
 const RealtimeContext = createContext<Centrifuge | undefined>(undefined)
 
@@ -87,17 +87,4 @@ export function useRealtimeSubscription(channel: string | undefined, configure?:
     }
   }, [channel, client, configure])
   return subscription
-}
-
-/** Follows a server-side channel through the provider's client; see `watchServerChannel`. Both handlers must keep their identity. */
-export function useServerChannel(
-  channel: string | undefined,
-  publication: (context: ServerPublicationContext) => void,
-  unrecovered?: (context: ServerSubscribedContext) => void,
-) {
-  const client = useRealtimeClient()
-  useEffect(() => {
-    if (!client || !channel) return undefined
-    return watchServerChannel(client, channel, { publication, ...(unrecovered ? { unrecovered } : {}) })
-  }, [channel, client, publication, unrecovered])
 }

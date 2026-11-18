@@ -2,16 +2,16 @@ import { useQuery } from '@tanstack/react-query'
 import { systemDiagnosticsQuery } from '../../queries'
 import { QueryState } from '../QueryState'
 import { formatBytes } from '../../../core/format'
-import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { SettingsSection } from './SettingsLayout'
 import { useI18n } from '../../i18n'
 
-export function SystemDiagnosticsPane({ embedded = false }: { embedded?: boolean }) {
+export function SystemDiagnosticsPane() {
   const query = useQuery(systemDiagnosticsQuery())
   const data = query.data
   const { t, locale } = useI18n()
   const copy = t.settings.systemDiagnostics
-  const content = (
-    <SettingsSection title={embedded ? copy.embeddedTitle : undefined}>
+  return (
+    <SettingsSection title={copy.title}>
       {!data && (
         <QueryState
           loading={query.isPending}
@@ -44,12 +44,5 @@ export function SystemDiagnosticsPane({ embedded = false }: { embedded?: boolean
         </dl>
       )}
     </SettingsSection>
-  )
-  if (embedded) return content
-  return (
-    <SettingsPage>
-      <SettingsHeader title={copy.title} description={copy.description} />
-      {content}
-    </SettingsPage>
   )
 }

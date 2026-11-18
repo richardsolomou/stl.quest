@@ -2,6 +2,8 @@ import { getRequest, setCookie } from '@tanstack/react-start/server'
 import { parseSetCookieHeader, toCookieOptions } from 'better-auth/cookies'
 import { copyRequest } from './copyRequest'
 
+/** Carries a pending invite token through a social sign-in round trip. */
+export const INVITE_COOKIE = 'stlquest_invite'
 const SECURE_PREFIX = '__Secure-'
 const AUTH_PREFIX = 'better-auth.'
 

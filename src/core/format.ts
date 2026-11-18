@@ -17,3 +17,11 @@ export function formatBytes(bytes: number, locale: Locale = DEFAULT_LOCALE) {
   const number = new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits, useGrouping: false })
   return `${number.format(value)} ${units[unit]}`
 }
+
+export function formatDate(value: number, locale: Locale) {
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(value)
+}
+
+export function formatDateTime(value: number, locale: Locale) {
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(value)
+}

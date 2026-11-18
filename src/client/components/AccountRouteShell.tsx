@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useNavigate, useHydrated } from '@tanstack/react-router'
+import { useEffect, type ReactNode } from 'react'
 import type { Identity } from '../../core/types'
 import { sessionQuery } from '../queries'
 import { useEscape } from '../useEscape'
@@ -16,14 +16,11 @@ export function AccountRouteShell({
   children: (identity: Identity) => ReactNode
 }) {
   const { data: session } = useSuspenseQuery(sessionQuery())
-  const [hydrated, setHydrated] = useState(false)
+  const hydrated = useHydrated()
   const navigate = useNavigate()
   useEscape(escapeTo ? () => navigate({ to: escapeTo }) : () => undefined)
   const identity = session.identity
 
-  useEffect(() => {
-    setHydrated(true)
-  }, [])
   useEffect(() => {
     if (!identity) void navigate({ to: '/' })
   }, [identity, navigate])

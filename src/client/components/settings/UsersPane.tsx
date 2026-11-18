@@ -11,7 +11,7 @@ import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
-import type { Messages } from '../../../core/i18n'
+import type { Locale, Messages } from '../../../core/i18n'
 import type { Identity, MemberRequestVisibility, WorkspaceRole } from '../../../core/types'
 import type { MemberRequestVisibilityChoice } from '../../../core/visibility'
 import { removeWorkspaceMember, updateMemberRequestVisibility, updateWorkspaceMemberRole } from '../../../server/fns'
@@ -20,6 +20,7 @@ import { invalidateQueries, retryQueries } from '../../queryState'
 import { useWorkspaceSlug } from '../../workspace'
 import { DialogProblem } from '../DialogProblem'
 import { DialogShell } from '../DialogShell'
+import { LocalDate } from '../LocalDate'
 import { QueryState } from '../QueryState'
 import { ProtectedEmail } from '../ProtectedEmail'
 import { UserTableIdentity, userEmailColumnMeta } from '../UserTableIdentity'
@@ -91,7 +92,6 @@ export function UsersPane({ me }: { me: Identity }) {
           ]}
           emptyMessage={copy.table.empty}
           itemLabel={copy.table.itemLabel}
-          alignLastColumnRight
         />
       </SettingsTableSection>
       {dialog?.action === 'role' && <ChangeRoleDialog user={dialog.user} onDone={() => setDialog(null)} />}
@@ -136,7 +136,7 @@ function userColumns({
 }: {
   me: Identity
   copy: MembersCopy
-  locale: string
+  locale: Locale
   onAction: (action: UserAction, user: WorkspaceMember) => void
 }) {
   return columnHelper.columns([
@@ -171,9 +171,7 @@ function userColumns({
       cell: ({ getValue }) => {
         const value = getValue()
         return value ? (
-          <time dateTime={new Date(value).toISOString()} className="whitespace-nowrap text-sm text-muted-foreground">
-            {new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(value)}
-          </time>
+          <LocalDate value={value} locale={locale} className="whitespace-nowrap text-sm text-muted-foreground" />
         ) : (
           <span className="text-sm text-muted-foreground">{copy.table.unknown}</span>
         )

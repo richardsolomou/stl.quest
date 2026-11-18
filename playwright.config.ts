@@ -3,8 +3,7 @@ import { defineConfig, devices } from '@playwright/test'
 const port = Number(process.env.PLAYWRIGHT_PORT ?? 4173)
 const coreOnly = process.env.PLAYWRIGHT_CORE_ONLY === '1'
 const containerSuffix = port === 4173 ? '' : `-${port}`
-const serverURL = `http://127.0.0.1:${port}`
-const baseURL = serverURL
+const baseURL = `http://127.0.0.1:${port}`
 const selfHostedPort = port + 1
 const selfHostedServerURL = `http://127.0.0.1:${selfHostedPort}`
 const selfHostedURL = `http://stlquest.test:${selfHostedPort}`
@@ -104,7 +103,7 @@ export default defineConfig({
   webServer: [
     {
       command: appServer(`stlquest-e2e-main${containerSuffix}`, port, root, { BETTER_AUTH_URL: baseURL }),
-      url: `${serverURL}/api/health`,
+      url: `${baseURL}/api/health`,
       reuseExistingServer: false,
       timeout: 120_000,
     },

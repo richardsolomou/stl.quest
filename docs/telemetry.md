@@ -62,7 +62,6 @@ Server logs sent to PostHog include the severity, message, event, outcome, reque
 | `board_visibility_changed`        | `private_requests`, `workspace_id`, `member_overrides`                                       |
 | `board_member_visibility_changed` | `visibility`, `workspace_id`, `member_overrides`                                             |
 | `print_group_created`             | `item_count`, `copy_count`                                                                   |
-| `print_group_renamed`             | —                                                                                            |
 | `print_group_deleted`             | `item_count`, `copy_count`                                                                   |
 | `print_group_moved`               | `from_status`, `to_status`, `item_count`, `copy_count`                                       |
 | `print_copy_tags_updated`         | `item_count`, `status_count`, `added_tag_count`, `removed_tag_count`, `created_tag`          |

@@ -5,7 +5,7 @@ import type { AdminWorkspace } from '../../../core/admin'
 import { useI18n } from '../../i18n'
 import { adminWorkspacesQuery } from '../../queries'
 import { QueryState } from '../QueryState'
-import { SettingNotice, type Notice } from '../SettingNotice'
+import { SettingNotice, successNotice, type Notice } from '../SettingNotice'
 import { SettingsHeader, SettingsPage, SettingsTableSection } from './SettingsLayout'
 import { DeleteWorkspaceDialog } from './SuperAdminDeleteWorkspaceDialog'
 import { SuperAdminWorkspaceDialog } from './SuperAdminWorkspaceDialog'
@@ -78,7 +78,6 @@ export function SuperAdminWorkspacesPane() {
           }}
           emptyMessage={copy.empty}
           itemLabel={{ singular: copy.itemSingular, plural: copy.itemPlural }}
-          alignLastColumnRight
           onRowClick={(workspace) => {
             setNotice(undefined)
             setDialog({ action: 'details', workspace })
@@ -91,13 +90,7 @@ export function SuperAdminWorkspacesPane() {
         <DeleteWorkspaceDialog
           workspace={dialog.workspace}
           onDone={() => setDialog(null)}
-          onDeleted={(workspace) =>
-            setNotice({
-              tone: 'success',
-              title: copy.deletedTitle(workspace.name),
-              hint: copy.deletedHint,
-            })
-          }
+          onDeleted={(workspace) => setNotice(successNotice(copy.deletedTitle(workspace.name), copy.deletedHint))}
         />
       )}
     </SettingsPage>

@@ -77,11 +77,11 @@ describe('uploadFile', () => {
     expect([configured.onShouldRetry(answered(423), 0, {}), configured.onShouldRetry(answered(500), 0, {})]).toEqual([false, true])
   })
 
-  it('reports progress as a percentage', async () => {
+  it('reports bytes sent and the total', async () => {
     const onProgress = vi.fn()
     await uploadFile(file('notes.txt'), { onProgress })
     uploads[0]!.options.onProgress?.(5, 20)
-    expect(onProgress).toHaveBeenCalledWith({ sent: 5, total: 20, percent: 25 })
+    expect(onProgress).toHaveBeenCalledWith({ sent: 5, total: 20 })
   })
 
   it('rejects with the upload error', async () => {

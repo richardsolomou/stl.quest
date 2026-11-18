@@ -1,7 +1,7 @@
 import { Box, CircleDot, Code2, Globe } from 'lucide-react'
 import { FieldDescription } from '@/components/ui/field'
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from '@/components/ui/item'
-import { SOURCE_CODE_URL } from '../../sourceCode'
+import { ISSUES_URL, RELEASES_URL, SOURCE_CODE_URL } from '../../sourceCode'
 import { Brand } from '../Brand'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { useI18n } from '../../i18n'
@@ -54,7 +54,7 @@ export function AboutPane() {
           <Item
             variant="outline"
             render={
-              <a href="https://github.com/richardsolomou/stl.quest/issues" target="_blank" rel="noreferrer">
+              <a href={ISSUES_URL} target="_blank" rel="noreferrer">
                 {copy.issues.title}
               </a>
             }
@@ -70,7 +70,7 @@ export function AboutPane() {
           <Item
             variant="outline"
             render={
-              <a href="https://github.com/richardsolomou/stl.quest/releases" target="_blank" rel="noreferrer">
+              <a href={RELEASES_URL} target="_blank" rel="noreferrer">
                 {copy.releases.title}
               </a>
             }

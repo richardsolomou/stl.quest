@@ -1,46 +1,35 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => {
-  class PermissionError extends Error {
-    constructor(readonly returnTo: string) {
-      super('missing permissions')
-    }
-  }
-
-  return {
-    app: vi.fn(),
-    beginDropbox: vi.fn(),
-    completeDropbox: vi.fn(),
-    completeGoogleDrive: vi.fn(),
-    completeOneDrive: vi.fn(),
-    deploymentSettings: vi.fn(() => ({})),
-    PermissionError,
-    requireCloudStorageApp: vi.fn(),
-  }
-})
+const mocks = vi.hoisted(() => ({
+  app: vi.fn(),
+  beginDropbox: vi.fn(),
+  completeDropbox: vi.fn(),
+  completeGoogleDrive: vi.fn(),
+  completeOneDrive: vi.fn(),
+  deploymentSettings: vi.fn(() => ({})),
+  requireCloudStorageApp: vi.fn(),
+}))
 
 vi.mock('./app', () => ({ app: mocks.app, deploymentSettings: mocks.deploymentSettings }))
 vi.mock('./cloudStorage', () => ({ requireCloudStorageApp: mocks.requireCloudStorageApp }))
 vi.mock('./dropboxConnection', () => ({
   beginDropboxAuthorization: mocks.beginDropbox,
   completeDropboxAuthorization: mocks.completeDropbox,
-  DropboxPermissionError: mocks.PermissionError,
 }))
 vi.mock('./googleDriveConnection', () => ({
   beginGoogleDriveAuthorization: vi.fn(),
   completeGoogleDriveAuthorization: mocks.completeGoogleDrive,
-  GoogleDrivePermissionError: mocks.PermissionError,
 }))
 vi.mock('./oneDriveConnection', () => ({
   beginOneDriveAuthorization: vi.fn(),
   completeOneDriveAuthorization: mocks.completeOneDrive,
-  OneDrivePermissionError: mocks.PermissionError,
 }))
 
+import { CloudPermissionError } from './cloudConnectionState'
 import { beginCloudStorageAuthorization, cloudStorageAuthorizationCallback } from './cloudConnections'
 
 describe('cloud connections', () => {
-  const capture = vi.fn(() => Promise.resolve())
+  const capture = vi.fn()
   const cloudApp = { clientId: 'client-id', clientSecret: 'client-secret' }
   const repository = { getSetting: vi.fn(), setSetting: vi.fn() }
 
@@ -75,7 +64,7 @@ describe('cloud connections', () => {
   })
 
   it('reports provider permission failures in the redirect', async () => {
-    mocks.completeOneDrive.mockRejectedValue(new mocks.PermissionError('/settings/storage'))
+    mocks.completeOneDrive.mockRejectedValue(new CloudPermissionError('/settings/storage', 'missing permissions'))
 
     const response = await cloudStorageAuthorizationCallback(
       new Request('https://print.example.com/api/storage/onedrive/callback?code=code&state=state'),

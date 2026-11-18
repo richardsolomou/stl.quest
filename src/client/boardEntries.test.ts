@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PrintGroup, PublicPrintRequest } from '../core/types'
-import { boardEntriesByStatus, boardGroupsByStatus, boardPrioritiesByStatus, boardTagCopyCounts } from './boardEntries'
+import { boardEntriesByStatus, boardPrioritiesByStatus, boardTagCopyCounts } from './boardEntries'
 
 const first = {
   id: 'first',
@@ -138,27 +138,6 @@ describe('boardEntriesByStatus', () => {
       entries: [{ request: { ...tagged, groups: [tagged.groups[0]] }, count: 1, key: 'first:todo:plate-1', groupId: 'plate-1' }],
       total: 1,
     })
-  })
-})
-
-describe('boardGroupsByStatus', () => {
-  it('resolves group items once and omits stale request references', () => {
-    const staleGroup = { ...group, items: [...group.items, { requestId: 'missing', status: 'todo', count: 2, order: 2 }] }
-
-    expect(boardGroupsByStatus([first], [staleGroup]).get('todo')).toEqual([{ group: staleGroup, items: [{ request: first, count: 1 }] }])
-  })
-
-  it('projects one plate into every stage containing its prints', () => {
-    const split = {
-      ...group,
-      items: [group.items[0], { requestId: 'second', status: 'done', count: 1, order: 1 }],
-    }
-
-    const result = boardGroupsByStatus([first, second], [split])
-
-    expect([...result.keys()]).toEqual(['todo', 'done'])
-    expect(result.get('todo')?.[0].items).toEqual([{ request: first, count: 1 }])
-    expect(result.get('done')?.[0].items).toEqual([{ request: second, count: 1 }])
   })
 })
 

@@ -4,13 +4,13 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it defines the layout (`src/core`
 
 ## Commands
 
-- `just check` — the full local gate (format, lint, `db:check`, `catalog:check`, build, typecheck, unit tests, backup CLI smoke). The build runs **before** typecheck because it generates `src/routeTree.gen.ts`; on a fresh clone, typecheck fails until you build.
+- `just check` — the full local gate: every step of `check:ci` in `package.json`, then unit tests. The build runs **before** typecheck because it generates `src/routeTree.gen.ts`; on a fresh clone, typecheck fails until you build.
 - Dev server: `just dev` starts Vite and the realtime service together, then stops realtime when Vite exits. Use `just realtime` only to debug that service separately.
 - Unit tests: `just test`. Vitest runs with `fileParallelism: false` because of the `globalThis.__stlquest` app singleton and shared SQLite state — don't assume isolation across test files.
 - E2E: `just e2e` builds and tests the production server; `just e2e-run` reruns the current build, and `just e2e-trace` records a local trace (see the `extending-e2e` skill). Install Chromium once with `just e2e-install`; set `PLAYWRIGHT_DEV_SERVER=1` only when debugging against Vite.
 - When optimizing E2E runtime, measure the default local command separately from CI and improve both paths.
 - Lint/format is oxlint + oxfmt (`just lint`, `just format`), not ESLint/Prettier. Warnings are denied in CI.
-- Toolchain: Node 24.x only (`engines` pins `>=24 <25`), pnpm 12.11.2 via the `packageManager` field, and just 1.59.0.
+- Toolchain: Node 24.x only (`engines` pins `>=24 <25`), pnpm through Corepack at the `packageManager` version, and just 1.59.0.
 
 ## Load-bearing rules
 

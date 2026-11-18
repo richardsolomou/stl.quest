@@ -88,9 +88,9 @@ jobs:
       matrix:
         include: &e2e-shards
           - name: core
-            specs: e2e/00-stlquest.spec.ts
+            args: e2e/00-stlquest.spec.ts --project chromium
           - name: ordering
-            specs: e2e/account-settings.spec.ts e2e/chunk-recovery.spec.ts e2e/request-ordering.spec.ts
+            args: "'e2e/(?!00-)' --project chromium"
     steps:
       - uses: actions/checkout@v7
       - uses: richardsolomou/ras-stack/actions/setup-js@v1
@@ -103,7 +103,7 @@ jobs:
         with:
           install-dependencies: 'false'
       - name: Run core E2E shard
-        run: sh scripts/runE2e.sh ${{ matrix.specs }}
+        run: sh scripts/runE2e.sh ${{ matrix.args }}
         env:
           PLAYWRIGHT_CORE_ONLY: '1'
           PLAYWRIGHT_FAST_SERVER: '1'
@@ -133,7 +133,7 @@ jobs:
         with:
           install-dependencies: 'false'
       - name: Run core E2E shard
-        run: sh scripts/runE2e.sh ${{ matrix.specs }}
+        run: sh scripts/runE2e.sh ${{ matrix.args }}
         env:
           PLAYWRIGHT_CORE_ONLY: '1'
       - if: failure()

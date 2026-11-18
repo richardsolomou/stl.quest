@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { AccountRouteShell } from '../client/components/AccountRouteShell'
 import { ARCHIVE_SORT_GROUPS, BoardFilters } from '../client/components/BoardFilters'
 import { LazyThumb } from '../client/components/LazyThumb'
+import { LocalDate } from '../client/components/LocalDate'
 import { ModelFormatLabel } from '../client/components/ModelFormatLabel'
 import { QueryState } from '../client/components/QueryState'
 import { UserAvatar } from '../client/components/UserAvatar'
@@ -19,11 +20,11 @@ import { requestsQuery, sessionQuery } from '../client/queries'
 import { retryQueries } from '../client/queryState'
 import { useWorkspaceSlug } from '../client/workspace'
 import { errorMessage } from '../core/error'
+import { formatDateTime } from '../core/format'
 import { printGroupBranchIds } from '../core/printGroups'
 import type { PublicPrintRequest } from '../core/types'
 import { unarchiveRequests } from '../server/fns'
 import { useI18n } from '../client/i18n'
-import type { Locale } from '../core/i18n'
 
 export const Route = createFileRoute('/archive')({ validateSearch: validateRequestSearch, component: ArchivePage })
 
@@ -221,7 +222,7 @@ function ArchivedRequestRow({
           {request.archivedAt && (
             <span title={t.requests.archive.archivedAt(formatDateTime(request.archivedAt, locale))}>
               {t.requests.archive.archivedOn.before}
-              <time dateTime={new Date(request.archivedAt).toISOString()}>{formatDate(request.archivedAt, locale)}</time>
+              <LocalDate value={request.archivedAt} locale={locale} />
               {t.requests.archive.archivedOn.after}
             </span>
           )}
@@ -235,12 +236,4 @@ function ArchivedRequestRow({
       )}
     </div>
   )
-}
-
-function formatDate(value: number, locale: Locale) {
-  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(value)
-}
-
-function formatDateTime(value: number, locale: Locale) {
-  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(value)
 }

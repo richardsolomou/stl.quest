@@ -1,28 +1,23 @@
 import type { StorageConfig } from '../core/types'
-import { CLOUD_STORAGE_PROVIDERS, CLOUD_STORAGE_PROVIDER_NAMES, type CloudStorageProvider } from '../core/auth'
+import {
+  CLOUD_STORAGE_PROVIDERS,
+  CLOUD_STORAGE_PROVIDER_NAMES,
+  cloudStorageProviderName,
+  isCloudStorageConfig,
+  isCloudStorageProvider,
+  type CloudStorageProvider,
+} from '../core/auth'
 import type { Messages } from '../core/i18n'
 
-export type CloudProvider = CloudStorageProvider
-
 export const CLOUD_PROVIDERS = CLOUD_STORAGE_PROVIDERS.map((value) => ({ value, label: CLOUD_STORAGE_PROVIDER_NAMES[value] }))
-
-export function cloudProviderLabel(provider: CloudProvider) {
-  return CLOUD_PROVIDERS.find((candidate) => candidate.value === provider)!.label
-}
-
-export function isCloudAdapter(adapter: string): adapter is CloudProvider {
-  return (CLOUD_STORAGE_PROVIDERS as readonly string[]).includes(adapter)
-}
 
 export type StorageMessages = Messages['storage']
 
 export function storageRecoveryHint(t: StorageMessages, adapter: StorageConfig['adapter']) {
-  return adapter === 'managed' || adapter === 'local' || adapter === 'webdav' || adapter === 's3'
-    ? t.recoveryHint[adapter]
-    : t.recoveryHint.cloud
+  return isCloudStorageProvider(adapter) ? t.recoveryHint.cloud : t.recoveryHint[adapter]
 }
 
-export const CLOUD_PROVIDER_CONSOLES: Record<CloudProvider, string> = {
+export const CLOUD_PROVIDER_CONSOLES: Record<CloudStorageProvider, string> = {
   dropbox: 'https://www.dropbox.com/developers/apps',
   'google-drive': 'https://console.cloud.google.com/apis/credentials',
   onedrive: 'https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade',
@@ -31,8 +26,7 @@ export const CLOUD_PROVIDER_CONSOLES: Record<CloudProvider, string> = {
 
 export function storageLabel(config: StorageConfig, t: StorageMessages) {
   if (config.adapter === 'managed') return t.label.managed
-  if (config.adapter === 'dropbox' || config.adapter === 'google-drive' || config.adapter === 'onedrive' || config.adapter === 'box')
-    return cloudProviderLabel(config.adapter)
+  if (isCloudStorageConfig(config)) return cloudStorageProviderName(config.adapter)
   if (config.adapter === 'local') return config.root || t.label.local
   if (config.adapter === 'webdav') return [config.endpoint.replace(/\/$/, ''), config.root].filter(Boolean).join('/')
   return `${config.endpoint}/${config.bucket}${config.prefix ? `/${config.prefix}` : ''}`

@@ -6,6 +6,7 @@ import { AuthenticationMethods } from './AuthenticationMethods'
 
 vi.mock('@tanstack/react-router', () => ({
   useRouter: () => ({}),
+  useHydrated: () => false,
   useLocation: ({ select }: { select: (location: { searchStr: string }) => unknown }) =>
     select({ searchStr: '?error=signup_disabled&error_description=private-provider-details' }),
 }))

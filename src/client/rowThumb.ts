@@ -2,10 +2,7 @@ import { wrap } from 'comlink'
 import { isPhone } from './device'
 import type { RowThumbWorker } from './rowThumb.worker'
 
-// Instant feedback while composing an upload, using the same software
-// rasterizer the server runs. Deliberately bounded: desktop only, files small
-// enough to parse without jank; anything bigger keeps the placeholder and
-// gets its real thumbnail from the server after upload.
+// Larger files and phones keep the placeholder until the server renders the thumbnail after upload.
 const MAX_BYTES = 25 * 1024 * 1024
 const SIZE = 128
 let worker: Worker | undefined

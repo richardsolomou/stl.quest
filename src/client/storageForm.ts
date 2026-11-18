@@ -1,6 +1,7 @@
 import { useForm } from '@tanstack/react-form'
 import type { StorageConfig } from '../core/types'
-import { cloudflareAccountId, inferS3Provider, s3Endpoint, type CloudProvider, type S3Provider } from './storageProviders'
+import type { CloudStorageProvider } from '../core/auth'
+import { cloudflareAccountId, inferS3Provider, s3Endpoint, type S3Provider } from './storageProviders'
 
 export type StorageFormValues = {
   adapter: StorageConfig['adapter']
@@ -69,7 +70,7 @@ export function storageConfigFromForm(value: StorageFormValues): StorageConfig {
   return { adapter: value.adapter, root: value.root }
 }
 
-export function rootForStorageAdapter(adapter: 'local' | 'webdav' | CloudProvider, current: StorageConfig) {
+export function rootForStorageAdapter(adapter: 'local' | 'webdav' | CloudStorageProvider, current: StorageConfig) {
   if (adapter === current.adapter) return current.root
   return adapter === 'local' ? '/prints' : adapter === 'webdav' ? 'stlquest' : ''
 }

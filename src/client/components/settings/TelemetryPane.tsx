@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch'
 import { updateTelemetrySettings } from '../../../server/fns'
 import { telemetryQuery } from '../../queries'
 import { QueryState } from '../QueryState'
-import { SettingNotice, noticeDetail } from '../SettingNotice'
+import { SettingNotice, errorNotice } from '../SettingNotice'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { useI18n } from '../../i18n'
 
@@ -51,16 +51,7 @@ export function TelemetryPane() {
             onCheckedChange={(enabled) => mutation.mutate({ data: { enabled } })}
           />
         </Field>
-        {mutation.error && (
-          <SettingNotice
-            notice={{
-              tone: 'error',
-              title: copy.notSaved,
-              hint: copy.notSavedHint,
-              detail: noticeDetail(mutation.error),
-            }}
-          />
-        )}
+        {mutation.error && <SettingNotice notice={errorNotice(copy.notSaved, copy.notSavedHint, mutation.error)} />}
       </SettingsSection>
     </SettingsPage>
   )

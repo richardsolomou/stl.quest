@@ -7,7 +7,7 @@ import { useI18n } from '../../i18n'
 import { accountsQuery, sessionQuery } from '../../queries'
 import { retryQueries } from '../../queryState'
 import { QueryState } from '../QueryState'
-import { SettingNotice, type Notice } from '../SettingNotice'
+import { SettingNotice, successNotice, type Notice } from '../SettingNotice'
 import { SettingsActions, SettingsHeader, SettingsPage, SettingsTableSection } from './SettingsLayout'
 import { ChangeServerRoleDialog, ImpersonateUserDialog } from './SuperAdminAccessDialogs'
 import { CreateUserDialog } from './SuperAdminCreateUserDialog'
@@ -102,7 +102,6 @@ export function SuperAdminUsersPane({ hosted }: { hosted: boolean }) {
           }}
           emptyMessage={copy.empty}
           itemLabel={{ singular: copy.itemSingular, plural: copy.itemPlural }}
-          alignLastColumnRight
           onRowClick={(user) => {
             setNotice(undefined)
             setDialog({ action: 'details', user })
@@ -117,26 +116,14 @@ export function SuperAdminUsersPane({ hosted }: { hosted: boolean }) {
         <SetPasswordDialog
           user={dialog.user}
           onDone={() => setDialog(null)}
-          onSaved={(user) =>
-            setNotice({
-              tone: 'success',
-              title: copy.passwordSetTitle(user.name),
-              hint: copy.passwordSetHint,
-            })
-          }
+          onSaved={(user) => setNotice(successNotice(copy.passwordSetTitle(user.name), copy.passwordSetHint))}
         />
       )}
       {dialog?.action === 'delete' && (
         <DeleteUserDialog
           user={dialog.user}
           onDone={() => setDialog(null)}
-          onDeleted={(user) =>
-            setNotice({
-              tone: 'success',
-              title: copy.deletedTitle(user.name),
-              hint: copy.deletedHint,
-            })
-          }
+          onDeleted={(user) => setNotice(successNotice(copy.deletedTitle(user.name), copy.deletedHint))}
         />
       )}
       {adding && <CreateUserDialog passwordEnabled={passwordEnabled} onDone={() => setAdding(false)} />}

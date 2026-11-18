@@ -5,7 +5,6 @@ export const SITE_ORIGIN = 'https://stl.quest'
 export const SIGN_IN_PATH = '/sign-in'
 export const SIGN_UP_PATH = '/sign-in?signup=true'
 export const SELF_HOSTING_GUIDE_URL = `${REPOSITORY_URL}#run-it-`
-export const ISSUES_URL = `${REPOSITORY_URL}/issues`
 
 export const LOCAL_STORAGE = 'Your machine'
 export const STORAGE_PROVIDERS = ['S3-compatible', ...Object.values(CLOUD_STORAGE_PROVIDER_NAMES), 'WebDAV', LOCAL_STORAGE]

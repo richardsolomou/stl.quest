@@ -30,9 +30,9 @@ describe('request status summaries', () => {
     const [summary] = requestStatusSummaries([request('a', { done: 1, todo: 2, in_progress: 1 }, 10)], statuses)
 
     expect(summary.stages).toEqual([
-      { status: 'todo', label: 'Queue', count: 2 },
-      { status: 'in_progress', label: 'Printing', count: 1 },
-      { status: 'done', label: 'Ready', count: 1 },
+      { status: 'todo', count: 2 },
+      { status: 'in_progress', count: 1 },
+      { status: 'done', count: 1 },
     ])
   })
 
@@ -133,8 +133,8 @@ describe('request stage totals', () => {
     const summaries = requestStatusSummaries([request('a', { todo: 2, done: 1 }, 10), request('b', { todo: 1 }, 20)], statuses)
 
     expect(requestStageTotals(summaries, statuses)).toEqual([
-      { status: 'todo', label: 'Queue', count: 3 },
-      { status: 'done', label: 'Ready', count: 1 },
+      { status: 'todo', count: 3 },
+      { status: 'done', count: 1 },
     ])
   })
 })

@@ -42,14 +42,6 @@ export function boardSelectedRequestIds(selection: BoardSelection | null, status
   )
 }
 
-export function boardSelectedCardIds(selection: BoardSelection | null, status?: StatusId) {
-  return new Set(
-    [...(selection?.statuses ?? [])]
-      .filter(([, selectedStatus]) => status === undefined || selectedStatus === status)
-      .map(([selectionId]) => selectionId),
-  )
-}
-
 export function boardRequestSelected(
   selection: BoardSelection | null,
   status: StatusId,

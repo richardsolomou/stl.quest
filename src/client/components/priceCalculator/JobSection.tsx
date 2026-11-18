@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldLabel, FieldTitle } from '@/components/ui/field'
 import type { PriceCalculation, PriceCalculatorJob, PriceCalculatorSettings } from '../../../core/priceCalculator'
+import { PRINT_TYPES } from '../../../core/types'
 import { useI18n } from '../../i18n'
 import { SettingsSection } from '../settings/SettingsLayout'
 import { NumberInput } from './fields'
@@ -28,7 +29,7 @@ export function JobSection({
           <FieldTitle>{copy.printType}</FieldTitle>
           <fieldset className="flex rounded-lg border border-input bg-background p-1">
             <legend className="sr-only">{copy.printType}</legend>
-            {(['resin', 'filament'] as const).map((value) => (
+            {PRINT_TYPES.map((value) => (
               <Button
                 key={value}
                 id={`calculator-print-type-${value}`}

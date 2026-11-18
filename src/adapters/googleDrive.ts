@@ -2,13 +2,13 @@ import crypto from 'node:crypto'
 import type { CloudStorageCredentials } from '../core/auth'
 import type { AssetStore } from '../core/types'
 import { assertRelativeStoragePath } from '../core/storagePath'
-import { cloudFetch, cloudRequestError, isHttpNotFound, waitForCloudRetry } from './cloudFetch'
+import { cloudFetch, cloudRequestError, isHttpNotFound, retryCloudRequest } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName, joinCloudPath } from './cloudPath'
 import { refreshOAuthAccessToken } from './oauthAccessToken'
 import { assertStreamSize, streamChunks } from './streamChunks'
 import { OAuthAssetStoreKeys } from './oauthAssetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
-import { assetMissingError } from './missingFile'
+import { assetMissingError, undefinedIfMissing } from './missingFile'
 import { moveIgnoringMissingSource, prepareAssetMove } from './assetMove'
 import { verifyWritableAssetStore } from './writableAssetStore'
 
@@ -151,11 +151,7 @@ export class GoogleDriveAssetStore extends OAuthAssetStoreKeys implements AssetS
   }
 
   async writable() {
-    await verifyWritableAssetStore({
-      write: (path, bytes) => this.write(path, bytes),
-      read: (path) => this.read(path),
-      remove: (path) => this.remove(path),
-    })
+    await verifyWritableAssetStore(this)
   }
 
   async inventory(options?: { maxEntries?: number }) {
@@ -184,10 +180,7 @@ export class GoogleDriveAssetStore extends OAuthAssetStoreKeys implements AssetS
   }
 
   private async file(relativePath: string) {
-    const parent = await this.parentId(relativePath, false).catch((error: NodeJS.ErrnoException) => {
-      if (error.code === 'ENOENT') return undefined
-      throw error
-    })
+    const parent = await undefinedIfMissing(this.parentId(relativePath, false))
     if (!parent) return undefined
     return this.find(parent, cloudFileName(relativePath), false)
   }
@@ -196,10 +189,7 @@ export class GoogleDriveAssetStore extends OAuthAssetStoreKeys implements AssetS
     const segments = this.fullFolderPath(relativePath).split('/').filter(Boolean)
     if (!segments.length) return { id: await this.rootFolderId(), name: 'STL Quest', mimeType: FOLDER_MIME }
     const name = segments.pop()!
-    const parent = await this.resolveFolders(segments, false).catch((error: NodeJS.ErrnoException) => {
-      if (error.code === 'ENOENT') return undefined
-      throw error
-    })
+    const parent = await undefinedIfMissing(this.resolveFolders(segments, false))
     return parent ? this.find(parent, name, true) : undefined
   }
 
@@ -305,17 +295,14 @@ export class GoogleDriveAssetStore extends OAuthAssetStoreKeys implements AssetS
   ) {
     const token = await this.token()
     const body = typeof init.body === 'string' ? init.body : init.body ? new Uint8Array(init.body) : undefined
-    for (let attempt = 0; ; attempt++) {
-      const response = await cloudFetch(url, {
-        method: init.method,
-        headers: { ...init.headers, authorization: `Bearer ${token}` },
-        body,
-      })
-      if (response.ok || (init.allowIncomplete && response.status === 308)) return response
-      const error = await googleDriveError(response)
-      if (!error.retryable || attempt === 5) throw error
-      await waitForCloudRetry(attempt)
-    }
+    return retryCloudRequest(
+      () => cloudFetch(url, { method: init.method, headers: { ...init.headers, authorization: `Bearer ${token}` }, body }),
+      {
+        error: googleDriveError,
+        retryable: (error) => error.retryable,
+        accept: (response) => Boolean(init.allowIncomplete) && response.status === 308,
+      },
+    )
   }
 
   protected async refreshAccessToken() {

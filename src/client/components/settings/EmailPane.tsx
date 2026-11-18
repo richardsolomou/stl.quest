@@ -35,7 +35,7 @@ import { AuthMethodIcon } from '../AuthMethodIcon'
 import { SettingRow } from '../SettingRow'
 import { useWorkspaceSlug } from '../../workspace'
 import { QueryState } from '../QueryState'
-import { SettingNotice, noticeDetail } from '../SettingNotice'
+import { SettingNotice, errorNotice } from '../SettingNotice'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { SmtpDialog } from './SmtpIntegrationSettings'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
@@ -139,25 +139,8 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
             </Button>
           )}
         </div>
-        {tooLarge && (
-          <SettingNotice
-            notice={{
-              tone: 'error',
-              title: copy.logo.tooLarge,
-              hint: copy.logo.tooLargeHint(MAX_EMAIL_LOGO_BYTES / 1024),
-            }}
-          />
-        )}
-        {mutation.error && (
-          <SettingNotice
-            notice={{
-              tone: 'error',
-              title: copy.logo.notSaved,
-              hint: copy.logo.notSavedHint,
-              detail: noticeDetail(mutation.error),
-            }}
-          />
-        )}
+        {tooLarge && <SettingNotice notice={errorNotice(copy.logo.tooLarge, copy.logo.tooLargeHint(MAX_EMAIL_LOGO_BYTES / 1024))} />}
+        {mutation.error && <SettingNotice notice={errorNotice(copy.logo.notSaved, copy.logo.notSavedHint, mutation.error)} />}
       </SettingsSection>
       <SenderSection sender={sender} relayed={relayed} ownServer={smtp.configured} />
       <MailServerSection smtp={smtp} hosted={hosted} />
@@ -242,16 +225,7 @@ function SenderSection({ sender, relayed, ownServer }: { sender: EmailSender; re
           </Button>
         </div>
       </form>
-      {mutation.error && (
-        <SettingNotice
-          notice={{
-            tone: 'error',
-            title: copy.notSaved,
-            hint: copy.notSavedHint,
-            detail: noticeDetail(mutation.error),
-          }}
-        />
-      )}
+      {mutation.error && <SettingNotice notice={errorNotice(copy.notSaved, copy.notSavedHint, mutation.error)} />}
     </SettingsSection>
   )
 }
@@ -477,16 +451,7 @@ function TemplateEditor({
           </Button>
         )}
       </div>
-      {mutation.error && (
-        <SettingNotice
-          notice={{
-            tone: 'error',
-            title: copy.notSaved,
-            hint: copy.notSavedHint,
-            detail: noticeDetail(mutation.error),
-          }}
-        />
-      )}
+      {mutation.error && <SettingNotice notice={errorNotice(copy.notSaved, copy.notSavedHint, mutation.error)} />}
     </form>
   )
 }

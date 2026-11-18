@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { useQuery } from '@tanstack/react-query'
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute, redirect, useHydrated } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { CircleAlert } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -42,10 +42,9 @@ function InvitePage() {
   const callBeginProvider = useServerFn(beginProviderInvite)
   const callSwitchWorkspace = useServerFn(switchWorkspace)
   const [error, setError] = useState('')
-  const [hydrated, setHydrated] = useState(false)
+  const hydrated = useHydrated()
   const [providerBusy, setProviderBusy] = useState<SocialAuthProvider | null>(null)
   const [signingIn, setSigningIn] = useState(false)
-  useEffect(() => setHydrated(true), [])
 
   const joinWorkspace = async () => {
     await callAcceptWorkspace({ data: { token } })

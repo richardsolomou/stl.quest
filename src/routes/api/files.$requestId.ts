@@ -38,11 +38,9 @@ export const Route = createFileRoute('/api/files/$requestId')({
             const assignedPrinter = printRequest.printerId
               ? (await storedPrinterProfiles(context.repository)).find(({ id }) => id === printRequest.printerId)
               : undefined
-            void instance.telemetry
-              .capture(context.identity.id, 'stl_download_served', {
-                print_type: assignedPrinter?.printType ?? printRequest.requestedPrintType,
-              })
-              .catch(() => undefined)
+            instance.telemetry.capture(context.identity.id, 'stl_download_served', {
+              print_type: assignedPrinter?.printType ?? printRequest.requestedPrintType,
+            })
           }
 
           if ((request.headers.get('accept-encoding') ?? '').includes('gzip')) {

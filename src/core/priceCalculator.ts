@@ -163,7 +163,6 @@ export function calculatePrintPrice(settings: PriceCalculatorSettings, job: Pric
     failureAllowance,
     labour,
     estimatedCost,
-    costPrice: estimatedCost,
     standardPrice: standardCost / (1 - standardMargin),
   }
 }
@@ -209,12 +208,13 @@ export function selectEquipmentMode(
   const next = updateEquipmentSettings(settings, equipment)
   if (mode === 'custom') return next
   if (equipment.presetIds.length) return applyEquipmentPresets(next, equipment.presetIds)
+  const defaults = equipmentSettingsFor(DEFAULT_PRICE_CALCULATOR_SETTINGS, settings.printType)
   return updateEquipmentSettings(next, {
     ...equipment,
-    printPowerWatts: DEFAULT_PRINTER_POWER_WATTS[settings.printType],
-    washPowerWatts: settings.printType === 'resin' ? 50 : 0,
-    dryPowerWatts: 0,
-    curePowerWatts: settings.printType === 'resin' ? 50 : 0,
+    printPowerWatts: defaults.printPowerWatts,
+    washPowerWatts: defaults.washPowerWatts,
+    dryPowerWatts: defaults.dryPowerWatts,
+    curePowerWatts: defaults.curePowerWatts,
   })
 }
 

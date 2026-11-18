@@ -108,13 +108,11 @@ export class S3UploadStaging implements UploadStagingArea, UploadStore {
     try {
       return await this.datastore.getUpload(stagedPath)
     } catch (error) {
-      if (isMissingObject(error)) return undefined
+      if (isNotFound(error)) return undefined
       throw error
     }
   }
 }
-
-export const isMissingObject = isNotFound
 
 // Structurally matches the server's WorkLockOptions; kept local so this adapter does not depend on
 // the server layer (it already satisfies WorkLocker structurally, the same way).

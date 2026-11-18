@@ -308,8 +308,7 @@ export class AssetGenerationQueue {
     } catch (error) {
       log.warn({ err: error, event: 'asset_source_read_failed' }, 'asset source read failed')
       if (!(await this.retry(requestId, stages, error))) {
-        if (!(error instanceof SourceTooLargeError))
-          void this.telemetry.exception(error, { action: 'assets_read', print_type: printType }).catch(() => undefined)
+        if (!(error instanceof SourceTooLargeError)) this.telemetry.exception(error, { action: 'assets_read', print_type: printType })
         // Only a missing or oversized source is the print's own fault; other storage faults heal once storage is healthy again.
         await this.fail(requestId, stages, error, error instanceof SourceTooLargeError || isAssetMissing(error) ? 'permanent' : 'storage')
       }
@@ -386,7 +385,7 @@ export class AssetGenerationQueue {
       } else if (error instanceof AssetWriteError) {
         log.warn({ err: error.cause, event: 'asset_write_failed' }, 'generated asset write failed')
         if (!(await this.retry(requestId, running, error.cause))) {
-          void this.telemetry.exception(error.cause, { action: 'assets_write', print_type: printType }).catch(() => undefined)
+          this.telemetry.exception(error.cause, { action: 'assets_write', print_type: printType })
           await this.fail(requestId, running, error.cause, 'storage')
         }
       } else if (error instanceof InvalidMeshError) {
@@ -395,7 +394,7 @@ export class AssetGenerationQueue {
         log.warn({ err: error, event: 'asset_generation_invalid_mesh' }, 'visual asset generation skipped invalid mesh')
         await this.fail(requestId, running, error, 'permanent')
       } else {
-        void this.telemetry.exception(error, { action: 'assets_generate', print_type: printType }).catch(() => undefined)
+        this.telemetry.exception(error, { action: 'assets_generate', print_type: printType })
         log.warn({ err: error, event: 'asset_generation_failed' }, 'visual asset generation failed')
         await this.fail(requestId, running, error, 'permanent')
       }

@@ -55,7 +55,7 @@ describe('print price calculator', () => {
     expect(result.cureElectricity).toBeCloseTo(0.008322, 6)
     expect(result.equipment).toBe(5.75)
     expect(result.consumables).toBe(1)
-    expect(result.costPrice).toBeCloseTo(16.0990841)
+    expect(result.estimatedCost).toBeCloseTo(16.0990841)
     expect(result.standardPrice).toBeCloseTo(21.4654455)
   })
 
@@ -113,7 +113,7 @@ describe('print price calculator', () => {
     })
 
     expect(result.labour).toBe(15)
-    expect(result.costPrice).toBeCloseTo(0.077)
+    expect(result.estimatedCost).toBeCloseTo(0.077)
     expect(result.standardPrice).toBeCloseTo(20.1026667)
   })
 

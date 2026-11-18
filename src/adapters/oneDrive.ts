@@ -1,13 +1,13 @@
 import type { CloudStorageCredentials } from '../core/auth'
 import type { AssetStore } from '../core/types'
 import { assertRelativeStoragePath } from '../core/storagePath'
-import { cloudFetch, cloudRequestError, isHttpNotFound, waitForCloudRetry } from './cloudFetch'
+import { cloudFetch, cloudRequestError, isHttpNotFound, retryCloudRequest } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName, joinCloudPath } from './cloudPath'
 import { refreshOAuthAccessToken } from './oauthAccessToken'
 import { assertStreamSize, streamChunks } from './streamChunks'
 import { OAuthAssetStoreKeys } from './oauthAssetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
-import { assetMissingError } from './missingFile'
+import { assetMissingError, undefinedIfMissing } from './missingFile'
 import { moveIgnoringMissingSource, prepareAssetMove } from './assetMove'
 import { verifyWritableAssetStore } from './writableAssetStore'
 
@@ -108,10 +108,7 @@ export class OneDriveAssetStore extends OAuthAssetStoreKeys implements AssetStor
   }
 
   async removeEmptyDirectory(relativePath: string) {
-    const folder = await this.folderItem(relativePath, false).catch((error: NodeJS.ErrnoException) => {
-      if (error.code === 'ENOENT') return undefined
-      throw error
-    })
+    const folder = await undefinedIfMissing(this.folderItem(relativePath, false))
     if (!folder) return true
     const response = await this.request(`${GRAPH}/me/drive/items/${encodeURIComponent(folder.id)}/children?$top=1`, {
       method: 'GET',
@@ -130,20 +127,13 @@ export class OneDriveAssetStore extends OAuthAssetStoreKeys implements AssetStor
   }
 
   async sweepTrash() {
-    const trash = await this.folderItem('trash', false).catch((error: NodeJS.ErrnoException) => {
-      if (error.code === 'ENOENT') return undefined
-      throw error
-    })
+    const trash = await undefinedIfMissing(this.folderItem('trash', false))
     if (trash) await this.deleteItem(trash.id)
     await this.folderItem('trash', true)
   }
 
   async writable() {
-    await verifyWritableAssetStore({
-      write: (path, bytes) => this.write(path, bytes),
-      read: (path) => this.read(path),
-      remove: (path) => this.remove(path),
-    })
+    await verifyWritableAssetStore(this)
   }
 
   async inventory(options?: { maxEntries?: number }) {
@@ -171,9 +161,7 @@ export class OneDriveAssetStore extends OAuthAssetStoreKeys implements AssetStor
   }
 
   async clear(options?: { initialize?: boolean }) {
-    const root = await this.rootItem(false).catch((error: NodeJS.ErrnoException) =>
-      error.code === 'ENOENT' ? undefined : Promise.reject(error),
-    )
+    const root = await undefinedIfMissing(this.rootItem(false))
     if (root) await this.deleteItem(root.id)
     if (options?.initialize !== false) await this.initialize()
   }
@@ -296,14 +284,12 @@ async function requestUploadSession(url: string, chunk: Uint8Array, start: numbe
   )
 }
 
-async function retryOneDriveRequest(request: () => Promise<Response>) {
-  for (let attempt = 0; ; attempt++) {
-    const response = await request()
-    if (response.ok) return response
-    const error = await oneDriveError(response)
-    if (!error.retryable || attempt === 5) throw error
-    await waitForCloudRetry(attempt, { delayMs: error.retryAfterMs })
-  }
+function retryOneDriveRequest(request: () => Promise<Response>) {
+  return retryCloudRequest(request, {
+    error: oneDriveError,
+    retryable: (error) => error.retryable,
+    delay: (error) => ({ delayMs: error.retryAfterMs }),
+  })
 }
 
 async function oneDriveError(response: Response) {

@@ -9,12 +9,12 @@ import { diagnosticsQuery } from '../../queries'
 import { storageRecoveryHint } from '../../storageProviders'
 import { useWorkspaceSlug } from '../../workspace'
 import { QueryState } from '../QueryState'
-import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { SettingsSection } from './SettingsLayout'
 import { useI18n } from '../../i18n'
 
 type DiagnosticsCopy = Messages['settings']['diagnostics']
 
-export function DiagnosticsPane({ embedded = false }: { embedded?: boolean }) {
+export function DiagnosticsPane() {
   const workspaceSlug = useWorkspaceSlug()
   const query = useQuery(diagnosticsQuery(workspaceSlug))
   const data = query.data
@@ -22,9 +22,9 @@ export function DiagnosticsPane({ embedded = false }: { embedded?: boolean }) {
   const unfinishedJobs = backgroundJobs.filter((job) => !['ready', 'skipped'].includes(job.status))
   const { t, locale } = useI18n()
   const copy = t.settings.diagnostics
-  const content = (
+  return (
     <>
-      <SettingsSection title={embedded ? copy.embeddedTitle : undefined}>
+      <SettingsSection title={copy.title}>
         {!data && (
           <QueryState
             loading={query.isPending}
@@ -109,13 +109,6 @@ export function DiagnosticsPane({ embedded = false }: { embedded?: boolean }) {
         </SettingsSection>
       )}
     </>
-  )
-  if (embedded) return content
-  return (
-    <SettingsPage>
-      <SettingsHeader title={copy.title} description={copy.description} />
-      {content}
-    </SettingsPage>
   )
 }
 

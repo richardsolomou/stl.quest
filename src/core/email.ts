@@ -36,19 +36,12 @@ export type EmailContent = {
 }
 
 export type EmailTemplate = { subject: string; html: string }
-export const emailPlaceholders = {
-  name: 'the requester’s name',
-  workspace: 'this workspace’s name',
-  prints: 'the list of ready prints',
-  link: 'the link back to STL Quest',
-  logo: 'your logo, or the workspace name without one',
-} as const
-export type EmailPlaceholder = keyof typeof emailPlaceholders
+export type EmailPlaceholder = 'name' | 'workspace' | 'prints' | 'link' | 'logo'
 
 export const emailTemplateKinds = [
-  { id: 'print-ready', name: 'Prints ready', placeholders: ['name', 'workspace', 'prints', 'link', 'logo'] },
-  { id: 'invite', name: 'Invitation', placeholders: ['workspace', 'link', 'logo'] },
-] as const satisfies readonly { id: string; name: string; placeholders: readonly EmailPlaceholder[] }[]
+  { id: 'print-ready', placeholders: ['name', 'workspace', 'prints', 'link', 'logo'] },
+  { id: 'invite', placeholders: ['workspace', 'link', 'logo'] },
+] as const satisfies readonly { id: string; placeholders: readonly EmailPlaceholder[] }[]
 
 export type EmailTemplateKind = (typeof emailTemplateKinds)[number]['id']
 export type EmailTemplates = Partial<Record<EmailTemplateKind, EmailTemplate>>
