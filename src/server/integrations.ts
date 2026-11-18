@@ -65,20 +65,12 @@ export function decryptSetting<T>(setting: EncryptedSetting, environment: NodeJS
   return JSON.parse(plaintext.toString('utf8')) as T
 }
 
-export function encryptIntegrationConfig(config: IntegrationConfig, environment: NodeJS.ProcessEnv = process.env): EncryptedSetting {
-  return encryptSetting(config, environment)
-}
-
-export function decryptIntegrationConfig(setting: EncryptedSetting, environment: NodeJS.ProcessEnv = process.env): IntegrationConfig {
-  return decryptSetting<IntegrationConfig>(setting, environment)
-}
-
 export async function getStoredIntegrationConfig(
   repository: SettingStore,
   environment: NodeJS.ProcessEnv = process.env,
 ): Promise<IntegrationConfig | undefined> {
   const setting = await repository.getSetting<EncryptedSetting>(SETTING_KEY)
-  return setting ? decryptIntegrationConfig(setting, environment) : undefined
+  return setting ? decryptSetting<IntegrationConfig>(setting, environment) : undefined
 }
 
 export async function setStoredIntegrationConfig(
@@ -86,7 +78,12 @@ export async function setStoredIntegrationConfig(
   config: IntegrationConfig,
   environment: NodeJS.ProcessEnv = process.env,
 ) {
-  await repository.setSetting(SETTING_KEY, encryptIntegrationConfig(config, environment))
+  await repository.setSetting(SETTING_KEY, encryptSetting(config, environment))
+}
+
+/** The stored integration settings, or the default of password sign-in with nothing else configured. */
+export async function integrationConfig(repository: SettingStore): Promise<IntegrationConfig> {
+  return (await getStoredIntegrationConfig(repository)) ?? { passwordEnabled: true }
 }
 
 export const OIDC_DISCOVERY_TIMEOUT_MS = 5_000

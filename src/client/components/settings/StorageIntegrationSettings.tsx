@@ -2,8 +2,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { CLOUD_STORAGE_PROVIDERS, type CloudStorageProvider, type PublicIntegrationConfig } from '../../../core/auth'
-import { cloudProviderLabel } from '../../storageProviders'
+import {
+  CLOUD_STORAGE_PROVIDERS,
+  cloudStorageProviderName,
+  type CloudStorageProvider,
+  type PublicIntegrationConfig,
+} from '../../../core/auth'
 import { useI18n } from '../../i18n'
 import { CloudProviderIcon } from '../CloudProviderIcon'
 import { SettingRow } from '../SettingRow'
@@ -29,7 +33,7 @@ export function CloudStorageSettings({
       <div className="flex flex-col gap-2">
         {CLOUD_STORAGE_PROVIDERS.map((provider) => {
           const config = data.cloudStorage[provider]
-          const label = cloudProviderLabel(provider)
+          const label = cloudStorageProviderName(provider)
           return (
             <SettingRow
               key={provider}

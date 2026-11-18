@@ -95,7 +95,7 @@ Your slicer remains the source of truth for orientation, arrangement, supports, 
 
 ## Development 🛠️
 
-Requires Node 24.x and pnpm 12.13.0. Setup, checks, and release guidance live in [CONTRIBUTING.md](CONTRIBUTING.md); see [SECURITY.md](SECURITY.md) for vulnerability reports and [GitHub Issues](https://github.com/richardsolomou/stl.quest/issues) for planned work.
+Requires Node 24.x and the pnpm version in `package.json`'s `packageManager` field. Setup, checks, and release guidance live in [CONTRIBUTING.md](CONTRIBUTING.md); see [SECURITY.md](SECURITY.md) for vulnerability reports and [GitHub Issues](https://github.com/richardsolomou/stl.quest/issues) for planned work.
 
 The UI components and their used Tailwind state variants live in `src/components/ui/` and `src/ui-variants.css`. The application does not need the shadcn generator CLI at install or build time.
 

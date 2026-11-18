@@ -2,8 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { useQuery } from '@tanstack/react-query'
 import { Badge } from '@/components/ui/badge'
-import { formatBytes } from '../../../core/format'
-import type { Locale } from '../../../core/i18n'
+import { formatBytes, formatDateTime } from '../../../core/format'
 import {
   adminWorkspaceAttentionReasons,
   adminWorkspaceHealth,
@@ -44,7 +43,6 @@ function WorkspaceDetails({ workspace }: { workspace: AdminWorkspaceDetails }) {
   const identity = useQuery(sessionQuery()).data?.identity
   const [removing, setRemoving] = useState<AdminWorkspaceMember | null>(null)
   const copy = t.superAdmin.workspaceDetails
-  const formatDateTime = (value: number) => dateTime(value, locale)
   const attention = adminWorkspaceAttentionReasons(workspace, t.superAdmin)
   const storageEntries: Array<[string, string]> = [
     [
@@ -89,7 +87,7 @@ function WorkspaceDetails({ workspace }: { workspace: AdminWorkspaceDetails }) {
           <DetailList
             entries={[
               [copy.slug, workspace.slug],
-              [copy.created, formatDateTime(workspace.createdAt)],
+              [copy.created, formatDateTime(workspace.createdAt, locale)],
               [copy.members, String(workspace.memberCount)],
               [copy.printers, String(workspace.printerCount)],
             ]}
@@ -100,7 +98,7 @@ function WorkspaceDetails({ workspace }: { workspace: AdminWorkspaceDetails }) {
             entries={[
               [copy.requests, String(workspace.requestCount)],
               [copy.copies, String(workspace.copyCount)],
-              [copy.lastRequestChange, workspace.lastRequestAt ? formatDateTime(workspace.lastRequestAt) : t.superAdmin.noRequests],
+              [copy.lastRequestChange, workspace.lastRequestAt ? formatDateTime(workspace.lastRequestAt, locale) : t.superAdmin.noRequests],
               [copy.backgroundJobs, copy.jobCounts(workspace.activeJobCount, workspace.failedJobCount)],
             ]}
           />
@@ -167,8 +165,4 @@ function DetailList({ entries }: { entries: Array<[string, string]> }) {
       ))}
     </dl>
   )
-}
-
-function dateTime(value: number, locale: Locale) {
-  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(value)
 }

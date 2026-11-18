@@ -1,7 +1,7 @@
-import { execFileSync } from 'node:child_process'
 import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { assertRevisions, checkoutSource, writeSourceLicense } from './catalogSources'
 import {
   applyCatalogOverrides,
   mergePrinterPresets,
@@ -48,16 +48,12 @@ function synchronizeCatalog(sources: CatalogSource[]) {
     const presets: GeneratedPrinterPreset[] = []
     const images = new Map<string, string>()
     for (const source of sources) {
-      const checkout = checkoutSource(temporaryRoot, source)
-      if (update) source.revision = git(checkout, 'rev-parse', 'HEAD').trim()
+      const checkout = checkoutSource(temporaryRoot, source, update)
       const parsed =
         source.kind === 'filament' ? parseOrcaCatalog(checkout, source, overrides) : parseUvtoolsCatalog(checkout, source, overrides)
       presets.push(...parsed.presets)
       for (const [destination, sourceImage] of parsed.images) images.set(destination, sourceImage)
-      const license = git(checkout, 'show', `HEAD:${source.licensePath}`)
-      const licenseOutput = path.join(root, source.licenseOutput)
-      mkdirSync(path.dirname(licenseOutput), { recursive: true })
-      writeFileSync(licenseOutput, license)
+      writeSourceLicense(root, checkout, source)
     }
 
     const mergedPresets = mergePrinterPresets(presets, manufacturerCatalog.presets)
@@ -101,32 +97,15 @@ function applyManufacturerImages(presets: GeneratedPrinterPreset[]) {
   })
 }
 
-function checkoutSource(temporaryRoot: string, source: CatalogSource) {
-  const checkout = path.join(temporaryRoot, source.id)
-  mkdirSync(checkout)
-  git(checkout, 'init', '--quiet')
-  git(checkout, 'remote', 'add', 'origin', source.repository)
-  git(checkout, 'sparse-checkout', 'init', '--cone')
-  git(checkout, 'sparse-checkout', 'set', source.catalogPath)
-  git(checkout, 'fetch', '--quiet', '--depth', '1', 'origin', update ? source.branch : source.revision)
-  git(checkout, 'checkout', '--quiet', 'FETCH_HEAD')
-  return checkout
-}
-
 function validateCommittedCatalog(sources: CatalogSource[]) {
   if (!existsSync(outputPath)) throw new Error('catalogs/printers/catalog.generated.json is missing; run pnpm catalog:sync')
   const catalog = JSON.parse(readFileSync(outputPath, 'utf8')) as {
     sources: { id: string; revision: string }[]
     presets: GeneratedPrinterPreset[]
   }
+  assertRevisions(catalog.sources, [...sources, ...manufacturerCatalog.sources], 'catalog')
   for (const source of sources) {
-    const generatedSource = catalog.sources.find((candidate) => candidate.id === source.id)
-    if (generatedSource?.revision !== source.revision) throw new Error(`${source.id} revision does not match the generated catalog`)
     if (!existsSync(path.join(root, source.licenseOutput))) throw new Error(`Missing ${source.id} license file`)
-  }
-  for (const source of manufacturerCatalog.sources) {
-    const generatedSource = catalog.sources.find((candidate) => candidate.id === source.id)
-    if (generatedSource?.revision !== source.revision) throw new Error(`${source.id} revision does not match the generated catalog`)
   }
   const imageSourceIds = new Set(imageSources.sources.map((source) => source.id))
   for (const source of imageSources.sources) {
@@ -172,8 +151,4 @@ function readdirRecursive(directory: string): string[] {
     const file = path.join(directory, entry.name)
     return entry.isDirectory() ? readdirRecursive(file) : [file]
   })
-}
-
-function git(directory: string, ...arguments_: string[]) {
-  return execFileSync('git', ['-C', directory, ...arguments_], { encoding: 'utf8' })
 }

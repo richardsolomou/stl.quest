@@ -15,8 +15,7 @@ export function socialProviderTestErrorCode(search: string, provider: SocialAuth
 
 export function socialProviderTestFailure(search: string, provider: SocialAuthProvider, copy: Messages['settings']['signIn']['provider']) {
   if (socialProviderTestResult(search, provider) !== 'failed') return undefined
-  const code = socialProviderTestErrorCode(search, provider)
-  switch (code) {
+  switch (socialSignInErrorCode(search)) {
     case 'unable_to_link_account':
       return copy.testErrors.linking
     case 'email_not_found':

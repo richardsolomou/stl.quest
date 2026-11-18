@@ -33,7 +33,7 @@ import { PrintersPane } from '../client/components/settings/PrintersPane'
 import { StoragePane } from '../client/components/settings/StoragePane'
 import { peopleQuery, pendingEstimateRefetchInterval, requestsQuery, sessionQuery } from '../client/queries'
 import { useWorkspaceSlug } from '../client/workspace'
-import { needsStorageOnboarding, storageSetupState } from '../client/onboarding'
+import { storageSetupState } from '../client/onboarding'
 import type { PublicPrintRequest } from '../core/types'
 import { printGroupBranchIds } from '../core/printGroups'
 import { createPrintGroup, deletePrintGroup, updatePrintGroup } from '../server/fns'
@@ -64,7 +64,7 @@ function Home() {
     return <AuthScreen setupRequired={session.setupRequired} hosted={session.hosted} auth={session.auth} creatingAccount={search.signup} />
   }
   if (session.identity.role === 'admin') {
-    const showStorage = reopenedStorage || needsStorageOnboarding(session.storageConfigured)
+    const showStorage = reopenedStorage || !session.storageConfigured
     const showPrinters = !showStorage && !session.printersConfigured
     if (showStorage || showPrinters) {
       const leaveStorage = () => setReopenedStorage(false)

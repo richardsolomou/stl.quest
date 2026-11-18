@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
+import { createFileRoute, redirect, useNavigate, useHydrated } from '@tanstack/react-router'
+import { useEffect } from 'react'
 import { isSuperAdminSection, SuperAdminPanes } from '../client/components/SuperAdminPanes'
 import { AppRail } from '../client/components/AppRail'
 import { sessionQuery } from '../client/queries'
@@ -20,15 +20,12 @@ export const Route = createFileRoute('/admin/$section')({
 function SuperAdminPage() {
   const { section } = Route.useParams()
   const { data: session } = useSuspenseQuery(sessionQuery())
-  const [hydrated, setHydrated] = useState(false)
+  const hydrated = useHydrated()
   const navigate = useNavigate()
   useEscape(() => navigate({ to: '/' }))
   const identity = session.identity
   const validSection = isSuperAdminSection(section) ? section : undefined
   const authorized = Boolean(identity?.superAdmin && validSection)
-  useEffect(() => {
-    setHydrated(true)
-  }, [])
   useEffect(() => {
     if (!authorized) void navigate({ to: '/' })
   }, [authorized, navigate])

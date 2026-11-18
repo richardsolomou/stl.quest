@@ -1,4 +1,5 @@
 import type { PriceCalculatorJob, PriceCalculatorSettings } from '../core/priceCalculator'
+import { isPrintType } from '../core/types'
 
 export type CalculatorSearch = {
   printType?: PriceCalculatorSettings['printType']
@@ -15,7 +16,7 @@ export function calculatorSearch(printType: PriceCalculatorSettings['printType']
 export function validateCalculatorSearch(input: Record<string, unknown>): CalculatorSearch {
   const plates = amount(input.plates)
   return {
-    printType: input.printType === 'resin' || input.printType === 'filament' ? input.printType : undefined,
+    printType: isPrintType(input.printType) ? input.printType : undefined,
     material: amount(input.material),
     unit: input.unit === 'ml' || input.unit === 'g' ? input.unit : undefined,
     hours: amount(input.hours),

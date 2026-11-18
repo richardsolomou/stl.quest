@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { IntegrationConfig } from '../core/auth'
-import { decryptIntegrationConfig, encryptIntegrationConfig, oidcDiscoveryProblem, publicIntegrationConfig } from './integrations'
+import { decryptSetting, encryptSetting, oidcDiscoveryProblem, publicIntegrationConfig } from './integrations'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { resolveSmtpConfig } from '../adapters/email'
 
@@ -126,21 +126,21 @@ describe('integration settings', () => {
       smtp: { from: 'print@example.com', host: 'smtp.example.com', port: 587, secure: false, password: 'email-secret' },
     }
     const env = environment()
-    const encrypted = encryptIntegrationConfig(config, env)
+    const encrypted = encryptSetting(config, env)
 
     expect(encrypted.ciphertext).not.toContain('secret')
     expect(encrypted.ciphertext).not.toContain('dropbox-secret')
-    expect(decryptIntegrationConfig(encrypted, env)).toEqual(config)
+    expect(decryptSetting(encrypted, env)).toEqual(config)
     expect(fs.statSync(path.join(env.DATA_DIR, 'integration-secrets.key')).mode & 0o777).toBe(0o600)
   })
 
   it('rejects tampered ciphertext', () => {
     const env = environment()
-    const encrypted = encryptIntegrationConfig({ passwordEnabled: true }, env)
+    const encrypted = encryptSetting({ passwordEnabled: true }, env)
     const ciphertext = Buffer.from(encrypted.ciphertext, 'base64url')
     ciphertext[0] ^= 1
     encrypted.ciphertext = ciphertext.toString('base64url')
-    expect(() => decryptIntegrationConfig(encrypted, env)).toThrow()
+    expect(() => decryptSetting(encrypted, env)).toThrow()
   })
 
   it('masks configured secrets in public settings', () => {

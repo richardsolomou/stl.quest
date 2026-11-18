@@ -9,6 +9,7 @@ import { formatBytes } from '../../../core/format'
 import type { Locale, Messages } from '../../../core/i18n'
 import { storagePlans } from '../../../core/plans'
 import type { Account, Identity } from '../../../core/types'
+import { LocalDate } from '../LocalDate'
 import { ProtectedEmail } from '../ProtectedEmail'
 import { UserTableIdentity, userEmailColumnMeta } from '../UserTableIdentity'
 
@@ -59,19 +60,19 @@ export function superAdminUserColumns({
     }),
     columnHelper.accessor('createdAt', {
       header: copy.columns.created,
-      cell: ({ getValue }) => <DateCell value={getValue()} locale={locale} />,
+      cell: ({ getValue }) => <LocalDate value={getValue()} locale={locale} />,
       meta: { className: '@max-3xl:hidden' },
     }),
     columnHelper.accessor('updatedAt', {
       header: copy.columns.updated,
-      cell: ({ getValue }) => <DateCell value={getValue()} locale={locale} />,
+      cell: ({ getValue }) => <LocalDate value={getValue()} locale={locale} />,
       meta: { className: '@max-3xl:hidden' },
     }),
     columnHelper.accessor('lastOnlineAt', {
       header: copy.columns.lastOnline,
       cell: ({ getValue }) => {
         const value = getValue()
-        return value ? <DateCell value={value} locale={locale} /> : <span className="text-muted-foreground">{copy.never}</span>
+        return value ? <LocalDate value={value} locale={locale} /> : <span className="text-muted-foreground">{copy.never}</span>
       },
       sortUndefined: 'last',
       meta: { className: '@max-xl:hidden' },
@@ -120,10 +121,6 @@ export function superAdminUserColumns({
       ),
     }),
   ])
-}
-
-function DateCell({ value, locale }: { value: number; locale: Locale }) {
-  return <time dateTime={new Date(value).toISOString()}>{new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(value)}</time>
 }
 
 function UserActions({

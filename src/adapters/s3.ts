@@ -52,7 +52,7 @@ export class S3AssetStore extends AssetStoreKeys implements AssetStore {
     await finalizeCloudUpload(
       stagedPath,
       relativePath,
-      () => this.head(relativePath),
+      () => this.stat(relativePath),
       (_stream, size, sourcePath) =>
         retryS3(() =>
           this.client.send(
@@ -99,15 +99,11 @@ export class S3AssetStore extends AssetStoreKeys implements AssetStore {
     return { stream: result.Body.transformToWebStream(), size: result.ContentLength ?? 0 }
   }
 
-  async stat(relativePath: string) {
-    return this.head(relativePath)
-  }
-
   async ensureMoved(sourcePath: string, destinationPath: string) {
     const move = await prepareAssetMove(
       sourcePath,
       destinationPath,
-      (path) => this.head(path),
+      (path) => this.stat(path),
       (asset) => asset.size,
     )
     if (!move) return
@@ -127,7 +123,7 @@ export class S3AssetStore extends AssetStoreKeys implements AssetStore {
   }
 
   async exists(relativePath: string) {
-    return !!(await this.head(relativePath))
+    return !!(await this.stat(relativePath))
   }
 
   async remove(relativePath: string) {
@@ -212,7 +208,7 @@ export class S3AssetStore extends AssetStoreKeys implements AssetStore {
     return this.prefix + relativePath
   }
 
-  private async head(relativePath: string) {
+  async stat(relativePath: string) {
     try {
       const result = await retryS3(() => this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: this.key(relativePath) })))
       return { size: result.ContentLength ?? 0 }

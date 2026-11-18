@@ -32,26 +32,23 @@ export class OptionalPostHogTelemetry implements Telemetry {
   }
 
   capture(identity: string, event: string, properties?: Record<string, unknown>) {
-    if (!this.enabled()) return Promise.resolve()
+    if (!this.enabled()) return
     this.telemetry.posthog.capture({ distinctId: identity, event, properties: { ...properties, ...this.context } })
-    return Promise.resolve()
   }
 
   exception(error: unknown, properties?: Record<string, unknown>) {
-    if (!this.enabled()) return Promise.resolve()
+    if (!this.enabled()) return
     const { posthogDistinctId, sessionId, ...context } = properties ?? {}
     this.telemetry.posthog.captureException(error, typeof posthogDistinctId === 'string' ? posthogDistinctId : undefined, {
       ...context,
       ...(typeof sessionId === 'string' ? { $session_id: sessionId } : {}),
     })
-    return Promise.resolve()
   }
 
   /** Sends a Pino record as a PostHog log. */
   log({ level, msg, time: _time, ...attributes }: Record<string, unknown>) {
-    if (!this.enabled()) return Promise.resolve()
+    if (!this.enabled()) return
     this.telemetry.log(typeof level === 'number' ? severityFor(level) : 'info', typeof msg === 'string' ? msg : '', attributes)
-    return Promise.resolve()
   }
 
   shutdown() {

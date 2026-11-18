@@ -1,7 +1,7 @@
 import { logger } from './logger'
 
 /** A failed dependency, with the stable code and message monitors see; the cause stays in the server log. */
-export class HealthCheckFailure extends Error {
+class HealthCheckFailure extends Error {
   readonly code: string
 
   constructor(code: string, message: string, options?: ErrorOptions) {

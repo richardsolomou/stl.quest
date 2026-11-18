@@ -462,9 +462,7 @@ export const settings: typeof en = {
       'STL Quest ist Open Source unter der GNU Affero General Public License v3.0. Nutzer gehosteter und selbst gehosteter Installationen können den zugehörigen Quellcode oben abrufen, und die anonyme Telemetrie lässt sich jederzeit deaktivieren.',
   },
   diagnostics: {
-    title: 'Diagnose',
-    description: 'Den Zustand von Speicher, Uploads und Dateiverarbeitung prüfen.',
-    embeddedTitle: 'Speicher und Verarbeitung',
+    title: 'Speicher und Verarbeitung',
     loading: 'Systemzustand wird geprüft…',
     loadError: 'Diagnose konnte nicht geladen werden',
     storage: 'Speicher',
@@ -497,9 +495,7 @@ export const settings: typeof en = {
     },
   },
   systemDiagnostics: {
-    title: 'Systemdiagnose',
-    description: 'Den Zustand von Bereitstellung, Authentifizierung, Datenbank und Datenträger prüfen.',
-    embeddedTitle: 'Systemzustand',
+    title: 'Systemzustand',
     loadError: 'Systemdiagnose konnte nicht geladen werden',
     version: 'Version',
     authentication: 'Authentifizierung',

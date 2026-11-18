@@ -6,6 +6,7 @@ import type { DataStore } from '@tus/server'
 import { z } from 'zod'
 import { app } from './app'
 import { MAX_UPLOAD_BYTES } from '../core/uploadLimits'
+import { PRINT_TYPES } from '../core/types'
 import {
   MAX_REQUEST_NAME_LENGTH,
   MAX_REQUEST_NOTES_LENGTH,
@@ -45,7 +46,7 @@ const metadataSchema = z.object({
     (value) => !value || validSourceUrl(value),
     'source URL must be an http(s) link',
   ),
-  requestedPrintType: z.enum(['resin', 'filament']),
+  requestedPrintType: z.enum(PRINT_TYPES),
   // Present when the upload completes a link-only request instead of creating a new one.
   attachToRequestId: z.preprocess((value) => (value === null ? undefined : value), z.string().uuid().optional()),
 })

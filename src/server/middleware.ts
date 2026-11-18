@@ -4,7 +4,7 @@ import { contentSecurityPolicy } from './contentSecurityPolicy'
 import { acceptedOrigins } from './origins'
 import { withServerFunction } from './serverFunction'
 
-export const securityHeaders: Record<string, string> = {
+const securityHeaders: Record<string, string> = {
   'content-security-policy': Object.entries(contentSecurityPolicy)
     .map(([directive, sources]) => [directive, ...sources].join(' '))
     .join('; '),

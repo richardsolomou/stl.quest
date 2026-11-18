@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import { Readable } from 'node:stream'
-import { uploadPartMissingError } from './missingFile'
+import { undefinedIfMissing, uploadPartMissingError } from './missingFile'
 
 export async function finalizeCloudUpload(
   stagedPath: string,
@@ -8,10 +8,7 @@ export async function finalizeCloudUpload(
   stat: () => Promise<{ size: number } | undefined>,
   writeStream: (stream: ReadableStream, size: number, stagedPath: string) => Promise<unknown>,
 ) {
-  const source = await fs.promises.stat(stagedPath).catch((error: NodeJS.ErrnoException) => {
-    if (error.code === 'ENOENT') return undefined
-    throw error
-  })
+  const source = await undefinedIfMissing(fs.promises.stat(stagedPath))
   const destination = await stat()
   if (!source && destination) return
   if (!source) throw uploadPartMissingError(stagedPath)

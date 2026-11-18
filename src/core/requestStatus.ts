@@ -3,7 +3,7 @@ import type { StatusId, WorkflowStatus } from './workflow'
 
 export type RequestStatusItem = RequestQueueItem & { counts: Record<string, number> }
 
-export type RequestStageCount = { status: StatusId; label: string; count: number }
+export type RequestStageCount = { status: StatusId; count: number }
 
 export type RequestStageRank = { status: StatusId; position: number; total: number }
 
@@ -32,9 +32,9 @@ export function requestStatusSummaries<T extends RequestStatusItem>(
   return requests
     .map((request) => ({
       request,
-      stages: statuses.flatMap(({ id, label }) => {
+      stages: statuses.flatMap(({ id }) => {
         const count = request.counts[id] ?? 0
-        return count > 0 ? [{ status: id, label, count }] : []
+        return count > 0 ? [{ status: id, count }] : []
       }),
       ranks: rankings.flatMap(({ status, total, priorities }) => {
         const priority = priorities.get(request.id)
@@ -55,8 +55,8 @@ export function requestStageTotals(
   summaries: Pick<RequestStatusSummary<RequestStatusItem>, 'stages'>[],
   statuses: readonly WorkflowStatus[],
 ) {
-  return statuses.flatMap(({ id, label }) => {
+  return statuses.flatMap(({ id }) => {
     const count = summaries.reduce((sum, summary) => sum + (summary.stages.find((stage) => stage.status === id)?.count ?? 0), 0)
-    return count > 0 ? [{ status: id, label, count }] : []
+    return count > 0 ? [{ status: id, count }] : []
   })
 }

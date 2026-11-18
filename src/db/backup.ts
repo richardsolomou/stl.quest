@@ -31,7 +31,7 @@ export async function backupDatabase(database: STLQuestDatabase, destination: st
     } finally {
       fs.closeSync(directory)
     }
-    return { totalPages, remainingPages: 0 }
+    return { totalPages }
   } finally {
     fs.rmSync(temporary, { force: true })
   }

@@ -43,9 +43,10 @@ export const Route = createFileRoute('/api/files/batch')({
             context.assets,
             entries.map(({ path }, index) => ({ path, name: names[index] })),
           )
-          void instance.telemetry
-            .capture(context.identity.id, 'stl_batch_download_served', { request_count: ids.length, file_count: files.length })
-            .catch(() => undefined)
+          instance.telemetry.capture(context.identity.id, 'stl_batch_download_served', {
+            request_count: ids.length,
+            file_count: files.length,
+          })
 
           return new Response(archive, {
             headers: {

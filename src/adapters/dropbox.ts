@@ -1,7 +1,7 @@
 import type { CloudStorageCredentials } from '../core/auth'
 import type { AssetStore } from '../core/types'
 import { assertRelativeStoragePath } from '../core/storagePath'
-import { cloudFetch, cloudRequestError, waitForCloudRetry } from './cloudFetch'
+import { cloudFetch, cloudRequestError, retryCloudRequest } from './cloudFetch'
 import { cleanCloudRoot, joinCloudPath } from './cloudPath'
 import { refreshOAuthAccessToken } from './oauthAccessToken'
 import { assertStreamSize, streamChunks } from './streamChunks'
@@ -82,19 +82,17 @@ export class DropboxAssetStore extends OAuthAssetStoreKeys implements AssetStore
     if (!move) return
     const { destination } = move
     if (destination) return this.remove(sourcePath)
-    if (!destination) {
-      await this.ensureParent(destinationPath)
-      await moveIgnoringMissingSource(
-        () =>
-          this.rpc('/files/move_v2', {
-            from_path: this.path(sourcePath),
-            to_path: this.path(destinationPath),
-            autorename: false,
-            allow_ownership_transfer: false,
-          }),
-        isDropboxNotFound,
-      )
-    }
+    await this.ensureParent(destinationPath)
+    await moveIgnoringMissingSource(
+      () =>
+        this.rpc('/files/move_v2', {
+          from_path: this.path(sourcePath),
+          to_path: this.path(destinationPath),
+          autorename: false,
+          allow_ownership_transfer: false,
+        }),
+      isDropboxNotFound,
+    )
   }
 
   async exists(relativePath: string) {
@@ -171,8 +169,8 @@ export class DropboxAssetStore extends OAuthAssetStoreKeys implements AssetStore
   }
 
   private async ensureParent(relativePath: string) {
-    const segments = relativePath.split('/').slice(0, -1)
-    for (let index = 1; index <= segments.length; index++) await this.createFolder(segments.slice(0, index).join('/'))
+    const parent = relativePath.split('/').slice(0, -1).join('/')
+    if (parent) await this.createFolder(parent)
   }
 
   private async createFolder(relativePath: string) {
@@ -217,18 +215,14 @@ export class DropboxAssetStore extends OAuthAssetStoreKeys implements AssetStore
   private async request(url: string, init: { headers: Record<string, string>; body?: string | Uint8Array }) {
     const token = await this.token()
     const body = typeof init.body === 'string' ? init.body : init.body ? Buffer.from(init.body) : undefined
-    for (let attempt = 0; ; attempt++) {
-      const response = await cloudFetch(url, {
-        method: 'POST',
-        ...init,
-        body,
-        headers: { ...init.headers, authorization: `Bearer ${token}` },
-      })
-      if (response.ok) return response
-      const error = await dropboxError(response)
-      if (error.status !== 429 || attempt === 5) throw error
-      await waitForCloudRetry(attempt, { minimumDelayMs: error.retryAfterMs })
-    }
+    return retryCloudRequest(
+      () => cloudFetch(url, { method: 'POST', ...init, body, headers: { ...init.headers, authorization: `Bearer ${token}` } }),
+      {
+        error: dropboxError,
+        retryable: (error) => error.status === 429,
+        delay: (error) => ({ minimumDelayMs: error.retryAfterMs }),
+      },
+    )
   }
 
   protected async refreshAccessToken() {

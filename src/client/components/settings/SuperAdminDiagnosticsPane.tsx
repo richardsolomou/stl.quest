@@ -8,8 +8,8 @@ export function SuperAdminDiagnosticsPane() {
   return (
     <SettingsPage>
       <SettingsHeader title={t.superAdmin.diagnostics.title} description={t.superAdmin.diagnostics.description} />
-      <SystemDiagnosticsPane embedded />
-      <DiagnosticsPane embedded />
+      <SystemDiagnosticsPane />
+      <DiagnosticsPane />
     </SettingsPage>
   )
 }

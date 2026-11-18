@@ -12,6 +12,8 @@ export const config = {
   workDirectory: path.join(captureDirectory, '.work'),
 }
 
+// `speed` compresses the still gaps Playwright leaves around each action; `orbitSpeed` further speeds up
+// only the model rotation, where nothing is demonstrated beat by beat.
 export const scenes = {
   landing: { width: 2560, height: 1440, scale: '1920:1080', speed: 1.15, orbitSpeed: 2.4, trim: 3.4 },
   gif: { width: 1728, height: 1080, scale: '1000:-1', speed: 1.2, trim: 3.2 },

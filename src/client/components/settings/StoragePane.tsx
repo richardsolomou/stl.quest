@@ -7,9 +7,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
-import type { PublicCloudConnection } from '../../../core/auth'
+import { cloudStorageProviderName, isCloudStorageProvider, type CloudStorageProvider, type PublicCloudConnection } from '../../../core/auth'
 import { formatBytes } from '../../../core/format'
-import type { StoragePlan } from '../../../core/plans'
+import { storagePlans, type StoragePlan } from '../../../core/plans'
 import type { PublicStorageMigration, StorageConfig, StorageInventory } from '../../../core/types'
 import {
   acknowledgeStorageMigration,
@@ -24,15 +24,7 @@ import {
 import { cloudConnectionsQuery, integrationsQuery, sessionQuery, storageMigrationQuery, storageQuery } from '../../queries'
 import { signalProductTourProgress } from '../../productTour'
 import { invalidateQueries, retryQueries } from '../../queryState'
-import {
-  CLOUD_PROVIDERS,
-  cloudProviderLabel,
-  isCloudAdapter,
-  storageLabel,
-  storageRecoveryHint,
-  type CloudProvider,
-  type StorageMessages,
-} from '../../storageProviders'
+import { CLOUD_PROVIDERS, storageLabel, storageRecoveryHint, type StorageMessages } from '../../storageProviders'
 import { rootForStorageAdapter, storageConfigFromForm, storageFormValues, useStorageConfigForm } from '../../storageForm'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { QueryState } from '../QueryState'
@@ -40,7 +32,7 @@ import { ServerFolderPicker } from '../ServerFolderPicker'
 import { useWorkspaceSlug } from '../../workspace'
 import { useI18n } from '../../i18n'
 import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
-import { SettingNotice, noticeDetail, type Notice } from '../SettingNotice'
+import { SettingNotice, errorNotice, successNotice, type Notice } from '../SettingNotice'
 import { CloudStorageAppDialog } from './CloudStorageAppDialog'
 import { StorageChangeDialog } from './StorageChangeDialog'
 import { MigrationProgress, MigrationStarting } from './StorageMigrationStatus'
@@ -51,12 +43,12 @@ import { S3StorageFields } from './S3StorageFields'
 import { WebDAVStorageFields } from './WebDAVStorageFields'
 import { CloudStorageFields } from './CloudStorageFields'
 
-type CloudConnections = Record<CloudProvider, PublicCloudConnection>
+type CloudConnections = Record<CloudStorageProvider, PublicCloudConnection>
 
 const refreshStorageSettings = (queryClient: ReturnType<typeof useQueryClient>) => invalidateQueries(queryClient, 'storage', 'session')
 
-function connectFirstNotice(t: StorageMessages, provider: CloudProvider): Notice {
-  return { tone: 'error', title: t.notice.notConnectedTitle(cloudProviderLabel(provider)), hint: t.notice.notConnectedHint }
+function connectFirstNotice(t: StorageMessages, provider: CloudStorageProvider): Notice {
+  return errorNotice(t.notice.notConnectedTitle(cloudStorageProviderName(provider)), t.notice.notConnectedHint)
 }
 
 export function StoragePane({
@@ -106,7 +98,7 @@ export function StoragePane({
       managedStorageUnavailableReason={session.managedStorageUnavailableReason}
       managedStorageUsage={session.managedStorageUsage}
       managedStoragePlan={session.billing?.plan ?? 'free'}
-      managedStorageQuotaBytes={session.billing?.plans[session.billing.plan].quotaBytes ?? 1_000_000_000}
+      managedStorageQuotaBytes={session.billing?.plans[session.billing.plan].quotaBytes ?? storagePlans.free.quotaBytes}
       onboarding={onboarding}
       onSaved={onSaved}
       onKeepCurrent={onKeepCurrent}
@@ -174,14 +166,14 @@ function StorageForm({
   const [cancelMigrationOpen, setCancelMigrationOpen] = useState(false)
   const [startingMigration, setStartingMigration] = useState<{ source: StorageConfig; destination: StorageConfig }>()
   const [folderPickerOpen, setFolderPickerOpen] = useState(false)
-  const [connectingProvider, setConnectingProvider] = useState<CloudProvider>()
-  const [disconnectingProvider, setDisconnectingProvider] = useState<CloudProvider>()
-  const [permissionProvider, setPermissionProvider] = useState<CloudProvider>()
+  const [connectingProvider, setConnectingProvider] = useState<CloudStorageProvider>()
+  const [disconnectingProvider, setDisconnectingProvider] = useState<CloudStorageProvider>()
+  const [permissionProvider, setPermissionProvider] = useState<CloudStorageProvider>()
   const [storageChoice, setStorageChoice] = useState<StorageConfig['adapter']>()
   const [preparingStorage, setPreparingStorage] = useState(false)
   const [notice, setNotice] = useState<Notice>()
   const [clearAcknowledged, setClearAcknowledged] = useState(false)
-  const [settingUpProvider, setSettingUpProvider] = useState<CloudProvider>()
+  const [settingUpProvider, setSettingUpProvider] = useState<CloudStorageProvider>()
   // Only a super admin may register the deployment-wide app, so only they can read its credentials.
   const integrations = useQuery({ ...integrationsQuery(), enabled: superAdmin }).data
   const s3 = current.adapter === 's3' ? current : undefined
@@ -202,7 +194,7 @@ function StorageForm({
   const form = useStorageConfigForm(defaultValues, async (value) => {
     const config = storageConfigFromForm(value)
     setNotice(undefined)
-    if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
+    if (isCloudStorageProvider(config.adapter) && !cloudConnections[config.adapter].connected) {
       setNotice(connectFirstNotice(t, config.adapter))
       return
     }
@@ -220,7 +212,7 @@ function StorageForm({
       onSaved?.()
     } catch (error) {
       setStorageChoice(config.adapter)
-      setNotice({ tone: 'error', title: t.notice.notChanged, hint: storageRecoveryHint(t, config.adapter), detail: noticeDetail(error) })
+      setNotice(errorNotice(t.notice.notChanged, storageRecoveryHint(t, config.adapter), error))
     }
   })
 
@@ -228,7 +220,7 @@ function StorageForm({
     const config = storageConfigFromForm(form.state.values)
     const configSnapshot = JSON.stringify(config)
     setNotice(undefined)
-    if (isCloudAdapter(config.adapter) && !cloudConnections[config.adapter].connected) {
+    if (isCloudStorageProvider(config.adapter) && !cloudConnections[config.adapter].connected) {
       setNotice(connectFirstNotice(t, config.adapter))
       return
     }
@@ -239,12 +231,7 @@ function StorageForm({
       setTestedConfig(configSnapshot)
     } catch (error) {
       setTestedConfig(undefined)
-      setNotice({
-        tone: 'error',
-        title: t.notice.unusableLocation,
-        hint: storageRecoveryHint(t, config.adapter),
-        detail: noticeDetail(error),
-      })
+      setNotice(errorNotice(t.notice.unusableLocation, storageRecoveryHint(t, config.adapter), error))
     } finally {
       setTesting(false)
     }
@@ -267,25 +254,20 @@ function StorageForm({
 
   useEffect(() => {
     const search = new URLSearchParams(window.location.search)
-    const provider = search.get('cloud') as CloudProvider | null
+    const provider = search.get('cloud') as CloudStorageProvider | null
     const outcome = search.get('outcome')
-    if (!provider || !isCloudAdapter(provider) || !outcome) return
+    if (!provider || !isCloudStorageProvider(provider) || !outcome) return
     setStorageChoice(provider)
     form.setFieldValue('adapter', provider)
     form.setFieldValue('root', rootForStorageAdapter(provider, current))
-    const label = cloudProviderLabel(provider)
-    if (outcome === 'connected') setNotice({ tone: 'success', title: t.notice.connectedTitle(label), hint: t.notice.connectedHint })
+    const label = cloudStorageProviderName(provider)
+    if (outcome === 'connected') setNotice(successNotice(t.notice.connectedTitle(label), t.notice.connectedHint))
     else if (outcome === 'missing-permissions') setPermissionProvider(provider)
-    else
-      setNotice({
-        tone: 'error',
-        title: t.notice.connectFailedTitle(label),
-        hint: t.notice.connectFailedHint,
-      })
+    else setNotice(errorNotice(t.notice.connectFailedTitle(label), t.notice.connectFailedHint))
     window.history.replaceState({}, '', window.location.pathname)
   }, [current, form, t])
 
-  const connectCloud = async (provider: CloudProvider) => {
+  const connectCloud = async (provider: CloudStorageProvider) => {
     setPermissionProvider(undefined)
     setConnectingProvider(provider)
     try {
@@ -294,27 +276,17 @@ function StorageForm({
       })
       window.location.assign(result.url)
     } catch (error) {
-      setNotice({
-        tone: 'error',
-        title: t.notice.openFailedTitle(cloudProviderLabel(provider)),
-        hint: t.notice.openFailedHint,
-        detail: noticeDetail(error),
-      })
+      setNotice(errorNotice(t.notice.openFailedTitle(cloudStorageProviderName(provider)), t.notice.openFailedHint, error))
       setConnectingProvider(undefined)
     }
   }
 
-  const disconnectCloud = (provider: CloudProvider) => {
+  const disconnectCloud = (provider: CloudStorageProvider) => {
     setDisconnectingProvider(provider)
     void callRemoveCloud({ data: { provider, workspaceSlug } })
       .then(() => queryClient.invalidateQueries({ queryKey: ['cloud-connections'] }))
       .catch((error: unknown) =>
-        setNotice({
-          tone: 'error',
-          title: t.notice.disconnectFailedTitle(cloudProviderLabel(provider)),
-          hint: t.notice.disconnectFailedHint,
-          detail: noticeDetail(error),
-        }),
+        setNotice(errorNotice(t.notice.disconnectFailedTitle(cloudStorageProviderName(provider)), t.notice.disconnectFailedHint, error)),
       )
       .finally(() => setDisconnectingProvider(undefined))
   }
@@ -341,12 +313,7 @@ function StorageForm({
     } catch (error) {
       setStartingMigration(undefined)
       setPendingChange(change)
-      setNotice({
-        tone: 'error',
-        title: t.notice.notChanged,
-        hint: storageRecoveryHint(t, change.config.adapter),
-        detail: noticeDetail(error),
-      })
+      setNotice(errorNotice(t.notice.notChanged, storageRecoveryHint(t, change.config.adapter), error))
     }
   }
 
@@ -358,7 +325,7 @@ function StorageForm({
     setNotice(undefined)
     setStorageChoice(adapter)
     form.setFieldValue('adapter', adapter)
-    if (adapter === 'local' || adapter === 'webdav' || isCloudAdapter(adapter))
+    if (adapter === 'local' || adapter === 'webdav' || isCloudStorageProvider(adapter))
       form.setFieldValue('root', rootForStorageAdapter(adapter, current))
   }
 
@@ -418,14 +385,7 @@ function StorageForm({
         setRetrying(true)
         void callRetryMigration({ data: { workspaceSlug } })
           .then(() => queryClient.invalidateQueries({ queryKey: ['storage-migration'] }))
-          .catch((error: unknown) =>
-            setNotice({
-              tone: 'error',
-              title: t.notice.retryFailedTitle,
-              hint: t.notice.retryFailedHint,
-              detail: noticeDetail(error),
-            }),
-          )
+          .catch((error: unknown) => setNotice(errorNotice(t.notice.retryFailedTitle, t.notice.retryFailedHint, error)))
           .finally(() => setRetrying(false))
       }}
     />
@@ -480,14 +440,7 @@ function StorageForm({
             .then((cancelled) => {
               queryClient.setQueryData(['storage-migration', workspaceSlug], cancelled)
             })
-            .catch((error: unknown) =>
-              setNotice({
-                tone: 'error',
-                title: t.notice.stopFailedTitle,
-                hint: t.notice.stopFailedHint,
-                detail: noticeDetail(error),
-              }),
-            )
+            .catch((error: unknown) => setNotice(errorNotice(t.notice.stopFailedTitle, t.notice.stopFailedHint, error)))
             .finally(() => setCancelling(false))
         }}
       />
@@ -562,7 +515,7 @@ function StorageForm({
             </Field>
           ) : adapter === 'webdav' ? (
             <WebDAVStorageFields form={form} current={webdav} />
-          ) : isCloudAdapter(adapter) ? (
+          ) : isCloudStorageProvider(adapter) ? (
             <CloudStorageFields
               provider={adapter}
               providers={cloudProviders}
@@ -597,7 +550,7 @@ function StorageForm({
       <form.Subscribe selector={(state) => ({ values: state.values, busy: state.isSubmitting, dirty: state.isDirty })}>
         {({ values, busy, dirty }) => {
           const adapter = values.adapter
-          const unavailable = isCloudAdapter(adapter) && !cloudConnections[adapter].connected
+          const unavailable = isCloudStorageProvider(adapter) && !cloudConnections[adapter].connected
           const connectionTested = testedConfig === JSON.stringify(storageConfigFromForm(values))
           return (
             <div className="flex flex-col gap-2">
@@ -618,14 +571,14 @@ function StorageForm({
                     ? t.pane.checking
                     : onboarding
                       ? unavailable
-                        ? t.pane.connectFirst(cloudProviderLabel(adapter))
+                        ? t.pane.connectFirst(cloudStorageProviderName(adapter))
                         : t.pane.saveAndContinue
                       : !configured
                         ? t.pane.save
                         : migrationInProgress
                           ? t.pane.migrationInProgress
                           : unavailable
-                            ? t.pane.connectFirst(cloudProviderLabel(adapter))
+                            ? t.pane.connectFirst(cloudStorageProviderName(adapter))
                             : dirty
                               ? t.pane.save
                               : t.pane.noChanges}
@@ -681,6 +634,6 @@ function StorageDestination({ config }: { config: StorageConfig }) {
 }
 
 function storageTarget(t: StorageMessages, adapter: StorageConfig['adapter']) {
-  if (isCloudAdapter(adapter)) return cloudProviderLabel(adapter)
+  if (isCloudStorageProvider(adapter)) return cloudStorageProviderName(adapter)
   return t.pane.target[adapter]
 }

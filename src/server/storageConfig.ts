@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { isCloudStorageConfig } from '../core/auth'
 import type { StorageConfig } from '../core/types'
 import { hasTraversalSegment } from '../core/storagePath'
 import { serverMessages } from './locale'
@@ -6,9 +7,7 @@ import { serverMessages } from './locale'
 export function resolveStorageInput(data: StorageConfig, current: StorageConfig): StorageConfig {
   if (data.adapter === 'managed') return data
   if (data.adapter === 'local') return { adapter: 'local', root: path.resolve(data.root) }
-  if (data.adapter === 'dropbox' || data.adapter === 'google-drive' || data.adapter === 'onedrive' || data.adapter === 'box') {
-    return { adapter: data.adapter, root: '', layout: 'workspace-root-v1' }
-  }
+  if (isCloudStorageConfig(data)) return { adapter: data.adapter, root: '', layout: 'workspace-root-v1' }
   if (data.adapter === 'webdav') {
     const password = data.password || (current.adapter === 'webdav' ? current.password : '')
     if (!password) throw new Response(serverMessages().storage.errors.missingWebdavPassword, { status: 400 })
@@ -63,11 +62,7 @@ export function storageLocationChanged(current: StorageConfig, next: StorageConf
   if (current.adapter !== next.adapter) return true
   if (current.adapter === 'managed') return false
   if (current.adapter === 'local') return next.adapter !== 'local' || current.root !== next.root
-  if (current.adapter === 'dropbox') return next.adapter !== 'dropbox' || current.root !== next.root || current.layout !== next.layout
-  if (current.adapter === 'google-drive')
-    return next.adapter !== 'google-drive' || current.root !== next.root || current.layout !== next.layout
-  if (current.adapter === 'onedrive') return next.adapter !== 'onedrive' || current.root !== next.root || current.layout !== next.layout
-  if (current.adapter === 'box') return next.adapter !== 'box' || current.root !== next.root || current.layout !== next.layout
+  if (isCloudStorageConfig(current)) return !isCloudStorageConfig(next) || current.root !== next.root || current.layout !== next.layout
   if (current.adapter === 'webdav') return next.adapter !== 'webdav' || current.endpoint !== next.endpoint || current.root !== next.root
   return (
     next.adapter !== 's3' ||

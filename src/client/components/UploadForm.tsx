@@ -16,6 +16,7 @@ import { renderRowThumbnail } from '../rowThumb'
 import { isIOS, isPhone } from '../device'
 import { availablePrintTypes } from '../fleet'
 import type { PrinterSummary } from '../../core/types'
+import { modelFormat } from '../../core/assetKeys'
 import { MAX_UPLOAD_BYTES } from '../../core/uploadLimits'
 import { DialogShell } from './DialogShell'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -143,7 +144,7 @@ export function UploadForm({
     setSkipped([])
     const generation = inspectionGeneration.current
     for (const file of files) {
-      const inspecting = file.name.toLowerCase().endsWith('.3mf')
+      const inspecting = modelFormat(file.name) === '3mf'
       if (inspecting) setInspectingFiles((count) => count + 1)
       void inspectThreeMf(file)
         .then((inspection) => {

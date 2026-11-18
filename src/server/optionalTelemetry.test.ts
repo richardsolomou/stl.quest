@@ -45,7 +45,7 @@ describe('OptionalPostHogTelemetry', () => {
 
   it('adds the application context to product events and shuts down', async () => {
     const telemetry = new OptionalPostHogTelemetry(() => true, { app_version: '1.2.3', deployment_type: 'hosted' })
-    await telemetry.capture('person', 'request_created', { count: 2 })
+    telemetry.capture('person', 'request_created', { count: 2 })
     await telemetry.shutdown()
     expect(capture).toHaveBeenCalledWith({
       distinctId: 'person',
@@ -60,8 +60,8 @@ describe('OptionalPostHogTelemetry', () => {
     const workspaceTelemetry = withTelemetryContext(telemetry, { workspace_id: 'anonymous-workspace' })
     const failure = new Error('unavailable')
 
-    await workspaceTelemetry.capture('person', 'request_created', { print_type: 'resin' })
-    await workspaceTelemetry.exception(failure, { action: 'create_request' })
+    workspaceTelemetry.capture('person', 'request_created', { print_type: 'resin' })
+    workspaceTelemetry.exception(failure, { action: 'create_request' })
 
     expect(capture).toHaveBeenCalledWith({
       distinctId: 'person',
@@ -74,30 +74,30 @@ describe('OptionalPostHogTelemetry', () => {
   it('checks the telemetry setting for every event', async () => {
     let enabled = true
     const telemetry = new OptionalPostHogTelemetry(() => enabled)
-    await telemetry.capture('first', 'request_created')
+    telemetry.capture('first', 'request_created')
     enabled = false
-    await telemetry.capture('second', 'request_created')
+    telemetry.capture('second', 'request_created')
     enabled = true
-    await telemetry.capture('third', 'request_created')
+    telemetry.capture('third', 'request_created')
     expect(capture).toHaveBeenCalledTimes(2)
   })
 
   it('correlates server exceptions with request identity and session', async () => {
     const telemetry = new OptionalPostHogTelemetry(() => true)
     const failure = new Error('database unavailable')
-    await telemetry.exception(failure, { action: 'sign_in', posthogDistinctId: 'person', sessionId: 'session' })
+    telemetry.exception(failure, { action: 'sign_in', posthogDistinctId: 'person', sessionId: 'session' })
     expect(captureException).toHaveBeenCalledWith(failure, 'person', { action: 'sign_in', $session_id: 'session' })
   })
 
   it('maps structured Pino records to PostHog logs', async () => {
     const telemetry = new OptionalPostHogTelemetry(() => true)
-    await telemetry.log({ level: 50, time: 1_234, msg: 'request failed', request_id: 'request-id', err: { type: 'Error' } })
+    telemetry.log({ level: 50, time: 1_234, msg: 'request failed', request_id: 'request-id', err: { type: 'Error' } })
     expect(log).toHaveBeenCalledWith('error', 'request failed', { request_id: 'request-id', err: { type: 'Error' } })
   })
 
   it('creates no PostHog client for a deployment with telemetry off', async () => {
     const telemetry = new OptionalPostHogTelemetry(() => false)
-    await telemetry.capture('person', 'request_created')
+    telemetry.capture('person', 'request_created')
     expect([construct.mock.calls[0]?.[0], capture.mock.calls.length]).toEqual([{ NODE_ENV: 'test' }, 0])
   })
 })

@@ -7,7 +7,7 @@ import { updateNotificationPreference } from '../../../server/fns'
 import { useI18n } from '../../i18n'
 import { notificationPreferencesQuery } from '../../queries'
 import { QueryState } from '../QueryState'
-import { SettingNotice, noticeDetail } from '../SettingNotice'
+import { SettingNotice, errorNotice } from '../SettingNotice'
 import { SettingsSection } from './SettingsLayout'
 
 export function AccountNotifications({
@@ -56,16 +56,7 @@ export function AccountNotifications({
           </Field>
         ))
       )}
-      {mutation.error && (
-        <SettingNotice
-          notice={{
-            tone: 'error',
-            title: copy.saveFailedTitle,
-            hint: copy.saveFailedHint,
-            detail: noticeDetail(mutation.error),
-          }}
-        />
-      )}
+      {mutation.error && <SettingNotice notice={errorNotice(copy.saveFailedTitle, copy.saveFailedHint, mutation.error)} />}
     </SettingsSection>
   )
 }

@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { DrizzleRepository } from '../db/repository'
 import { LocalAssetStore } from '../adapters/filesystem'
-import { S3AssetStore } from '../adapters/s3'
+import { isNotFound, S3AssetStore } from '../adapters/s3'
 import { WebDAVAssetStore, webdavClient } from '../adapters/webdav'
 import { guardedAgents } from '../adapters/outbound'
 import { DropboxAssetStore } from '../adapters/dropbox'
@@ -16,7 +16,7 @@ import { publishWorkspaceEvent, RealtimeEventBus, type RealtimePublish } from '.
 import { OptionalPostHogTelemetry, setRpcTelemetry, withTelemetryContext } from './optionalTelemetry'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig, type EmailDelivery } from '../adapters/email'
-import { cloudStorageProviderName } from '../core/auth'
+import { cloudStorageProviderName, isCloudStorageConfig, isCloudStorageProvider } from '../core/auth'
 import { errorMessage } from '../core/error'
 import { STLQuestService } from '../core/services'
 import { normalizeBoardConfig, seesOnlyOwnRequests } from '../core/visibility'
@@ -42,13 +42,7 @@ import type {
 import { logger, setTelemetryExporters } from './logger'
 import { diagnostics } from './operations'
 import { decryptSetting, getStoredIntegrationConfig, type EncryptedSetting } from './integrations'
-import {
-  adoptDeploymentCloudConnections,
-  cloudStorageApp,
-  cloudStorageConnection,
-  isCloudStorageProvider,
-  rotateCloudRefreshToken,
-} from './cloudStorage'
+import { adoptDeploymentCloudConnections, cloudStorageApp, cloudStorageConnection, rotateCloudRefreshToken } from './cloudStorage'
 import { userImage } from './avatar'
 import { normalizeAuthHeaders } from './authCookies'
 import { acquireDataDirectoryLease, networkFilesystem } from './dataSafety'
@@ -69,7 +63,6 @@ import { isLocale } from '../core/i18n/locales'
 import { pendingAssetMigrations, runAssetMigrations } from './assetMigrations'
 import { assertDistributedWorkspaceReadiness, resolveDistributedConfig } from './distributed'
 import { createDistributedRuntime, type DistributedRuntime } from './distributedRuntime'
-import { isMissingObject } from '../adapters/distributedUploads'
 import { isAssetMissing } from '../adapters/missingFile'
 import { createRealtime, type RealtimeViewerLookup } from './realtime'
 import { channelPolicy } from './realtimeChannels'
@@ -91,12 +84,6 @@ const NOTIFICATION_SHUTDOWN_TIMEOUT_MS = 5_000
 const AUTO_ARCHIVE_INTERVAL_MS = 60 * 60_000
 const STORAGE_FAILURE_RECOVERY_INTERVAL_MS = 10 * 60_000
 const STORAGE_FAILURE_RECOVERY_BATCH = 25
-type CloudStorageConfig = Extract<StorageConfig, { adapter: 'dropbox' | 'google-drive' | 'onedrive' | 'box' }>
-
-function isCloudStorageConfig(config: StorageConfig): config is CloudStorageConfig {
-  return isCloudStorageProvider(config.adapter)
-}
-
 export async function resolveStorageConfig(repository: Repository): Promise<StorageConfig> {
   const encrypted = await repository.getSetting<EncryptedSetting>('storageEncrypted')
   const configured = encrypted ? decryptSetting<StorageConfig>(encrypted) : await repository.getSetting<StorageConfig>('storage')
@@ -146,7 +133,7 @@ export function workspaceStorageConfig(config: StorageConfig, workspaceId?: stri
   return namespacedStorageConfig(config, workspaceId)
 }
 
-export function namespacedStorageConfig(config: StorageConfig, workspaceId: string): StorageConfig {
+function namespacedStorageConfig(config: StorageConfig, workspaceId: string): StorageConfig {
   if (config.adapter === 'managed') return config
   if (config.adapter === 'local') return { ...config, root: path.join(config.root, workspaceId) }
   if (config.adapter === 's3') return { ...config, prefix: [config.prefix, workspaceId].filter(Boolean).join('/') }
@@ -166,9 +153,7 @@ export function canonicalCloudStorageConfig(config: StorageConfig): StorageConfi
 export async function buildAssetStore(config: StorageConfig, repository?: Repository, workspaceId?: string, workLocker?: WorkLocker) {
   const legacyNamespaced = workspaceId === 'legacy-workspace' && (await repository?.getSetting(LEGACY_STORAGE_NAMESPACE_SETTING)) === true
   const workspaceConfig = workspaceStorageConfig(config, workspaceId, legacyNamespaced)
-  const generatedCloudRoot =
-    (config.adapter === 'dropbox' || config.adapter === 'google-drive' || config.adapter === 'onedrive' || config.adapter === 'box') &&
-    config.layout === 'workspace-root-v1'
+  const generatedCloudRoot = isCloudStorageConfig(config) && config.layout === 'workspace-root-v1'
   if (workspaceConfig.adapter === 'managed') {
     if (!workspaceId) throw new Error('managed storage requires a workspace')
     if (!repository) throw new Error('managed storage requires a repository')
@@ -245,6 +230,18 @@ async function createApp() {
   const dataDirectory = path.resolve(process.env.DATA_DIR ?? '/data')
   const distributedConfig = resolveDistributedConfig()
   const lease = distributedConfig ? undefined : acquireDataDirectoryLease(dataDirectory)
+  const releaseResources = async () => {
+    await closeRealtime(realtime)
+    try {
+      await telemetry?.shutdown()
+    } finally {
+      setRpcTelemetry(undefined)
+      setTelemetryExporters(undefined)
+      await repository?.close()
+      await distributedRuntime?.close()
+      lease?.release()
+    }
+  }
   try {
     const filesystem = distributedConfig ? undefined : networkFilesystem(dataDirectory)
     if (filesystem && !process.env.DATABASE_URL) {
@@ -303,8 +300,8 @@ async function createApp() {
     telemetry = appTelemetry
     setRpcTelemetry(appTelemetry)
     setTelemetryExporters({
-      exception: (error, properties) => void appTelemetry.exception(error, properties),
-      log: (record) => void appTelemetry.log(record),
+      exception: (error, properties) => appTelemetry.exception(error, properties),
+      log: (record) => appTelemetry.log(record),
     })
     await adoptDeploymentCloudConnections(repository)
     const storedIntegrations = await getStoredIntegrationConfig(settings)
@@ -535,7 +532,7 @@ async function createApp() {
       })
       if (personalSuccessor) await repository!.setPersonalWorkspace(baseIdentity.id, personalSuccessor.id)
       await auth.api.setActiveOrganization({ body: { organizationId: nextWorkspace.id }, headers })
-      void appTelemetry.capture(baseIdentity.id, 'workspace_deleted', { deleted_by: 'owner' }).catch(() => undefined)
+      appTelemetry.capture(baseIdentity.id, 'workspace_deleted', { deleted_by: 'owner' })
       return nextWorkspace
     }
 
@@ -570,7 +567,7 @@ async function createApp() {
       await purgeWorkspace(workspaceId, async () => await repository!.deleteWorkspaceRecord(workspaceId))
       for (const { userId, successor } of personalSuccessors) if (successor) await repository!.setPersonalWorkspace(userId, successor.id)
       logger.info({ event: 'workspace_deleted', actor: 'super_admin', workspace_id: workspaceId }, 'super admin deleted a workspace')
-      void appTelemetry.capture(actor.id, 'workspace_deleted', { deleted_by: 'super_admin' }).catch(() => undefined)
+      appTelemetry.capture(actor.id, 'workspace_deleted', { deleted_by: 'super_admin' })
     }
 
     const purgeWorkspace = async (workspaceId: string, deleteRecord: () => Promise<void>) => {
@@ -644,16 +641,7 @@ async function createApp() {
         if (!(await notificationDeliveries.drain(NOTIFICATION_SHUTDOWN_TIMEOUT_MS))) {
           logger.warn({ event: 'notification_shutdown_timed_out' }, 'notification emails did not finish sending before shutdown')
         }
-        await closeRealtime(realtime)
-        try {
-          await appTelemetry.shutdown()
-        } finally {
-          setRpcTelemetry(undefined)
-          setTelemetryExporters(undefined)
-          await repository?.close()
-          await distributedRuntime?.close()
-          lease?.release()
-        }
+        await releaseResources()
       }
     }
 
@@ -678,13 +666,11 @@ async function createApp() {
       auth,
       authCapabilities: {
         password: authConfig.password,
-        passwordReset: authConfig.password && email !== undefined,
         socialProviders: authConfig.socialProviders,
         oidcName: authConfig.oidcName,
       },
       emailCapabilities: { configured: email !== undefined },
       emailDelivery: email,
-      integrationConfig: storedIntegrations ?? { passwordEnabled: true },
       identity,
       requireIdentity,
       createWorkspace,
@@ -702,16 +688,7 @@ async function createApp() {
     }
   } catch (error) {
     logger.error({ err: error, event: 'application_start_failed' }, 'application startup failed')
-    await closeRealtime(realtime)
-    try {
-      await telemetry?.shutdown()
-    } finally {
-      setRpcTelemetry(undefined)
-      setTelemetryExporters(undefined)
-      await repository?.close()
-      await distributedRuntime?.close()
-      lease?.release()
-    }
+    await releaseResources()
     throw error
   }
 }
@@ -1053,7 +1030,7 @@ export async function localActiveUploads(
     try {
       if (!(await datastore.getUpload(uploadId))) return true
     } catch (error) {
-      if (!isMissingObject(error)) throw error
+      if (!isNotFound(error)) throw error
       return true
     }
   }

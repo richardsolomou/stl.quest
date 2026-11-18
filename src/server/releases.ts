@@ -9,7 +9,7 @@ type GitHubRelease = {
   tag_name?: unknown
 }
 
-export type ReleaseUpdate = {
+type ReleaseUpdate = {
   latestVersion: string
   releaseUrl: string
 }

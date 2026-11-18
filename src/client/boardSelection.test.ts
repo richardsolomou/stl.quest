@@ -6,7 +6,6 @@ import {
   boardBatchDeletions,
   boardBatchMoves,
   boardRequestSelected,
-  boardSelectedCardIds,
   boardSelectedRequests,
   boardSelectedRequestIds,
   boardSelectionEntries,
@@ -128,12 +127,6 @@ describe('board selection', () => {
     ]).toEqual([true, false, false])
   })
 
-  it('keeps grouped requests visible as selected cards', () => {
-    const selection = selectBoardRequest(null, 'todo', ids, 'one', {}, 'group-one')
-
-    expect(boardSelectedCardIds(selection, 'todo')).toEqual(new Set([cohort('one', 'todo', 'group-one')]))
-  })
-
   it('selects requests from multiple print groups', () => {
     const initial = selectBoardRequest(null, 'todo', ids, 'one', {}, 'group-one')
     const grouped = selectBoardRequest(initial, 'todo', ids, 'two', { toggle: true }, 'group-one')
@@ -171,7 +164,7 @@ describe('board selection', () => {
     expect([
       boardRequestSelected(both, 'todo', 'one', 'group-one'),
       boardRequestSelected(both, 'todo', 'one', 'group-two'),
-      boardSelectedCardIds(both, 'todo'),
+      new Set(both.statuses.keys()),
     ]).toEqual([true, true, new Set([cohort('one', 'todo', 'group-one'), cohort('one', 'todo', 'group-two')])])
   })
 

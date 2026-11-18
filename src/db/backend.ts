@@ -4,7 +4,7 @@ export type DatabaseInfo = {
   integrity: string
   lastCheckedAt: number
 }
-export type DatabaseBackupResult = { totalPages: number; remainingPages: number }
+export type DatabaseBackupResult = { totalPages: number }
 
 export interface DatabaseBackend<TDatabase> {
   readonly database: TDatabase

@@ -1,6 +1,11 @@
 import { OneDriveAssetStore } from '../adapters/oneDrive'
 import type { CloudStorageApp } from '../core/auth'
-import { beginCloudAuthorization, completeCloudAuthorization, requireCloudAuthorizationCallback } from './cloudConnectionState'
+import {
+  beginCloudAuthorization,
+  completeCloudAuthorization,
+  requireCloudAuthorizationCallback,
+  verifyConnectionWritable,
+} from './cloudConnectionState'
 import type { SettingStore } from './integrations'
 import { exchangeOAuthAuthorizationCode, fetchOAuthProfile } from './oauthConnection'
 
@@ -9,16 +14,6 @@ const TOKEN_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
 const PROFILE_URL = 'https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName'
 const SCOPES = ['offline_access', 'User.Read', 'Files.ReadWrite']
 
-export class OneDrivePermissionError extends Error {
-  constructor(readonly returnTo: string) {
-    super('OneDrive did not grant the required Files.ReadWrite permission')
-  }
-}
-
-export function oneDriveCallbackUrl(origin: string) {
-  return `${origin}/api/storage/onedrive/callback`
-}
-
 export async function beginOneDriveAuthorization(
   app: CloudStorageApp,
   workspace: SettingStore,
@@ -26,8 +21,7 @@ export async function beginOneDriveAuthorization(
   origin: string,
   returnTo: string,
 ) {
-  const redirectUri = oneDriveCallbackUrl(origin)
-  return beginCloudAuthorization(workspace, 'onedrive', adminId, redirectUri, returnTo, AUTHORIZE_URL, {
+  return beginCloudAuthorization(workspace, 'onedrive', adminId, origin, returnTo, AUTHORIZE_URL, {
     client_id: app.clientId,
     response_type: 'code',
     response_mode: 'query',
@@ -59,11 +53,10 @@ export async function completeOneDriveAuthorization(app: CloudStorageApp, worksp
     accountEmail: account.mail ?? account.userPrincipalName,
     connectedAt: Date.now(),
   }
-  try {
-    await new OneDriveAssetStore('', { ...app, refreshToken }).writable()
-  } catch (error) {
-    if ([401, 403].includes((error as { status?: number }).status ?? 0)) throw new OneDrivePermissionError(pending.returnTo)
-    throw error
-  }
+  await verifyConnectionWritable(
+    new OneDriveAssetStore('', { ...app, refreshToken }),
+    pending.returnTo,
+    'OneDrive did not grant the required Files.ReadWrite permission',
+  )
   return completeCloudAuthorization(workspace, 'onedrive', pending, next, adminId)
 }

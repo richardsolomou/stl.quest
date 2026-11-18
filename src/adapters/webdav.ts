@@ -1,14 +1,14 @@
 import { Readable } from 'node:stream'
 import { AuthType, createClient, type FileStat, type WebDAVClient, type WebDAVClientError } from 'webdav'
 import type { AssetStore, StorageConfig } from '../core/types'
-import { assertRelativeStoragePath, hasTraversalSegment } from '../core/storagePath'
+import { assertRelativeStoragePath } from '../core/storagePath'
 import { assertStreamSize, streamChunks } from './streamChunks'
 import { AssetStoreKeys } from './assetStoreKeys'
 import { StorageInventoryBuilder } from './storageInventory'
 import { prepareAssetMove } from './assetMove'
 import { finalizeCloudUpload } from './finalizeCloudUpload'
 import { verifyWritableAssetStore } from './writableAssetStore'
-import { joinCloudPath } from './cloudPath'
+import { cleanCloudRoot, joinCloudPath } from './cloudPath'
 import type { OutboundAgents } from './outbound'
 
 type WebDAVConfig = Extract<StorageConfig, { adapter: 'webdav' }>
@@ -61,7 +61,7 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
     readConcurrency = READ_CONCURRENCY,
   ) {
     super()
-    this.root = cleanRoot(config.root)
+    this.root = cleanCloudRoot(config.root, 'WebDAV')
     this.client = client ?? webdavClient(config)
     this.reads = new ConcurrencyGate(readConcurrency)
   }
@@ -286,9 +286,7 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
 
   private async moveByStreaming(sourcePath: string, destinationPath: string) {
     const [source, destination] = await Promise.all([this.stat(sourcePath), this.stat(destinationPath)])
-    // A source that vanished mid-move (a concurrent/duplicate delete, or listing
-    // lag racing the move) leaves nothing to move — treat it as already complete
-    // rather than crashing the delete, matching the other stores' 404 tolerance.
+    // A source that vanished mid-move counts as already moved, as in moveIgnoringMissingSource.
     if (!source) return
     if (destination && destination.size !== source.size) throw new Error(`asset destination already exists: ${destinationPath}`)
     if (!destination) {
@@ -366,12 +364,6 @@ export class WebDAVAssetStore extends AssetStoreKeys implements AssetStore {
       data: chunk,
     })
   }
-}
-
-function cleanRoot(root: string) {
-  const cleaned = root.trim().replace(/^\/+|\/+$/g, '')
-  if (hasTraversalSegment(cleaned)) throw new Response('invalid path', { status: 400 })
-  return cleaned
 }
 
 function isNotFound(error: unknown) {

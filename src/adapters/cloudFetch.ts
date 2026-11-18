@@ -36,6 +36,25 @@ export function waitForCloudRetry(attempt: number, options: { delayMs?: number; 
   return new Promise<void>((resolve) => setTimeout(resolve, delayMs))
 }
 
+/** Sends a cloud request, retrying up to five times while the provider marks the failure retryable. */
+export async function retryCloudRequest<RequestError extends Error>(
+  request: () => Promise<Response>,
+  options: {
+    error: (response: Response) => Promise<RequestError>
+    retryable: (error: RequestError) => boolean
+    delay?: (error: RequestError) => { delayMs?: number; minimumDelayMs?: number }
+    accept?: (response: Response) => boolean
+  },
+) {
+  for (let attempt = 0; ; attempt++) {
+    const response = await request()
+    if (response.ok || options.accept?.(response)) return response
+    const error = await options.error(response)
+    if (!options.retryable(error) || attempt === 5) throw error
+    await waitForCloudRetry(attempt, options.delay?.(error))
+  }
+}
+
 export function isHttpNotFound(error: unknown) {
   return (error as { status?: number }).status === 404
 }

@@ -21,7 +21,7 @@ export function QuoteSection({
 }) {
   const { t, locale } = useI18n()
   const copy = t.calculator.quote
-  const price = mode === 'standard' ? result.standardPrice : result.costPrice
+  const price = mode === 'standard' ? result.standardPrice : result.estimatedCost
   const money = (value: number) => formatMoney(value, settings.currency, locale)
   const explanation =
     mode === 'standard' ? copy.standardExplanation(formatNumber(settings.standardMarginPercent, locale)) : copy.costExplanation

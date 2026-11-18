@@ -1174,25 +1174,6 @@ describe('STLQuestService crash recovery', () => {
     expect(await repository.listRequests()).toHaveLength(0)
   })
 
-  it('contains rejected optional telemetry promises', async () => {
-    const rejecting: Telemetry = {
-      capture: async () => {
-        throw new Error('telemetry down')
-      },
-      exception: async () => undefined,
-    }
-    service = new STLQuestService(repository, assets, staging, eventBus(), rejecting, { remove: removeTusUpload })
-    const unhandled = vi.fn()
-    process.on('unhandledRejection', unhandled)
-    try {
-      await request()
-      await new Promise((resolve) => setImmediate(resolve))
-      expect(unhandled).not.toHaveBeenCalled()
-    } finally {
-      process.off('unhandledRejection', unhandled)
-    }
-  })
-
   it('terminally reconciles a stale conflicting move instead of poisoning every startup', async () => {
     const id = await request()
     await repository.beginOperation(crypto.randomUUID(), {
@@ -1598,13 +1579,6 @@ describe('STLQuestService crash recovery', () => {
       await expect(other.createGroup('Plate', 'todo', 'blue', [])).resolves.toBeTypeOf('string')
     })
 
-    it('rejects renaming a tag to another tag name', async () => {
-      await service.createGroup({ name: 'Plate', status: 'todo', items: [] }, admin)
-      const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [] }, admin)
-
-      await expect(service.renameGroup(tag, 'plate', admin)).rejects.toMatchObject({ status: 409 })
-    })
-
     it('rejects updating a tag to another tag name', async () => {
       await service.createGroup({ name: 'Plate', status: 'todo', items: [] }, admin)
       const tag = await service.createGroup({ name: 'Batch', status: 'todo', items: [] }, admin)
@@ -1975,7 +1949,7 @@ describe('STLQuestService crash recovery', () => {
     capture.mockClear()
     const group = await service.createGroup({ name: 'Original plate', status: 'todo', items: [{ requestId: id, count: 1 }] }, admin)
 
-    await service.renameGroup(group, 'Updated plate', admin)
+    await service.updateGroup(group, { name: 'Updated plate' }, admin)
     expect((await repository.getGroup(group))?.name).toBe('Updated plate')
 
     await service.deleteGroup(group, admin)
@@ -1983,7 +1957,6 @@ describe('STLQuestService crash recovery', () => {
     expect((await repository.getRequest(id))?.counts.todo).toBe(1)
     expect(capture.mock.calls).toEqual([
       [admin.id, 'print_group_created', { item_count: 1, copy_count: 1 }],
-      [admin.id, 'print_group_renamed', undefined],
       [admin.id, 'print_group_deleted', { item_count: 1, copy_count: 1 }],
     ])
   })

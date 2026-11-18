@@ -54,19 +54,6 @@ function MenuGroupLabel({ className, ...props }: MenuPrimitive.GroupLabel.Props)
   )
 }
 
-function MenuItem({ className, ...props }: MenuPrimitive.Item.Props) {
-  return (
-    <MenuPrimitive.Item
-      data-slot="menu-item"
-      className={cn(
-        'flex h-8 w-full cursor-default items-center gap-2 rounded-md px-2 text-left outline-none select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50',
-        className,
-      )}
-      {...props}
-    />
-  )
-}
-
 function MenuRadioGroup({ ...props }: MenuPrimitive.RadioGroup.Props) {
   return <MenuPrimitive.RadioGroup data-slot="menu-radio-group" {...props} />
 }
@@ -84,4 +71,4 @@ function MenuRadioItem({ className, ...props }: MenuPrimitive.RadioItem.Props) {
   )
 }
 
-export { Menu, MenuTrigger, MenuContent, MenuGroup, MenuGroupLabel, MenuItem, MenuRadioGroup, MenuRadioItem }
+export { Menu, MenuTrigger, MenuContent, MenuGroup, MenuGroupLabel, MenuRadioGroup, MenuRadioItem }

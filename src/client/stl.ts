@@ -6,11 +6,8 @@ import { assertBinaryStlFits, InvalidMeshError } from '../core/mesh/stl'
 import { isThreeMf, parseThreeMf } from '../core/mesh/threeMf'
 import { isObj, parseObj } from '../core/mesh/obj'
 
-// Whether the browser can hand out a WebGL context. `new THREE.WebGLRenderer(...)` throws
-// `Error creating WebGL context.` when it can't (software rendering disabled, blocklisted GPU,
-// `webgl.disabled`, a VM). Probing a throwaway canvas first lets the viewer fail fast — before
-// it downloads and parses a model it can never render — into a distinct terminal state, instead
-// of surfacing a permanent condition as a retryable "couldn't load this model".
+// Probing first lets the viewer fail into a terminal state before downloading a model it can never render, rather than
+// reporting a permanent condition as a retryable load failure.
 export function isWebGLAvailable(): boolean {
   try {
     const canvas = document.createElement('canvas')

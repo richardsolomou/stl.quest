@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { LOCALE_NAMES, LOCALES, isLocale, negotiateLocale, type Locale } from '../../../core/i18n'
 import { updateLocale } from '../../../server/fns'
 import { useI18n } from '../../i18n'
-import { SettingNotice, noticeDetail } from '../SettingNotice'
+import { SettingNotice, errorNotice } from '../SettingNotice'
 import { SettingsSection } from './SettingsLayout'
 
 const BROWSER = 'browser'
@@ -51,16 +51,7 @@ export function AccountLanguage({ preference }: { preference?: Locale }) {
           </SelectContent>
         </Select>
       </Field>
-      {mutation.error && (
-        <SettingNotice
-          notice={{
-            tone: 'error',
-            title: t.language.saveFailedTitle,
-            hint: t.language.saveFailedHint,
-            detail: noticeDetail(mutation.error),
-          }}
-        />
-      )}
+      {mutation.error && <SettingNotice notice={errorNotice(t.language.saveFailedTitle, t.language.saveFailedHint, mutation.error)} />}
     </SettingsSection>
   )
 }

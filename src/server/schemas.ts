@@ -14,7 +14,7 @@ import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../core/security'
 import { CLOUD_STORAGE_PROVIDERS, normalizeOidcIssuer, OIDC_NAME_MAX_LENGTH, SOCIAL_AUTH_PROVIDERS } from '../core/auth'
 import { MAX_USER_NAME_LENGTH, normalizeEmail } from '../core/identity'
 import { MAX_PRINT_GROUP_NAME_LENGTH } from '../core/printGroups'
-import { printGroupColors } from '../core/types'
+import { PRINT_TYPES, printGroupColors, REQUEST_SORTS } from '../core/types'
 import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
 import { PRICE_CALCULATOR_CURRENCIES } from '../core/priceCalculator'
 import {
@@ -59,7 +59,7 @@ export const createLinkedRequestSchema = z.object({
   quantity: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY),
   notes: z.string().trim().max(MAX_REQUEST_NOTES_LENGTH).optional(),
   sourceUrl: requiredSourceUrl,
-  requestedPrintType: z.enum(['resin', 'filament']),
+  requestedPrintType: z.enum(PRINT_TYPES),
 })
 export const inviteInfoSchema = z.object({ token: inviteToken })
 export const beginProviderInviteSchema = z.object({ token: inviteToken, provider: z.enum(SOCIAL_AUTH_PROVIDERS) })
@@ -86,7 +86,7 @@ const priceCalculatorEquipmentSchema = z.object({
 })
 export const priceCalculatorSettingsSchema = z.object({
   currency: z.enum(PRICE_CALCULATOR_CURRENCIES),
-  printType: z.enum(['resin', 'filament']),
+  printType: z.enum(PRINT_TYPES),
   resinPresetId: z.string().trim().min(1).max(200).optional(),
   resinPricePerLitre: z.number().positive().max(100_000),
   resinDensityGramsPerMl: z.number().positive().max(100),
@@ -159,7 +159,7 @@ const printerProfileBaseSchema = z.object({
   depthMm: z.number().positive().max(10_000).optional(),
   heightMm: z.number().positive().max(10_000).optional(),
   name: z.string().trim().min(1).max(100),
-  printType: z.enum(['resin', 'filament']),
+  printType: z.enum(PRINT_TYPES),
   archived: z.boolean().optional(),
   used: z.boolean().optional(),
 })
@@ -216,23 +216,7 @@ export const smtpEmailSettingsSchema = z.object({
   password: z.string().max(1000).optional(),
 })
 
-const requestSortSchema = z.enum([
-  'fair',
-  'updated-desc',
-  'updated-asc',
-  'created-desc',
-  'created-asc',
-  'name-asc',
-  'name-desc',
-  'quantity-desc',
-  'quantity-asc',
-  'material-desc',
-  'material-asc',
-  'time-desc',
-  'time-asc',
-  'archived-desc',
-  'archived-asc',
-])
+const requestSortSchema = z.enum(REQUEST_SORTS)
 
 export const requestFiltersSchema = z
   .object({
@@ -250,7 +234,7 @@ export const requestFiltersSchema = z
     hasSource: z.boolean().optional(),
     hasThumbnail: z.boolean().optional(),
     hasPreview: z.boolean().optional(),
-    printType: z.enum(['resin', 'filament']).optional(),
+    printType: z.enum(PRINT_TYPES).optional(),
     printerId: id.nullable().optional(),
     sort: requestSortSchema.optional(),
     archived: z.boolean().optional(),
@@ -333,7 +317,7 @@ export const storageChangeSchema = z.intersection(
   z.object({ destinationAction: z.enum(['preserve', 'clear-all']).optional() }),
 )
 export const storageDirectorySchema = z.object({ path: z.string().trim().min(1).max(4_096) })
-export const cloudStorageProviderSchema = z.enum(CLOUD_STORAGE_PROVIDERS)
+const cloudStorageProviderSchema = z.enum(CLOUD_STORAGE_PROVIDERS)
 export const cloudStorageAppSchema = z.object({
   provider: cloudStorageProviderSchema,
   clientId: z.string().trim().min(1).max(256),
@@ -370,7 +354,6 @@ export const createPrintGroupSchema = z.object({
 })
 
 export const movePrintGroupSchema = z.object({ id, from: statusId, to: statusId })
-export const renamePrintGroupSchema = z.object({ id, name: printGroupName })
 export const updatePrintGroupSchema = z.object({
   id,
   name: printGroupName.optional(),
@@ -416,7 +399,7 @@ export const updateRequestSchema = z.object({
   quantity: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY).optional(),
   notes: z.string().max(MAX_REQUEST_NOTES_LENGTH).optional(),
   sourceUrl: optionalSourceUrl.optional(),
-  requestedPrintType: z.enum(['resin', 'filament']).optional(),
+  requestedPrintType: z.enum(PRINT_TYPES).optional(),
   printerId: id.nullable().optional(),
   estimatedMaterialOverride: z.number().positive().max(1_000_000).nullable().optional(),
   estimatedPrintMinutesOverride: z.number().positive().max(1_000_000).nullable().optional(),

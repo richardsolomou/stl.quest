@@ -12,7 +12,7 @@ import { setOwnPassword } from '../../../server/fns'
 import { authClient } from '../../authClient'
 import { useI18n } from '../../i18n'
 import { DialogProblem } from '../DialogProblem'
-import type { Notice } from '../SettingNotice'
+import { successNotice, type Notice } from '../SettingNotice'
 
 export function CreatePasswordForm({ onDone }: { onDone: () => void | Promise<void> }) {
   const { t } = useI18n()
@@ -65,11 +65,7 @@ export function ChangePasswordForm({ onDone }: { onDone: (notice: Notice) => voi
       else {
         form.reset()
         posthog.capture('password_changed', { other_sessions_revoked: true })
-        onDone({
-          tone: 'success',
-          title: copy.changedTitle,
-          hint: copy.changedHint,
-        })
+        onDone(successNotice(copy.changedTitle, copy.changedHint))
       }
     },
   })

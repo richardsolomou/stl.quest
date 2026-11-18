@@ -1,7 +1,7 @@
 import type { PrintGroup } from './types'
 
 export const MAX_PRINT_GROUP_NAME_LENGTH = 80
-export const PRINT_GROUP_PATH_SEPARATOR = ' / '
+const PRINT_GROUP_PATH_SEPARATOR = ' / '
 
 export function validPrintGroupName(name: string) {
   const normalized = name.trim()

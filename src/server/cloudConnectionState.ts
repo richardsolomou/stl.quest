@@ -1,12 +1,6 @@
 import crypto from 'node:crypto'
 import { cloudStorageProviderName } from '../core/auth'
-import type {
-  CloudStorageConnection,
-  CloudStorageProvider,
-  IntegrationConfig,
-  PendingCloudAuthorization,
-  PublicCloudConnection,
-} from '../core/auth'
+import type { CloudStorageConnection, CloudStorageProvider, PendingCloudAuthorization, PublicCloudConnection } from '../core/auth'
 import {
   enabledCloudStorageApp,
   cloudStorageConnection,
@@ -14,7 +8,7 @@ import {
   setPendingCloudAuthorization,
   workspaceCloudStorage,
 } from './cloudStorage'
-import { getStoredIntegrationConfig, type SettingStore } from './integrations'
+import type { SettingStore } from './integrations'
 import { logger } from './logger'
 
 const STATE_TTL = 10 * 60 * 1_000
@@ -26,11 +20,7 @@ type PendingConnection = {
   stateHash: string
 }
 
-export async function connectionIntegrationConfig(repository: SettingStore): Promise<IntegrationConfig> {
-  return (await getStoredIntegrationConfig(repository)) ?? { passwordEnabled: true }
-}
-
-export function createConnectionState() {
+function createConnectionState() {
   const state = crypto.randomBytes(32).toString('base64url')
   return { state, stateHash: hash(state), expiresAt: Date.now() + STATE_TTL }
 }
@@ -49,15 +39,36 @@ export async function publicCloudConnection(
   }
 }
 
+/** A provider refused the access STL Quest needs, so the callback reports missing permissions rather than a failure. */
+export class CloudPermissionError extends Error {
+  constructor(
+    readonly returnTo: string,
+    message: string,
+  ) {
+    super(message)
+  }
+}
+
+/** Probes a newly authorized store, treating a refused write as a permission error. */
+export async function verifyConnectionWritable(store: { writable(): Promise<void> }, returnTo: string, refusal: string) {
+  try {
+    await store.writable()
+  } catch (error) {
+    if ([401, 403].includes((error as { status?: number }).status ?? 0)) throw new CloudPermissionError(returnTo, refusal)
+    throw error
+  }
+}
+
 export async function beginCloudAuthorization(
   workspace: SettingStore,
   provider: CloudStorageProvider,
   adminId: string,
-  redirectUri: string,
+  origin: string,
   returnTo: string,
   authorizeUrl: string,
   parameters: Record<string, string>,
 ) {
+  const redirectUri = `${origin}/api/storage/${provider}/callback`
   const { state, stateHash, expiresAt } = createConnectionState()
   await setPendingCloudAuthorization(workspace, { provider, stateHash, adminId, redirectUri, returnTo, expiresAt })
   const url = new URL(authorizeUrl)
@@ -109,11 +120,11 @@ export function disconnectCloudStorage(workspace: SettingStore, provider: CloudS
   return setCloudStorageConnection(workspace, provider, undefined)
 }
 
-export function connectionStateMatches(pending: PendingConnection, state: string, adminId: string) {
+function connectionStateMatches(pending: PendingConnection, state: string, adminId: string) {
   return pending.expiresAt >= Date.now() && pending.adminId === adminId && hashesMatch(pending.stateHash, hash(state))
 }
 
-export function hashesMatch(left: string, right: string) {
+function hashesMatch(left: string, right: string) {
   const leftBytes = Buffer.from(left)
   const rightBytes = Buffer.from(right)
   return leftBytes.length === rightBytes.length && crypto.timingSafeEqual(leftBytes, rightBytes)

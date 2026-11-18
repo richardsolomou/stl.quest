@@ -113,7 +113,7 @@ function sizedSourceImageUrl(source: string) {
   return (provider?.sized?.(url) ?? url).toString()
 }
 
-export function validSourceImageUrl(source: string) {
+function validSourceImageUrl(source: string) {
   try {
     const url = new URL(source)
     return url.protocol === 'https:' && IMAGE_HOSTS.has(url.hostname.toLowerCase())

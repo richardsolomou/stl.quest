@@ -2,34 +2,33 @@ import { useEffect, useState } from 'react'
 import { Check } from 'lucide-react'
 import { useI18n } from '../i18n'
 
-// Copies `value` to the clipboard, returning whether it succeeded. The async Clipboard API is only
-// available in secure contexts, so on a plain-HTTP self-hosted install (e.g. a LAN IP) the browser
-// leaves `navigator.clipboard` undefined; feature-detect it and fall back to the legacy execCommand
-// path so copy buttons keep working. A rejected write (denied permission) also falls through rather
-// than escaping as an unhandled rejection.
-export async function writeClipboard(value: string): Promise<boolean> {
+// The async Clipboard API is undefined outside secure contexts, such as a self-hosted install on a plain-HTTP LAN address,
+// and a denied write rejects, so both fall back to the legacy execCommand path.
+export async function writeClipboard(value: string): Promise<{ copied: boolean; method: 'clipboard' | 'fallback' }> {
   try {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(value)
-      return true
+      return { copied: true, method: 'clipboard' }
     }
-  } catch {
-    // Fall through to the legacy path below.
-  }
-  return copyWithExecCommand(value)
+  } catch {}
+  return { copied: copyWithExecCommand(value), method: 'fallback' }
 }
 
+// Restores any existing selection afterwards, so nothing appears selected.
 function copyWithExecCommand(value: string): boolean {
   try {
     const textarea = document.createElement('textarea')
     textarea.value = value
     textarea.setAttribute('readonly', '')
-    textarea.style.position = 'fixed'
-    textarea.style.opacity = '0'
-    document.body.appendChild(textarea)
+    textarea.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none'
+    document.body.append(textarea)
+    const selection = getSelection()
+    const selected = selection && selection.rangeCount > 0 ? selection.getRangeAt(0).cloneRange() : null
     textarea.select()
     const copied = document.execCommand('copy')
-    document.body.removeChild(textarea)
+    textarea.remove()
+    selection?.removeAllRanges()
+    if (selected) selection?.addRange(selected)
     return copied
   } catch {
     return false
@@ -47,8 +46,8 @@ export function useCopied(resetAfterMs = 2000) {
   return {
     copied,
     copy: (value: string) =>
-      void writeClipboard(value).then((success) => {
-        if (success) setCopied(true)
+      void writeClipboard(value).then((result) => {
+        if (result.copied) setCopied(true)
       }),
   }
 }

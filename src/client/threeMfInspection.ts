@@ -1,4 +1,5 @@
 import { wrap } from 'comlink'
+import { modelFormat } from '../core/assetKeys'
 import type { ThreeMfInspectionWorker } from './threeMfInspection.worker'
 import type { ThreeMfInspection } from './threeMfFiles'
 
@@ -10,7 +11,7 @@ function inspector() {
 }
 
 export async function inspectThreeMf(file: File): Promise<ThreeMfInspection | undefined> {
-  if (!file.name.toLowerCase().endsWith('.3mf')) return undefined
+  if (modelFormat(file.name) !== '3mf') return undefined
   const result = await inspector().inspect(await file.arrayBuffer())
   return result ? { file, ...result } : undefined
 }

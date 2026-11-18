@@ -3,7 +3,6 @@ import { cva, type VariantProps } from 'class-variance-authority'
 
 import { cn } from '@/lib/utils'
 import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
 
 function FieldSet({ className, ...props }: React.ComponentProps<'fieldset'>) {
   return (
@@ -21,19 +20,6 @@ function FieldLegend({ className, variant = 'legend', ...props }: React.Componen
       data-slot="field-legend"
       data-variant={variant}
       className={cn('mb-1.5 font-medium data-[variant=label]:text-sm data-[variant=legend]:text-base', className)}
-      {...props}
-    />
-  )
-}
-
-function FieldGroup({ className, ...props }: React.ComponentProps<'div'>) {
-  return (
-    <div
-      data-slot="field-group"
-      className={cn(
-        'group/field-group @container/field-group flex w-full flex-col gap-5 data-[slot=checkbox-group]:gap-3 *:data-[slot=field-group]:gap-4',
-        className,
-      )}
       {...props}
     />
   )
@@ -103,30 +89,6 @@ function FieldDescription({ className, ...props }: React.ComponentProps<'p'>) {
   )
 }
 
-function FieldSeparator({
-  children,
-  className,
-  ...props
-}: React.ComponentProps<'div'> & {
-  children?: React.ReactNode
-}) {
-  return (
-    <div
-      data-slot="field-separator"
-      data-content={!!children}
-      className={cn('relative -my-2 h-5 text-sm group-data-[variant=outline]/field-group:-mb-2', className)}
-      {...props}
-    >
-      <Separator className="absolute inset-0 top-1/2" />
-      {children && (
-        <span className="relative mx-auto block w-fit bg-background px-2 text-muted-foreground" data-slot="field-separator-content">
-          {children}
-        </span>
-      )}
-    </div>
-  )
-}
-
 function FieldError({
   className,
   children,
@@ -168,4 +130,4 @@ function FieldError({
   )
 }
 
-export { Field, FieldLabel, FieldDescription, FieldError, FieldGroup, FieldLegend, FieldSeparator, FieldSet, FieldContent, FieldTitle }
+export { Field, FieldLabel, FieldDescription, FieldError, FieldLegend, FieldSet, FieldContent, FieldTitle }

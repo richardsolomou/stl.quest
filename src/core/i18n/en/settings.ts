@@ -447,9 +447,7 @@ export const settings = {
       'STL Quest is open source under the GNU Affero General Public License v3.0. Hosted and self-hosted users can obtain the corresponding source code above, and anonymous telemetry can be disabled at any time.',
   },
   diagnostics: {
-    title: 'Diagnostics',
-    description: 'Inspect storage, uploads, and asset-processing health.',
-    embeddedTitle: 'Storage and processing',
+    title: 'Storage and processing',
     loading: 'Checking system health…',
     loadError: 'Could not load diagnostics',
     storage: 'Storage',
@@ -482,9 +480,7 @@ export const settings = {
     },
   },
   systemDiagnostics: {
-    title: 'System diagnostics',
-    description: 'Inspect deployment, authentication, database, and data-disk health.',
-    embeddedTitle: 'System health',
+    title: 'System health',
     loadError: 'Could not load system diagnostics',
     version: 'Version',
     authentication: 'Authentication',

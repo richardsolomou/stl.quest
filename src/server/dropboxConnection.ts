@@ -1,7 +1,12 @@
 import crypto from 'node:crypto'
 import type { CloudStorageApp } from '../core/auth'
 import { cloudFetch } from '../adapters/cloudFetch'
-import { beginCloudAuthorization, completeCloudAuthorization, requireCloudAuthorizationCallback } from './cloudConnectionState'
+import {
+  beginCloudAuthorization,
+  CloudPermissionError,
+  completeCloudAuthorization,
+  requireCloudAuthorizationCallback,
+} from './cloudConnectionState'
 import type { SettingStore } from './integrations'
 import { exchangeOAuthAuthorizationCode } from './oauthConnection'
 
@@ -11,20 +16,14 @@ const API_URL = 'https://api.dropboxapi.com/2'
 const CONTENT_URL = 'https://content.dropboxapi.com/2'
 const ACCOUNT_URL = `${API_URL}/users/get_current_account`
 
-export const DROPBOX_REQUIRED_SCOPES = ['account_info.read', 'files.metadata.read', 'files.content.read', 'files.content.write'] as const
-
-export class DropboxPermissionError extends Error {
+export class DropboxPermissionError extends CloudPermissionError {
   constructor(
-    readonly returnTo: string,
+    returnTo: string,
     readonly missingScopes: string[],
   ) {
-    super(`Dropbox is missing required permissions: ${missingScopes.join(', ')}`)
+    super(returnTo, `Dropbox is missing required permissions: ${missingScopes.join(', ')}`)
     this.name = 'DropboxPermissionError'
   }
-}
-
-export function dropboxCallbackUrl(origin: string) {
-  return `${origin}/api/storage/dropbox/callback`
 }
 
 export async function beginDropboxAuthorization(
@@ -34,8 +33,7 @@ export async function beginDropboxAuthorization(
   origin: string,
   returnTo: string,
 ) {
-  const redirectUri = dropboxCallbackUrl(origin)
-  return beginCloudAuthorization(workspace, 'dropbox', adminId, redirectUri, returnTo, AUTHORIZE_URL, {
+  return beginCloudAuthorization(workspace, 'dropbox', adminId, origin, returnTo, AUTHORIZE_URL, {
     client_id: app.clientId,
     response_type: 'code',
     token_access_type: 'offline',

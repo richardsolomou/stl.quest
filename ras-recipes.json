@@ -30,6 +30,8 @@
         "Social providers come from `AUTH_<PROVIDER>_CLIENT_ID` and `AUTH_<PROVIDER>_CLIENT_SECRET`, optionally `AUTH_<PROVIDER>_ENABLED`, or from the super admin settings, and include OIDC, in `src/adapters/auth.ts`.",
         "`src/db/schema/auth.ts` holds the auth tables with the organization, admin, two-factor, and Stripe columns, in SQLite and, in `src/db/schema-postgres/auth.ts`, PostgreSQL.",
         "`src/core/authFailures.ts` holds the failure classifiers in the domain layer, because `src/core/auth.ts` builds the translated sign-in messages from them.",
+        "`authFailureMessage` and `classifyAuthCallbackFailure` are left out: `errorMessage` in `src/core/error.ts` already reads a failure's message, and callback errors are handled by `src/client/socialSignIn.ts`.",
+        "`src/client/useAuthAction.ts` reads hydration from TanStack Router's `useHydrated` instead of its own `useSyncExternalStore` flag, matching the application's other hydration checks.",
         "`src/server/session.ts` and `src/server/random.ts` are left out: the composition root's `identity`, `requireIdentity`, and `workspace` own session lookups, and invite tokens use `node:crypto` directly.",
         "`localRedirectPath` is left out because sign-in has no `next` destination.",
         "`better-auth` and `@better-auth/stripe` are pinned to the same version and grouped in Dependabot because the Stripe plugin pins the core version."

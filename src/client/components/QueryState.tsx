@@ -4,7 +4,7 @@ import { Button } from '../../components/ui/button'
 import { Spinner } from '../../components/ui/spinner'
 import { cn } from '../../lib/utils'
 import { useI18n } from '../i18n'
-import { queryErrorMessage, queryStateKind } from '../queryState'
+import { queryErrorMessage } from '../queryState'
 
 export function QueryState({
   loading,
@@ -22,7 +22,7 @@ export function QueryState({
   className?: string
 }) {
   const { t } = useI18n()
-  if (queryStateKind(loading, error) === 'loading') {
+  if (loading && !error) {
     return (
       <output className={cn('flex items-center justify-center gap-2 p-6 text-muted-foreground', className)}>
         <Spinner /> {loadingLabel}

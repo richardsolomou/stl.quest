@@ -4,7 +4,7 @@ Thanks for helping with STL Quest. We aim to keep the codebase small and easy to
 
 ## Development setup
 
-Install Node 24.x, pnpm 12.13.0, and just 1.59.0, then run:
+Install Node 24.x and just 1.59.0, then run the following, which enables Corepack so pnpm matches the `packageManager` field in `package.json`:
 
 ```sh
 just install
@@ -27,7 +27,7 @@ just check
 just e2e
 ```
 
-`just check` runs the formatter, linter, database migration checks, printer catalog and Unraid metadata checks, production build, type checker, unit tests, and a quick backup command test. The build comes before type checking because it generates `src/routeTree.gen.ts`.
+`just check` runs every step of `check:ci` in `package.json`, then the unit tests. The build comes before type checking because it generates `src/routeTree.gen.ts`.
 
 `just e2e` builds the production server and runs the end-to-end tests. Install Chromium once with `just e2e-install`. For faster reruns against an existing build, use `just e2e-run`. Set `PLAYWRIGHT_DEV_SERVER=1` only when debugging against Vite.
 

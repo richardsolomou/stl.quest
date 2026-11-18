@@ -15,12 +15,19 @@ export function modelFormat(fileName: string) {
   return fileName.match(MODEL_EXTENSION)?.[1]?.toLowerCase() as ModelFormat | undefined
 }
 
+export function stripModelExtension(fileName: string) {
+  return fileName.replace(MODEL_EXTENSION, '')
+}
+
+function assertUuid(value: string, kind: string) {
+  if (!/^[a-f0-9-]{36}$/i.test(value)) throw new Error(`invalid ${kind} id`)
+}
+
 export function createAssetKey(requestId: string, originalFileName: string) {
-  if (!/^[a-f0-9-]{36}$/i.test(requestId)) throw new Error('invalid request id')
+  assertUuid(requestId, 'request')
   const extension = modelFormat(originalFileName) ?? 'stl'
   const base =
-    baseName(originalFileName)
-      .replace(MODEL_EXTENSION, '')
+    stripModelExtension(baseName(originalFileName))
       .replace(/[^\w.\- ]+/g, '_')
       .trim()
       .slice(0, 120) || 'model'
@@ -31,12 +38,12 @@ export function createAssetKey(requestId: string, originalFileName: string) {
 // orphaning one under a new extension. The stored bytes carry their own magic number, so the served
 // content type is detected on read.
 export function sourceImageKey(requestId: string) {
-  if (!/^[a-f0-9-]{36}$/i.test(requestId)) throw new Error('invalid request id')
+  assertUuid(requestId, 'request')
   return `covers/${requestId}`
 }
 
 export function previewKey(originalKey: string) {
-  return `previews/${baseName(originalKey).replace(/\.(?:stl|3mf|obj)$/i, '')}.phm`
+  return `previews/${stripModelExtension(baseName(originalKey))}.phm`
 }
 
 const THUMBNAIL_EXTENSIONS: Record<string, string> = { 'image/png': 'png', 'image/webp': 'webp', 'image/jpeg': 'jpg' }
@@ -44,7 +51,7 @@ const THUMBNAIL_EXTENSIONS: Record<string, string> = { 'image/png': 'png', 'imag
 export function thumbnailKey(originalKey: string, mime: string) {
   const extension = THUMBNAIL_EXTENSIONS[mime]
   if (!extension) throw new Response('unsupported thumbnail type', { status: 400 })
-  return `thumbnails/${baseName(originalKey).replace(/\.(?:stl|3mf|obj)$/i, '')}.${extension}`
+  return `thumbnails/${stripModelExtension(baseName(originalKey))}.${extension}`
 }
 
 export function thumbnailMime(key: string) {
@@ -65,6 +72,6 @@ export function assetContentType(key: string) {
 }
 
 export function trashKey(operationId: string, key: string, assetId: string) {
-  if (!/^[a-f0-9-]{36}$/i.test(operationId)) throw new Error('invalid operation id')
+  assertUuid(operationId, 'operation')
   return `trash/${operationId}__${assetId}__${baseName(key)}`
 }

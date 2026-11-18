@@ -1,4 +1,4 @@
-import type { BoardSort, PrintType, RequestFilters, RequestSort } from '../core/types'
+import { isPrintType, REQUEST_SORTS, type BoardSort, type PrintType, type RequestFilters, type RequestSort } from '../core/types'
 
 export type BoardSearch = {
   signup?: boolean
@@ -23,24 +23,7 @@ export type BoardSearch = {
   next?: string
 }
 
-const SORT_IDS = new Set<BoardSort>([
-  'fair',
-  'round-robin',
-  'created-asc',
-  'created-desc',
-  'quantity-desc',
-  'quantity-asc',
-  'name-asc',
-  'name-desc',
-  'updated-desc',
-  'updated-asc',
-  'material-desc',
-  'material-asc',
-  'time-desc',
-  'time-asc',
-  'archived-desc',
-  'archived-asc',
-])
+const SORT_IDS = new Set<BoardSort>([...REQUEST_SORTS, 'round-robin'])
 
 function endOfDay(value?: string) {
   if (!value) return undefined
@@ -84,7 +67,7 @@ export function validateRequestSearch(input: Record<string, unknown>): BoardSear
     hasSource: boolean(input.hasSource),
     hasThumbnail: boolean(input.hasThumbnail),
     hasPreview: boolean(input.hasPreview),
-    printType: input.printType === 'resin' || input.printType === 'filament' ? input.printType : undefined,
+    printType: isPrintType(input.printType) ? input.printType : undefined,
     printer: text(input.printer, 100),
     tag: text(input.tag, 100),
     sort: sort && SORT_IDS.has(sort) ? sort : undefined,

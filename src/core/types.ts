@@ -8,7 +8,12 @@ export type Role = 'admin' | 'requester'
 export type AccountRole = 'super_admin' | 'requester'
 export type WorkspaceRole = 'owner' | 'admin' | 'member'
 export type AssignableWorkspaceRole = Exclude<WorkspaceRole, 'owner'>
-export type PrintType = 'resin' | 'filament'
+export const PRINT_TYPES = ['resin', 'filament'] as const
+export type PrintType = (typeof PRINT_TYPES)[number]
+
+export function isPrintType(value: unknown): value is PrintType {
+  return (PRINT_TYPES as readonly unknown[]).includes(value)
+}
 
 export type WorkspaceSummary = {
   id: string
@@ -200,22 +205,24 @@ export type AssetGenerationJob = {
   finishedAt?: number
 }
 
-export type RequestSort =
-  | 'fair'
-  | 'updated-desc'
-  | 'updated-asc'
-  | 'created-desc'
-  | 'created-asc'
-  | 'name-asc'
-  | 'name-desc'
-  | 'quantity-desc'
-  | 'quantity-asc'
-  | 'material-desc'
-  | 'material-asc'
-  | 'time-desc'
-  | 'time-asc'
-  | 'archived-desc'
-  | 'archived-asc'
+export const REQUEST_SORTS = [
+  'fair',
+  'updated-desc',
+  'updated-asc',
+  'created-desc',
+  'created-asc',
+  'name-asc',
+  'name-desc',
+  'quantity-desc',
+  'quantity-asc',
+  'material-desc',
+  'material-asc',
+  'time-desc',
+  'time-asc',
+  'archived-desc',
+  'archived-asc',
+] as const
+export type RequestSort = (typeof REQUEST_SORTS)[number]
 
 export type BoardSort = RequestSort | 'round-robin'
 
@@ -372,7 +379,6 @@ interface RepositoryShape {
     items: Omit<PrintGroupItem, 'order' | 'status'>[],
     parentId?: string,
   ): string
-  renameGroup(id: string, name: string): void
   updateGroup(id: string, fields: { name?: string; color?: PrintGroupColor; parentId?: string | null }): void
   updateCopyTags(edit: Omit<CopyTagEdit, 'createTagName'>, createTag?: { name: string; color: PrintGroupColor }): string | undefined
   deleteGroup(id: string): void
@@ -457,7 +463,6 @@ interface RepositoryShape {
   storageFailedAssetGenerationRequests(limit: number): string[]
   /** Requeues storage-failed stages for the given requests, or for every request when none are given. */
   requeueStorageFailedAssetGeneration(requestIds?: string[]): void
-  requestsNeedingModelDimensions(): string[]
   setModelDimensions(id: string, dimensions: ModelDimensions, volumeMm3?: number, surfaceAreaMm2?: number): void
   completeAssetGeneration(id: string, generated: { thumbnailPath?: string; previewPath?: string }): void
   recordSourceImagePath(id: string, path: string | null): void
@@ -503,7 +508,7 @@ interface RepositoryShape {
     lastCheckedAt: number
   }
   maintain(): { integrity: string; checkedAt: number }
-  backup(destination: string): Promise<{ totalPages: number; remainingPages: number }>
+  backup(destination: string): Promise<{ totalPages: number }>
   beginOperation(id: string, payload: OperationPayload): void
   beginUploadOperation(id: string, payload: UploadOperation | AttachOperation): void
   markOperationAssetsMoved(id: string): void
@@ -657,6 +662,6 @@ export interface Notifier {
 }
 
 export interface Telemetry {
-  capture(identity: string, event: string, properties?: Record<string, unknown>): Promise<void>
-  exception(error: unknown, properties?: Record<string, unknown>): Promise<void>
+  capture(identity: string, event: string, properties?: Record<string, unknown>): void
+  exception(error: unknown, properties?: Record<string, unknown>): void
 }

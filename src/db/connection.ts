@@ -25,7 +25,7 @@ export function createDatabase(source: Database.Database | string): STLQuestData
   const raw = typeof source === 'string' ? drizzle(source, { schema }) : drizzle({ client: source, schema })
   const database = asyncDatabase(raw)
   rawDatabases.set(database, raw)
-  return registerDatabaseProvider(database, 'sqlite')
+  return database
 }
 
 export function registerDatabaseProvider<T extends object>(database: T, provider: DatabaseProvider): T {

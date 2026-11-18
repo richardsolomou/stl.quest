@@ -57,7 +57,7 @@ export function DeploymentSmtpDialog({ current, onDone }: { current: PublicInteg
   )
 }
 
-export type SmtpValues = { from: string; host: string; port: number; secure: boolean; user?: string; password?: string }
+type SmtpValues = { from: string; host: string; port: number; secure: boolean; user?: string; password?: string }
 
 export function SmtpDialog({
   smtp,

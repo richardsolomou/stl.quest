@@ -1,3 +1,4 @@
+import { modelFormat, stripModelExtension } from '../core/assetKeys'
 import type { PrintType } from '../core/types'
 import { MAX_UPLOAD_BYTES } from '../core/uploadLimits'
 import type { Messages } from '../core/i18n'
@@ -19,10 +20,7 @@ export function prepareUploadFiles(files: Iterable<File>, printTypes: readonly P
     accepted.push({
       key: `f${nextUploadKey++}`,
       file,
-      name: file.name
-        .replace(/\.(?:stl|3mf|obj)$/i, '')
-        .replace(/[_-]+/g, ' ')
-        .trim(),
+      name: stripModelExtension(file.name).replace(/[_-]+/g, ' ').trim(),
       quantity: '1',
       notes: '',
       sourceUrl: '',
@@ -51,7 +49,7 @@ export function uploadOutcome(fileCount: number, failedCount: number) {
 }
 
 function uploadFileRejection(file: Pick<File, 'name' | 'size'>, t: RequestMessages) {
-  if (!/\.(?:stl|3mf|obj)$/i.test(file.name)) return t.upload.notModelFile
+  if (!modelFormat(file.name)) return t.upload.notModelFile
   if (file.size === 0 || file.size > MAX_UPLOAD_BYTES) return t.upload.overLimit
   return undefined
 }

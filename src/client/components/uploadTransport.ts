@@ -1,5 +1,6 @@
 import { uploadFile } from '../uploads'
 import type { UploadEntry } from './uploadTypes'
+import { stripModelExtension } from '../../core/assetKeys'
 import { normalizeRequestQuantity } from '../../core/request'
 import { errorMessage } from '../../core/error'
 import type { Messages } from '../../core/i18n'
@@ -27,7 +28,7 @@ export function isUploadCancelled(error: unknown) {
 export function uploadMetadata(entry: UploadEntry) {
   const metadata: Record<string, string> = {
     filename: entry.file.name,
-    name: entry.name.trim() || entry.file.name.replace(/\.(?:stl|3mf|obj)$/i, ''),
+    name: entry.name.trim() || stripModelExtension(entry.file.name),
     quantity: String(normalizeRequestQuantity(entry.quantity)),
   }
   if (!entry.printType) throw new Error('Choose resin or filament for every model')

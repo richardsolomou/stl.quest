@@ -9,16 +9,16 @@ afterEach(() => {
 function stubExecCommandDocument(copyResult: boolean) {
   const appended: unknown[] = []
   const removed: unknown[] = []
-  const body = {
-    appendChild: (node: unknown) => appended.push(node),
-    removeChild: (node: unknown) => removed.push(node),
-  }
   const execCommand = vi.fn(() => copyResult)
   vi.stubGlobal('document', {
-    body,
-    createElement: () => ({ value: '', style: {}, setAttribute: () => {}, select: () => {} }),
+    body: { append: (node: unknown) => appended.push(node) },
+    createElement: () => {
+      const node = { value: '', style: {}, setAttribute: () => {}, select: () => {}, remove: () => removed.push(node) }
+      return node
+    },
     execCommand,
   })
+  vi.stubGlobal('getSelection', () => null)
   return { appended, removed, execCommand }
 }
 
@@ -27,7 +27,7 @@ describe('writeClipboard', () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     vi.stubGlobal('navigator', { clipboard: { writeText } })
 
-    await expect(writeClipboard('invite-link')).resolves.toBe(true)
+    await expect(writeClipboard('invite-link')).resolves.toEqual({ copied: true, method: 'clipboard' })
     expect(writeText).toHaveBeenCalledWith('invite-link')
   })
 
@@ -36,7 +36,7 @@ describe('writeClipboard', () => {
     vi.stubGlobal('navigator', {})
     const { appended, removed, execCommand } = stubExecCommandDocument(true)
 
-    await expect(writeClipboard('recovery-code')).resolves.toBe(true)
+    await expect(writeClipboard('recovery-code')).resolves.toEqual({ copied: true, method: 'fallback' })
     expect(execCommand).toHaveBeenCalledWith('copy')
     // The temporary textarea is cleaned up regardless of outcome.
     expect(appended).toHaveLength(1)
@@ -48,7 +48,7 @@ describe('writeClipboard', () => {
     vi.stubGlobal('navigator', { clipboard: { writeText } })
     const { execCommand } = stubExecCommandDocument(true)
 
-    await expect(writeClipboard('value')).resolves.toBe(true)
+    await expect(writeClipboard('value')).resolves.toEqual({ copied: true, method: 'fallback' })
     expect(writeText).toHaveBeenCalled()
     expect(execCommand).toHaveBeenCalledWith('copy')
   })
@@ -57,6 +57,6 @@ describe('writeClipboard', () => {
     vi.stubGlobal('navigator', {})
     stubExecCommandDocument(false)
 
-    await expect(writeClipboard('value')).resolves.toBe(false)
+    await expect(writeClipboard('value')).resolves.toEqual({ copied: false, method: 'fallback' })
   })
 })

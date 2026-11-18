@@ -3,9 +3,9 @@ import type { CloudStorageCredentials } from '../core/auth'
 import { assertRelativeStoragePath } from '../core/storagePath'
 import type { AssetStore } from '../core/types'
 import { moveIgnoringMissingSource, prepareAssetMove } from './assetMove'
-import { cloudFetch, cloudRequestError, isHttpNotFound, waitForCloudRetry } from './cloudFetch'
+import { cloudFetch, cloudRequestError, isHttpNotFound, retryCloudRequest, waitForCloudRetry } from './cloudFetch'
 import { cleanCloudRoot, cloudFileName, joinCloudPath } from './cloudPath'
-import { assetMissingError } from './missingFile'
+import { assetMissingError, undefinedIfMissing } from './missingFile'
 import { OAuthAssetStoreKeys } from './oauthAssetStoreKeys'
 import { refreshOAuthAccessToken } from './oauthAccessToken'
 import { assertStreamSize, streamChunks } from './streamChunks'
@@ -137,9 +137,7 @@ export class BoxAssetStore extends OAuthAssetStoreKeys implements AssetStore {
   }
 
   async removeEmptyDirectory(relativePath: string) {
-    const folder = await this.folderItem(relativePath, false).catch((error: NodeJS.ErrnoException) =>
-      error.code === 'ENOENT' ? undefined : Promise.reject(error),
-    )
+    const folder = await undefinedIfMissing(this.folderItem(relativePath, false))
     if (!folder) return true
     if ((await this.children(folder.id, 1)).length) return false
     await this.deleteItem(folder)
@@ -147,15 +145,13 @@ export class BoxAssetStore extends OAuthAssetStoreKeys implements AssetStore {
   }
 
   async sweepTrash() {
-    const trash = await this.folderItem('trash', false).catch((error: NodeJS.ErrnoException) =>
-      error.code === 'ENOENT' ? undefined : Promise.reject(error),
-    )
+    const trash = await undefinedIfMissing(this.folderItem('trash', false))
     if (trash) await this.deleteItem(trash)
     await this.folderItem('trash', true)
   }
 
   async writable() {
-    await verifyWritableAssetStore({ write: (p, b) => this.write(p, b), read: (p) => this.read(p), remove: (p) => this.remove(p) })
+    await verifyWritableAssetStore(this)
   }
 
   async inventory(options?: { maxEntries?: number }) {
@@ -174,9 +170,7 @@ export class BoxAssetStore extends OAuthAssetStoreKeys implements AssetStore {
   }
 
   async clear(options?: { initialize?: boolean }) {
-    const root = await this.rootItem(false).catch((error: NodeJS.ErrnoException) =>
-      error.code === 'ENOENT' ? undefined : Promise.reject(error),
-    )
+    const root = await undefinedIfMissing(this.rootItem(false))
     if (root) await this.deleteItem(root)
     if (options?.initialize !== false) await this.initialize()
   }
@@ -254,13 +248,11 @@ export class BoxAssetStore extends OAuthAssetStoreKeys implements AssetStore {
 
   private async request(url: string, init: { method: string; headers?: Record<string, string>; body?: BodyInit }) {
     const token = await this.token()
-    for (let attempt = 0; ; attempt++) {
-      const response = await cloudFetch(url, { ...init, headers: { ...init.headers, authorization: `Bearer ${token}` } })
-      if (response.ok || response.status === 201 || response.status === 202) return response
-      const error = await boxError(response)
-      if (!error.retryable || attempt === 5) throw error
-      await waitForCloudRetry(attempt, { delayMs: error.retryAfterMs })
-    }
+    return retryCloudRequest(() => cloudFetch(url, { ...init, headers: { ...init.headers, authorization: `Bearer ${token}` } }), {
+      error: boxError,
+      retryable: (error) => error.retryable,
+      delay: (error) => ({ delayMs: error.retryAfterMs }),
+    })
   }
 
   protected async refreshAccessToken() {

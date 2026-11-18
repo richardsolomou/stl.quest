@@ -61,7 +61,7 @@ Supporting, not headline: dimension-aware auto-assignment across mixed resin and
 ## Evidence on Hand
 
 - Working product at `stl.quest`, released publicly (v1.27.0 at time of writing) with a full CHANGELOG.
-- Product tour animation hosted at `https://stl.quest/product-tour.gif` (not in-repo).
+- Product tour animation at `public/product-tour.gif`, served from `https://stl.quest/product-tour.gif`.
 - Public documentation: `docs/deployment.md`, `docs/storage.md`, `docs/telemetry.md`, `docs/webdav.md`.
 - Distribution listings: TrueNAS Apps catalog, Unraid Community Apps, GHCR container images.
 - Generated printer catalog with manufacturer specifications and preset images under `public/printer-presets/`.

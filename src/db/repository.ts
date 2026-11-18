@@ -18,6 +18,12 @@ import type {
   Role,
   UploadOperation,
   AttachOperation,
+  AssetGenerationOutcome,
+  AssetGenerationStage,
+  ModelDimensions,
+  PrintType,
+  WorkspaceRole,
+  WorkspaceSummary,
 } from '../core/types'
 import { initialStatus, workflow } from '../core/workflow'
 import { normalizeEmail } from '../core/identity'
@@ -298,10 +304,6 @@ export class DrizzleRepository implements Repository {
       }
     })
     return id
-  }
-
-  async renameGroup(id: string, name: string) {
-    await this.updateGroup(id, { name })
   }
 
   async updateGroup(id: string, fields: { name?: string; color?: PrintGroupColor; parentId?: string | null }) {
@@ -1353,7 +1355,7 @@ export class DrizzleRepository implements Repository {
       notes?: string
       sourceUrl?: string
       sourceImageUrl?: string | null
-      requestedPrintType?: import('../core/types').PrintType | null
+      requestedPrintType?: PrintType | null
       printerId?: string | null
       automaticPrinterAssignment?: boolean
       estimatedMaterialOverride?: number | null
@@ -1725,7 +1727,7 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  async requeueAssetGeneration(id: string, stages: import('../core/types').AssetGenerationStage[]) {
+  async requeueAssetGeneration(id: string, stages: AssetGenerationStage[]) {
     const workspaceId = await this.workspace()
     await this.database.transaction(async (tx) => {
       const now = Date.now()
@@ -1748,7 +1750,7 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  async startAssetGeneration(id: string, stages: import('../core/types').AssetGenerationStage[]) {
+  async startAssetGeneration(id: string, stages: AssetGenerationStage[]) {
     const workspaceId = await this.workspace()
     await this.database
       .update(assetGenerationJobs)
@@ -1764,11 +1766,7 @@ export class DrizzleRepository implements Repository {
       .run()
   }
 
-  async finishAssetGeneration(
-    id: string,
-    stage: import('../core/types').AssetGenerationStage,
-    outcome: import('../core/types').AssetGenerationOutcome,
-  ) {
+  async finishAssetGeneration(id: string, stage: AssetGenerationStage, outcome: AssetGenerationOutcome) {
     const workspaceId = await this.workspace()
     await this.database.transaction(async (tx) => {
       const now = Date.now()
@@ -1816,7 +1814,7 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  async listAssetGenerationJobs(stage?: import('../core/types').AssetGenerationStage) {
+  async listAssetGenerationJobs(stage?: AssetGenerationStage) {
     const workspaceId = await this.workspace()
     return (
       await this.database
@@ -1887,29 +1885,7 @@ export class DrizzleRepository implements Repository {
       .run()
   }
 
-  async requestsNeedingModelDimensions() {
-    return (
-      await this.database
-        .select({ id: requests.id })
-        .from(requests)
-        .where(
-          and(
-            eq(requests.workspaceId, await this.workspace()),
-            or(
-              isNull(requests.modelWidthMm),
-              isNull(requests.modelDepthMm),
-              isNull(requests.modelHeightMm),
-              isNull(requests.modelVolumeMm3),
-              isNull(requests.modelSurfaceAreaMm2),
-            ),
-          ),
-        )
-        .orderBy(requests.createdAt)
-        .all()
-    ).map(({ id }) => id)
-  }
-
-  async setModelDimensions(id: string, dimensions: import('../core/types').ModelDimensions, volumeMm3?: number, surfaceAreaMm2?: number) {
+  async setModelDimensions(id: string, dimensions: ModelDimensions, volumeMm3?: number, surfaceAreaMm2?: number) {
     await this.database
       .update(requests)
       .set({
@@ -2674,7 +2650,7 @@ export class DrizzleRepository implements Repository {
     return await this.countOwnedWorkspacesWith(this.database, userId)
   }
 
-  async listWorkspacesForUser(userId: string): Promise<import('../core/types').WorkspaceSummary[]> {
+  async listWorkspacesForUser(userId: string): Promise<WorkspaceSummary[]> {
     return await this.database
       .select({ id: organization.id, name: organization.name, slug: organization.slug, role: member.role })
       .from(member)
@@ -2770,7 +2746,7 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  async addWorkspaceMember(userId: string, role: import('../core/types').WorkspaceRole) {
+  async addWorkspaceMember(userId: string, role: WorkspaceRole) {
     return await this.addWorkspaceMemberWith(this.database, await this.workspace(), userId, role)
   }
 
@@ -2904,7 +2880,7 @@ export class DrizzleRepository implements Repository {
     database: DatabaseExecutor,
     workspaceId: string,
     userId: string,
-    role: import('../core/types').WorkspaceRole,
+    role: WorkspaceRole,
     createdAt = new Date(),
   ) {
     const added = await database
@@ -2949,7 +2925,7 @@ export class DrizzleRepository implements Repository {
     )
   }
 
-  async setWorkspaceMemberRole(userId: string, role: import('../core/types').WorkspaceRole) {
+  async setWorkspaceMemberRole(userId: string, role: WorkspaceRole) {
     const current = await this.database
       .select({ role: member.role })
       .from(member)

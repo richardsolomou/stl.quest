@@ -3,7 +3,7 @@ import { CircleAlert, CircleCheck } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 
-export type SettingRowStatus = { label: string; tone: 'on' | 'ready' | 'off' }
+type SettingRowStatus = { label: string; tone: 'on' | 'ready' | 'off' }
 
 // One shape for every "thing you can turn on or set up" list: identity on the left, true state in the badge, actions on the right.
 export function SettingRow({

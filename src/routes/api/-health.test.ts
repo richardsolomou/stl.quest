@@ -3,8 +3,10 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
 
+let temporary: string | undefined
+
 it('stays healthy when workspace storage is unavailable', async () => {
-  const temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-health-'))
+  temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-health-'))
   process.env.DATA_DIR = path.join(temporary, 'data')
   const unavailableStorage = path.join(temporary, 'unavailable')
   await fs.promises.writeFile(unavailableStorage, 'not a directory')
@@ -17,11 +19,12 @@ it('stays healthy when workspace storage is unavailable', async () => {
   const response = await healthResponse()
 
   expect(response).toMatchObject({ status: 200 })
-  await fs.promises.rm(temporary, { recursive: true, force: true })
 })
 
 afterEach(async () => {
   delete process.env.DATA_DIR
   await (await import('../../server/app')).resetApp()
   vi.resetModules()
+  if (temporary) await fs.promises.rm(temporary, { recursive: true, force: true })
+  temporary = undefined
 })

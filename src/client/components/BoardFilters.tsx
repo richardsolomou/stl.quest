@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useHydrated } from '@tanstack/react-router'
 import { ArrowUpDown, Check, Search, SlidersHorizontal, Tags, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,9 +23,9 @@ import { printGroupRows } from '../../core/printGroups'
 import type { Messages } from '../../core/i18n'
 import { useI18n } from '../i18n'
 
-export type SortGroup = { id: keyof Messages['board']['sort']['groups']; options: (keyof Messages['board']['sort']['options'])[] }
+type SortGroup = { id: keyof Messages['board']['sort']['groups']; options: (keyof Messages['board']['sort']['options'])[] }
 
-export const DEFAULT_SORT_GROUPS: SortGroup[] = [
+const DEFAULT_SORT_GROUPS: SortGroup[] = [
   { id: 'strategy', options: ['fair', 'round-robin'] },
   { id: 'submitted', options: ['created-asc', 'created-desc'] },
   {
@@ -79,7 +80,7 @@ export function BoardFilters({
   const { t } = useI18n()
   const f = t.board.filters
   const queryTimer = useRef<number | undefined>(undefined)
-  const [hydrated, setHydrated] = useState(false)
+  const hydrated = useHydrated()
   const [expanded, setExpanded] = useState(false)
   const [query, setQuery] = useState(search.q ?? '')
   const printTypes = availablePrintTypes()
@@ -99,7 +100,6 @@ export function BoardFilters({
   const activeSort = sorts.find((sort) => sort.value === (search.sort ?? defaultSort)) ?? sorts[0]
 
   useEffect(() => setQuery(search.q ?? ''), [search.q])
-  useEffect(() => setHydrated(true), [])
   useEffect(() => () => window.clearTimeout(queryTimer.current), [])
 
   const tagOptions = useMemo(

@@ -5,14 +5,13 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
-import type { PublicCloudConnection } from '../../../core/auth'
+import { cloudStorageProviderName, type CloudStorageProvider, type PublicCloudConnection } from '../../../core/auth'
 import type { StorageConfig } from '../../../core/types'
-import { cloudProviderLabel, type CloudProvider } from '../../storageProviders'
 import { useI18n } from '../../i18n'
 import { CloudProviderIcon } from '../CloudProviderIcon'
 import { ProtectedEmail } from '../ProtectedEmail'
 
-type CloudProviderOption = { value: CloudProvider; label: string; available: boolean }
+type CloudProviderOption = { value: CloudStorageProvider; label: string; available: boolean }
 
 export function CloudStorageFields({
   provider,
@@ -30,30 +29,30 @@ export function CloudStorageFields({
   onConnect,
   onDisconnect,
 }: {
-  provider: CloudProvider
+  provider: CloudStorageProvider
   providers: CloudProviderOption[]
-  connections: Record<CloudProvider, PublicCloudConnection>
+  connections: Record<CloudStorageProvider, PublicCloudConnection>
   currentAdapter: StorageConfig['adapter']
   onboarding: boolean
   superAdmin: boolean
-  permissionProvider?: CloudProvider
-  connectingProvider?: CloudProvider
-  disconnectingProvider?: CloudProvider
+  permissionProvider?: CloudStorageProvider
+  connectingProvider?: CloudStorageProvider
+  disconnectingProvider?: CloudStorageProvider
   migrationInProgress: boolean
-  onProviderChange: (provider: CloudProvider) => void
-  onSetUp: (provider: CloudProvider) => void
-  onConnect: (provider: CloudProvider) => void
-  onDisconnect: (provider: CloudProvider) => void
+  onProviderChange: (provider: CloudStorageProvider) => void
+  onSetUp: (provider: CloudStorageProvider) => void
+  onConnect: (provider: CloudStorageProvider) => void
+  onDisconnect: (provider: CloudStorageProvider) => void
 }) {
   const { storage: t } = useI18n().t
   const connection = connections[provider]
-  const label = cloudProviderLabel(provider)
+  const label = cloudStorageProviderName(provider)
   return (
     <div className="flex flex-col gap-4">
       {!onboarding && (
         <Field>
           <FieldLabel htmlFor="cloud-provider">{t.cloud.provider}</FieldLabel>
-          <Select items={providers} value={provider} onValueChange={(value) => onProviderChange(value as CloudProvider)}>
+          <Select items={providers} value={provider} onValueChange={(value) => onProviderChange(value as CloudStorageProvider)}>
             <SelectTrigger className="w-full" id="cloud-provider">
               <SelectValue>
                 <CloudProviderIcon provider={provider} />

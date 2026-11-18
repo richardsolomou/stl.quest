@@ -19,6 +19,7 @@ import {
   X,
 } from 'lucide-react'
 import { Brand } from '@/client/components/Brand'
+import { writeClipboard } from '@/client/components/useCopied'
 import { NasMark } from './NasMarks'
 import { Button, ButtonLink } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './LandingCard'
@@ -58,44 +59,12 @@ const copyLabels = {
   failed: 'Could not copy the Docker command',
 }
 
-/**
- * Fallback for when navigator.clipboard is missing (insecure origin) or refuses the write. Copies
- * from a hidden textarea and puts any existing selection back, so nothing appears selected.
- */
-function copyViaHiddenTextarea(text: string) {
-  const textarea = document.createElement('textarea')
-  textarea.value = text
-  textarea.setAttribute('readonly', '')
-  textarea.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none'
-  document.body.append(textarea)
-
-  const selection = getSelection()
-  const selected = selection && selection.rangeCount > 0 ? selection.getRangeAt(0).cloneRange() : null
-
-  textarea.select()
-  const copied = document.execCommand('copy')
-  textarea.remove()
-
-  selection?.removeAllRanges()
-  if (selected) selection?.addRange(selected)
-
-  return copied
-}
-
 function CommandBlock({ command }: { command: string }) {
   const posthog = usePostHog()
   const [feedback, setFeedback] = useState<keyof typeof copyLabels>('idle')
 
   async function copy() {
-    let copied = false
-    let method = 'clipboard'
-    try {
-      await navigator.clipboard.writeText(command)
-      copied = true
-    } catch {
-      method = 'fallback'
-      copied = copyViaHiddenTextarea(command)
-    }
+    const { copied, method } = await writeClipboard(command)
     posthog?.capture('docker_command_copy_completed', { success: copied, method })
     setFeedback(copied ? 'copied' : 'failed')
     setTimeout(() => setFeedback('idle'), 2000)

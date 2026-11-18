@@ -1,6 +1,6 @@
 // Scripted screen recordings of the demo board.
 //
-//   pnpm tour:video   → .capture/landing.mp4  (long cut, 1080p)
+//   pnpm tour:video   → .capture/product-tour.{mp4,webm,webp}  (long cut, 1080p, with poster)
 //   pnpm tour:gif     → .capture/product-tour.gif  (short loop for GitHub)
 //
 // Assumes the demo data is seeded and a server is running (see docs/development/product-tour-capture.md). Playwright drives
@@ -16,10 +16,6 @@ import path from 'node:path'
 import { config, isSceneName, scenes, signIn, type SceneName } from './config.ts'
 import { encodeRecording, type Marks } from './media.ts'
 
-// `speed` gently compresses the finished timeline — Playwright leaves a still gap around every
-// action while it resolves locators and runs actionability checks. `orbitSpeed` is applied on top of
-// that, to the model rotation only: the orbit is the one stretch where nothing is being demonstrated
-// beat by beat, so it can run fast without becoming unreadable.
 type Mark = (label: string) => void
 
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))

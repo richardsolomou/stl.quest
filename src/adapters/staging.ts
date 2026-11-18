@@ -1,8 +1,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { UploadStagingArea } from '../core/types'
+import type { AssetStore, UploadStagingArea } from '../core/types'
 import { assertUploadCapacity } from './filesystemCapacity'
 import { verifyWritableDirectory } from './writableDirectory'
+import { undefinedIfMissing } from './missingFile'
 
 // Chunked uploads always stage on local disk under /data: resumable appends
 // need random access, which final storage adapters cannot promise.
@@ -51,7 +52,7 @@ export class UploadStaging implements UploadStagingArea {
     await syncDirectory(directory)
   }
 
-  async finalizeUpload(_uploadId: string, stagedPath: string, destinationPath: string, assets: import('../core/types').AssetStore) {
+  async finalizeUpload(_uploadId: string, stagedPath: string, destinationPath: string, assets: AssetStore) {
     await assets.finalizeUpload(stagedPath, destinationPath)
   }
 
@@ -76,10 +77,7 @@ export class UploadStaging implements UploadStagingArea {
       if (!match) continue
       if (exclude.has(match[1])) continue
       const file = path.join(this.root, name)
-      const stat = await fs.promises.stat(file).catch((error: NodeJS.ErrnoException) => {
-        if (error.code === 'ENOENT') return undefined
-        throw error
-      })
+      const stat = await undefinedIfMissing(fs.promises.stat(file))
       if (stat && Date.now() - stat.mtimeMs > 86_400_000) await fs.promises.rm(file, { force: true })
     }
   }

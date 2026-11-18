@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatBytes } from './format'
+import { formatBytes, formatDate, formatDateTime } from './format'
 
 describe('formatBytes', () => {
   it.each([
@@ -23,5 +23,17 @@ describe('formatBytes', () => {
 
   it('does not group thousands of the largest unit', () => {
     expect(formatBytes(3_000_000_000_000_000)).toBe('3000.0 TB')
+  })
+})
+
+describe('formatDate', () => {
+  const value = Date.UTC(2026, 2, 4, 12)
+
+  it('formats a medium date in the given locale', () => {
+    expect([formatDate(value, 'en'), formatDate(value, 'de')]).toEqual(['Mar 4, 2026', '04.03.2026'])
+  })
+
+  it('adds the time when formatting a date and time', () => {
+    expect(formatDateTime(value, 'en')).toMatch(/^Mar 4, 2026, \d{1,2}:\d{2}\s?[AP]M$/)
   })
 })

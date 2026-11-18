@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
-import type { CloudStorageProvider, PublicCloudStorageApp } from '../../../core/auth'
+import { cloudStorageProviderName, type CloudStorageProvider, type PublicCloudStorageApp } from '../../../core/auth'
 import { removeCloudStorageApp, saveCloudStorageApp } from '../../../server/fns'
 import { invalidateQueries } from '../../queryState'
-import { CLOUD_PROVIDER_CONSOLES, cloudProviderLabel } from '../../storageProviders'
+import { CLOUD_PROVIDER_CONSOLES } from '../../storageProviders'
 import { useI18n } from '../../i18n'
 import { CopyableValue } from '../CopyableValue'
 import { DialogProblem } from '../DialogProblem'
@@ -37,7 +37,7 @@ export function CloudStorageAppDialog({
   const mutation = useMutation({ mutationFn: useServerFn(saveCloudStorageApp), onSuccess: refresh })
   const removeMutation = useMutation({ mutationFn: useServerFn(removeCloudStorageApp), onSuccess: refresh })
   const help = t.cloudHelp[provider]
-  const label = cloudProviderLabel(provider)
+  const label = cloudStorageProviderName(provider)
   return (
     <DialogShell open title={t.cloud.setUpApp(label)} className="sm:max-w-[640px]" onClose={onDone}>
       <div className="space-y-5 pr-1">

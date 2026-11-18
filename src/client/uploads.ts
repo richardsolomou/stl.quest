@@ -1,6 +1,6 @@
 import { defaultOptions, Upload } from 'tus-js-client'
 
-export type UploadProgress = { sent: number; total: number; percent: number }
+export type UploadProgress = { sent: number; total: number }
 
 export type UploadFileOptions = {
   /** Sent to the server as tus metadata; `acceptUpload` requires `filename`. */
@@ -37,7 +37,7 @@ export async function uploadFile(file: File, { metadata = {}, onProgress, signal
             shouldRetry(error.originalResponse?.getStatus()) && defaultOptions.onShouldRetry?.(error, attempt, options) === true,
         }
       : {}),
-    onProgress: (sent, total) => onProgress?.({ sent, total, percent: total ? Math.round((sent / total) * 100) : 0 }),
+    onProgress: (sent, total) => onProgress?.({ sent, total }),
   })
 
   let rejectAbort!: (reason: unknown) => void
