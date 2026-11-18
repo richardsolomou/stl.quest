@@ -27,3 +27,7 @@ minimumReleaseAgeExclude:
   - 'posthog-*'
   - '@posthog/*'
   - ras-stack
+auditConfig:
+  ignoreGhsas:
+    # The build rejects picomatch in shipped JavaScript. Remove once a patched release is available.
+    - GHSA-fc5q-39xc-vjpf

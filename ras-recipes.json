@@ -45,7 +45,8 @@
       "notes": [
         "`ci.yml` is left out: `.github/workflows/docker.yml` runs `pnpm check:ci` with a PostgreSQL service so both database targets are tested, splits the unit tests and end-to-end suites into shards, scans the image, and releases, so one workflow carries checks, release, and deploy.",
         "Dependabot ignores `@better-auth/stripe`, which must move with `better-auth`.",
-        "Dependabot groups `better-auth` with `@better-auth/*`, because Better Auth's plugins pin its core version and a lone bump splits the types."
+        "Dependabot groups `better-auth` with `@better-auth/*`, because Better Auth's plugins pin its core version and a lone bump splits the types.",
+        "The dependency audit excepts GHSA-fc5q-39xc-vjpf until picomatch has a patched release, and the build rejects picomatch in production JavaScript."
       ]
     },
     "database-sqlite": {
