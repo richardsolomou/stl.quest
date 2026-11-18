@@ -846,7 +846,7 @@ describe('better-auth integration', () => {
     expect(await auth.api.listUserAccounts({ headers: requestHeaders })).toHaveLength(1)
   })
 
-  it('keeps the existing email until the new address is verified', async () => {
+  it.each([false, true])('changes the email after confirmation and preserves emailVerified=%s', async (emailVerified) => {
     const repository = await DrizzleRepository.create(createDatabase(':memory:'))
     cleanup = () => repository.close()
     const messages: EmailMessage[] = []
@@ -859,6 +859,7 @@ describe('better-auth integration', () => {
       body: { email: 'before@example.com', password: 'password1234', name: 'Before' },
       returnHeaders: true,
     })
+    await repository.database.update(user).set({ emailVerified }).where(eq(user.email, 'before@example.com')).run()
 
     await auth.manageAccount.changeEmail({
       newEmail: 'after@example.com',
@@ -872,9 +873,14 @@ describe('better-auth integration', () => {
     expect(messages[0].text).toContain('/verify-email?token=')
 
     const verificationURL = new URL(messages[0].text.match(/https?:\/\/\S+/)![0])
-    await auth.api.verifyEmail({ query: { token: verificationURL.searchParams.get('token')! } })
+    const response = await auth.handler(new Request(verificationURL))
 
-    expect(await repository.database.select().from(user).get()).toMatchObject({ email: 'after@example.com', emailVerified: true })
+    expect(response.headers.get('location')).toBe('/account')
+    expect(response.headers.getSetCookie()).toEqual([])
+    expect(await repository.database.select().from(user).get()).toMatchObject({ email: 'after@example.com', emailVerified })
+    await expect(auth.api.signInEmail({ body: { email: 'after@example.com', password: 'password1234' } })).resolves.toMatchObject({
+      user: { email: 'after@example.com' },
+    })
   })
 
   it('requires the current password before sending an email-change link', async () => {

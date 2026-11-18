@@ -6,6 +6,14 @@ const publicRoot = '.output/public'
 const stylesheetPattern = /\/assets\/styles-[A-Za-z0-9_-]+\.css/g
 const stylesheets = new Set<string>()
 
+// Picomatch's error message survives minification when the bundler removes its name.
+const picomatchPattern = /\bpicomatch\b|Expected pattern to be a non-empty string/
+for (const file of fs.globSync('.output/**/*.{js,mjs,cjs}')) {
+  if (picomatchPattern.test(file) || picomatchPattern.test(fs.readFileSync(file, 'utf8'))) {
+    throw new Error(`picomatch must stay out of the production build (GHSA-fc5q-39xc-vjpf): ${file}`)
+  }
+}
+
 for (const directory of fs.globSync(`${serverRoot}/**/*.mjs`)) {
   for (const stylesheet of fs.readFileSync(directory, 'utf8').match(stylesheetPattern) ?? []) stylesheets.add(stylesheet)
 }
