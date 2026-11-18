@@ -21,6 +21,11 @@ updates:
         patterns:
           - better-auth
           - '@better-auth/*'
+      # The API, stable SDK, and experimental exporters share compatibility constraints.
+      opentelemetry:
+        applies-to: version-updates
+        patterns:
+          - '@opentelemetry/*'
       patch-updates:
         applies-to: version-updates
         patterns:
