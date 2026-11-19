@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.50.0
+
+### Minor Changes
+
+- 6db84d5: Add Formlabs resin printers and the latest community printer models to the printer presets so that more fleets can pick their exact machines with pictures.
+- 7f75acc: Bring workspace, account, server, and about settings into one Settings hub with a grouped menu, and replace the side rail with a bottom navigation bar on phones so every page gets the full screen width.
+
 ## 1.49.1
 
 ### Patch Changes
