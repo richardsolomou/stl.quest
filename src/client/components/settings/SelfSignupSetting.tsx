@@ -20,7 +20,7 @@ export function SelfSignupSetting({ enabled }: { enabled: boolean }) {
       ]),
   })
   return (
-    <SettingsSection>
+    <SettingsSection title={copy.title}>
       <Field orientation="horizontal">
         <FieldContent>
           <FieldLabel htmlFor="self-signup-enabled">{copy.label}</FieldLabel>

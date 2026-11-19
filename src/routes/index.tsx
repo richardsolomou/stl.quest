@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { canAttachModel } from '../core/request'
 import { AccountMenu } from '../client/components/AccountMenu'
-import { AppRail } from '../client/components/AppRail'
+import { AppShell } from '../client/components/AppShell'
 import { Board } from '../client/components/Board'
 import { RequestModal } from '../client/components/RequestModal'
 import { UploadForm } from '../client/components/UploadForm'
@@ -75,7 +75,7 @@ function Home() {
               <CardHeader className="gap-4">
                 <div className="flex items-start justify-between gap-3">
                   <Brand />
-                  <AccountMenu isSuperAdmin={session.identity.superAdmin} side="bottom" />
+                  <AccountMenu side="bottom" align="end" />
                 </div>
                 {session.workspace && (
                   <p className="text-sm text-muted-foreground">
@@ -227,116 +227,111 @@ function AuthenticatedHome() {
   if (!identity) return null
   const me = identity
   return (
-    <div className="relative flex h-dvh">
-      <AppRail active="board" isAdmin={isAdmin} isSuperAdmin={me.superAdmin} />
-      <div className="flex min-w-0 flex-1 flex-col">
-        {((isAdmin && (!storageConfigured || !printersConfigured)) || !storageReady) && (
-          <WorkspaceSetupNotice
-            isAdmin={isAdmin}
-            storageConfigured={storageConfigured}
-            storageReady={storageReady}
-            printersConfigured={printersConfigured}
+    <AppShell active="board" fill>
+      {((isAdmin && (!storageConfigured || !printersConfigured)) || !storageReady) && (
+        <WorkspaceSetupNotice
+          isAdmin={isAdmin}
+          storageConfigured={storageConfigured}
+          storageReady={storageReady}
+          printersConfigured={printersConfigured}
+        />
+      )}
+      {result ? (
+        <>
+          <BoardFilters
+            search={effectiveSearch}
+            facets={facets}
+            tags={tags}
+            onManageTags={isAdmin ? () => setManageTags(true) : undefined}
+            prioritySortLabel={isAdmin ? undefined : t.board.sort.myPriority}
+            showRoundRobin={isWorkspaceOwner}
+            presence={<BoardPresence workspaceSlug={workspaceSlug} visible={!hideRequester} />}
+            action={
+              <>
+                <MyRequests workspaceSlug={workspaceSlug} userId={me.id} workflow={workflow} onOpenRequest={openRequest} />
+                <Button
+                  type="button"
+                  data-onboarding="upload"
+                  onClick={() => {
+                    posthog.capture('add_print_opened', { source: 'button' })
+                    setAddMode('upload')
+                    setUploadOpen(true)
+                  }}
+                >
+                  <Plus />
+                  <span className="max-sm:sr-only">{page.addPrint}</span>
+                </Button>
+              </>
+            }
+            onChange={(patch, replace = false) => void navigate({ to: '/', search: updateRequestSearch(effectiveSearch, patch), replace })}
           />
-        )}
-        {result ? (
-          <>
-            <BoardFilters
-              search={effectiveSearch}
-              facets={facets}
+          <Board
+            requests={visibleRequests}
+            groups={result.groups}
+            workflow={workflow}
+            isAdmin={isAdmin}
+            showRequesters={!hideRequester}
+            showPrintTypes={showPrintTypes}
+            uploadsEnabled={storageReady}
+            selectedTagIds={selectedTagIds}
+            filtered={search.tag !== undefined || Object.entries(filters).some(([key, value]) => key !== 'sort' && value !== undefined)}
+            sort={effectiveSearch.sort ?? 'fair'}
+            onOpenRequest={openRequest}
+          />
+          {manageTags && (
+            <ManageTagsDialog
               tags={tags}
-              onManageTags={isAdmin ? () => setManageTags(true) : undefined}
-              prioritySortLabel={isAdmin ? undefined : t.board.sort.myPriority}
-              showRoundRobin={isWorkspaceOwner}
-              presence={<BoardPresence workspaceSlug={workspaceSlug} visible={!hideRequester} />}
-              action={
-                <>
-                  <MyRequests workspaceSlug={workspaceSlug} userId={me.id} workflow={workflow} onOpenRequest={openRequest} />
-                  <Button
-                    type="button"
-                    data-onboarding="upload"
-                    onClick={() => {
-                      posthog.capture('add_print_opened', { source: 'button' })
-                      setAddMode('upload')
-                      setUploadOpen(true)
-                    }}
-                  >
-                    <Plus />
-                    <span className="max-sm:sr-only">{page.addPrint}</span>
-                  </Button>
-                </>
-              }
-              onChange={(patch, replace = false) =>
-                void navigate({ to: '/', search: updateRequestSearch(effectiveSearch, patch), replace })
-              }
-            />
-            <Board
-              requests={visibleRequests}
-              groups={result.groups}
-              workflow={workflow}
-              isAdmin={isAdmin}
-              showRequesters={!hideRequester}
-              showPrintTypes={showPrintTypes}
-              uploadsEnabled={storageReady}
-              selectedTagIds={selectedTagIds}
-              filtered={search.tag !== undefined || Object.entries(filters).some(([key, value]) => key !== 'sort' && value !== undefined)}
-              sort={effectiveSearch.sort ?? 'fair'}
-              onOpenRequest={openRequest}
-            />
-            {manageTags && (
-              <ManageTagsDialog
-                tags={tags}
-                pending={updateTagMutation.isPending || deleteTagMutation.isPending || createTagMutation.isPending}
-                error={tagError}
-                onCreate={async (name, parentId) => {
+              pending={updateTagMutation.isPending || deleteTagMutation.isPending || createTagMutation.isPending}
+              error={tagError}
+              onCreate={async (name, parentId) => {
+                setTagError(undefined)
+                try {
+                  return await createTagMutation.mutateAsync({
+                    data: { workspaceSlug, name, parentId, status: workflow.statuses[0].id, items: [] },
+                  })
+                } catch (error) {
+                  setTagError(errorMessage(error, page.tagCreateFailed))
+                }
+              }}
+              onSave={async (id, fields) => {
+                setTagError(undefined)
+                try {
+                  await updateTagMutation.mutateAsync({ data: { workspaceSlug, id, ...fields } })
+                  return true
+                } catch (error) {
+                  setTagError(errorMessage(error, page.tagUpdateFailed))
+                  return false
+                }
+              }}
+              onDelete={async (tag) => {
+                setTagError(undefined)
+                try {
+                  await deleteTagMutation.mutateAsync({ data: { workspaceSlug, id: tag.id } })
+                } catch (error) {
+                  setTagError(errorMessage(error, page.tagDeleteFailed))
+                }
+              }}
+              onCancel={() => {
+                if (!updateTagMutation.isPending && !deleteTagMutation.isPending && !createTagMutation.isPending) {
+                  setManageTags(false)
                   setTagError(undefined)
-                  try {
-                    return await createTagMutation.mutateAsync({
-                      data: { workspaceSlug, name, parentId, status: workflow.statuses[0].id, items: [] },
-                    })
-                  } catch (error) {
-                    setTagError(errorMessage(error, page.tagCreateFailed))
-                  }
-                }}
-                onSave={async (id, fields) => {
-                  setTagError(undefined)
-                  try {
-                    await updateTagMutation.mutateAsync({ data: { workspaceSlug, id, ...fields } })
-                    return true
-                  } catch (error) {
-                    setTagError(errorMessage(error, page.tagUpdateFailed))
-                    return false
-                  }
-                }}
-                onDelete={async (tag) => {
-                  setTagError(undefined)
-                  try {
-                    await deleteTagMutation.mutateAsync({ data: { workspaceSlug, id: tag.id } })
-                  } catch (error) {
-                    setTagError(errorMessage(error, page.tagDeleteFailed))
-                  }
-                }}
-                onCancel={() => {
-                  if (!updateTagMutation.isPending && !deleteTagMutation.isPending && !createTagMutation.isPending) {
-                    setManageTags(false)
-                    setTagError(undefined)
-                  }
-                }}
-              />
-            )}
-          </>
-        ) : (
-          <main className="grid min-h-0 flex-1 place-items-center p-6">
-            <QueryState
-              loading={requestsResult.isPending}
-              error={requestsResult.error}
-              loadingLabel={page.loading}
-              errorTitle={page.loadError}
-              onRetry={() => void retryQueries(requestsResult.refetch)}
-              className="w-full max-w-xl"
+                }
+              }}
             />
-          </main>
-        )}
-      </div>
+          )}
+        </>
+      ) : (
+        <div className="grid min-h-0 flex-1 place-items-center p-6">
+          <QueryState
+            loading={requestsResult.isPending}
+            error={requestsResult.error}
+            loadingLabel={page.loading}
+            errorTitle={page.loadError}
+            onRetry={() => void retryQueries(requestsResult.refetch)}
+            className="w-full max-w-xl"
+          />
+        </div>
+      )}
       {fileDragActive && !uploadOpen && (
         <div
           className={cn(
@@ -373,7 +368,7 @@ function AuthenticatedHome() {
           onClose={() => setOpenRequestId(null)}
         />
       )}
-    </div>
+    </AppShell>
   )
 }
 

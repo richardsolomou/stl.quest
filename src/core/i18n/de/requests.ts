@@ -228,6 +228,8 @@ export const requests: typeof en = {
       'Archivierte Drucke erscheinen nicht auf dem Board, behalten aber ihre Phase, Quelle, Dateien und ihren Verlauf. Holen Sie einen zurück, sobald Sie ihn wieder brauchen.',
     filtersLabel: 'Archivfilter',
     filtersDescription: 'Kombinieren Sie beliebige Felder, um das Archiv einzugrenzen.',
+    noMatchesTitle: 'Keine Treffer',
+    emptyTitle: 'Das Archiv ist leer',
     noMatches: 'Keine archivierten Drucke entsprechen diesen Filtern.',
     empty: 'Noch nichts archiviert. Klicken Sie mit der rechten Maustaste auf einen Druck auf dem Board und wählen Sie Archivieren.',
     loading: 'Archiv wird geladen…',

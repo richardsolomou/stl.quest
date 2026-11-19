@@ -8,7 +8,8 @@ import { accountsQuery, sessionQuery } from '../../queries'
 import { retryQueries } from '../../queryState'
 import { QueryState } from '../QueryState'
 import { SettingNotice, successNotice, type Notice } from '../SettingNotice'
-import { SettingsActions, SettingsHeader, SettingsPage, SettingsTableSection } from './SettingsLayout'
+import { PageHeader, SettingsPage, SettingsTableSection } from './SettingsLayout'
+import { UserPlus } from 'lucide-react'
 import { ChangeServerRoleDialog, ImpersonateUserDialog } from './SuperAdminAccessDialogs'
 import { CreateUserDialog } from './SuperAdminCreateUserDialog'
 import { DeleteUserDialog } from './SuperAdminDeleteUserDialog'
@@ -32,7 +33,7 @@ export function SuperAdminUsersPane({ hosted }: { hosted: boolean }) {
   if (!users || !session) {
     return (
       <SettingsPage>
-        <SettingsHeader title={copy.title} description={copy.description} />
+        <PageHeader title={copy.title} description={copy.description} />
         <QueryState
           loading={usersResult.isPending || sessionResult.isPending}
           error={usersResult.error ?? sessionResult.error}
@@ -46,8 +47,16 @@ export function SuperAdminUsersPane({ hosted }: { hosted: boolean }) {
 
   return (
     <SettingsPage>
-      <SettingsHeader title={copy.title} description={copy.description} />
-      <SelfSignupSetting enabled={session.auth.selfSignup} />
+      <PageHeader
+        title={copy.title}
+        description={copy.description}
+        actions={
+          <Button type="button" onClick={() => setAdding(true)}>
+            <UserPlus />
+            {copy.add}
+          </Button>
+        }
+      />
       <SettingNotice notice={notice} />
       <SettingsTableSection>
         <DataTable
@@ -127,11 +136,7 @@ export function SuperAdminUsersPane({ hosted }: { hosted: boolean }) {
         />
       )}
       {adding && <CreateUserDialog passwordEnabled={passwordEnabled} onDone={() => setAdding(false)} />}
-      <SettingsActions>
-        <Button type="button" onClick={() => setAdding(true)}>
-          {copy.add}
-        </Button>
-      </SettingsActions>
+      <SelfSignupSetting enabled={session.auth.selfSignup} />
     </SettingsPage>
   )
 }

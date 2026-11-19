@@ -4,7 +4,6 @@ const workspaces = (count: number) => (count === 1 ? 'Arbeitsbereich' : 'Arbeits
 
 export const superAdmin: typeof en = {
   nav: {
-    label: 'Bereiche für Super-Administratoren',
     overview: 'Übersicht',
     users: 'Benutzer',
     workspaces: 'Arbeitsbereiche',

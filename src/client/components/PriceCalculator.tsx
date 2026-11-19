@@ -16,7 +16,7 @@ import { JobSection } from './priceCalculator/JobSection'
 import { QuoteSection, type PriceMode } from './priceCalculator/QuoteSection'
 import { SetupForm } from './priceCalculator/SetupForm'
 import type { SetupMode } from './priceCalculator/fields'
-import { SettingsHeader, SettingsPage } from './settings/SettingsLayout'
+import { PageHeader, SettingsPage } from './settings/SettingsLayout'
 
 const emptyJob: PriceCalculatorJob = {
   materialAmount: 0,
@@ -34,7 +34,7 @@ export function PriceCalculator({ workspaceSlug, prefill }: { workspaceSlug: str
   if (!query.data) {
     return (
       <SettingsPage>
-        <SettingsHeader title={t.calculator.title} description={t.calculator.loadingDescription} />
+        <PageHeader title={t.calculator.title} description={t.calculator.loadingDescription} />
         <QueryState
           loading={query.isPending}
           error={query.error}
@@ -45,16 +45,20 @@ export function PriceCalculator({ workspaceSlug, prefill }: { workspaceSlug: str
       </SettingsPage>
     )
   }
-  return <LoadedPriceCalculator workspaceSlug={workspaceSlug} savedSettings={query.data.settings} prefill={prefill} />
+  return (
+    <LoadedPriceCalculator workspaceSlug={workspaceSlug} savedSettings={query.data.settings} saved={query.data.saved} prefill={prefill} />
+  )
 }
 
 function LoadedPriceCalculator({
   workspaceSlug,
   savedSettings,
+  saved,
   prefill,
 }: {
   workspaceSlug: string
   savedSettings: PriceCalculatorSettings
+  saved: boolean
   prefill?: Prefill
 }) {
   const { t } = useI18n()
@@ -64,15 +68,17 @@ function LoadedPriceCalculator({
   const [job, setJob] = useState(() => (prefill ? { ...emptyJob, ...prefill.job } : emptyJob))
   const syncedSettings = useRef(savedSettings)
   const [priceMode, setPriceMode] = useState<PriceMode>('standard')
+  const [setupOpen, setSetupOpen] = useState(!saved)
   const [resinMode, setResinMode] = useState<SetupMode>(savedSettings.resinPresetId ? 'preset' : 'custom')
   const [electricityMode, setElectricityMode] = useState<SetupMode>(savedSettings.electricityCountryCode ? 'preset' : 'custom')
   const callSave = useServerFn(savePriceCalculatorSettings)
   const queryClient = useQueryClient()
   const mutation = useMutation({
     mutationFn: callSave,
-    onSuccess: (saved) => {
-      setSettings(saved)
-      queryClient.setQueryData(priceCalculatorSettingsQuery(workspaceSlug).queryKey, { settings: saved, saved: true })
+    onSuccess: (stored) => {
+      setSettings(stored)
+      setSetupOpen(false)
+      queryClient.setQueryData(priceCalculatorSettingsQuery(workspaceSlug).queryKey, { settings: stored, saved: true })
     },
   })
   // Only a later save resyncs, so a prefilled print type survives the first render.
@@ -85,6 +91,9 @@ function LoadedPriceCalculator({
   }, [savedSettings])
 
   const result = calculatePrintPrice(settings, job)
+  // The job's print type is remembered on save but is a job choice, so switching it alone is not an unsaved setup change.
+  // A never-saved setup is the defaults, and saving is how the operator accepts them.
+  const setupDirty = !saved || JSON.stringify({ ...settings, printType: savedSettings.printType }) !== JSON.stringify(savedSettings)
   const selectPrintType = (printType: PriceCalculatorSettings['printType']) => {
     setSettings((current) => selectPriceCalculatorPrintType(current, printType))
     setJob((current) => ({ ...current, materialAmount: 0, materialUnit: printType === 'resin' ? 'ml' : 'g' }))
@@ -92,7 +101,7 @@ function LoadedPriceCalculator({
 
   return (
     <SettingsPage>
-      <SettingsHeader title={t.calculator.title} description={t.calculator.description} />
+      <PageHeader title={t.calculator.title} description={t.calculator.description} />
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(19rem,0.8fr)]">
         <JobSection settings={settings} job={job} result={result} onJobChange={setJob} onPrintTypeChange={selectPrintType} />
         <QuoteSection settings={settings} job={job} result={result} mode={priceMode} onModeChange={setPriceMode} />
@@ -100,13 +109,22 @@ function LoadedPriceCalculator({
           settings={settings}
           resinMode={resinMode}
           electricityMode={electricityMode}
-          dirty={JSON.stringify(settings) !== JSON.stringify(savedSettings)}
+          dirty={setupDirty}
           saving={mutation.isPending}
           error={mutation.error}
+          open={setupOpen}
+          onOpenChange={setSetupOpen}
           onSettingsChange={setSettings}
           onResinModeChange={setResinMode}
           onElectricityModeChange={setElectricityMode}
           onSave={() => mutation.mutate({ data: { workspaceSlug, ...settings } })}
+          onDiscard={() => {
+            // Discarding keeps the job's print type, which lives in the same settings object.
+            setSettings(selectPriceCalculatorPrintType(savedSettings, settings.printType))
+            setResinMode(savedSettings.resinPresetId ? 'preset' : 'custom')
+            setElectricityMode(savedSettings.electricityCountryCode ? 'preset' : 'custom')
+            mutation.reset()
+          }}
         />
       </div>
     </SettingsPage>

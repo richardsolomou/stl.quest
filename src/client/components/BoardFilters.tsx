@@ -195,7 +195,7 @@ export function BoardFilters({
               render={<Button type="button" variant="outline" aria-label={f.sortAria(activeSort.label)} data-onboarding="sort" />}
             >
               <ArrowUpDown />
-              <span>{f.sort}</span>
+              <span className="max-sm:sr-only">{f.sort}</span>
             </MenuTrigger>
             <MenuContent
               aria-label={f.sortMenuAria}
@@ -232,7 +232,7 @@ export function BoardFilters({
         <Popover open={expanded} onOpenChange={setExpanded}>
           <PopoverTrigger render={<Button type="button" variant="outline" data-onboarding="filters" />}>
             <SlidersHorizontal />
-            {f.filters}
+            <span className="max-sm:sr-only">{f.filters}</span>
             {advanced > 0 && (
               <span className="rounded-full bg-primary px-1.5 font-mono text-[10px] text-primary-foreground">{advanced}</span>
             )}
@@ -412,11 +412,11 @@ export function BoardFilters({
         {onManageTags && (
           <Button type="button" variant="outline" onClick={onManageTags}>
             <Tags />
-            {f.tags}
+            <span className="max-sm:sr-only">{f.tags}</span>
           </Button>
         )}
 
-        <div className="flex-1 max-[900px]:hidden" />
+        <div className="flex-1" />
         {presence}
         {action}
       </div>

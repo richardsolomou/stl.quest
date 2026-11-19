@@ -1,4 +1,8 @@
+import { Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { SegmentedControl } from '@/components/ui/segmented-control'
+import { cn } from '@/lib/utils'
+import { CopyButtonLabel, useCopied } from '../useCopied'
 import type { PriceCalculation, PriceCalculatorJob, PriceCalculatorSettings } from '../../../core/priceCalculator'
 import { useI18n } from '../../i18n'
 import { SettingsSection } from '../settings/SettingsLayout'
@@ -21,31 +25,46 @@ export function QuoteSection({
 }) {
   const { t, locale } = useI18n()
   const copy = t.calculator.quote
+  const { copied, copy: copyPrice } = useCopied()
   const price = mode === 'standard' ? result.standardPrice : result.estimatedCost
+  // Consumables alone still produce a price, which reads as a real quote before any slicer totals are in.
+  const empty = job.materialAmount === 0 && job.printHours === 0
   const money = (value: number) => formatMoney(value, settings.currency, locale)
   const explanation =
     mode === 'standard' ? copy.standardExplanation(formatNumber(settings.standardMarginPercent, locale)) : copy.costExplanation
   return (
     <div className="lg:sticky lg:top-7 lg:col-start-2 lg:row-start-1 lg:row-span-2">
       <SettingsSection title={copy.title} className="border-blueprint/30 bg-card/70 shadow-sm">
-        <div className="flex rounded-lg border border-input bg-background p-1" aria-label={copy.priceMode}>
-          {(['standard', 'cost'] as const).map((option) => (
-            <Button
-              key={option}
-              type="button"
-              variant={mode === option ? 'secondary' : 'ghost'}
-              className="flex-1 capitalize"
-              aria-pressed={mode === option}
-              onClick={() => onModeChange(option)}
-            >
-              {copy.modes[option]}
-            </Button>
-          ))}
-        </div>
+        <SegmentedControl
+          legend={copy.priceMode}
+          value={mode}
+          options={(['standard', 'cost'] as const).map((option) => ({
+            value: option,
+            label: <span className="capitalize">{copy.modes[option]}</span>,
+          }))}
+          onChange={onModeChange}
+        />
         <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-5 text-center">
-          <div className="text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase">{copy.suggestedPrice}</div>
-          <div className="mt-1 font-heading text-4xl font-semibold tracking-tight">{money(price)}</div>
-          <p className="mt-2 text-xs text-muted-foreground">{explanation}</p>
+          <div className="font-heading text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
+            {copy.suggestedPrice}
+          </div>
+          <div className={cn('mt-1 font-heading text-4xl font-semibold tracking-tight', empty && 'text-muted-foreground')}>
+            {money(price)}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">{empty ? copy.emptyHint : explanation}</p>
+          {!empty && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              className="mt-2"
+              aria-label={copy.copyPrice}
+              onClick={() => copyPrice(money(price))}
+            >
+              {copied ? null : <Copy />}
+              <CopyButtonLabel copied={copied} />
+            </Button>
+          )}
         </div>
         <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-sm">
           <CostRow

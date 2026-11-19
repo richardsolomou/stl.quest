@@ -3,7 +3,7 @@ import type { calculator as en } from '../en/calculator'
 export const calculator: typeof en = {
   defaultPowerBasis: 'estimation par défaut ; saisissez la puissance mesurée en mode Personnalisé pour un devis plus précis',
   title: 'Calculateur d’impression',
-  loadingDescription: 'Estimez le prix approximatif d’une impression résine ou FDM sans l’associer à une demande.',
+  loadingDescription: 'Estimez le prix approximatif d’une impression résine ou filament sans l’associer à une demande.',
   description: 'Un brouillon de tarification privé. Saisissez les totaux de votre trancheur ; rien ici n’est associé à une demande.',
   loading: 'Chargement du calculateur…',
   loadError: 'Impossible de charger le calculateur',
@@ -15,7 +15,7 @@ export const calculator: typeof en = {
     title: 'Tâche tranchée',
     printType: 'Type d’impression',
     resin: 'Résine',
-    filament: 'FDM',
+    filament: 'Filament',
     expectedMaterial: 'Matière prévue',
     materialUnit: 'Unité de matière',
     grams: 'grammes',
@@ -27,6 +27,8 @@ export const calculator: typeof en = {
     handsOnHint: 'Retrait des supports, nettoyage, assemblage et tout autre temps passé sur la tâche.',
   },
   quote: {
+    emptyHint: 'Saisissez la matière et la durée d’impression de votre trancheur pour voir un prix.',
+    copyPrice: 'Copier le prix',
     title: 'Devis approximatif',
     priceMode: 'Mode de prix',
     modes: {
@@ -49,6 +51,11 @@ export const calculator: typeof en = {
     estimatedCost: 'Coût estimé',
   },
   setup: {
+    edit: 'Modifier la configuration',
+    done: 'Terminé',
+    discard: 'Annuler les modifications',
+    unsaved: 'Modifications non enregistrées',
+    summary: { printer: 'Imprimante', labour: 'Main-d’œuvre', margin: 'Marge' },
     title: 'Configuration enregistrée',
     description:
       'Ces valeurs par défaut appartiennent à cet espace de travail et seront conservées. Les valeurs de la tâche ci-dessus restent un brouillon jetable.',
@@ -130,7 +137,7 @@ export const calculator: typeof en = {
     includedInPrinter: 'inclus dans la puissance de l’imprimante',
     printer: 'Imprimante',
     resinPrinterSearch: 'Rechercher des imprimantes résine…',
-    filamentPrinterSearch: 'Rechercher des imprimantes FDM…',
+    filamentPrinterSearch: 'Rechercher des imprimantes filament…',
     printerEmpty: 'Aucune imprimante prédéfinie correspondante.',
     printerCount: (count: number) =>
       count <= 1

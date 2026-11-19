@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { usePostHog } from '@posthog/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate } from '@tanstack/react-router'
@@ -116,41 +116,43 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     if (data && !acknowledgedTasks.current) acknowledgedTasks.current = new Set(data.completedTasks)
   }, [data])
 
-  useEffect(() => {
-    const complete = (event: Event) => {
-      const { task } = (event as CustomEvent<ProductTourProgress>).detail
-      const source: GuidanceSource = focusedTask === task ? 'quest_list' : 'interaction'
-      if (focusedTask === task) {
-        setFocusedTask(undefined)
-        sessionStorage.removeItem(focusedQuestKey)
-      }
-      const acknowledged = (acknowledgedTasks.current ??= new Set(data?.completedTasks))
-      if (acknowledged.has(task)) return
-      acknowledged.add(task)
-      if (!data?.completedTasks.includes(task)) updateProgress({ operation: 'complete', task })
-      const resolved = new Set([...(data?.completedTasks ?? []), ...(data?.skippedTasks ?? []), task])
-      const completesOnboarding = applicable.every((quest) => resolved.has(quest.id))
-      if (source === 'interaction' && !completesOnboarding) {
-        const quest = applicable.find((item) => item.id === task)
-        if (quest) {
-          toast.success(t.shell.tour.questComplete(t.shell.onboarding.quests[quest.id].title), {
-            description: t.shell.tour.xpEarned(quest.points),
-            action: { label: t.shell.tour.viewOnboarding, onClick: () => setOpen(true) },
-          })
-        }
-      }
-      const startedAt = viewedAt.current.get(task)
-      posthog.capture('product_tour_task_completed', {
-        tour_id: PRODUCT_TOUR_ID,
-        task,
-        source,
-        ...(startedAt ? { duration_seconds: Math.min(86_400, Math.max(0, Math.round((Date.now() - startedAt) / 1_000))) } : {}),
-      })
-      viewedAt.current.delete(task)
+  // Progress is announced from other components' effects, so the listener must never be briefly
+  // unsubscribed while those effects run; it subscribes once and always reads the latest state.
+  const complete = useEffectEvent((event: Event) => {
+    const { task } = (event as CustomEvent<ProductTourProgress>).detail
+    const source: GuidanceSource = focusedTask === task ? 'quest_list' : 'interaction'
+    if (focusedTask === task) {
+      setFocusedTask(undefined)
+      sessionStorage.removeItem(focusedQuestKey)
     }
+    const acknowledged = (acknowledgedTasks.current ??= new Set(data?.completedTasks))
+    if (acknowledged.has(task)) return
+    acknowledged.add(task)
+    if (!data?.completedTasks.includes(task)) updateProgress({ operation: 'complete', task })
+    const resolved = new Set([...(data?.completedTasks ?? []), ...(data?.skippedTasks ?? []), task])
+    const completesOnboarding = applicable.every((quest) => resolved.has(quest.id))
+    if (source === 'interaction' && !completesOnboarding) {
+      const quest = applicable.find((item) => item.id === task)
+      if (quest) {
+        toast.success(t.shell.tour.questComplete(t.shell.onboarding.quests[quest.id].title), {
+          description: t.shell.tour.xpEarned(quest.points),
+          action: { label: t.shell.tour.viewOnboarding, onClick: () => setOpen(true) },
+        })
+      }
+    }
+    const startedAt = viewedAt.current.get(task)
+    posthog.capture('product_tour_task_completed', {
+      tour_id: PRODUCT_TOUR_ID,
+      task,
+      source,
+      ...(startedAt ? { duration_seconds: Math.min(86_400, Math.max(0, Math.round((Date.now() - startedAt) / 1_000))) } : {}),
+    })
+    viewedAt.current.delete(task)
+  })
+  useEffect(() => {
     window.addEventListener(PRODUCT_TOUR_PROGRESS_EVENT, complete)
     return () => window.removeEventListener(PRODUCT_TOUR_PROGRESS_EVENT, complete)
-  }, [applicable, data?.completedTasks, data?.skippedTasks, focusedTask, posthog, t, updateProgress])
+  }, [])
 
   useEffect(() => {
     if (!data || mutation.isPending || celebrating) return
@@ -349,7 +351,7 @@ function QuestPopover({
                 <button
                   type="button"
                   className={cn(
-                    'fixed right-4 bottom-4 z-50 grid size-11 cursor-pointer place-items-center rounded-full border-2 border-blueprint/40 bg-background text-muted-foreground shadow-lg transition-colors hover:bg-muted hover:text-foreground',
+                    'fixed right-4 bottom-4 z-50 grid size-11 max-sm:bottom-20 cursor-pointer place-items-center rounded-full border-2 border-blueprint/40 bg-background text-muted-foreground shadow-lg transition-colors hover:bg-muted hover:text-foreground',
                     !complete && 'text-primary',
                     activePrompt && 'ring-4 ring-primary/20',
                     complete && 'invisible pointer-events-none',

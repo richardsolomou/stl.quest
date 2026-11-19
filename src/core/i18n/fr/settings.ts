@@ -2,13 +2,14 @@ import type { settings as en } from '../en/settings'
 
 export const settings: typeof en = {
   board: {
-    title: 'Tableau',
+    title: 'Général',
     description:
       'Choisissez comment les demandes sont partagées entre administrateurs et demandeurs, et quand les impressions terminées quittent le tableau.',
     loading: 'Chargement des paramètres du tableau…',
     loadError: 'Impossible de charger les paramètres du tableau',
     previousSettingKept: 'Le tableau utilise toujours le réglage précédent. Réessayez dans un instant.',
     visibility: {
+      title: 'Visibilité',
       label: 'Visibilité des demandes',
       shared: 'Partagée — tout le monde voit toutes les demandes',
       private: 'Privée — les demandeurs ne voient que les leurs',
@@ -46,9 +47,8 @@ export const settings: typeof en = {
     },
   },
   sections: {
-    label: 'Sections des paramètres de l’espace de travail',
     workspaceFallback: 'Espace de travail',
-    board: 'Tableau',
+    board: 'Général',
     printers: 'Imprimantes',
     users: 'Membres',
     email: 'E-mail',
@@ -442,14 +442,14 @@ export const settings: typeof en = {
   },
   about: {
     title: 'À propos',
-    description: 'Informations sur le projet, liens communautaires et licence.',
     version: (version: string) => `Version ${version}`,
     tagline: 'Une file d’attente privée de demandes et de production d’impressions 3D pour imprimantes résine et filament.',
     links: 'Liens du projet',
-    website: { link: 'Site web', description: 'Visiter le site officiel de STL Quest' },
+    website: { description: 'Visiter le site officiel de STL Quest' },
     source: { title: 'Code source', description: 'Obtenir le code source correspondant à cette version' },
     issues: { title: 'Problèmes et idées', description: 'Signaler un bogue ou proposer une amélioration' },
     releases: { title: 'Notes de version', description: 'Voir ce qui a changé entre les versions' },
+    licenseTitle: 'Licence',
     license:
       'STL Quest est open source sous licence GNU Affero General Public License v3.0. Les utilisateurs hébergés et auto-hébergés peuvent obtenir le code source correspondant ci-dessus, et la télémétrie anonyme peut être désactivée à tout moment.',
   },
@@ -540,6 +540,7 @@ export const settings: typeof en = {
       `Hébergé par STL Quest. ${freePlan ? 'Votre formule Gratuite' : 'Votre formule'} inclut ${quota} au total pour les modèles, aperçus et miniatures, partagés entre tous vos espaces de travail. Rien d’autre à configurer.`,
   },
   selfSignup: {
+    title: 'Inscription',
     label: 'Autoriser l’inscription libre',
     description:
       'Lorsque cette option est désactivée, un compte ne peut être créé que via un lien d’invitation ou avec « Ajouter un utilisateur ».',

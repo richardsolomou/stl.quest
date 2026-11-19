@@ -4,7 +4,7 @@ export const calculator: typeof en = {
   defaultPowerBasis:
     'Standardschätzung; geben Sie im Modus „Benutzerdefiniert“ die gemessene Leistung ein, um ein genaueres Angebot zu erhalten',
   title: 'Druckkostenrechner',
-  loadingDescription: 'Ermitteln Sie einen groben Preis für einen Harz- oder FDM-Druck, ohne ihn einer Anfrage zuzuordnen.',
+  loadingDescription: 'Ermitteln Sie einen groben Preis für einen Harz- oder Filamentdruck, ohne ihn einer Anfrage zuzuordnen.',
   description:
     'Ein privater Notizblock für die Preiskalkulation. Geben Sie die Summen aus Ihrem Slicer ein; nichts hier wird einer Anfrage zugeordnet.',
   loading: 'Rechner wird geladen…',
@@ -17,7 +17,7 @@ export const calculator: typeof en = {
     title: 'Geslicter Auftrag',
     printType: 'Druckart',
     resin: 'Harz',
-    filament: 'FDM',
+    filament: 'Filament',
     expectedMaterial: 'Erwartetes Material',
     materialUnit: 'Materialeinheit',
     grams: 'Gramm',
@@ -29,6 +29,8 @@ export const calculator: typeof en = {
     handsOnHint: 'Entfernen von Stützen, Reinigung, Montage und weitere Zeit, die Sie für den Auftrag aufwenden.',
   },
   quote: {
+    emptyHint: 'Geben Sie Material und Druckzeit aus Ihrem Slicer ein, um einen Preis zu sehen.',
+    copyPrice: 'Preis kopieren',
     title: 'Grobes Angebot',
     priceMode: 'Preismodus',
     modes: {
@@ -51,6 +53,11 @@ export const calculator: typeof en = {
     estimatedCost: 'Geschätzte Kosten',
   },
   setup: {
+    edit: 'Einrichtung bearbeiten',
+    done: 'Fertig',
+    discard: 'Änderungen verwerfen',
+    unsaved: 'Ungespeicherte Änderungen',
+    summary: { printer: 'Drucker', labour: 'Arbeit', margin: 'Marge' },
     title: 'Gespeicherte Einrichtung',
     description:
       'Diese Standardwerte gehören zu diesem Arbeitsbereich und bleiben beim nächsten Mal erhalten. Die Auftragswerte oben bleiben ein Notizblock zum Wegwerfen.',
@@ -135,7 +142,7 @@ export const calculator: typeof en = {
     includedInPrinter: 'in der Druckerleistung enthalten',
     printer: 'Drucker',
     resinPrinterSearch: 'Harzdrucker suchen…',
-    filamentPrinterSearch: 'FDM-Drucker suchen…',
+    filamentPrinterSearch: 'Filamentdrucker suchen…',
     printerEmpty: 'Keine passende Druckervorgabe.',
     printerCount: (count: number) => `${count} Drucker aus dem Hauptdruckerkatalog verfügbar.`,
     accessories: 'Zubehör',

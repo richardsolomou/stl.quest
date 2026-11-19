@@ -2,7 +2,6 @@ const workspaces = (count: number) => (count === 1 ? 'workspace' : 'workspaces')
 
 export const superAdmin = {
   nav: {
-    label: 'Super admin sections',
     overview: 'Overview',
     users: 'Users',
     workspaces: 'Workspaces',

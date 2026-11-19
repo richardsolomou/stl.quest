@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react'
+import { type ComponentProps, type ReactNode, useState } from 'react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { Archive, Calculator, HardDrive, LayoutDashboard, Settings } from 'lucide-react'
@@ -6,6 +6,7 @@ import { buttonVariants } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import type { Identity } from '../../core/types'
 import { AccountMenu } from './AccountMenu'
 import { RailBrand } from './Brand'
 import { useI18n } from '../i18n'
@@ -13,25 +14,55 @@ import { sessionQuery } from '../queries'
 import { useWorkspaceSlug } from '../workspace'
 import { formatBytes } from '../../core/format'
 import { nextStoragePlan, storageUsageLevel } from '../../core/plans'
-import { ProductTour } from './ProductTour'
+import { useReleaseUpdate } from './ReleaseUpdateNotice'
 
-export type AppView = 'board' | 'archive' | 'calculator' | 'settings' | 'account' | 'admin'
+export type AppView = 'board' | 'archive' | 'calculator' | 'settings'
 
-export function AppRail({
-  active,
-  isAdmin,
-  isSuperAdmin = false,
-  navigationEnabled = true,
-}: {
-  active: AppView
-  isAdmin: boolean
-  isSuperAdmin?: boolean
-  navigationEnabled?: boolean
-}) {
+type Destination = {
+  view: AppView
+  label: string
+  icon: ReactNode
+  to: '/' | '/archive' | '/calculator' | '/settings/$section' | '/account'
+}
+
+// Settings is one hub for everyone: admins land on their workspace, everyone else on their own account.
+function useDestinations(identity: Identity): Destination[] {
   const { t } = useI18n()
+  const isAdmin = identity.role === 'admin'
+  return [
+    { view: 'board', label: t.shell.rail.board, icon: <LayoutDashboard />, to: '/' },
+    { view: 'archive', label: t.shell.rail.archive, icon: <Archive />, to: '/archive' },
+    ...(isAdmin ? [{ view: 'calculator', label: t.shell.rail.calculator, icon: <Calculator />, to: '/calculator' } as const] : []),
+    { view: 'settings', label: t.shell.rail.settings, icon: <Settings />, to: isAdmin ? '/settings/$section' : '/account' },
+  ]
+}
+
+function DestinationLink({ destination, ...props }: { destination: Destination } & Omit<ComponentProps<'a'>, 'href'>) {
+  return destination.to === '/settings/$section' ? (
+    <Link to={destination.to} params={{ section: 'board' }} {...props} />
+  ) : (
+    <Link to={destination.to} {...props} />
+  )
+}
+
+function UpdateDot({ identity }: { identity: Identity }) {
+  const { t } = useI18n()
+  const update = useReleaseUpdate(identity.superAdmin ?? false)
+  if (!update) return null
+  return (
+    <>
+      <span className="absolute top-1 right-1 size-2 rounded-full bg-primary ring-2 ring-background" aria-hidden="true" />
+      <span className="sr-only">{t.shell.rail.updateAvailable(update.latestVersion)}</span>
+    </>
+  )
+}
+
+export function AppRail({ active, identity, navigationEnabled }: { active: AppView; identity: Identity; navigationEnabled: boolean }) {
+  const { t } = useI18n()
+  const destinations = useDestinations(identity)
   return (
     <aside
-      className="flex w-14 shrink-0 flex-col items-center gap-5 border-r-2 border-dashed border-blueprint/25 bg-background py-4"
+      className="flex w-14 shrink-0 flex-col items-center gap-5 border-r-2 border-dashed border-blueprint/25 bg-background py-4 max-sm:hidden"
       data-hydrated={navigationEnabled}
     >
       {navigationEnabled ? (
@@ -44,35 +75,80 @@ export function AppRail({
         </span>
       )}
       <nav className="flex flex-1 flex-col items-center gap-1" aria-label={t.shell.rail.mainNavigation}>
-        <RailLink active={active === 'board'} enabled={navigationEnabled} to="/" label={t.shell.rail.board} icon={<LayoutDashboard />} />
-        <RailLink active={active === 'archive'} enabled={navigationEnabled} to="/archive" label={t.shell.rail.archive} icon={<Archive />} />
-        {isAdmin && (
-          <>
-            <RailLink
-              active={active === 'calculator'}
-              enabled={navigationEnabled}
-              to="/calculator"
-              label={t.shell.rail.calculator}
-              icon={<Calculator />}
-            />
-            <RailLink
-              active={active === 'settings'}
-              enabled={navigationEnabled}
-              to="/settings/$section"
-              label={t.shell.rail.settings}
-              icon={<Settings />}
-            />
-          </>
-        )}
+        {destinations.map((destination) => {
+          const current = destination.view === active
+          return (
+            <Tooltip key={destination.view}>
+              <TooltipTrigger
+                render={
+                  <DestinationLink
+                    destination={destination}
+                    className={cn(
+                      'relative grid size-9 place-items-center rounded-lg text-muted-foreground transition-colors [&>svg]:size-[18px] hover:bg-muted hover:text-foreground',
+                      current && 'bg-primary/15 text-primary hover:bg-primary/15 hover:text-primary',
+                      !navigationEnabled && 'pointer-events-none opacity-50',
+                    )}
+                    aria-current={current ? 'page' : undefined}
+                    aria-label={destination.label}
+                  />
+                }
+              >
+                {destination.icon}
+                {destination.view === 'settings' && <UpdateDot identity={identity} />}
+              </TooltipTrigger>
+              <TooltipContent side="right">{destination.label}</TooltipContent>
+            </Tooltip>
+          )
+        })}
       </nav>
-      {navigationEnabled && <StorageRemaining />}
-      <AccountMenu isSuperAdmin={isSuperAdmin} />
-      {navigationEnabled && <ProductTour isAdmin={isAdmin} />}
+      {navigationEnabled && <StorageRemaining side="right" />}
+      <AccountMenu />
     </aside>
   )
 }
 
-function StorageRemaining() {
+/** The phone layout's navigation: the same destinations as the rail, along the bottom edge where a thumb reaches. */
+export function MobileNav({ active, identity, navigationEnabled }: { active: AppView; identity: Identity; navigationEnabled: boolean }) {
+  const { t } = useI18n()
+  const destinations = useDestinations(identity)
+  return (
+    <nav
+      className="flex shrink-0 items-stretch border-t-2 border-dashed border-blueprint/25 bg-background px-1 pb-[env(safe-area-inset-bottom)] sm:hidden"
+      aria-label={t.shell.rail.mainNavigation}
+      data-hydrated={navigationEnabled}
+    >
+      {destinations.map((destination) => {
+        const current = destination.view === active
+        return (
+          <DestinationLink
+            key={destination.view}
+            destination={destination}
+            className={cn(
+              'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] leading-none text-muted-foreground no-underline [&>svg]:size-5',
+              current && 'text-primary',
+              !navigationEnabled && 'pointer-events-none opacity-50',
+            )}
+            aria-current={current ? 'page' : undefined}
+          >
+            {destination.icon}
+            <span className="max-w-full truncate">{destination.label}</span>
+            {destination.view === 'settings' && <UpdateDot identity={identity} />}
+          </DestinationLink>
+        )
+      })}
+      {navigationEnabled && (
+        <div className="flex flex-1 items-center justify-center empty:hidden">
+          <StorageRemaining side="top" />
+        </div>
+      )}
+      <div className="flex flex-1 items-center justify-center">
+        <AccountMenu side="top" align="end" />
+      </div>
+    </nav>
+  )
+}
+
+function StorageRemaining({ side }: { side: 'right' | 'top' }) {
   const { t, locale } = useI18n()
   const workspaceSlug = useWorkspaceSlug()
   const { data } = useSuspenseQuery(sessionQuery(workspaceSlug))
@@ -119,12 +195,12 @@ function StorageRemaining() {
           <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-destructive ring-2 ring-background" aria-hidden="true" />
         )}
       </PopoverTrigger>
-      <PopoverContent side="right" align="end" sideOffset={12} className="w-64 max-w-[calc(100vw-1rem)] gap-3 p-3">
+      <PopoverContent side={side} align="end" sideOffset={12} className="w-64 max-w-[calc(100vw-1rem)] gap-3 p-3">
         <span className="self-start rounded-sm border-2 border-blueprint/30 bg-background px-2 py-0.5 font-heading text-[11px] font-semibold tracking-[0.08em] text-foreground uppercase">
           {t.shell.rail.includedStorage}
         </span>
         <div className="flex items-baseline justify-between gap-2">
-          <span className="font-heading text-xl leading-none">{formatBytes(usedBytes, locale)}</span>
+          <span className="font-mono text-xl leading-none">{formatBytes(usedBytes, locale)}</span>
           <span className="text-xs text-muted-foreground">{t.shell.rail.storageUsedOf(formatBytes(usage.quotaBytes, locale))}</span>
         </div>
         <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
@@ -141,47 +217,5 @@ function StorageRemaining() {
         </div>
       </PopoverContent>
     </Popover>
-  )
-}
-
-function RailLink({
-  active,
-  enabled,
-  to,
-  label,
-  icon,
-}: {
-  active: boolean
-  enabled: boolean
-  to: '/' | '/archive' | '/calculator' | '/settings/$section'
-  label: string
-  icon: ReactNode
-}) {
-  const className = cn(
-    'grid size-9 place-items-center rounded-lg text-muted-foreground transition-colors [&>svg]:size-[18px] hover:bg-muted hover:text-foreground',
-    active && 'bg-primary/15 text-primary hover:bg-primary/15 hover:text-primary',
-    !enabled && 'pointer-events-none opacity-50',
-  )
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          to === '/settings/$section' ? (
-            <Link
-              to={to}
-              params={{ section: 'board' }}
-              className={className}
-              aria-current={active ? 'page' : undefined}
-              aria-label={label}
-            />
-          ) : (
-            <Link to={to} className={className} aria-current={active ? 'page' : undefined} aria-label={label} />
-          )
-        }
-      >
-        {icon}
-      </TooltipTrigger>
-      <TooltipContent side="right">{label}</TooltipContent>
-    </Tooltip>
   )
 }

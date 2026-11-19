@@ -31,7 +31,7 @@ import { QueryState } from '../QueryState'
 import { ServerFolderPicker } from '../ServerFolderPicker'
 import { useWorkspaceSlug } from '../../workspace'
 import { useI18n } from '../../i18n'
-import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { PageHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { SettingNotice, errorNotice, successNotice, type Notice } from '../SettingNotice'
 import { CloudStorageAppDialog } from './CloudStorageAppDialog'
 import { StorageChangeDialog } from './StorageChangeDialog'
@@ -79,7 +79,7 @@ export function StoragePane({
     if (onboarding) return state
     return (
       <SettingsPage>
-        <SettingsHeader title={t.pane.title} description={t.pane.loadingDescription} />
+        <PageHeader title={t.pane.title} description={t.pane.loadingDescription} />
         {state}
       </SettingsPage>
     )
@@ -400,9 +400,9 @@ function StorageForm({
   if (!onboarding && !storageChoice && !pickerBlockedByMigration) {
     return (
       <SettingsPage>
-        <SettingsHeader title={t.pane.title} description={t.pane.description(storageChoices)} />
+        <PageHeader title={t.pane.title} description={t.pane.description(storageChoices)} />
         {migrationBanner && <SettingsSection>{migrationBanner}</SettingsSection>}
-        <SettingsSection>{providerPicker}</SettingsSection>
+        <SettingsSection title={t.picker.locationTitle}>{providerPicker}</SettingsSection>
       </SettingsPage>
     )
   }
@@ -613,7 +613,7 @@ function StorageForm({
 
   return (
     <SettingsPage>
-      <SettingsHeader title={t.pane.title} description={t.pane.description(storageChoices)} />
+      <PageHeader title={t.pane.title} description={t.pane.description(storageChoices)} />
       <SettingsSection>{formContent}</SettingsSection>
     </SettingsPage>
   )

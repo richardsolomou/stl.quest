@@ -36,7 +36,7 @@ import { SettingRow } from '../SettingRow'
 import { useWorkspaceSlug } from '../../workspace'
 import { QueryState } from '../QueryState'
 import { SettingNotice, errorNotice } from '../SettingNotice'
-import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { PageHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { SmtpDialog } from './SmtpIntegrationSettings'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 import { useI18n } from '../../i18n'
@@ -65,7 +65,7 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
   if (!query.data) {
     return (
       <SettingsPage>
-        <SettingsHeader title={copy.title} description={copy.description} />
+        <PageHeader title={copy.title} description={copy.description} />
         <QueryState
           loading={query.isPending}
           error={query.error}
@@ -99,7 +99,7 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
 
   return (
     <SettingsPage>
-      <SettingsHeader title={copy.title} description={copy.description} />
+      <PageHeader title={copy.title} description={copy.description} />
       <SettingsSection title={copy.logo.title} description={copy.logo.description(MAX_EMAIL_LOGO_BYTES / 1024)}>
         <input
           ref={input}

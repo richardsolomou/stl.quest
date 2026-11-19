@@ -17,7 +17,7 @@ import { signalProductTourProgress } from '../../productTour'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { QueryState } from '../QueryState'
 import { SettingNotice, errorNotice } from '../SettingNotice'
-import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { PageHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 import { useI18n } from '../../i18n'
 
@@ -54,7 +54,7 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
   if (!current) {
     return (
       <SettingsPage>
-        <SettingsHeader title={copy.title} description={copy.description} />
+        <PageHeader title={copy.title} description={copy.description} />
         <QueryState
           loading={query.isPending}
           error={query.error}
@@ -68,8 +68,8 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
 
   return (
     <SettingsPage>
-      <SettingsHeader title={copy.title} description={copy.description} />
-      <SettingsSection>
+      <PageHeader title={copy.title} description={copy.description} />
+      <SettingsSection title={copy.visibility.title}>
         <Field>
           <FieldLabel htmlFor="board-visibility">{copy.visibility.label}</FieldLabel>
           <Select

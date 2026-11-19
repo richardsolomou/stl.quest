@@ -5,7 +5,7 @@ import { usePostHog } from '@posthog/react'
 import { useDropzone } from 'react-dropzone'
 import { Link2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import { FieldError } from '@/components/ui/field'
 import { Empty, EmptyDescription } from '@/components/ui/empty'
 import { Input } from '@/components/ui/input'
@@ -281,30 +281,32 @@ export function UploadForm({
   return (
     <>
       <DialogShell onClose={requestClose} title={t.requests.upload.title} description={t.requests.upload.description} preventClose={busy}>
-        {/* Choosing a mode is not the action that commits, so the selected segment is raised, not amber. */}
-        <fieldset className="m-0 grid grid-cols-2 rounded-lg bg-muted p-1">
-          <legend className="sr-only">{t.requests.upload.modeLegend}</legend>
-          <Button
-            type="button"
-            variant="ghost"
-            aria-pressed={mode === 'upload'}
-            className={cn(mode === 'upload' && 'bg-accent text-foreground ring-1 ring-foreground/10 hover:bg-accent')}
-            disabled={!uploadsEnabled}
-            title={uploadsEnabled ? undefined : t.requests.upload.uploadsUnavailable}
-            onClick={() => setMode('upload')}
-          >
-            <Upload /> {t.requests.upload.uploadFiles}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            aria-pressed={mode === 'link'}
-            className={cn(mode === 'link' && 'bg-accent text-foreground ring-1 ring-foreground/10 hover:bg-accent')}
-            onClick={() => setMode('link')}
-          >
-            <Link2 /> {t.requests.upload.addFromLink}
-          </Button>
-        </fieldset>
+        <SegmentedControl
+          legend={t.requests.upload.modeLegend}
+          value={mode}
+          className="[&_svg]:max-[380px]:hidden"
+          options={[
+            {
+              value: 'upload',
+              label: (
+                <>
+                  <Upload /> {t.requests.upload.uploadFiles}
+                </>
+              ),
+              disabled: !uploadsEnabled,
+              title: uploadsEnabled ? undefined : t.requests.upload.uploadsUnavailable,
+            },
+            {
+              value: 'link',
+              label: (
+                <>
+                  <Link2 /> {t.requests.upload.addFromLink}
+                </>
+              ),
+            },
+          ]}
+          onChange={setMode}
+        />
 
         {mode === 'link' ? (
           <LinkedRequestForm

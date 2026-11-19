@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { createColumnHelper } from '@tanstack/react-table'
-import { Ellipsis, Eye, ShieldCheck, Trash2 } from 'lucide-react'
+import { Ellipsis, Eye, Send, ShieldCheck, Trash2, UserPlus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
@@ -25,7 +25,7 @@ import { QueryState } from '../QueryState'
 import { ProtectedEmail } from '../ProtectedEmail'
 import { UserTableIdentity, userEmailColumnMeta } from '../UserTableIdentity'
 import { UserSummary } from '../UserSummary'
-import { SettingsActions, SettingsHeader, SettingsPage, SettingsTableSection } from './SettingsLayout'
+import { PageHeader, SettingsPage, SettingsTableSection } from './SettingsLayout'
 import { InviteDialog, PendingInvites } from './WorkspaceInvites'
 import { SuperAdminAddMemberForm } from './SuperAdminAddMemberForm'
 import { useI18n } from '../../i18n'
@@ -53,7 +53,7 @@ export function UsersPane({ me }: { me: Identity }) {
   if (!users || !session) {
     return (
       <SettingsPage>
-        <SettingsHeader title={copy.title} description={copy.description} />
+        <PageHeader title={copy.title} description={copy.description} />
         <QueryState
           loading={usersResult.isPending || sessionResult.isPending}
           error={usersResult.error ?? sessionResult.error}
@@ -66,7 +66,24 @@ export function UsersPane({ me }: { me: Identity }) {
   }
   return (
     <SettingsPage>
-      <SettingsHeader title={copy.title} description={copy.description} />
+      <PageHeader
+        title={copy.title}
+        description={copy.description}
+        actions={
+          <>
+            {me.superAdmin && me.workspaceId && (
+              <Button type="button" variant="outline" onClick={() => setAdding(true)}>
+                <UserPlus />
+                {t.superAdmin.workspaceDetails.addUser}
+              </Button>
+            )}
+            <Button type="button" data-onboarding="invite" onClick={() => setInviting(true)}>
+              <Send />
+              {copy.invite}
+            </Button>
+          </>
+        }
+      />
       <SettingsTableSection>
         <DataTable
           columns={userColumns({
@@ -103,16 +120,6 @@ export function UsersPane({ me }: { me: Identity }) {
           <SuperAdminAddMemberForm workspace={{ id: me.workspaceId, members: users }} onAdded={() => setAdding(false)} />
         </DialogShell>
       )}
-      <SettingsActions>
-        {me.superAdmin && me.workspaceId && (
-          <Button type="button" onClick={() => setAdding(true)}>
-            {t.superAdmin.workspaceDetails.addUser}
-          </Button>
-        )}
-        <Button type="button" data-onboarding="invite" onClick={() => setInviting(true)}>
-          {copy.invite}
-        </Button>
-      </SettingsActions>
       <PendingInvites />
     </SettingsPage>
   )

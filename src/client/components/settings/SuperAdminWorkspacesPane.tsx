@@ -6,7 +6,7 @@ import { useI18n } from '../../i18n'
 import { adminWorkspacesQuery } from '../../queries'
 import { QueryState } from '../QueryState'
 import { SettingNotice, successNotice, type Notice } from '../SettingNotice'
-import { SettingsHeader, SettingsPage, SettingsTableSection } from './SettingsLayout'
+import { PageHeader, SettingsPage, SettingsTableSection } from './SettingsLayout'
 import { DeleteWorkspaceDialog } from './SuperAdminDeleteWorkspaceDialog'
 import { SuperAdminWorkspaceDialog } from './SuperAdminWorkspaceDialog'
 import { adminWorkspaceHealthOptions, superAdminWorkspaceColumns } from './SuperAdminWorkspacesTable'
@@ -22,7 +22,7 @@ export function SuperAdminWorkspacesPane() {
   if (!workspaces) {
     return (
       <SettingsPage>
-        <SettingsHeader title={copy.title} description={copy.description} />
+        <PageHeader title={copy.title} description={copy.description} />
         <QueryState
           loading={query.isPending}
           error={query.error}
@@ -36,7 +36,7 @@ export function SuperAdminWorkspacesPane() {
 
   return (
     <SettingsPage>
-      <SettingsHeader title={copy.title} description={copy.description} />
+      <PageHeader title={copy.title} description={copy.description} />
       <SettingNotice notice={notice} />
       <SettingsTableSection>
         <DataTable

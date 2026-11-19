@@ -1,11 +1,12 @@
 export const settings = {
   board: {
-    title: 'Board',
+    title: 'General',
     description: 'Control how requests are shared between admins and requesters, and when finished prints leave the board.',
     loading: 'Loading board settings…',
     loadError: 'Could not load board settings',
     previousSettingKept: 'The board is still using the previous setting. Try again in a moment.',
     visibility: {
+      title: 'Visibility',
       label: 'Request visibility',
       shared: 'Shared — everyone sees every request',
       private: 'Private — requesters see only their own',
@@ -42,9 +43,8 @@ export const settings = {
     },
   },
   sections: {
-    label: 'Workspace settings sections',
     workspaceFallback: 'Workspace',
-    board: 'Board',
+    board: 'General',
     printers: 'Printers',
     users: 'Members',
     email: 'Email',
@@ -435,14 +435,14 @@ export const settings = {
   },
   about: {
     title: 'About',
-    description: 'Project information, community links, and licensing.',
     version: (version: string) => `Version ${version}`,
     tagline: 'A private 3D-print request and production queue for resin and filament printers.',
     links: 'Project links',
-    website: { link: 'Website', description: 'Visit the official STL Quest website' },
+    website: { description: 'Visit the official STL Quest website' },
     source: { title: 'Source code', description: 'Get the corresponding source code for this version' },
     issues: { title: 'Issues and ideas', description: 'Report a bug or suggest an improvement' },
     releases: { title: 'Release notes', description: 'See what changed between versions' },
+    licenseTitle: 'License',
     license:
       'STL Quest is open source under the GNU Affero General Public License v3.0. Hosted and self-hosted users can obtain the corresponding source code above, and anonymous telemetry can be disabled at any time.',
   },
@@ -532,6 +532,7 @@ export const settings = {
       `Hosted by STL Quest. ${freePlan ? 'Your Free plan' : 'Your plan'} includes ${quota} total for models, previews, and thumbnails, shared across all your workspaces. Nothing else to configure.`,
   },
   selfSignup: {
+    title: 'Sign-up',
     label: 'Allow self-signup',
     description: 'When this is off, people can only create an account from an invite link or through Add user.',
     notSaved: 'That preference was not saved',

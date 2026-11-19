@@ -1,12 +1,9 @@
-import { Link } from '@tanstack/react-router'
-import { cn } from '@/lib/utils'
 import type { Identity } from '../../core/types'
 import { BoardPane } from './settings/BoardPane'
 import { EmailPane } from './settings/EmailPane'
 import { PrintersPane } from './settings/PrintersPane'
 import { StoragePane } from './settings/StoragePane'
 import { UsersPane } from './settings/UsersPane'
-import { useI18n } from '../i18n'
 
 export const settingsSections = ['board', 'printers', 'users', 'email', 'storage'] as const
 export type SettingsSection = (typeof settingsSections)[number]
@@ -26,35 +23,16 @@ export function SettingsPanes({
   workspaceName: string
   workspaceCount: number
 }) {
-  const { t } = useI18n()
-  return (
-    <div className="grid items-start gap-6 sm:grid-cols-[170px_1fr]">
-      <nav
-        className="sticky top-6 flex flex-col gap-0.5 border-r-2 border-dashed border-blueprint/25 pr-3 max-sm:static max-sm:flex-row max-sm:overflow-x-auto max-sm:border-r-0 max-sm:border-b-2 max-sm:pb-2.5 max-sm:[mask-image:linear-gradient(to_right,black_calc(100%-2rem),transparent)] max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden"
-        aria-label={t.settings.sections.label}
-      >
-        <p className="truncate px-3 pb-1 text-xs font-medium text-muted-foreground max-sm:hidden">{workspaceName}</p>
-        {settingsSections.map((id) => (
-          <Link
-            key={id}
-            to="/settings/$section"
-            params={{ section: id }}
-            className={cn(
-              'w-full justify-start rounded-sm border-l-2 border-transparent px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-sm:w-auto max-sm:shrink-0 max-sm:border-l-0 max-sm:border-b-2',
-              section === id && 'border-primary bg-primary/10 font-medium text-primary hover:bg-primary/10 hover:text-primary',
-            )}
-          >
-            {t.settings.sections[id]}
-          </Link>
-        ))}
-      </nav>
-      <div className="min-w-0">
-        {section === 'board' && <BoardPane me={me} workspaceName={workspaceName} workspaceCount={workspaceCount} />}
-        {section === 'printers' && <PrintersPane />}
-        {section === 'users' && <UsersPane me={me} />}
-        {section === 'email' && <EmailPane workspaceName={workspaceName} />}
-        {section === 'storage' && <StoragePane />}
-      </div>
-    </div>
-  )
+  switch (section) {
+    case 'board':
+      return <BoardPane me={me} workspaceName={workspaceName} workspaceCount={workspaceCount} />
+    case 'printers':
+      return <PrintersPane />
+    case 'users':
+      return <UsersPane me={me} />
+    case 'email':
+      return <EmailPane workspaceName={workspaceName} />
+    case 'storage':
+      return <StoragePane />
+  }
 }

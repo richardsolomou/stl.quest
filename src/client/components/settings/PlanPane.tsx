@@ -7,7 +7,7 @@ import { storagePlans, type StoragePlan } from '../../../core/plans'
 import { authClient } from '../../authClient'
 import { planOverviewQuery } from '../../queries'
 import { planSummary } from './planCopy'
-import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { PageHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { useI18n } from '../../i18n'
 
 export function PlanPane() {
@@ -50,14 +50,14 @@ export function PlanPane() {
   if (!data.available) {
     return (
       <SettingsPage>
-        <SettingsHeader title={copy.title} description={copy.unavailable} />
+        <PageHeader title={copy.title} description={copy.unavailable} />
       </SettingsPage>
     )
   }
 
   return (
     <SettingsPage>
-      <SettingsHeader title={copy.title} description={copy.description} />
+      <PageHeader title={copy.title} description={copy.description} />
       <SettingsSection title={copy.names[plan]} description={planSummary(data.subscription, plan, t, locale)}>
         <AllowanceBreakdown quotaBytes={data.quotaBytes} workspaces={data.workspaces} />
         {paid && <p className="text-sm text-muted-foreground">{copy.downgradeNote}</p>}

@@ -1,7 +1,7 @@
 export const calculator = {
   defaultPowerBasis: 'default estimate; enter measured power in Custom mode for a closer quote',
   title: 'Print calculator',
-  loadingDescription: 'Work out a rough resin or FDM print price without attaching it to a request.',
+  loadingDescription: 'Work out a rough resin or filament print price without attaching it to a request.',
   description: 'A private pricing scratchpad. Enter the totals from your slicer; nothing here is attached to a request.',
   loading: 'Loading calculator…',
   loadError: 'Could not load the calculator',
@@ -13,7 +13,7 @@ export const calculator = {
     title: 'Sliced job',
     printType: 'Print type',
     resin: 'Resin',
-    filament: 'FDM',
+    filament: 'Filament',
     expectedMaterial: 'Expected material',
     materialUnit: 'Material unit',
     grams: 'grams',
@@ -25,6 +25,8 @@ export const calculator = {
     handsOnHint: 'Support removal, cleaning, assembly, and other time you spend on the job.',
   },
   quote: {
+    emptyHint: "Enter your slicer's material and print time to see a price.",
+    copyPrice: 'Copy price',
     title: 'Rough quote',
     priceMode: 'Price mode',
     modes: {
@@ -47,6 +49,11 @@ export const calculator = {
     estimatedCost: 'Estimated cost',
   },
   setup: {
+    edit: 'Edit setup',
+    done: 'Done',
+    discard: 'Discard changes',
+    unsaved: 'Unsaved changes',
+    summary: { printer: 'Printer', labour: 'Labour', margin: 'Margin' },
     title: 'Saved setup',
     description: 'These defaults belong to this workspace and will be here next time. Job values above remain a disposable scratchpad.',
     save: 'Save setup',
@@ -124,7 +131,7 @@ export const calculator = {
     includedInPrinter: 'included in printer power',
     printer: 'Printer',
     resinPrinterSearch: 'Search resin printers…',
-    filamentPrinterSearch: 'Search FDM printers…',
+    filamentPrinterSearch: 'Search filament printers…',
     printerEmpty: 'No matching printer preset.',
     printerCount: (count: number) => `${count} printers available from the main printer catalogue.`,
     accessories: 'Accessories',

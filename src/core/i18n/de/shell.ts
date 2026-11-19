@@ -18,6 +18,18 @@ export const shell: typeof en = {
     storageNearlyFull: 'Der Speicher ist fast voll.',
     upgradeTo: (plan) => `Auf ${plan} upgraden`,
     viewPlan: 'Tarif ansehen',
+    updateAvailable: (version) => `STL Quest v${version} ist verfügbar`,
+  },
+  settingsNav: {
+    label: 'Einstellungsbereiche',
+    choose: 'Einstellungsbereich wählen',
+    workspace: 'Arbeitsbereich',
+    you: 'Persönlich',
+    server: 'Server',
+    product: 'STL Quest',
+    account: 'Konto',
+    plan: 'Tarif',
+    about: 'Über',
   },
   setup: {
     steps: { storage: 'Speicher', printers: 'Drucker' },

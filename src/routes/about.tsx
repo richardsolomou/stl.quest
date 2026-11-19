@@ -1,9 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { AccountRouteShell } from '../client/components/AccountRouteShell'
 import { AboutPane } from '../client/components/settings/AboutPane'
+import { SettingsShell } from '../client/components/settings/SettingsShell'
 
 export const Route = createFileRoute('/about')({ component: AboutPage })
 
 function AboutPage() {
-  return <AccountRouteShell>{() => <AboutPane />}</AccountRouteShell>
+  return (
+    <SettingsShell current={{ kind: 'about' }}>
+      <AboutPane />
+    </SettingsShell>
+  )
 }

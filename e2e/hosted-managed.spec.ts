@@ -52,8 +52,12 @@ test('shares included storage across three hosted workspaces and enforces the ow
   await expect(page.getByRole('link', { name: 'Hosted Owner' })).toHaveCount(0)
   await screenshot(page, 'hosted-account-menu')
   await page.keyboard.press('Escape')
+  // Phones open a different menu button, so let this menu finish closing before the rail it belongs to disappears.
+  await expect(page.getByRole('link', { name: 'Plan Free' })).toBeHidden()
 
   await page.setViewportSize({ width: 320, height: 720 })
+  // The rail is hidden on phones, so the bottom bar carries the storage meter and its full-storage warning.
+  await expect(page.getByRole('button', { name: /storage available/ })).toBeVisible()
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await expect(page.getByRole('link', { name: 'Plan Free' })).toBeVisible()
   await screenshot(page, 'hosted-account-menu-mobile')
@@ -78,7 +82,7 @@ test('shares included storage across three hosted workspaces and enforces the ow
   await screenshot(page, 'hosted-account-page', true)
 
   await page.goto('/settings/storage')
-  await expect(page.getByRole('heading', { name: 'Change where your models live' })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Location' })).toBeVisible()
   await expect(page.getByText('0 B used or reserved')).toBeVisible()
   await expect(page.getByText('1.0 GB available')).toBeVisible()
   await screenshot(page, 'hosted-shared-storage', true)
