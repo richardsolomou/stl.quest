@@ -14,7 +14,7 @@ Supplemental resin definitions and images are derived from the pinned [Open Resi
 
 HeyGears printer definitions, build volumes, and product images are synchronized from its official storefront. Selected Phrozen images are synchronized from exact official product pages. Formlabs printer definitions and build volumes are synchronized from its official resin printer tech specs, and its printer images from its official product listing. Manufacturer names, product data, and product images remain the property of their respective owners.
 
-Every synchronized manufacturer image records its source page and original image URL in `catalogs/printers/manufacturer-images.json`. The generated catalog and images are committed so installed applications do not contact these services at runtime.
+Every synchronized manufacturer image records its source page and original image URL in `catalogs/printers/manufacturer-images.json`. Printer images are resized and converted to WebP. The generated catalog and images are committed so installed applications do not contact these services at runtime.
 
 The Open Resin Alliance printer plugin images are licensed under MIT. Their license texts are included in `LICENSES/Open-Resin-Alliance-df-plugin-elegoo-MIT.txt`, `LICENSES/Open-Resin-Alliance-df-plugin-anycubic-MIT.txt`, and `LICENSES/Open-Resin-Alliance-df-plugin-uniformation-MIT.txt`.
 

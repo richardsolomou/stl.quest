@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import path from 'node:path'
+import sharp from 'sharp'
 
 export type CatalogSource = {
   id: string
@@ -160,7 +161,7 @@ export function parseOrcaCatalog(sourceRoot: string, source: CatalogSource, over
       const sourceUrl = `${source.webRepository}/blob/${source.revision}/${encodePath(profilePath)}`
       const image = existsSync(coverPath)
         ? {
-            src: `/printer-presets/orcaslicer/${id}.png`,
+            src: presetImageSrc('orcaslicer', id),
             sourceId: source.id,
             sourceUrl: `${source.webRepository}/blob/${source.revision}/${encodePath(
               path.join(source.catalogPath, path.basename(vendorFile, '.json'), `${modelEntry.name}_cover.png`).replaceAll(path.sep, '/'),
@@ -393,6 +394,20 @@ function stripBrand(name: string, brand: string) {
     if (name.toLocaleLowerCase().startsWith(`${prefix.toLocaleLowerCase()} `)) return name.slice(prefix.length).trim()
   }
   return name
+}
+
+// Presets render at most 56 CSS pixels wide, so 256 pixels stays sharp on high-density screens.
+const PRESET_IMAGE_SIZE = 256
+
+export function presetImageSrc(folder: 'orcaslicer' | 'manufacturer', presetId: string) {
+  return `/printer-presets/${folder}/${presetId}.webp`
+}
+
+export async function writePresetImage(input: Buffer | string, outputPath: string) {
+  await sharp(input)
+    .resize(PRESET_IMAGE_SIZE, PRESET_IMAGE_SIZE, { fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 85 })
+    .toFile(outputPath)
 }
 
 export function printerPresetId(printType: GeneratedPrinterPreset['printType'], brand: string, model: string) {
