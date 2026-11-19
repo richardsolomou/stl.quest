@@ -529,6 +529,22 @@
       "checkedAt": "2026-11-19"
     },
     {
+      "presetId": "resin-phrozen-sonic-mega-8k-s",
+      "sourceId": "phrozen-product-pages",
+      "sourcePageUrl": "https://phrozen3d.com/en/products/sonic-mega-8k-s",
+      "sourceUrl": "https://phrozen3d.com/uploads/Products/products_1400X1600_Printers/Sonic-Mega-8K%20S_1400x1600.webp?v=1743065321964",
+      "src": "/printer-presets/manufacturer/resin-phrozen-sonic-mega-8k-s.webp",
+      "checkedAt": "2026-11-19"
+    },
+    {
+      "presetId": "resin-phrozen-sonic-mega-8k-v2",
+      "sourceId": "phrozen-product-pages",
+      "sourcePageUrl": "https://phrozen3d.com/en/products/sonic-mega-8k-v2",
+      "sourceUrl": "https://phrozen3d.com/uploads/Products/products_1400X1600_Printers/Sonic-Mega-8K-V2_1400x1600.webp",
+      "src": "/printer-presets/manufacturer/resin-phrozen-sonic-mega-8k-v2.webp",
+      "checkedAt": "2026-11-19"
+    },
+    {
       "presetId": "resin-phrozen-sonic-mighty-8k",
       "sourceId": "phrozen-product-pages",
       "sourcePageUrl": "https://phrozen3d.com/en/products/sonic-mighty-8k",
@@ -542,6 +558,22 @@
       "sourcePageUrl": "https://phrozen3d.com/en/products/sonic-mighty-revo",
       "sourceUrl": "https://phrozen3d.com/uploads/Products/products_1400X1600_Printers/Sonic-Mighty-14K-Revo_1400x1600.webp?v=1743063527866",
       "src": "/printer-presets/manufacturer/resin-phrozen-sonic-mighty-revo.webp",
+      "checkedAt": "2026-11-19"
+    },
+    {
+      "presetId": "resin-phrozen-sonic-mighty-revo-16k",
+      "sourceId": "phrozen-product-pages",
+      "sourcePageUrl": "https://phrozen3d.com/en/products/sonic-mighty-16k-printer",
+      "sourceUrl": "https://phrozen-landing.s3.amazonaws.com/uploads/Products/products_1400X1600_Printers/Sonic_Mighty_Revo_16K_1400x1600_01.webp",
+      "src": "/printer-presets/manufacturer/resin-phrozen-sonic-mighty-revo-16k.webp",
+      "checkedAt": "2026-11-19"
+    },
+    {
+      "presetId": "resin-phrozen-sonic-mighty-revo-16k-max",
+      "sourceId": "phrozen-product-pages",
+      "sourcePageUrl": "https://phrozen3d.com/en/products/sonic-mighty-revo-max",
+      "sourceUrl": "https://phrozen3d.com/uploads/Product_2000x2000_%E9%A0%90%E7%86%B1_%E5%96%AE%E6%A9%9F.png",
+      "src": "/printer-presets/manufacturer/resin-phrozen-sonic-mighty-revo-16k-max.webp",
       "checkedAt": "2026-11-19"
     },
     {

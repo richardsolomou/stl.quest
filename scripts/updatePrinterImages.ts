@@ -49,6 +49,7 @@ const checkedAt = new Date().toISOString().slice(0, 10)
 const update = process.argv.includes('--update')
 const shopifyProducts = new Map<string, ShopifyProduct[]>()
 const openResinPrinters = new Map<string, { printer: OpenResinPrinter; definitionPath: string }[]>()
+const webpages = new Map<string, string>()
 
 if (update) {
   for (const source of manifest.sources) {
@@ -60,13 +61,15 @@ const manufacturerPresets: GeneratedPrinterPreset[] = []
 const manufacturerSources: ManufacturerCatalogSource[] = []
 const claimedCatalogPresetIds = new Set(communityPresets.map((preset) => preset.id))
 for (const source of manifest.sources) {
-  if (!source.catalog || source.kind === 'github' || source.kind === 'webpage') continue
+  if (!source.catalog || source.kind === 'github') continue
   const synchronized =
     source.kind === 'open-resin'
       ? await synchronizeGithubCatalog(source)
       : source.kind === 'formlabs'
         ? await synchronizeFormlabsCatalog(source)
-        : await synchronizeShopifyCatalog(source)
+        : source.kind === 'webpage'
+          ? await synchronizeWebpageCatalog(source, claimedCatalogPresetIds)
+          : await synchronizeShopifyCatalog(source)
   for (const preset of synchronized) {
     if (claimedCatalogPresetIds.has(preset.id)) continue
     manufacturerPresets.push(preset)
@@ -80,7 +83,9 @@ for (const source of manifest.sources) {
         ? `https://github.com/${source.repository}`
         : source.kind === 'formlabs'
           ? source.techSpecsUrl
-          : source.storefrontUrl,
+          : source.kind === 'webpage'
+            ? source.siteUrl
+            : source.storefrontUrl,
     revision: source.kind === 'open-resin' ? source.revision : checkedAt,
     license: source.kind === 'open-resin' ? source.license : 'manufacturer product data',
   })
@@ -246,19 +251,40 @@ async function synchronizeGithubImages(source: Extract<ManufacturerImageSource, 
   return synchronizedImages
 }
 
+async function synchronizeWebpageCatalog(source: Extract<ManufacturerImageSource, { kind: 'webpage' }>, claimedIds: Set<string>) {
+  const presets: GeneratedPrinterPreset[] = []
+  for (const [model, sourcePageUrl] of Object.entries(source.pages)) {
+    const id = printerPresetId('resin', source.brand, model)
+    if (claimedIds.has(id)) continue
+    const dimensions = parseBuildVolumeHtml(await loadWebpage(source, sourcePageUrl))
+    if (!dimensions) throw new Error(`${source.id} page for ${model} has no parseable build volume`)
+    presets.push({ id, brand: source.brand, model, printType: 'resin', ...dimensions, source: { id: source.id, url: sourcePageUrl } })
+  }
+  return presets
+}
+
 async function synchronizeWebpageImages(source: Extract<ManufacturerImageSource, { kind: 'webpage' }>, existingPresetIds: Set<string>) {
   const catalogPresetIds = new Set(catalogPresets.map((preset) => preset.id))
   const synchronizedImages: ManufacturerImage[] = []
-  for (const [presetId, sourcePageUrl] of Object.entries(source.pages)) {
+  for (const [model, sourcePageUrl] of Object.entries(source.pages)) {
+    const presetId = printerPresetId('resin', source.brand, model)
     if (!catalogPresetIds.has(presetId) || existingPresetIds.has(presetId)) continue
-    const pageResponse = await fetchWithRetry(sourcePageUrl)
-    if (!pageResponse.ok) throw new Error(`${source.id} page for ${presetId} returned ${pageResponse.status}`)
-    const sourceUrl = extractProductImageUrl(await pageResponse.text(), sourcePageUrl)
-    if (!sourceUrl) throw new Error(`${source.id} page for ${presetId} has no product image`)
+    const sourceUrl = extractProductImageUrl(await loadWebpage(source, sourcePageUrl), sourcePageUrl)
+    if (!sourceUrl) continue
     const src = await downloadPresetImage(source.id, presetId, sourceUrl)
     synchronizedImages.push({ presetId, sourceId: source.id, sourcePageUrl, sourceUrl, src, checkedAt })
   }
   return synchronizedImages
+}
+
+async function loadWebpage(source: Extract<ManufacturerImageSource, { kind: 'webpage' }>, url: string) {
+  const cached = webpages.get(url)
+  if (cached !== undefined) return cached
+  const response = await fetchWithRetry(url)
+  if (!response.ok) throw new Error(`${source.id} page ${url} returned ${response.status}`)
+  const html = await response.text()
+  webpages.set(url, html)
+  return html
 }
 
 async function synchronizeFormlabsCatalog(source: Extract<ManufacturerImageSource, { kind: 'formlabs' }>) {

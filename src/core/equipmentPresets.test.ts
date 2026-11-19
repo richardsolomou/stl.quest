@@ -49,6 +49,10 @@ describe('equipment presets', () => {
     expect(printerPowerProfile('resin-formlabs-form-4')).toMatchObject({ watts: 480, basis: 'rated power' })
   })
 
+  it('applies the sourced Phrozen Sonic Mighty 12K power', () => {
+    expect(printerPowerProfile('resin-phrozen-sonic-mighty-12k')?.watts).toBe(120)
+  })
+
   it('shares rated power between Formlabs plus models and their base models', () => {
     expect(printerPowerProfile('resin-formlabs-form-3b-plus')?.watts).toBe(220)
   })

@@ -71,12 +71,28 @@
       "id": "phrozen-product-pages",
       "kind": "webpage",
       "brand": "Phrozen",
+      "siteUrl": "https://phrozen3d.com",
       "pages": {
-        "resin-phrozen-sonic-mighty-8k": "https://phrozen3d.com/en/products/sonic-mighty-8k",
-        "resin-phrozen-sonic-mighty-revo": "https://phrozen3d.com/en/products/sonic-mighty-revo",
-        "resin-phrozen-sonic-mini-8k": "https://phrozen3d.com/en/products/sonic-mini-8k",
-        "resin-phrozen-sonic-mini-8k-s": "https://phrozen3d.com/en/products/sonic-mini-8k-s"
-      }
+        "Sonic Mega 8K S": "https://phrozen3d.com/en/products/sonic-mega-8k-s",
+        "Sonic Mega 8K V2": "https://phrozen3d.com/en/products/sonic-mega-8k-v2",
+        "Sonic Mighty 8K": "https://phrozen3d.com/en/products/sonic-mighty-8k",
+        "Sonic Mighty Revo": "https://phrozen3d.com/en/products/sonic-mighty-revo",
+        "Sonic Mighty Revo 16K": "https://phrozen3d.com/en/products/sonic-mighty-16k-printer",
+        "Sonic Mighty Revo 16K MAX": "https://phrozen3d.com/en/products/sonic-mighty-revo-max",
+        "Sonic Mini 8K": "https://phrozen3d.com/en/products/sonic-mini-8k",
+        "Sonic Mini 8K S": "https://phrozen3d.com/en/products/sonic-mini-8k-s"
+      },
+      "catalog": {}
+    },
+    {
+      "id": "phrozen-help-center",
+      "kind": "webpage",
+      "brand": "Phrozen",
+      "siteUrl": "https://helpcenter.phrozen3d.com",
+      "pages": {
+        "Sonic Mighty 12K": "https://helpcenter.phrozen3d.com/api/v2/help_center/en-us/articles/28418612363033.json"
+      },
+      "catalog": {}
     },
     {
       "id": "elegoo",

@@ -52,11 +52,13 @@ describe('printer presets', () => {
   })
 
   it('ranks closest matches by how many words they match', () => {
-    expect(
-      filterPrinterPresets('Sonic Mighty 99K')
-        .presets.slice(0, 2)
-        .map((preset) => preset.model),
-    ).toEqual(['Sonic Mighty 4K', 'Sonic Mighty 8K'])
+    expect(filterPrinterPresets('Phrozen Transform 99K').presets[0]?.id).toBe('resin-phrozen-transform')
+  })
+
+  it('suggests sibling models when one word misses', () => {
+    expect(filterPrinterPresets('Sonic Mighty 99K').presets.map((preset) => preset.model)).toEqual(
+      expect.arrayContaining(['Sonic Mighty 8K', 'Sonic Mighty Revo']),
+    )
   })
 
   it('caps the closest matches', () => {
@@ -92,10 +94,19 @@ describe('printer presets', () => {
     ).toEqual(['prusaslicer', 'prusaslicer'])
   })
 
+  it('includes the Phrozen Sonic Mighty 12K build volume from its official specifications', () => {
+    const preset = PRINTER_PRESETS.find((candidate) => candidate.id === 'resin-phrozen-sonic-mighty-12k')
+    expect(preset && [preset.widthMm, preset.depthMm, preset.heightMm]).toEqual([218, 123, 235])
+  })
+
   it('includes official product images for current Phrozen printers', () => {
     expect(PRINTER_PRESETS.filter((preset) => preset.image?.sourceId === 'phrozen-product-pages').map((preset) => preset.id)).toEqual([
+      'resin-phrozen-sonic-mega-8k-s',
+      'resin-phrozen-sonic-mega-8k-v2',
       'resin-phrozen-sonic-mighty-8k',
       'resin-phrozen-sonic-mighty-revo',
+      'resin-phrozen-sonic-mighty-revo-16k',
+      'resin-phrozen-sonic-mighty-revo-16k-max',
       'resin-phrozen-sonic-mini-8k',
       'resin-phrozen-sonic-mini-8k-s',
     ])

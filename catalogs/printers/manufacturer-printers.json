@@ -29,6 +29,20 @@
       "license": "manufacturer product data"
     },
     {
+      "id": "phrozen-product-pages",
+      "kind": "resin",
+      "repository": "https://phrozen3d.com",
+      "revision": "2026-11-19",
+      "license": "manufacturer product data"
+    },
+    {
+      "id": "phrozen-help-center",
+      "kind": "resin",
+      "repository": "https://helpcenter.phrozen3d.com",
+      "revision": "2026-11-19",
+      "license": "manufacturer product data"
+    },
+    {
       "id": "formlabs",
       "kind": "resin",
       "repository": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
@@ -204,6 +218,71 @@
       "source": {
         "id": "heygears",
         "url": "https://store.heygears.com/products/ultracraft-reflex-rs-3d-printer"
+      }
+    },
+    {
+      "id": "resin-phrozen-sonic-mega-8k-s",
+      "brand": "Phrozen",
+      "model": "Sonic Mega 8K S",
+      "printType": "resin",
+      "widthMm": 330,
+      "depthMm": 185,
+      "heightMm": 300,
+      "source": {
+        "id": "phrozen-product-pages",
+        "url": "https://phrozen3d.com/en/products/sonic-mega-8k-s"
+      }
+    },
+    {
+      "id": "resin-phrozen-sonic-mega-8k-v2",
+      "brand": "Phrozen",
+      "model": "Sonic Mega 8K V2",
+      "printType": "resin",
+      "widthMm": 330,
+      "depthMm": 185,
+      "heightMm": 400,
+      "source": {
+        "id": "phrozen-product-pages",
+        "url": "https://phrozen3d.com/en/products/sonic-mega-8k-v2"
+      }
+    },
+    {
+      "id": "resin-phrozen-sonic-mighty-revo-16k",
+      "brand": "Phrozen",
+      "model": "Sonic Mighty Revo 16K",
+      "printType": "resin",
+      "widthMm": 211.68,
+      "depthMm": 118.37,
+      "heightMm": 235,
+      "source": {
+        "id": "phrozen-product-pages",
+        "url": "https://phrozen3d.com/en/products/sonic-mighty-16k-printer"
+      }
+    },
+    {
+      "id": "resin-phrozen-sonic-mighty-revo-16k-max",
+      "brand": "Phrozen",
+      "model": "Sonic Mighty Revo 16K MAX",
+      "printType": "resin",
+      "widthMm": 302.4,
+      "depthMm": 161.98,
+      "heightMm": 300,
+      "source": {
+        "id": "phrozen-product-pages",
+        "url": "https://phrozen3d.com/en/products/sonic-mighty-revo-max"
+      }
+    },
+    {
+      "id": "resin-phrozen-sonic-mighty-12k",
+      "brand": "Phrozen",
+      "model": "Sonic Mighty 12K",
+      "printType": "resin",
+      "widthMm": 218,
+      "depthMm": 123,
+      "heightMm": 235,
+      "source": {
+        "id": "phrozen-help-center",
+        "url": "https://helpcenter.phrozen3d.com/api/v2/help_center/en-us/articles/28418612363033.json"
       }
     },
     {

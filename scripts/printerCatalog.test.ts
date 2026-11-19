@@ -44,6 +44,61 @@ describe('printer catalog synchronization', () => {
     })
   })
 
+  it('parses build volumes from product structured data', () => {
+    expect(parseBuildVolumeHtml('{"@type": "PropertyValue", "name": "Printing Volume", "value": "W 218 × D 123 × H 235 mm"}')).toEqual({
+      widthMm: 218,
+      depthMm: 123,
+      heightMm: 235,
+    })
+  })
+
+  it('keeps fractional build volume dimensions', () => {
+    expect(parseBuildVolumeHtml('"name":"Printing Volume","value":"W 302.4 x D 161.98 x H 300 mm"')).toEqual({
+      widthMm: 302.4,
+      depthMm: 161.98,
+      heightMm: 300,
+    })
+  })
+
+  it('converts centimetre build volumes from support articles', () => {
+    expect(parseBuildVolumeHtml('<p><strong>Printing volume</strong>: L21.8 x W12.3 x H23.5 cm</p>')).toEqual({
+      widthMm: 218,
+      depthMm: 123,
+      heightMm: 235,
+    })
+  })
+
+  it('ignores pages without a build volume', () => {
+    expect(parseBuildVolumeHtml('<p>Build volume matters for large prints.</p><p>Printer size: 33 x 33 x 51 cm</p>')).toBeUndefined()
+  })
+
+  it('prefers the structured data product image over the social preview', () => {
+    expect(
+      extractProductImageUrl(
+        '<meta property="og:image" content="https://example.com/banner.jpg"><script type="application/ld+json">{"@type":"Product","name":"Revo","image":["https://example.com/printer.png","https://example.com/banner.jpg"],"brand":{}}</script>',
+        'https://example.com/product',
+      ),
+    ).toBe('https://example.com/printer.png')
+  })
+
+  it('reads a single structured data product image', () => {
+    expect(
+      extractProductImageUrl(
+        '{"@type":"Product","name":"Revo 16K","image":"https://example.com/printer.webp"}',
+        'https://example.com/product',
+      ),
+    ).toBe('https://example.com/printer.webp')
+  })
+
+  it('ignores images outside the structured data product', () => {
+    expect(
+      extractProductImageUrl(
+        '<meta property="og:image" content="https://example.com/printer.jpg">{"@type":"Product","offers":{"image":"https://example.com/offer.png"}}',
+        'https://example.com/product',
+      ),
+    ).toBe('https://example.com/printer.jpg')
+  })
+
   it('extracts product images from manufacturer page metadata', () => {
     expect(
       extractProductImageUrl(
