@@ -99,6 +99,8 @@ export const requests: typeof en = {
     suggested: (price, quantity) => (quantity > 1 ? `${price} empfohlen für alle ${quantity} Kopien` : `${price} empfohlen`),
     hint: 'Basierend auf Ihrer gespeicherten Rechnereinrichtung, mit einer Druckplatte pro Kopie und ohne manuelle Arbeitszeit.',
     openCalculator: 'Im Rechner öffnen',
+    onPrinter: (printer: string) => `auf ${printer}`,
+    onEachPrinter: 'Auf jedem Drucker',
   },
   repeat: {
     title: 'Erneut drucken',

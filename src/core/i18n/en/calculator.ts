@@ -23,6 +23,9 @@ export const calculator = {
     plateRuns: 'Plate runs',
     handsOnTime: 'Hands-on time (minutes)',
     handsOnHint: 'Support removal, cleaning, assembly, and other time you spend on the job.',
+    priceOn: 'Price on',
+    workspaceSetup: 'Workspace setup',
+    printerHint: 'Quote with one of your printers to use its own costs.',
   },
   quote: {
     emptyHint: "Enter your slicer's material and print time to see a price.",
@@ -47,6 +50,7 @@ export const calculator = {
     failureAllowance: 'Failure allowance',
     labour: 'Labour',
     estimatedCost: 'Estimated cost',
+    onEachPrinter: 'On each printer',
   },
   setup: {
     edit: 'Edit setup',
@@ -58,6 +62,13 @@ export const calculator = {
     description: 'These defaults belong to this workspace and will be here next time. Job values above remain a disposable scratchpad.',
     save: 'Save setup',
     saveError: 'The setup could not be saved.',
+    scope: {
+      shared: (printer: string) => `${printer} uses the workspace setup.`,
+      own: (printer: string) =>
+        `${printer} has its own material, equipment, wear, and consumables. Currency, electricity, labour, failure allowance, and margin are shared by every printer.`,
+      useOwn: 'Give it its own costs',
+      useShared: 'Use the workspace setup',
+    },
   },
   currency: {
     title: 'Currency',

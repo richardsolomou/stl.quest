@@ -28,8 +28,11 @@ const resinOptions = RESIN_PRESETS.map((preset) => ({
   type: preset.type,
 }))
 
+export type SetupScope = { printerName: string; ownCosts: boolean; onOwnCostsChange: (own: boolean) => void }
+
 export function SetupForm({
   settings,
+  scope,
   resinMode,
   electricityMode,
   dirty,
@@ -44,6 +47,7 @@ export function SetupForm({
   onDiscard,
 }: {
   settings: PriceCalculatorSettings
+  scope?: SetupScope
   resinMode: SetupMode
   electricityMode: SetupMode
   dirty: boolean
@@ -76,6 +80,7 @@ export function SetupForm({
             </Button>
           )}
         </div>
+        {scope && <ScopeNotice scope={scope} />}
         {expanded && (
           <>
             <div className="grid gap-6 border-t border-border/70 pt-5">
@@ -116,6 +121,20 @@ export function SetupForm({
         )}
       </SettingsSection>
     </form>
+  )
+}
+
+function ScopeNotice({ scope }: { scope: SetupScope }) {
+  const copy = useI18n().t.calculator.setup.scope
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm">
+      <p className="min-w-56 flex-1 text-muted-foreground">
+        {scope.ownCosts ? copy.own(scope.printerName) : copy.shared(scope.printerName)}
+      </p>
+      <Button type="button" variant="outline" size="sm" onClick={() => scope.onOwnCostsChange(!scope.ownCosts)}>
+        {scope.ownCosts ? copy.useShared : copy.useOwn}
+      </Button>
+    </div>
   )
 }
 

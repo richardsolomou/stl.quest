@@ -46,7 +46,12 @@ import { managedStorageAvailable } from './managedStorage'
 import { storagePlans } from '../core/plans'
 import { billingAvailable } from './billing'
 import { workflow } from '../core/workflow'
-import { DEFAULT_PRICE_CALCULATOR_SETTINGS, PRICE_CALCULATOR_SETTING, type PriceCalculatorSettings } from '../core/priceCalculator'
+import {
+  DEFAULT_PRICE_CALCULATOR_SETTINGS,
+  PRICE_CALCULATOR_SETTING,
+  prunePrinterCosts,
+  type PriceCalculatorSettings,
+} from '../core/priceCalculator'
 import {
   cloudStorageProviderName,
   oidcDisplayName,
@@ -1132,7 +1137,8 @@ export const savePriceCalculatorSettings = createServerFn({ method: 'POST' })
     mutationRpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      const { workspaceSlug: _, ...settings } = data
+      const { workspaceSlug: _, ...edited } = data
+      const settings = prunePrinterCosts(edited, await storedPrinterProfiles(context.repository))
       await context.repository.setSetting(PRICE_CALCULATOR_SETTING, settings)
       context.events.publish('settings.changed')
       instance.telemetry.capture(context.identity.id, 'price_calculator_settings_saved', {
@@ -1140,6 +1146,7 @@ export const savePriceCalculatorSettings = createServerFn({ method: 'POST' })
         resin_preset: Boolean(settings.resinPresetId),
         electricity_preset: Boolean(settings.electricityCountryCode),
         equipment_preset_count: settings.resinEquipment.presetIds.length + settings.filamentEquipment.presetIds.length,
+        printer_cost_count: Object.keys(settings.printerCosts).length,
       })
       return settings
     }),

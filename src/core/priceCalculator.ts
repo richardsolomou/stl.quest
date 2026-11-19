@@ -1,4 +1,6 @@
 import { DEFAULT_PRINTER_POWER_WATTS, equipmentPowerTotals } from './equipmentPresets'
+import { getPrinterPreset } from './printerPresets'
+import type { PrinterProfile } from './types'
 
 export const PRICE_CALCULATOR_SETTING = 'price_calculator'
 
@@ -67,7 +69,22 @@ export type PriceCalculatorSettings = {
   labourCostPerHour: number
   failureAllowancePercent: number
   standardMarginPercent: number
+  /** Keyed by printer ID; a printer without an entry uses the workspace setup above. */
+  printerCosts: Record<string, PrinterCosts>
 }
+
+/** What differs between printers; currency, electricity, labour, failure allowance, and margin stay shared. */
+export type PrinterCosts = Pick<
+  PriceCalculatorSettings,
+  | 'resinPresetId'
+  | 'resinPricePerLitre'
+  | 'resinDensityGramsPerMl'
+  | 'filamentPricePerKg'
+  | 'equipmentCostPerHour'
+  | 'consumablesCostPerPlate'
+> & { equipment: PriceCalculatorEquipmentSettings }
+
+type CostedPrinter = Pick<PrinterProfile, 'id' | 'printType' | 'presetId' | 'archived'>
 
 export type PriceCalculatorJob = {
   materialAmount: number
@@ -111,6 +128,7 @@ export const DEFAULT_PRICE_CALCULATOR_SETTINGS: PriceCalculatorSettings = {
   labourCostPerHour: 15,
   failureAllowancePercent: 10,
   standardMarginPercent: 25,
+  printerCosts: {},
 }
 
 export function calculatePrintPrice(settings: PriceCalculatorSettings, job: PriceCalculatorJob) {
@@ -247,6 +265,72 @@ export function priceRequest(settings: PriceCalculatorSettings, request: Request
     handsOnMinutes: 0,
   }
   return { job, result: calculatePrintPrice(selectPriceCalculatorPrintType(settings, request.printType), job) }
+}
+
+/** The setup a printer prices with: its own costs over the workspace setup, always in its own print type. */
+export function printerCostSettings(settings: PriceCalculatorSettings, printer: CostedPrinter): PriceCalculatorSettings {
+  const typed = selectPriceCalculatorPrintType(settings, printer.printType)
+  const costs = settings.printerCosts[printer.id]
+  if (!costs) return typed
+  const { equipment, ...rates } = costs
+  return updateEquipmentSettings({ ...typed, ...rates }, equipment)
+}
+
+/** Stores an edited printer setup: per-printer fields go to that printer, shared fields to the workspace. */
+export function withPrinterCostSettings(
+  settings: PriceCalculatorSettings,
+  printerId: string,
+  edited: PriceCalculatorSettings,
+): PriceCalculatorSettings {
+  const costs: PrinterCosts = {
+    resinPresetId: edited.resinPresetId,
+    resinPricePerLitre: edited.resinPricePerLitre,
+    resinDensityGramsPerMl: edited.resinDensityGramsPerMl,
+    filamentPricePerKg: edited.filamentPricePerKg,
+    equipmentCostPerHour: edited.equipmentCostPerHour,
+    consumablesCostPerPlate: edited.consumablesCostPerPlate,
+    equipment: equipmentSettingsFor(edited),
+  }
+  return {
+    ...settings,
+    currency: edited.currency,
+    electricityCountryCode: edited.electricityCountryCode,
+    electricityPricePerKwh: edited.electricityPricePerKwh,
+    labourCostPerHour: edited.labourCostPerHour,
+    failureAllowancePercent: edited.failureAllowancePercent,
+    standardMarginPercent: edited.standardMarginPercent,
+    printerCosts: { ...settings.printerCosts, [printerId]: costs },
+  }
+}
+
+/** Gives a printer its own costs, starting from the workspace setup with that printer's power in place of the workspace printer. */
+export function startPrinterCosts(settings: PriceCalculatorSettings, printer: CostedPrinter): PriceCalculatorSettings {
+  const typed = selectPriceCalculatorPrintType(settings, printer.printType)
+  const accessories = equipmentSettingsFor(typed).presetIds.filter((id) => !getPrinterPreset(id))
+  const own = printer.presetId && getPrinterPreset(printer.presetId) ? [printer.presetId, ...accessories] : undefined
+  const edited = own && equipmentSettingsFor(typed).mode === 'preset' ? applyEquipmentPresets(typed, own) : typed
+  return withPrinterCostSettings(settings, printer.id, edited)
+}
+
+export function removePrinterCosts(settings: PriceCalculatorSettings, printerId: string): PriceCalculatorSettings {
+  const { [printerId]: _, ...printerCosts } = settings.printerCosts
+  return { ...settings, printerCosts }
+}
+
+export function prunePrinterCosts(settings: PriceCalculatorSettings, printers: Pick<PrinterProfile, 'id'>[]): PriceCalculatorSettings {
+  const ids = new Set(printers.map((printer) => printer.id))
+  return { ...settings, printerCosts: Object.fromEntries(Object.entries(settings.printerCosts).filter(([id]) => ids.has(id))) }
+}
+
+/** Prices a request on each active printer of its print type, so the operator can compare where to run it. */
+export function priceRequestOnPrinters<Printer extends CostedPrinter>(
+  settings: PriceCalculatorSettings,
+  printers: Printer[],
+  request: RequestPriceInput,
+) {
+  return printers
+    .filter((printer) => !printer.archived && printer.printType === request.printType)
+    .map((printer) => ({ printer, quote: priceRequest(printerCostSettings(settings, printer), request) }))
 }
 
 function phaseElectricity(plates: number, minutesPerPlate: number, powerWatts: number, pricePerKwh: number) {

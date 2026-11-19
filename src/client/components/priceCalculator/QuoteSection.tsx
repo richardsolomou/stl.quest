@@ -4,6 +4,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control'
 import { cn } from '@/lib/utils'
 import { CopyButtonLabel, useCopied } from '../useCopied'
 import type { PriceCalculation, PriceCalculatorJob, PriceCalculatorSettings } from '../../../core/priceCalculator'
+import type { PrinterSummary } from '../../../core/types'
 import { useI18n } from '../../i18n'
 import { SettingsSection } from '../settings/SettingsLayout'
 import { formatMoney, formatNumber } from './format'
@@ -15,13 +16,19 @@ export function QuoteSection({
   job,
   result,
   mode,
+  comparison,
+  printerId,
   onModeChange,
+  onPrinterChange,
 }: {
   settings: PriceCalculatorSettings
   job: PriceCalculatorJob
   result: PriceCalculation
   mode: PriceMode
+  comparison: { printer: PrinterSummary; result: PriceCalculation }[]
+  printerId?: string
   onModeChange: (mode: PriceMode) => void
+  onPrinterChange: (printerId: string) => void
 }) {
   const { t, locale } = useI18n()
   const copy = t.calculator.quote
@@ -87,6 +94,30 @@ export function QuoteSection({
           <dt className="font-medium">{copy.estimatedCost}</dt>
           <dd className="font-mono font-medium tabular-nums">{money(result.estimatedCost)}</dd>
         </dl>
+        {!empty && comparison.length > 1 && (
+          <div className="grid gap-1 border-t border-border/70 pt-3">
+            <div className="font-heading text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
+              {copy.onEachPrinter}
+            </div>
+            {comparison.map(({ printer, result: printerResult }) => (
+              <button
+                key={printer.id}
+                type="button"
+                aria-pressed={printer.id === printerId}
+                className={cn(
+                  'flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted',
+                  printer.id === printerId && 'bg-muted font-medium',
+                )}
+                onClick={() => onPrinterChange(printer.id)}
+              >
+                <span className="min-w-0 truncate">{printer.name}</span>
+                <span className="font-mono tabular-nums">
+                  {money(mode === 'standard' ? printerResult.standardPrice : printerResult.estimatedCost)}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </SettingsSection>
     </div>
   )

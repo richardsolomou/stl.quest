@@ -5,6 +5,12 @@ import {
   DEFAULT_PRICE_CALCULATOR_SETTINGS,
   equipmentSettingsFor,
   priceRequest,
+  priceRequestOnPrinters,
+  printerCostSettings,
+  prunePrinterCosts,
+  removePrinterCosts,
+  startPrinterCosts,
+  withPrinterCostSettings,
   selectEquipmentMode,
   selectPriceCalculatorCurrency,
   selectPriceCalculatorPrintType,
@@ -222,5 +228,81 @@ describe('print price calculator', () => {
 
   it('does not price a request missing its time estimate', () => {
     expect(priceRequest(settings, { printType: 'resin', material: 10, materialUnit: 'ml', quantity: 1 })).toBeUndefined()
+  })
+})
+
+describe('per-printer costs', () => {
+  const saturn = { id: 'saturn', name: 'Saturn', printType: 'resin' as const, presetId: 'resin-elegoo-saturn-4-ultra' }
+  const form4 = { id: 'form4', name: 'Form 4', printType: 'resin' as const, presetId: 'resin-formlabs-form-4' }
+  const bambu = { id: 'bambu', name: 'P1S', printType: 'filament' as const }
+  const withForm4 = withPrinterCostSettings(settings, 'form4', { ...printerCostSettings(settings, form4), resinPricePerLitre: 160 })
+
+  it('uses the workspace setup for a printer without its own costs', () => {
+    expect(printerCostSettings(settings, saturn).resinPricePerLitre).toBe(70)
+  })
+
+  it('uses the printer type of a printer without its own costs', () => {
+    expect(printerCostSettings(settings, bambu).printType).toBe('filament')
+  })
+
+  it('uses a printer own material price', () => {
+    expect(printerCostSettings(withForm4, form4).resinPricePerLitre).toBe(160)
+  })
+
+  it('keeps other printers on the workspace material price', () => {
+    expect(printerCostSettings(withForm4, saturn).resinPricePerLitre).toBe(70)
+  })
+
+  it('leaves the workspace material price alone when editing a printer', () => {
+    expect(withForm4.resinPricePerLitre).toBe(70)
+  })
+
+  it('shares labour edits made while a printer is selected', () => {
+    const edited = withPrinterCostSettings(withForm4, 'form4', { ...printerCostSettings(withForm4, form4), labourCostPerHour: 30 })
+    expect(printerCostSettings(edited, saturn).labourCostPerHour).toBe(30)
+  })
+
+  it('starts a printer own costs from its own rated power', () => {
+    expect(printerCostSettings(startPrinterCosts(settings, saturn), saturn).resinEquipment.printPowerWatts).toBe(144 + 25)
+  })
+
+  it('keeps workspace accessories when starting a printer own costs', () => {
+    expect(printerCostSettings(startPrinterCosts(settings, form4), form4).resinEquipment.presetIds).toContain(
+      'postprocess-elegoo-mercury-plus-v3',
+    )
+  })
+
+  it('returns a printer to the workspace setup when its own costs are removed', () => {
+    expect(printerCostSettings(removePrinterCosts(withForm4, 'form4'), form4).resinPricePerLitre).toBe(70)
+  })
+
+  it('drops costs for printers that no longer exist', () => {
+    expect(Object.keys(prunePrinterCosts(withForm4, [saturn]).printerCosts)).toEqual([])
+  })
+
+  it('keeps costs for printers that still exist', () => {
+    expect(Object.keys(prunePrinterCosts(withForm4, [form4]).printerCosts)).toEqual(['form4'])
+  })
+
+  it('prices a request on every active printer of its print type', () => {
+    const quotes = priceRequestOnPrinters(withForm4, [saturn, form4, bambu, { ...saturn, id: 'old', archived: true }], {
+      printType: 'resin',
+      material: 100,
+      materialUnit: 'ml',
+      minutes: 60,
+      quantity: 1,
+    })
+    expect(quotes.map(({ printer }) => printer.id)).toEqual(['saturn', 'form4'])
+  })
+
+  it('prices a request on each printer with that printer costs', () => {
+    const quotes = priceRequestOnPrinters(withForm4, [saturn, form4], {
+      printType: 'resin',
+      material: 100,
+      materialUnit: 'ml',
+      minutes: 60,
+      quantity: 1,
+    })
+    expect(quotes.map(({ quote }) => quote?.result.material)).toEqual([7, 16])
   })
 })

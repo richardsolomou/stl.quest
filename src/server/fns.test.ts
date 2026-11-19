@@ -52,6 +52,22 @@ describe('price calculator settings', () => {
     })
   })
 
+  it('gives a setup saved before per-printer costs no printer costs', () => {
+    expect(storedPriceCalculatorSettings({ resinPricePerLitre: 80 }).settings.printerCosts).toEqual({})
+  })
+
+  it('keeps a printer own costs when loading a saved setup', () => {
+    const costs = {
+      resinPricePerLitre: 160,
+      resinDensityGramsPerMl: 1.1,
+      filamentPricePerKg: 25,
+      equipmentCostPerHour: 2,
+      consumablesCostPerPlate: 1,
+      equipment: DEFAULT_PRICE_CALCULATOR_SETTINGS.resinEquipment,
+    }
+    expect(storedPriceCalculatorSettings({ printerCosts: { form4: costs } }).settings.printerCosts.form4?.resinPricePerLitre).toBe(160)
+  })
+
   it('keeps euros for a setup saved before the currency setting existed', () => {
     expect(storedPriceCalculatorSettings({ resinPricePerLitre: 80 }).settings.currency).toBe('EUR')
     expect(storedPriceCalculatorSettings({ currency: 'CAD' }).settings.currency).toBe('CAD')

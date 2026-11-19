@@ -73,6 +73,7 @@ export const acceptInviteSchema = z.object({
 
 export const telemetrySettingsSchema = z.object({ enabled: z.boolean() })
 export const selfSignupSettingsSchema = z.object({ enabled: z.boolean() })
+const MAX_PRINTER_PROFILES = 50
 const priceCalculatorEquipmentSchema = z.object({
   mode: z.enum(['preset', 'custom']),
   presetIds: z.array(z.string().trim().min(1).max(200)).max(50),
@@ -83,6 +84,15 @@ const priceCalculatorEquipmentSchema = z.object({
   dryMinutesPerPlate: z.number().nonnegative().max(100_000),
   curePowerWatts: z.number().nonnegative().max(100_000),
   cureMinutesPerPlate: z.number().nonnegative().max(100_000),
+})
+const printerCostsSchema = z.object({
+  resinPresetId: z.string().trim().min(1).max(200).optional(),
+  resinPricePerLitre: z.number().positive().max(100_000),
+  resinDensityGramsPerMl: z.number().positive().max(100),
+  filamentPricePerKg: z.number().positive().max(100_000),
+  equipmentCostPerHour: z.number().nonnegative().max(100_000),
+  consumablesCostPerPlate: z.number().nonnegative().max(100_000),
+  equipment: priceCalculatorEquipmentSchema,
 })
 export const priceCalculatorSettingsSchema = z.object({
   currency: z.enum(PRICE_CALCULATOR_CURRENCIES),
@@ -100,6 +110,10 @@ export const priceCalculatorSettingsSchema = z.object({
   labourCostPerHour: z.number().nonnegative().max(100_000),
   failureAllowancePercent: z.number().nonnegative().max(100),
   standardMarginPercent: z.number().nonnegative().max(95),
+  printerCosts: z
+    .record(z.string().trim().min(1).max(200), printerCostsSchema)
+    .refine((costs) => Object.keys(costs).length <= MAX_PRINTER_PROFILES)
+    .default({}),
 })
 export const emailLogoSchema = z.object({
   data: z
@@ -165,7 +179,7 @@ const printerProfileBaseSchema = z.object({
 })
 
 export const printerProfilesSchema = z
-  .object({ profiles: z.array(printerProfileBaseSchema).max(50) })
+  .object({ profiles: z.array(printerProfileBaseSchema).max(MAX_PRINTER_PROFILES) })
   .superRefine(({ profiles }, context) => {
     const ids = new Set<string>()
     for (const [index, profile] of profiles.entries()) {

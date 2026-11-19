@@ -97,6 +97,8 @@ export const requests = {
     suggested: (price: string, quantity: number) => (quantity > 1 ? `${price} suggested for all ${quantity} copies` : `${price} suggested`),
     hint: 'From your saved calculator setup, assuming one plate per copy and no hands-on time.',
     openCalculator: 'Open in calculator',
+    onPrinter: (printer: string) => `on ${printer}`,
+    onEachPrinter: 'On each printer',
   },
   repeat: {
     title: 'Print again',

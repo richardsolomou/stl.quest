@@ -25,6 +25,9 @@ export const calculator: typeof en = {
     plateRuns: 'Plateaux imprimés',
     handsOnTime: 'Temps de travail manuel (minutes)',
     handsOnHint: 'Retrait des supports, nettoyage, assemblage et tout autre temps passé sur la tâche.',
+    priceOn: 'Chiffrer sur',
+    workspaceSetup: 'Configuration de l’espace de travail',
+    printerHint: 'Chiffrez avec l’une de vos imprimantes pour utiliser ses propres coûts.',
   },
   quote: {
     emptyHint: 'Saisissez la matière et la durée d’impression de votre trancheur pour voir un prix.',
@@ -49,6 +52,7 @@ export const calculator: typeof en = {
     failureAllowance: 'Marge pour échecs',
     labour: 'Main-d’œuvre',
     estimatedCost: 'Coût estimé',
+    onEachPrinter: 'Sur chaque imprimante',
   },
   setup: {
     edit: 'Modifier la configuration',
@@ -61,6 +65,13 @@ export const calculator: typeof en = {
       'Ces valeurs par défaut appartiennent à cet espace de travail et seront conservées. Les valeurs de la tâche ci-dessus restent un brouillon jetable.',
     save: 'Enregistrer la configuration',
     saveError: 'La configuration n’a pas pu être enregistrée.',
+    scope: {
+      shared: (printer: string) => `${printer} utilise la configuration de l’espace de travail.`,
+      own: (printer: string) =>
+        `${printer} a son propre matériau, son équipement, son usure et ses consommables. La devise, l’électricité, la main-d’œuvre, la marge pour échecs et la marge sont communes à toutes les imprimantes.`,
+      useOwn: 'Lui donner ses propres coûts',
+      useShared: 'Utiliser la configuration de l’espace de travail',
+    },
   },
   currency: {
     title: 'Devise',

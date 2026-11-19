@@ -27,6 +27,9 @@ export const calculator: typeof en = {
     plateRuns: 'Druckplattendurchläufe',
     handsOnTime: 'Arbeitszeit (Minuten)',
     handsOnHint: 'Entfernen von Stützen, Reinigung, Montage und weitere Zeit, die Sie für den Auftrag aufwenden.',
+    priceOn: 'Kalkulieren für',
+    workspaceSetup: 'Workspace-Einrichtung',
+    printerHint: 'Kalkulieren Sie mit einem Ihrer Drucker, um dessen eigene Kosten zu verwenden.',
   },
   quote: {
     emptyHint: 'Geben Sie Material und Druckzeit aus Ihrem Slicer ein, um einen Preis zu sehen.',
@@ -51,6 +54,7 @@ export const calculator: typeof en = {
     failureAllowance: 'Ausfallreserve',
     labour: 'Arbeitszeit',
     estimatedCost: 'Geschätzte Kosten',
+    onEachPrinter: 'Auf jedem Drucker',
   },
   setup: {
     edit: 'Einrichtung bearbeiten',
@@ -63,6 +67,13 @@ export const calculator: typeof en = {
       'Diese Standardwerte gehören zu diesem Arbeitsbereich und bleiben beim nächsten Mal erhalten. Die Auftragswerte oben bleiben ein Notizblock zum Wegwerfen.',
     save: 'Einrichtung speichern',
     saveError: 'Die Einrichtung konnte nicht gespeichert werden.',
+    scope: {
+      shared: (printer: string) => `${printer} verwendet die Workspace-Einrichtung.`,
+      own: (printer: string) =>
+        `${printer} hat eigenes Material, eigene Ausrüstung, eigenen Verschleiß und eigene Verbrauchsmaterialien. Währung, Strom, Arbeit, Ausschusszuschlag und Marge gelten für alle Drucker.`,
+      useOwn: 'Eigene Kosten festlegen',
+      useShared: 'Workspace-Einrichtung verwenden',
+    },
   },
   currency: {
     title: 'Währung',
