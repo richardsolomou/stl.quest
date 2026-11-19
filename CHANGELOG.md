@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.51.0
+
+### Minor Changes
+
+- 38b8225: Add Formlabs resin presets and the missing Phrozen printers, and suggest the closest printers when a search has no exact match so that more fleets find their exact machines and materials.
+- 38b8225: Keep the resins, filaments, and wear parts you buy in a consumables library, give each printer its own costs, and see what a print would cost on each printer so that operators can pick the cheapest machine for a job.
+
 ## 1.50.1
 
 ### Patch Changes
