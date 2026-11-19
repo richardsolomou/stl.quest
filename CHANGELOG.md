@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.52.1
+
+### Patch Changes
+
+- 228950d: Free a failed upload's slot right away and explain when a file was moved or changed mid-upload, so that one failed file no longer blocks the rest with a misleading "too many uploads in progress" error.
+
 ## 1.52.0
 
 ### Minor Changes
