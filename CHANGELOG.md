@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.52.0
+
+### Minor Changes
+
+- 6944ef0: Serve STL Quest under a subpath of another site by setting `BASE_PATH`, such as `/stlquest`, so that a reverse proxy can route to it by path instead of by hostname.
+
 ## 1.51.0
 
 ### Minor Changes
