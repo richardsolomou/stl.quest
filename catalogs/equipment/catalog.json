@@ -231,6 +231,89 @@
       }
     },
     {
+      "id": "postprocess-formlabs-form-wash-v2",
+      "brand": "Formlabs",
+      "model": "Form Wash V2",
+      "powerProfiles": [{ "phase": "washing", "watts": 50, "basis": "rated power" }],
+      "source": {
+        "url": "https://formlabs.com/global/products/form-wash/",
+        "accessedAt": "2026-11-19"
+      }
+    },
+    {
+      "id": "postprocess-formlabs-form-wash-l-v1",
+      "brand": "Formlabs",
+      "model": "Form Wash L V1",
+      "powerProfiles": [{ "phase": "washing", "watts": 120, "basis": "maximum input current (120 V × 1 A)" }],
+      "source": {
+        "url": "https://formlabs.com/global/products/form-wash-l-2nd-generation/",
+        "accessedAt": "2026-11-19"
+      }
+    },
+    {
+      "id": "postprocess-formlabs-form-wash-l-v2",
+      "brand": "Formlabs",
+      "model": "Form Wash L V2",
+      "powerProfiles": [{ "phase": "washing", "watts": 120, "basis": "maximum input current (120 V × 1 A)" }],
+      "source": {
+        "url": "https://formlabs.com/global/products/form-wash-l-2nd-generation/",
+        "accessedAt": "2026-11-19"
+      }
+    },
+    {
+      "id": "postprocess-formlabs-form-cure-v1",
+      "brand": "Formlabs",
+      "model": "Form Cure V1",
+      "powerProfiles": [{ "phase": "curing", "watts": 144, "basis": "rated power" }],
+      "source": {
+        "url": "https://formlabs.com/global/products/form-cure/",
+        "accessedAt": "2026-11-19"
+      }
+    },
+    {
+      "id": "postprocess-formlabs-form-cure-v2",
+      "brand": "Formlabs",
+      "model": "Form Cure V2",
+      "powerProfiles": [{ "phase": "curing", "watts": 150, "basis": "LED power; heater draw is not published" }],
+      "source": {
+        "url": "https://formlabs.com/global/products/form-cure/",
+        "accessedAt": "2026-11-19"
+      }
+    },
+    {
+      "id": "postprocess-formlabs-form-cure-l-v1",
+      "brand": "Formlabs",
+      "model": "Form Cure L V1",
+      "powerProfiles": [{ "phase": "curing", "watts": 70, "basis": "LED power; heater draw is not published" }],
+      "source": {
+        "url": "https://formlabs.com/global/products/form-cure/",
+        "accessedAt": "2026-11-19"
+      }
+    },
+    {
+      "id": "postprocess-formlabs-form-cure-l-v2",
+      "brand": "Formlabs",
+      "model": "Form Cure L V2",
+      "powerProfiles": [{ "phase": "curing", "watts": 350, "basis": "LED power; heater draw is not published" }],
+      "source": {
+        "url": "https://formlabs.com/global/products/form-cure/",
+        "accessedAt": "2026-11-19"
+      }
+    },
+    {
+      "id": "postprocess-formlabs-form-studio-wash-cure",
+      "brand": "Formlabs",
+      "model": "Form Studio Wash+Cure",
+      "powerProfiles": [
+        { "phase": "washing", "watts": 60, "basis": "maximum adapter output (24 V DC, 60 W)" },
+        { "phase": "curing", "watts": 60, "basis": "maximum adapter output (24 V DC, 60 W)" }
+      ],
+      "source": {
+        "url": "https://formlabs.com/global/products/form-cure/",
+        "accessedAt": "2026-11-19"
+      }
+    },
+    {
       "id": "printer-elegoo-mars-5-ultra",
       "brand": "Elegoo",
       "model": "Mars 5 Ultra",
@@ -288,6 +371,106 @@
       "source": {
         "url": "https://us.phrozen3d.com/collections/whats-new/products/phrozen-sonic-mighty-12k-10-1-lcd-3d-printer-ca",
         "accessedAt": "2026-08-27"
+      }
+    },
+    {
+      "id": "printer-formlabs-form-studio-1",
+      "brand": "Formlabs",
+      "model": "Form Studio 1",
+      "powerProfiles": [{ "phase": "printing", "watts": 300, "basis": "rated power" }],
+      "source": {
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
+        "accessedAt": "2026-11-19"
+      }
+    },
+    {
+      "id": "printer-formlabs-form-4",
+      "brand": "Formlabs",
+      "model": "Form 4",
+      "powerProfiles": [{ "phase": "printing", "watts": 480, "basis": "rated power" }],
+      "source": {
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
+        "accessedAt": "2026-11-19"
+      }
+    },
+    {
+      "id": "printer-formlabs-form-4b",
+      "brand": "Formlabs",
+      "model": "Form 4B",
+      "powerProfiles": [{ "phase": "printing", "watts": 480, "basis": "rated power" }],
+      "source": {
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
+        "accessedAt": "2026-11-19"
+      }
+    },
+    {
+      "id": "printer-formlabs-form-4l",
+      "brand": "Formlabs",
+      "model": "Form 4L",
+      "powerProfiles": [{ "phase": "printing", "watts": 900, "basis": "rated power" }],
+      "source": {
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
+        "accessedAt": "2026-11-19"
+      }
+    },
+    {
+      "id": "printer-formlabs-form-4bl",
+      "brand": "Formlabs",
+      "model": "Form 4BL",
+      "powerProfiles": [{ "phase": "printing", "watts": 900, "basis": "rated power" }],
+      "source": {
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
+        "accessedAt": "2026-11-19"
+      }
+    },
+    {
+      "id": "printer-formlabs-form-3",
+      "brand": "Formlabs",
+      "model": "Form 3",
+      "powerProfiles": [{ "phase": "printing", "watts": 220, "basis": "rated power" }],
+      "source": {
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
+        "accessedAt": "2026-11-19"
+      }
+    },
+    {
+      "id": "printer-formlabs-form-3b",
+      "brand": "Formlabs",
+      "model": "Form 3B",
+      "powerProfiles": [{ "phase": "printing", "watts": 220, "basis": "rated power" }],
+      "source": {
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
+        "accessedAt": "2026-11-19"
+      }
+    },
+    {
+      "id": "printer-formlabs-form-3l",
+      "brand": "Formlabs",
+      "model": "Form 3L",
+      "powerProfiles": [{ "phase": "printing", "watts": 650, "basis": "rated power" }],
+      "source": {
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
+        "accessedAt": "2026-11-19"
+      }
+    },
+    {
+      "id": "printer-formlabs-form-3bl",
+      "brand": "Formlabs",
+      "model": "Form 3BL",
+      "powerProfiles": [{ "phase": "printing", "watts": 650, "basis": "rated power" }],
+      "source": {
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
+        "accessedAt": "2026-11-19"
+      }
+    },
+    {
+      "id": "printer-formlabs-form-2",
+      "brand": "Formlabs",
+      "model": "Form 2",
+      "powerProfiles": [{ "phase": "printing", "watts": 65, "basis": "rated power" }],
+      "source": {
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
+        "accessedAt": "2026-11-19"
       }
     },
     {
