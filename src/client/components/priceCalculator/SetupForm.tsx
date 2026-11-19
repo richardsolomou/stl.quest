@@ -595,7 +595,7 @@ function WearParts({
       <legend className="mb-1 text-sm font-medium">{copy.wearParts}</legend>
       {parts.map((part) => (
         <label key={part.id} className="flex items-center gap-2 text-sm">
-          <Checkbox checked={equipment.partIds.includes(part.id)} onCheckedChange={(checked) => toggle(part.id, checked === true)} />
+          <Checkbox checked={equipment.partIds.includes(part.id)} onCheckedChange={(checked) => toggle(part.id, checked)} />
           <span className="min-w-0 flex-1 truncate">{part.name}</span>
           <span className="font-mono text-xs text-muted-foreground tabular-nums">
             {part.lifespanUnit === 'plates'
