@@ -7,9 +7,6 @@ export const account = {
     account: 'Account',
     onboarding: 'Onboarding',
     plan: 'Plan',
-    about: 'About',
-    admin: 'Admin',
-    updateAvailable: (version: string) => `STL Quest v${version} is available`,
     signOut: 'Sign out',
     createDescriptionBilling:
       'A workspace has its own board, members, and printers. Workspaces using included storage share your account’s plan allowance.',
@@ -31,12 +28,12 @@ export const account = {
     revealHint: 'Click to reveal email address',
   },
   appearance: {
-    title: 'Appearance',
     theme: 'Theme',
     themeDescription: 'Saved in this browser, so each device can keep its own.',
     themes: { system: 'Match system', light: 'Light', dark: 'Dark' },
   },
   pane: {
+    preferencesTitle: 'Preferences',
     title: 'Account',
     description: 'Manage your profile, appearance, notifications, and sign-in methods.',
     loading: 'Loading account settings…',

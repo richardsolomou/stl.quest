@@ -309,6 +309,10 @@ Model thumbnails are 56px squares filled with the blueprint graph-paper grid (`-
 - **Error:** Border and ring shift to Fault Red, driven by `aria-invalid` rather than a class, so the visual state and the accessible state cannot drift apart.
 - **Disabled:** Black at 15% with 50% opacity and no pointer events.
 
+### Segmented control
+
+A choice between a few modes (print type, units, preset or custom, upload or link). One component (`SegmentedControl`): a fieldset with a hidden legend, a stroked recess, and the selected segment raised to Secondary with `aria-pressed`. Choosing a mode commits nothing, so it never takes the amber fill.
+
 ### Chips
 
 - **Copy count** (Recess fill, Graphite mono text, 2.4px corner): The small figure at the end of a station header and on card metadata. Always mono, always right-aligned in its row.
@@ -316,7 +320,11 @@ Model thumbnails are 56px squares filled with the blueprint graph-paper grid (`-
 
 ### Navigation
 
+- **App shell:** Every signed-in page renders through one shell (`AppShell`): the rail on wide screens, a bottom bar on phones, and one content column capped at `max-w-6xl`. The destinations are the same everywhere — Board, Archive, Calculator (admins), Settings — and Settings is shown to everyone.
 - **App rail:** 56px wide, Bench, dashed Blueprint Teal 2px right edge. The brand mark sits at the top; nav items are 36px circular targets that move from Graphite to Bone on hover with a Recess fill, and to Signal Amber when current. Current state is carried by `aria-current="page"`, not colour alone.
+- **Bottom bar (below 640px):** Replaces the rail so a 320px screen keeps its full width. Same destinations with an icon over a micro label, the account avatar last, and a dashed Blueprint Teal top edge.
+- **Settings hub:** Workspace, personal, server, and product settings share one grouped sub-nav (`SettingsShell`): _Workspace_ (admins, labelled with the workspace name), _You_, _Server_ (super admins), and _STL Quest_. Below 768px the sub-nav collapses into a single picker that names the current group and page.
+- **Page header:** Every page outside the board opens with the same header — Oswald title, one-line purpose, page-level actions on the right, and the dashed rule beneath. Actions that act on the whole page live there, never stranded below a table.
 - **Station header:** A row of buttons, one per station, each a full-width Oswald uppercase label with a leading stage dot and a trailing mono total. The whole header is a button — clicking a station selects everything in it — and it disables when the station is empty.
 
 ### Traveler Card (signature component)
@@ -349,7 +357,7 @@ The one component that defines the system. A 4px Ticket-surfaced card with a sin
 ### Don't
 
 - **Don't** use Blueprint Teal as a fill, a button colour, or a text colour on ordinary UI. It is linework.
-- **Don't** add a dashed border anywhere except the app rail edge and the board header rule.
+- **Don't** add a dashed border anywhere except the structural rules named in Shapes.
 - **Don't** introduce a radius above 10.4px, or a fully rounded surface larger than a badge.
 - **Don't** use pure white for text; Bone is the ceiling.
 - **Don't** add a second resting shadow to the system.

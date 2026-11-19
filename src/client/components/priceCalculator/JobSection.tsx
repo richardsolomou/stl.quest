@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui/button'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import { Field, FieldDescription, FieldLabel, FieldTitle } from '@/components/ui/field'
 import type { PriceCalculation, PriceCalculatorJob, PriceCalculatorSettings } from '../../../core/priceCalculator'
 import { PRINT_TYPES } from '../../../core/types'
@@ -27,47 +27,30 @@ export function JobSection({
       <div className="grid gap-4 sm:grid-cols-2">
         <Field className="sm:col-span-2">
           <FieldTitle>{copy.printType}</FieldTitle>
-          <fieldset className="flex rounded-lg border border-input bg-background p-1">
-            <legend className="sr-only">{copy.printType}</legend>
-            {PRINT_TYPES.map((value) => (
-              <Button
-                key={value}
-                id={`calculator-print-type-${value}`}
-                type="button"
-                variant={settings.printType === value ? 'secondary' : 'ghost'}
-                className="flex-1"
-                aria-pressed={settings.printType === value}
-                onClick={() => onPrintTypeChange(value)}
-              >
-                {copy[value]}
-              </Button>
-            ))}
-          </fieldset>
+          <SegmentedControl
+            legend={copy.printType}
+            value={settings.printType}
+            options={PRINT_TYPES.map((value) => ({ value, label: copy[value], id: `calculator-print-type-${value}` }))}
+            onChange={onPrintTypeChange}
+          />
         </Field>
         <Field className="sm:col-span-2">
           <div className="flex items-center justify-between gap-3">
             <FieldLabel htmlFor="calculator-material">{copy.expectedMaterial}</FieldLabel>
             {settings.printType === 'resin' ? (
-              <div className="flex rounded-lg border border-input bg-background p-0.5" aria-label={copy.materialUnit}>
-                {(['ml', 'g'] as const).map((unit) => (
-                  <Button
-                    key={unit}
-                    type="button"
-                    size="xs"
-                    variant={job.materialUnit === unit ? 'secondary' : 'ghost'}
-                    aria-pressed={job.materialUnit === unit}
-                    onClick={() =>
-                      onJobChange({
-                        ...job,
-                        materialAmount: unit === 'ml' ? result.materialMl : result.materialGrams,
-                        materialUnit: unit,
-                      })
-                    }
-                  >
-                    {unit}
-                  </Button>
-                ))}
-              </div>
+              <SegmentedControl
+                legend={copy.materialUnit}
+                size="xs"
+                value={job.materialUnit}
+                options={(['ml', 'g'] as const).map((unit) => ({ value: unit, label: unit }))}
+                onChange={(unit) =>
+                  onJobChange({
+                    ...job,
+                    materialAmount: unit === 'ml' ? result.materialMl : result.materialGrams,
+                    materialUnit: unit,
+                  })
+                }
+              />
             ) : (
               <span className="text-xs text-muted-foreground">{copy.grams}</span>
             )}

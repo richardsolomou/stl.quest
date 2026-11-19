@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Button } from '@/components/ui/button'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { useI18n } from '../../i18n'
@@ -18,10 +18,10 @@ export function SetupGroup({
   children: ReactNode
 }) {
   return (
-    <section className="grid gap-4 rounded-lg border border-border/70 bg-muted/15 p-4">
+    <section className="grid gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="grid gap-1">
-          <h3 className="font-heading text-sm font-semibold tracking-tight">{title}</h3>
+          <h3 className="font-heading text-base font-semibold tracking-tight">{title}</h3>
           {description && <p className="text-xs leading-relaxed text-muted-foreground">{description}</p>}
         </div>
         {action}
@@ -34,22 +34,16 @@ export function SetupGroup({
 export function ModeSelector({ legend, value, onChange }: { legend: string; value: SetupMode; onChange: (value: SetupMode) => void }) {
   const { t } = useI18n()
   return (
-    <fieldset className="m-0 flex min-w-0 rounded-lg border border-input bg-background p-0.5">
-      <legend className="sr-only">{legend}</legend>
-      {(['preset', 'custom'] as const).map((option) => (
-        <Button
-          key={option}
-          type="button"
-          size="xs"
-          variant={value === option ? 'secondary' : 'ghost'}
-          className="capitalize"
-          aria-pressed={value === option}
-          onClick={() => onChange(option)}
-        >
-          {t.calculator.modes[option]}
-        </Button>
-      ))}
-    </fieldset>
+    <SegmentedControl
+      legend={legend}
+      size="xs"
+      value={value}
+      options={(['preset', 'custom'] as const).map((option) => ({
+        value: option,
+        label: <span className="capitalize">{t.calculator.modes[option]}</span>,
+      }))}
+      onChange={onChange}
+    />
   )
 }
 

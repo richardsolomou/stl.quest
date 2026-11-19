@@ -6,7 +6,7 @@ import { updateTelemetrySettings } from '../../../server/fns'
 import { telemetryQuery } from '../../queries'
 import { QueryState } from '../QueryState'
 import { SettingNotice, errorNotice } from '../SettingNotice'
-import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { PageHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { useI18n } from '../../i18n'
 
 export function TelemetryPane() {
@@ -23,7 +23,7 @@ export function TelemetryPane() {
   if (!current) {
     return (
       <SettingsPage>
-        <SettingsHeader title={copy.title} description={copy.loadingDescription} />
+        <PageHeader title={copy.title} description={copy.loadingDescription} />
         <QueryState
           loading={query.isPending}
           error={query.error}
@@ -37,7 +37,7 @@ export function TelemetryPane() {
 
   return (
     <SettingsPage>
-      <SettingsHeader title={copy.title} description={copy.description} />
+      <PageHeader title={copy.title} description={copy.description} />
       <SettingsSection>
         <Field orientation="horizontal">
           <FieldContent>

@@ -29,7 +29,7 @@ import { QueryState } from '../QueryState'
 import { SettingNotice } from '../SettingNotice'
 import { PrinterPresetImage } from './PrinterPresetImage'
 import { PrinterPresetPicker } from './PrinterPresetPicker'
-import { SettingsActions, SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { SettingsActions, PageHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { useI18n } from '../../i18n'
 
 const printTypeOptions = (labels: Record<PrintType, string>) => PRINT_TYPES.map((value) => ({ value, label: labels[value] }))
@@ -215,7 +215,7 @@ export function PrintersPane({
     </div>
   ) : (
     <>
-      <SettingsHeader title={copy.title} description={copy.description} />
+      <PageHeader title={copy.title} description={copy.description} />
 
       <SettingsSection
         title={copy.active.title}

@@ -3,7 +3,7 @@ import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-q
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
-import { Check, CircleHelp, CreditCard, Info, LogOut, Plus, ShieldCheck, UserCog } from 'lucide-react'
+import { Check, CircleHelp, CreditCard, LogOut, Plus, UserCog } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -19,12 +19,11 @@ import { sessionQuery } from '../queries'
 import { reloadAfterWorkspaceChange, useWorkspaceSlug, WORKSPACE_CHANGED_KEY } from '../workspace'
 import { DialogProblem } from './DialogProblem'
 import { DialogShell } from './DialogShell'
-import { useReleaseUpdate } from './ReleaseUpdateNotice'
 import { UserAvatar } from './UserAvatar'
 import { ProtectedEmail } from './ProtectedEmail'
 import { openProductQuest } from '../productTour'
 
-export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdmin?: boolean; side?: 'top' | 'bottom' }) {
+export function AccountMenu({ side = 'top', align = 'start' }: { side?: 'top' | 'bottom'; align?: 'start' | 'end' }) {
   const { t } = useI18n()
   const copy = t.account.menu
   const workspaceSlug = useWorkspaceSlug()
@@ -38,7 +37,6 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
   const [name, setName] = useState('')
   const callCreate = useServerFn(createWorkspace)
   const callSwitch = useServerFn(switchWorkspace)
-  const releaseUpdate = useReleaseUpdate(isSuperAdmin)
   useEffect(() => {
     const refreshOtherTab = (event: StorageEvent) => {
       if (event.key === WORKSPACE_CHANGED_KEY) window.location.reload()
@@ -72,12 +70,7 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
         >
           <UserAvatar name={identity.name} image={identity.image} />
         </PopoverTrigger>
-        <PopoverContent
-          side={side}
-          align={side === 'top' ? 'start' : 'end'}
-          sideOffset={12}
-          className="w-72 max-w-[calc(100vw-1rem)] gap-2 p-2"
-        >
+        <PopoverContent side={side} align={align} sideOffset={12} className="w-72 max-w-[calc(100vw-1rem)] gap-2 p-2">
           <div className="flex min-w-0 items-center gap-3 rounded-lg px-2 py-1.5 text-foreground">
             <UserAvatar name={identity.name} image={identity.image} />
             <div className="min-w-0">
@@ -156,47 +149,23 @@ export function AccountMenu({ isSuperAdmin = false, side = 'top' }: { isSuperAdm
               </Link>
             )}
           </div>
-          {/* A full-bleed footer, so the width of the row belongs to the bar rather than reading as
-              space around three small controls. */}
-          <div className="-mx-2 -mb-2 flex items-center justify-between gap-1 rounded-b-lg border-t border-border bg-muted/40 px-3 py-1.5">
-            <Link
-              to="/about"
-              className="flex items-center gap-1.5 rounded-sm px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-              onClick={() => setMenuOpen(false)}
-            >
-              <Info className="size-3.5" />
-              {copy.about}
-            </Link>
-            {isSuperAdmin && (
-              <Link
-                to="/admin/$section"
-                params={{ section: 'overview' }}
-                className="flex items-center gap-1.5 rounded-sm px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                onClick={() => setMenuOpen(false)}
-              >
-                <ShieldCheck className="size-3.5" />
-                {copy.admin}
-                {releaseUpdate && (
-                  <span className="size-1.5 rounded-full bg-primary" aria-label={copy.updateAvailable(releaseUpdate.latestVersion)} />
-                )}
-              </Link>
-            )}
-            <button
-              type="button"
-              className="flex cursor-pointer items-center gap-1.5 rounded-sm px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-              onClick={async () => {
-                await authClient.signOut()
-                posthog.capture('user_signed_out')
-                posthog.reset()
-                setMenuOpen(false)
-                await navigate({ to: '/' })
-                await queryClient.invalidateQueries({ queryKey: ['session'] })
-              }}
-            >
-              <LogOut className="size-3.5" />
-              {copy.signOut}
-            </button>
-          </div>
+          <Separator />
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full justify-start text-muted-foreground"
+            onClick={async () => {
+              await authClient.signOut()
+              posthog.capture('user_signed_out')
+              posthog.reset()
+              setMenuOpen(false)
+              await navigate({ to: '/' })
+              await queryClient.invalidateQueries({ queryKey: ['session'] })
+            }}
+          >
+            <LogOut />
+            {copy.signOut}
+          </Button>
         </PopoverContent>
       </Popover>
       {dialogOpen && (

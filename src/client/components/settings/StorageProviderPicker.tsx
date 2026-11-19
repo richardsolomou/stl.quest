@@ -90,7 +90,8 @@ export function StorageProviderPicker({
   return (
     <div className="flex flex-col gap-5">
       <div className="space-y-2">
-        <h3 className="font-heading text-xl font-semibold">{inUse ? t.picker.changeTitle : t.picker.chooseTitle}</h3>
+        {/* In settings the surrounding section names the choice. */}
+        {!settings && <h3 className="font-heading text-xl font-semibold">{inUse ? t.picker.changeTitle : t.picker.chooseTitle}</h3>}
         <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
       </div>
       {inUse && (

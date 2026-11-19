@@ -5,14 +5,28 @@ export function SettingsPage({ className, ...props }: ComponentProps<'div'>) {
   return <div data-slot="settings-page" className={cn('flex min-w-0 flex-col gap-6', className)} {...props} />
 }
 
-export function SettingsHeader({ title, description, children }: { title: string; description?: ReactNode; children?: ReactNode }) {
+/** The top of every page outside the board: the page's name, what it is for, and the actions that act on the whole page. */
+export function PageHeader({
+  title,
+  description,
+  actions,
+  children,
+}: {
+  title: string
+  description?: ReactNode
+  actions?: ReactNode
+  children?: ReactNode
+}) {
   return (
-    <header data-slot="settings-header" className="flex flex-col gap-2 border-b-2 border-dashed border-blueprint/25 pb-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="font-heading text-xl font-semibold tracking-tight text-foreground">{title}</h2>
-        {children}
+    <header data-slot="page-header" className="flex flex-wrap items-end gap-x-6 gap-y-3 border-b-2 border-dashed border-blueprint/25 pb-5">
+      <div className="flex min-w-0 flex-[1_1_20rem] flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="font-heading text-xl font-semibold tracking-tight text-foreground">{title}</h1>
+          {children}
+        </div>
+        {description && <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">{description}</p>}
       </div>
-      {description && <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">{description}</p>}
+      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </header>
   )
 }

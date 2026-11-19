@@ -1,11 +1,13 @@
-import { useEffect, useRef } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { useRef } from 'react'
+import { createFileRoute } from '@tanstack/react-router'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { ArchiveRestore, ArchiveX, Link2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { AccountRouteShell } from '../client/components/AccountRouteShell'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '@/components/ui/empty'
+import { AppShell } from '../client/components/AppShell'
+import { PageHeader } from '../client/components/settings/SettingsLayout'
 import { ARCHIVE_SORT_GROUPS, BoardFilters } from '../client/components/BoardFilters'
 import { LazyThumb } from '../client/components/LazyThumb'
 import { LocalDate } from '../client/components/LocalDate'
@@ -29,13 +31,11 @@ import { useI18n } from '../client/i18n'
 export const Route = createFileRoute('/archive')({ validateSearch: validateRequestSearch, component: ArchivePage })
 
 function ArchivePage() {
-  const navigate = useNavigate()
-  const { data: session } = useSuspenseQuery(sessionQuery())
-  useEffect(() => {
-    if (!session.identity) void navigate({ to: '/' })
-  }, [session.identity, navigate])
-  if (!session.identity) return null
-  return <AccountRouteShell active="archive">{() => <ArchiveView />}</AccountRouteShell>
+  return (
+    <AppShell active="archive" contained>
+      <ArchiveView />
+    </AppShell>
+  )
 }
 
 function ArchiveView() {
@@ -89,13 +89,10 @@ function ArchiveView() {
   const filtered =
     search.tag !== undefined || Object.entries(filters).some(([key, value]) => key !== 'sort' && key !== 'archived' && value !== undefined)
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <header className="shrink-0">
-        <h1 className="font-heading text-xl font-semibold">{t.requests.archive.title}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{t.requests.archive.description}</p>
-      </header>
+    <div className="flex min-h-0 flex-1 flex-col gap-5">
+      <PageHeader title={t.requests.archive.title} description={t.requests.archive.description} />
       <BoardFilters
-        className="-mx-5 shrink-0 px-5"
+        className="shrink-0 px-0 pt-0"
         search={search}
         facets={facets}
         tags={tags}
@@ -106,10 +103,17 @@ function ArchiveView() {
         onChange={(patch, replace = false) => void navigate({ search: updateRequestSearch(search, patch), replace })}
       />
       {archivedRequests.length === 0 ? (
-        <div className="grid place-items-center gap-3 rounded-xl border border-dashed border-blueprint/25 p-10 text-center">
-          <ArchiveX aria-hidden="true" className="size-8 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">{filtered ? t.requests.archive.noMatches : t.requests.archive.empty}</p>
-        </div>
+        <Empty className="flex-none border border-border/70 bg-card/40 py-12">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <ArchiveX aria-hidden="true" />
+            </EmptyMedia>
+            <h2 className="font-heading text-sm font-medium tracking-tight">
+              {filtered ? t.requests.archive.noMatchesTitle : t.requests.archive.emptyTitle}
+            </h2>
+            <EmptyDescription>{filtered ? t.requests.archive.noMatches : t.requests.archive.empty}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
         <ArchivedRequestList
           requests={archivedRequests}

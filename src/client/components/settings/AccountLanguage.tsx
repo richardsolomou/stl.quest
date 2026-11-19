@@ -6,7 +6,6 @@ import { LOCALE_NAMES, LOCALES, isLocale, negotiateLocale, type Locale } from '.
 import { updateLocale } from '../../../server/fns'
 import { useI18n } from '../../i18n'
 import { SettingNotice, errorNotice } from '../SettingNotice'
-import { SettingsSection } from './SettingsLayout'
 
 const BROWSER = 'browser'
 
@@ -24,7 +23,7 @@ export function AccountLanguage({ preference }: { preference?: Locale }) {
   const items = [{ value: BROWSER, label: browserLabel }, ...LOCALES.map((locale) => ({ value: locale, label: LOCALE_NAMES[locale] }))]
   const value = preference ?? BROWSER
   return (
-    <SettingsSection title={t.language.title}>
+    <>
       <Field orientation="horizontal" className="max-sm:flex-col">
         <FieldContent>
           <FieldLabel htmlFor="interface-language">{t.language.label}</FieldLabel>
@@ -39,7 +38,7 @@ export function AccountLanguage({ preference }: { preference?: Locale }) {
             mutation.mutate({ data: { locale: isLocale(next) ? next : undefined } })
           }}
         >
-          <SelectTrigger className="w-auto max-w-56 max-sm:w-full max-sm:max-w-none" id="interface-language" aria-label={t.language.label}>
+          <SelectTrigger className="w-56 max-sm:w-full" id="interface-language" aria-label={t.language.label}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent align="end" alignItemWithTrigger={false}>
@@ -52,6 +51,6 @@ export function AccountLanguage({ preference }: { preference?: Locale }) {
         </Select>
       </Field>
       {mutation.error && <SettingNotice notice={errorNotice(t.language.saveFailedTitle, t.language.saveFailedHint, mutation.error)} />}
-    </SettingsSection>
+    </>
   )
 }

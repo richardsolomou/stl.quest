@@ -2,13 +2,14 @@ import type { settings as en } from '../en/settings'
 
 export const settings: typeof en = {
   board: {
-    title: 'Board',
+    title: 'Allgemein',
     description:
       'Legen Sie fest, wie Anfragen zwischen Administratoren und Anfragenden geteilt werden und wann fertige Drucke das Board verlassen.',
     loading: 'Board-Einstellungen werden geladen…',
     loadError: 'Board-Einstellungen konnten nicht geladen werden',
     previousSettingKept: 'Das Board verwendet weiterhin die vorherige Einstellung. Versuchen Sie es gleich noch einmal.',
     visibility: {
+      title: 'Sichtbarkeit',
       label: 'Sichtbarkeit der Anfragen',
       shared: 'Geteilt — alle sehen jede Anfrage',
       private: 'Privat — Anfragende sehen nur ihre eigenen',
@@ -47,9 +48,8 @@ export const settings: typeof en = {
     },
   },
   sections: {
-    label: 'Bereiche der Arbeitsbereich-Einstellungen',
     workspaceFallback: 'Arbeitsbereich',
-    board: 'Board',
+    board: 'Allgemein',
     printers: 'Drucker',
     users: 'Mitglieder',
     email: 'E-Mail',
@@ -450,14 +450,14 @@ export const settings: typeof en = {
   },
   about: {
     title: 'Über',
-    description: 'Projektinformationen, Community-Links und Lizenz.',
     version: (version: string) => `Version ${version}`,
     tagline: 'Eine private Anfrage- und Produktionswarteschlange für 3D-Drucke auf Harz- und Filamentdruckern.',
     links: 'Projektlinks',
-    website: { link: 'Website', description: 'Die offizielle Website von STL Quest besuchen' },
+    website: { description: 'Die offizielle Website von STL Quest besuchen' },
     source: { title: 'Quellcode', description: 'Den zugehörigen Quellcode dieser Version abrufen' },
     issues: { title: 'Probleme und Ideen', description: 'Einen Fehler melden oder eine Verbesserung vorschlagen' },
     releases: { title: 'Versionshinweise', description: 'Sehen, was sich zwischen den Versionen geändert hat' },
+    licenseTitle: 'Lizenz',
     license:
       'STL Quest ist Open Source unter der GNU Affero General Public License v3.0. Nutzer gehosteter und selbst gehosteter Installationen können den zugehörigen Quellcode oben abrufen, und die anonyme Telemetrie lässt sich jederzeit deaktivieren.',
   },
@@ -547,6 +547,7 @@ export const settings: typeof en = {
       `Von STL Quest gehostet. ${freePlan ? 'Ihr kostenloser Tarif' : 'Ihr Tarif'} enthält insgesamt ${quota} für Modelle, Vorschauen und Vorschaubilder, geteilt über alle Ihre Arbeitsbereiche. Sonst ist nichts zu konfigurieren.`,
   },
   selfSignup: {
+    title: 'Registrierung',
     label: 'Selbstregistrierung erlauben',
     description: 'Ist dies deaktiviert, kann ein Konto nur über einen Einladungslink oder über „Benutzer hinzufügen“ erstellt werden.',
     notSaved: 'Diese Einstellung wurde nicht gespeichert',

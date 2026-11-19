@@ -15,7 +15,7 @@ import { SettingNotice, type Notice } from '../SettingNotice'
 import { SettingRow } from '../SettingRow'
 import { ProtectedEmail } from '../ProtectedEmail'
 import { UserAvatar } from '../UserAvatar'
-import { SettingsHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { PageHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { DisableTwoFactorForm, TwoFactorSetupForm } from './AccountTwoFactorForms'
 import { ChangePasswordForm, CreatePasswordForm } from './AccountPasswordForms'
 import { AccountProfileForm } from './AccountProfileForm'
@@ -47,7 +47,7 @@ export function AccountPane({ me }: { me: Identity }) {
   if (!session || !methods) {
     return (
       <SettingsPage>
-        <SettingsHeader title={pane.title} description={pane.description} />
+        <PageHeader title={pane.title} description={pane.description} />
         <QueryState
           loading={sessionResult.isPending || methodsResult.isPending}
           error={sessionResult.error ?? methodsResult.error}
@@ -60,22 +60,24 @@ export function AccountPane({ me }: { me: Identity }) {
   }
   return (
     <SettingsPage>
-      <SettingsHeader title={pane.title} description={pane.description} />
+      <PageHeader title={pane.title} description={pane.description} />
       <SettingNotice notice={notice} />
       <SettingsSection title={pane.profileTitle} description={pane.profileDescription}>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <UserAvatar name={me.name} image={me.image} size="lg" />
-          <div>
-            <h3 className="ph-no-capture font-medium">{me.name}</h3>
+          <div className="min-w-32 flex-1">
+            <h3 className="ph-no-capture truncate font-medium">{me.name}</h3>
             <ProtectedEmail email={me.email} className="block text-sm text-muted-foreground" />
           </div>
-          <Button type="button" variant="outline" className="ml-auto" onClick={() => setEditingProfile(true)}>
+          <Button type="button" variant="outline" onClick={() => setEditingProfile(true)}>
             {pane.editProfile}
           </Button>
         </div>
       </SettingsSection>
-      <AccountAppearance />
-      <AccountLanguage preference={me.locale} />
+      <SettingsSection title={pane.preferencesTitle}>
+        <AccountAppearance />
+        <AccountLanguage preference={me.locale} />
+      </SettingsSection>
       {me.workspaceSlug && (
         <AccountNotifications
           workspaceSlug={me.workspaceSlug}

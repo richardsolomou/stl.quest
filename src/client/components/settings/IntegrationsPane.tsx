@@ -5,7 +5,7 @@ import { integrationsQuery } from '../../queries'
 import { QueryState } from '../QueryState'
 import { CloudStorageAppDialog } from './CloudStorageAppDialog'
 import { AuthenticationSettings, ProviderDialog } from './AuthenticationIntegrationSettings'
-import { SettingsHeader, SettingsPage } from './SettingsLayout'
+import { PageHeader, SettingsPage } from './SettingsLayout'
 import { DeploymentSmtpDialog, SmtpSettings } from './SmtpIntegrationSettings'
 import { CloudStorageSettings } from './StorageIntegrationSettings'
 import { useI18n } from '../../i18n'
@@ -20,7 +20,7 @@ export function IntegrationsPane() {
   if (!data) {
     return (
       <SettingsPage>
-        <SettingsHeader title={copy.title} description={copy.loadingDescription} />
+        <PageHeader title={copy.title} description={copy.loadingDescription} />
         <QueryState
           loading={query.isPending}
           error={query.error}
@@ -33,7 +33,7 @@ export function IntegrationsPane() {
   }
   return (
     <SettingsPage>
-      <SettingsHeader title={copy.title} description={copy.description} />
+      <PageHeader title={copy.title} description={copy.description} />
       <AuthenticationSettings data={data} onConfigure={setProvider} />
       <CloudStorageSettings data={data} onConfigure={setCloudProvider} />
       <SmtpSettings data={data} onConfigure={() => setSmtpOpen(true)} />

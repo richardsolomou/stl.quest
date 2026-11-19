@@ -226,6 +226,8 @@ export const requests: typeof en = {
       'Les impressions archivées sortent du tableau mais conservent leur étape, leur source, leurs fichiers et leur historique. Remettez-en une sur le tableau dès que vous en avez besoin.',
     filtersLabel: 'Filtres des archives',
     filtersDescription: 'Combinez des champs pour affiner les archives.',
+    noMatchesTitle: 'Aucun résultat',
+    emptyTitle: 'Les archives sont vides',
     noMatches: 'Aucune impression archivée ne correspond à ces filtres.',
     empty: 'Rien n’est encore archivé. Faites un clic droit sur une impression du tableau et choisissez Archiver.',
     loading: 'Chargement des archives…',

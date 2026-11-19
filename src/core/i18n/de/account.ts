@@ -9,9 +9,6 @@ export const account: typeof en = {
     account: 'Konto',
     onboarding: 'Einführung',
     plan: 'Tarif',
-    about: 'Über',
-    admin: 'Administration',
-    updateAvailable: (version) => `STL Quest v${version} ist verfügbar`,
     signOut: 'Abmelden',
     createDescriptionBilling:
       'Ein Arbeitsbereich hat ein eigenes Board, eigene Mitglieder und eigene Drucker. Arbeitsbereiche mit inklusivem Speicher teilen sich das Kontingent des Tarifs Ihres Kontos.',
@@ -33,12 +30,12 @@ export const account: typeof en = {
     revealHint: 'Klicken, um die E-Mail-Adresse anzuzeigen',
   },
   appearance: {
-    title: 'Darstellung',
     theme: 'Design',
     themeDescription: 'In diesem Browser gespeichert, damit jedes Gerät seine eigene Einstellung behält.',
     themes: { system: 'Wie das System', light: 'Hell', dark: 'Dunkel' },
   },
   pane: {
+    preferencesTitle: 'Einstellungen',
     title: 'Konto',
     description: 'Verwalten Sie Ihr Profil, die Darstellung, Ihre Benachrichtigungen und Ihre Anmeldemethoden.',
     loading: 'Kontoeinstellungen werden geladen…',

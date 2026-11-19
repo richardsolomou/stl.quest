@@ -9,9 +9,6 @@ export const account: typeof en = {
     account: 'Compte',
     onboarding: 'Prise en main',
     plan: 'Formule',
-    about: 'À propos',
-    admin: 'Administration',
-    updateAvailable: (version) => `STL Quest v${version} est disponible`,
     signOut: 'Se déconnecter',
     createDescriptionBilling:
       'Un espace de travail a son propre tableau, ses membres et ses imprimantes. Les espaces de travail qui utilisent le stockage inclus partagent le quota de la formule de votre compte.',
@@ -33,12 +30,12 @@ export const account: typeof en = {
     revealHint: 'Cliquez pour afficher l’adresse e-mail',
   },
   appearance: {
-    title: 'Apparence',
     theme: 'Thème',
     themeDescription: 'Enregistré dans ce navigateur, pour que chaque appareil garde le sien.',
     themes: { system: 'Comme le système', light: 'Clair', dark: 'Sombre' },
   },
   pane: {
+    preferencesTitle: 'Préférences',
     title: 'Compte',
     description: 'Gérez votre profil, l’apparence, vos notifications et vos méthodes de connexion.',
     loading: 'Chargement des paramètres du compte…',

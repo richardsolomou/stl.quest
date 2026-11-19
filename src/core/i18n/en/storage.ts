@@ -104,6 +104,7 @@ export const storage = {
     s3Requires: 'Needs a bucket and access keys from Amazon S3, Cloudflare R2, Backblaze, MinIO, or a similar provider.',
     webdavLabel: 'Remote folder over WebDAV',
     webdavRequires: 'Needs a WebDAV server on your own machine or NAS, reachable over HTTPS.',
+    locationTitle: 'Location',
     changeTitle: 'Change where your models live',
     chooseTitle: 'Choose where your models live',
     setUp: 'Storage is set up',

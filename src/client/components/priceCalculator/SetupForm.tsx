@@ -1,4 +1,5 @@
 import { useMemo, type FormEvent } from 'react'
+import { Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -12,6 +13,7 @@ import {
   type PriceCalculatorCurrency,
   type PriceCalculatorSettings,
 } from '../../../core/priceCalculator'
+import { getPrinterPreset } from '../../../core/printerPresets'
 import { getResinPreset, RESIN_PRESETS } from '../../../core/resinPresets'
 import { useI18n } from '../../i18n'
 import { FilterCombobox } from '../FilterCombobox'
@@ -33,10 +35,13 @@ export function SetupForm({
   dirty,
   saving,
   error,
+  open,
+  onOpenChange,
   onSettingsChange,
   onResinModeChange,
   onElectricityModeChange,
   onSave,
+  onDiscard,
 }: {
   settings: PriceCalculatorSettings
   resinMode: SetupMode
@@ -44,45 +49,114 @@ export function SetupForm({
   dirty: boolean
   saving: boolean
   error: unknown
+  open: boolean
+  onOpenChange: (open: boolean) => void
   onSettingsChange: (settings: PriceCalculatorSettings) => void
   onResinModeChange: (mode: SetupMode) => void
   onElectricityModeChange: (mode: SetupMode) => void
   onSave: () => void
+  onDiscard: () => void
 }) {
   const copy = useI18n().t.calculator.setup
   const save = (event: FormEvent) => {
     event.preventDefault()
     onSave()
   }
+  // The setup is set once and then mostly read, so it folds to a summary until someone needs to change it.
+  const expanded = open || dirty
   return (
     <form className="lg:col-start-1 lg:row-start-2" onSubmit={save}>
       <SettingsSection title={copy.title} description={copy.description} disabled={saving}>
-        <div className="grid gap-4">
-          <CurrencySetup
-            settings={settings}
-            onCurrencyChange={(currency) => {
-              onSettingsChange(selectPriceCalculatorCurrency(settings, currency))
-              if (!electricityPresetsAvailable(currency)) onElectricityModeChange('custom')
-            }}
-          />
-          <EquipmentSetup settings={settings} onSettingsChange={onSettingsChange} />
-          <MaterialSetup settings={settings} mode={resinMode} onModeChange={onResinModeChange} onSettingsChange={onSettingsChange} />
-          <ElectricitySetup
-            settings={settings}
-            mode={electricityMode}
-            onModeChange={onElectricityModeChange}
-            onSettingsChange={onSettingsChange}
-          />
-          <PricingSetup settings={settings} onSettingsChange={onSettingsChange} />
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <SetupSummary settings={settings} />
+          {!expanded && (
+            <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(true)}>
+              <Pencil />
+              {copy.edit}
+            </Button>
+          )}
         </div>
-        <SettingsActions>
-          <Button type="submit" disabled={saving || !dirty}>
-            {saving && <Spinner />} {copy.save}
-          </Button>
-          {error != null && <FieldError>{error instanceof Error ? error.message : copy.saveError}</FieldError>}
-        </SettingsActions>
+        {expanded && (
+          <>
+            <div className="grid gap-6 border-t border-border/70 pt-5">
+              <CurrencySetup
+                settings={settings}
+                onCurrencyChange={(currency) => {
+                  onSettingsChange(selectPriceCalculatorCurrency(settings, currency))
+                  if (!electricityPresetsAvailable(currency)) onElectricityModeChange('custom')
+                }}
+              />
+              <EquipmentSetup settings={settings} onSettingsChange={onSettingsChange} />
+              <MaterialSetup settings={settings} mode={resinMode} onModeChange={onResinModeChange} onSettingsChange={onSettingsChange} />
+              <ElectricitySetup
+                settings={settings}
+                mode={electricityMode}
+                onModeChange={onElectricityModeChange}
+                onSettingsChange={onSettingsChange}
+              />
+              <PricingSetup settings={settings} onSettingsChange={onSettingsChange} />
+            </div>
+            <SettingsActions className="border-t border-border/70 pt-4">
+              <Button type="submit" disabled={saving || !dirty}>
+                {saving && <Spinner />} {copy.save}
+              </Button>
+              {dirty ? (
+                <Button type="button" variant="ghost" disabled={saving} onClick={onDiscard}>
+                  {copy.discard}
+                </Button>
+              ) : (
+                <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+                  {copy.done}
+                </Button>
+              )}
+              {dirty && <span className="text-sm text-muted-foreground">{copy.unsaved}</span>}
+              {error != null && <FieldError>{error instanceof Error ? error.message : copy.saveError}</FieldError>}
+            </SettingsActions>
+          </>
+        )}
       </SettingsSection>
     </form>
+  )
+}
+
+function SetupSummary({ settings }: { settings: PriceCalculatorSettings }) {
+  const { t, locale } = useI18n()
+  const symbol = currencySymbol(settings.currency, locale)
+  const equipment = settings.printType === 'resin' ? settings.resinEquipment : settings.filamentEquipment
+  const printer = equipment.presetIds.map((id) => getPrinterPreset(id)).find((preset) => preset !== undefined)
+  const resin = getResinPreset(settings.resinPresetId)
+  const country = getElectricityPricePreset(settings.electricityCountryCode)
+  const items = [
+    { label: t.calculator.currency.title, value: settings.currency },
+    {
+      label: t.calculator.setup.summary.printer,
+      value: printer ? `${printer.brand} ${printer.model}` : `${formatNumber(equipment.printPowerWatts, locale)} W`,
+    },
+    {
+      label: t.calculator.material.title,
+      value:
+        settings.printType === 'filament'
+          ? `${symbol}${formatNumber(settings.filamentPricePerKg, locale)}/kg`
+          : `${resin ? `${resin.brand} ${resin.name} · ` : ''}${symbol}${formatNumber(settings.resinPricePerLitre, locale)}/L`,
+    },
+    {
+      label: t.calculator.electricity.title,
+      value: `${country ? `${countryFlag(country.countryCode)} ` : ''}${symbol}${formatNumber(settings.electricityPricePerKwh, locale, 4)}/kWh`,
+    },
+    { label: t.calculator.setup.summary.labour, value: `${symbol}${formatNumber(settings.labourCostPerHour, locale)}/h` },
+    { label: t.calculator.setup.summary.margin, value: `${formatNumber(settings.standardMarginPercent, locale)}%` },
+  ]
+  return (
+    <dl className="grid min-w-0 flex-1 grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-x-5 gap-y-3">
+      {items.map((item) => (
+        <div key={item.label} className="min-w-0">
+          <dt className="font-heading text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">{item.label}</dt>
+          <dd className="mt-1 truncate font-mono text-sm" title={item.value}>
+            {item.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
   )
 }
 

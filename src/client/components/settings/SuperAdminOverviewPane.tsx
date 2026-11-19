@@ -11,7 +11,7 @@ import { adminWorkspaceAttentionReasons, type AdminWorkspace } from '../../../co
 import { useI18n } from '../../i18n'
 import { accountsQuery, adminWorkspacesQuery } from '../../queries'
 import { QueryState } from '../QueryState'
-import { SettingsHeader, SettingsPage } from './SettingsLayout'
+import { PageHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { SuperAdminWorkspaceDialog } from './SuperAdminWorkspaceDialog'
 
 const DAY = 24 * 60 * 60 * 1_000
@@ -28,7 +28,7 @@ export function SuperAdminOverviewPane({ hosted }: { hosted: boolean }) {
   if (!accounts || !workspaces) {
     return (
       <SettingsPage>
-        <SettingsHeader title={copy.title} description={copy.description} />
+        <PageHeader title={copy.title} description={copy.description} />
         <QueryState
           loading={accountsResult.isPending || workspacesResult.isPending}
           error={accountsResult.error ?? workspacesResult.error}
@@ -54,7 +54,7 @@ export function SuperAdminOverviewPane({ hosted }: { hosted: boolean }) {
 
   return (
     <SettingsPage>
-      <SettingsHeader title={copy.title} description={copy.description} />
+      <PageHeader title={copy.title} description={copy.description} />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <SummaryCard label={copy.users} value={accounts.length} detail={copy.newInLast30Days(newAccounts)} />
         <SummaryCard label={copy.activeUsers} value={activeAccounts} detail={copy.activeUsersDetail} />
@@ -70,13 +70,9 @@ export function SuperAdminOverviewPane({ hosted }: { hosted: boolean }) {
 
       {hosted && <HostedStorageValue accounts={accounts} />}
 
-      <section className="overflow-hidden rounded-sm border-2 border-border/70 bg-card/40">
-        <header className="space-y-1 border-b-2 border-dashed border-blueprint/25 px-5 py-4">
-          <h3 className="font-heading text-base font-semibold tracking-tight">{copy.needsAttention}</h3>
-          <p className="text-sm leading-relaxed text-muted-foreground">{copy.attentionDescription}</p>
-        </header>
+      <SettingsSection title={copy.needsAttention} description={copy.attentionDescription}>
         {attention.length ? (
-          <div className="divide-y">
+          <div className="divide-y overflow-hidden rounded-sm border">
             {attention.slice(0, 8).map(({ workspace, reasons }) => (
               <Button
                 key={workspace.id}
@@ -94,7 +90,7 @@ export function SuperAdminOverviewPane({ hosted }: { hosted: boolean }) {
             ))}
           </div>
         ) : (
-          <Empty className="min-h-36 rounded-none border-0 p-6">
+          <Empty className="border-0 p-4">
             <EmptyMedia variant="icon">
               <CircleCheck />
             </EmptyMedia>
@@ -104,7 +100,7 @@ export function SuperAdminOverviewPane({ hosted }: { hosted: boolean }) {
             </EmptyHeader>
           </Empty>
         )}
-      </section>
+      </SettingsSection>
       {selected && <SuperAdminWorkspaceDialog workspace={selected} onDone={() => setSelected(undefined)} />}
     </SettingsPage>
   )
@@ -121,19 +117,15 @@ function HostedStorageValue({ accounts }: { accounts: Account[] }) {
   const paidAccounts = customerAccounts.filter((account) => account.plan && account.plan !== 'free')
   const storedBytes = customerAccounts.reduce((total, account) => total + (account.managedStorageUsedBytes ?? 0), 0)
   return (
-    <section className="overflow-hidden rounded-sm border-2 border-border/70 bg-card/40">
-      <header className="space-y-1 border-b-2 border-dashed border-blueprint/25 px-5 py-4">
-        <h3 className="font-heading text-base font-semibold tracking-tight">{copy.title}</h3>
-        <p className="text-sm leading-relaxed text-muted-foreground">{copy.description}</p>
-      </header>
-      <div className="grid gap-px bg-border/70 sm:grid-cols-2 lg:grid-cols-4">
+    <SettingsSection title={copy.title} description={copy.description}>
+      <div className="grid gap-px overflow-hidden rounded-sm border bg-border/70 sm:grid-cols-2 lg:grid-cols-4">
         <ValueStat label={copy.using} value={usingStorage.length} detail={copy.ofCustomerAccounts(customerAccounts.length)} />
         <ValueStat label={copy.storingData} value={storingData.length} detail={copy.storingDataDetail} />
         <ValueStat label={copy.paidPlans} value={paidAccounts.length} detail={copy.paidPlansDetail} />
         <ValueStat label={copy.dataStored} value={formatBytes(storedBytes, locale)} detail={copy.dataStoredDetail} />
       </div>
-      <div className="border-t-2 border-dashed border-blueprint/25 px-5 py-4">
-        <h4 className="mb-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">{copy.planMix}</h4>
+      <div>
+        <h4 className="mb-3 font-heading text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">{copy.planMix}</h4>
         <div className="grid gap-3 sm:grid-cols-3">
           {plans.map((plan) => {
             const planAccounts = customerAccounts.filter((account) => (account.plan ?? 'free') === plan)
@@ -143,7 +135,7 @@ function HostedStorageValue({ accounts }: { accounts: Account[] }) {
               <div key={plan} className="rounded-sm border border-border/70 bg-background/40 p-3">
                 <div className="flex items-baseline justify-between gap-3">
                   <p className="font-medium">{planNames[plan]}</p>
-                  <p className="font-heading text-xl font-semibold tabular-nums">{planAccounts.length}</p>
+                  <p className="font-mono text-xl">{planAccounts.length}</p>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">{copy.planUsage(planUsingStorage, formatBytes(planBytes, locale))}</p>
               </div>
@@ -151,15 +143,15 @@ function HostedStorageValue({ accounts }: { accounts: Account[] }) {
           })}
         </div>
       </div>
-    </section>
+    </SettingsSection>
   )
 }
 
 function ValueStat({ label, value, detail }: { label: string; value: string | number; detail: string }) {
   return (
     <div className="min-w-0 bg-card px-5 py-4">
-      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
-      <p className="mt-2 font-heading text-2xl leading-none font-semibold tabular-nums">{value}</p>
+      <p className="font-heading text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">{label}</p>
+      <p className="mt-2 font-mono text-2xl leading-none">{value}</p>
       <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{detail}</p>
     </div>
   )
@@ -168,8 +160,8 @@ function ValueStat({ label, value, detail }: { label: string; value: string | nu
 function SummaryCard({ label, value, detail }: { label: string; value: string | number; detail: string }) {
   return (
     <div className="rounded-sm border-2 border-border/70 bg-card/40 p-4">
-      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
-      <p className="mt-2 font-heading text-3xl leading-none font-semibold tabular-nums">{value}</p>
+      <p className="font-heading text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">{label}</p>
+      <p className="mt-2 font-mono text-3xl leading-none">{value}</p>
       <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{detail}</p>
     </div>
   )

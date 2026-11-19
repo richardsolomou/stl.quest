@@ -1,20 +1,17 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { createFileRoute, useNavigate, useHydrated } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
-import { AppRail } from '../client/components/AppRail'
+import { AppShell } from '../client/components/AppShell'
 import { calculatorPrefill, validateCalculatorSearch } from '../client/calculatorSearch'
 import { PriceCalculator } from '../client/components/PriceCalculator'
 import { sessionQuery } from '../client/queries'
-import { useEscape } from '../client/useEscape'
 
 export const Route = createFileRoute('/calculator')({ validateSearch: validateCalculatorSearch, component: PriceCalculatorPage })
 
 function PriceCalculatorPage() {
   const { data: session } = useSuspenseQuery(sessionQuery())
   const search = Route.useSearch()
-  const hydrated = useHydrated()
   const navigate = useNavigate()
-  useEscape(() => navigate({ to: '/' }))
   const identity = session.identity
   const authorized = Boolean(identity?.role === 'admin' && identity.workspaceSlug)
   useEffect(() => {
@@ -22,13 +19,8 @@ function PriceCalculatorPage() {
   }, [authorized, navigate])
   if (!authorized) return null
   return (
-    <div className="fixed inset-0 flex overflow-hidden">
-      <AppRail active="calculator" isAdmin isSuperAdmin={identity!.superAdmin} navigationEnabled={hydrated} />
-      <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-none">
-        <div className="mx-auto w-full max-w-5xl px-5 pt-7 pb-12">
-          <PriceCalculator workspaceSlug={identity!.workspaceSlug!} prefill={calculatorPrefill(search)} />
-        </div>
-      </main>
-    </div>
+    <AppShell active="calculator">
+      <PriceCalculator workspaceSlug={identity!.workspaceSlug!} prefill={calculatorPrefill(search)} />
+    </AppShell>
   )
 }

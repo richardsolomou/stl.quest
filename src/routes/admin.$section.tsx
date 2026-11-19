@@ -1,10 +1,9 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { createFileRoute, redirect, useNavigate, useHydrated } from '@tanstack/react-router'
+import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { isSuperAdminSection, SuperAdminPanes } from '../client/components/SuperAdminPanes'
-import { AppRail } from '../client/components/AppRail'
+import { SettingsShell } from '../client/components/settings/SettingsShell'
 import { sessionQuery } from '../client/queries'
-import { useEscape } from '../client/useEscape'
 
 export const Route = createFileRoute('/admin/$section')({
   beforeLoad: ({ params }) => {
@@ -20,9 +19,7 @@ export const Route = createFileRoute('/admin/$section')({
 function SuperAdminPage() {
   const { section } = Route.useParams()
   const { data: session } = useSuspenseQuery(sessionQuery())
-  const hydrated = useHydrated()
   const navigate = useNavigate()
-  useEscape(() => navigate({ to: '/' }))
   const identity = session.identity
   const validSection = isSuperAdminSection(section) ? section : undefined
   const authorized = Boolean(identity?.superAdmin && validSection)
@@ -31,13 +28,8 @@ function SuperAdminPage() {
   }, [authorized, navigate])
   if (!authorized) return null
   return (
-    <div className="flex h-dvh">
-      <AppRail active="admin" isAdmin={identity!.role === 'admin'} isSuperAdmin navigationEnabled={hydrated} />
-      <main className="min-w-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-5xl px-5 pt-7 pb-12">
-          <SuperAdminPanes section={validSection!} hosted={session.hosted} />
-        </div>
-      </main>
-    </div>
+    <SettingsShell current={{ kind: 'admin', section: validSection! }}>
+      <SuperAdminPanes section={validSection!} hosted={session.hosted} />
+    </SettingsShell>
   )
 }

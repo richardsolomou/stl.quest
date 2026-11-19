@@ -39,6 +39,10 @@ test('requesters own queue priority while admins move work between stages', asyn
     .click()
   await expect(requestCard(requesterPage, 'requester-delete')).toHaveCount(0)
   await expect(requesterPage.getByRole('button', { name: 'STL Quest, 1 of 5 resolved, 20 XP' })).toBeVisible()
+  // Settings is for everyone; a member's lands on their own account rather than the workspace.
+  await expect(
+    requesterPage.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Settings', exact: true }),
+  ).toHaveAttribute('href', '/account')
   await requestCard(requesterPage, 'requester-first').click()
   const inspectToast = requesterPage.getByRole('listitem').filter({ hasText: 'Inspect a print complete' })
   await expect(inspectToast).toBeVisible()
@@ -256,7 +260,7 @@ test('requesters own queue priority while admins move work between stages', asyn
 
 // The board settings pane links to Members too, so section navigation is scoped to the settings nav.
 function settingsSection(page: Page, name: string) {
-  return page.getByLabel('Workspace settings sections').getByRole('link', { name, exact: true })
+  return page.getByLabel('Settings sections').getByRole('link', { name, exact: true })
 }
 
 async function enterAdminWorkspace(page: Page) {

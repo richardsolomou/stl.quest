@@ -216,6 +216,8 @@ export const requests = {
       'Archived prints stay out of the board but keep their stage, source, files, and history. Move one back whenever you need it again.',
     filtersLabel: 'Archive filters',
     filtersDescription: 'Combine any fields to narrow the archive.',
+    noMatchesTitle: 'No matches',
+    emptyTitle: 'The archive is empty',
     noMatches: 'No archived prints match these filters.',
     empty: 'Nothing is archived yet. Right-click a print on the board and choose Archive.',
     loading: 'Loading archive…',

@@ -16,6 +16,18 @@ export const shell = {
     storageNearlyFull: 'Storage is nearly full.',
     upgradeTo: (plan: string) => `Upgrade to ${plan}`,
     viewPlan: 'View plan',
+    updateAvailable: (version: string) => `STL Quest v${version} is available`,
+  },
+  settingsNav: {
+    label: 'Settings sections',
+    choose: 'Choose a settings section',
+    workspace: 'Workspace',
+    you: 'You',
+    server: 'Server',
+    product: 'STL Quest',
+    account: 'Account',
+    plan: 'Plan',
+    about: 'About',
   },
   setup: {
     steps: { storage: 'Storage', printers: 'Printers' },

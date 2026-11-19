@@ -166,7 +166,7 @@ export function Column({
         )}
       >
         {entries.length === 0 && (
-          <Empty className="border-0 py-6">
+          <Empty className="flex-none border-0 px-4 py-8">
             <EmptyDescription>{filtered ? t.board.column.filteredEmpty : statusText(t, 'empty', definition.id)}</EmptyDescription>
           </Empty>
         )}

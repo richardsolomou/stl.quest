@@ -113,6 +113,7 @@ export const storage: typeof en = {
     s3Requires: 'Nécessite un bucket et des clés d’accès d’Amazon S3, Cloudflare R2, Backblaze, MinIO ou d’un fournisseur similaire.',
     webdavLabel: 'Dossier distant via WebDAV',
     webdavRequires: 'Nécessite un serveur WebDAV sur votre propre machine ou NAS, joignable en HTTPS.',
+    locationTitle: 'Emplacement',
     changeTitle: 'Changer l’emplacement de vos modèles',
     chooseTitle: 'Choisir l’emplacement de vos modèles',
     setUp: 'Le stockage est configuré',

@@ -16,8 +16,8 @@ export function currencyLabel(currency: PriceCalculatorCurrency, locale: Locale)
   return `${currency} · ${new Intl.DisplayNames(locale, { type: 'currency' }).of(currency)}`
 }
 
-export function formatNumber(value: number, locale: Locale) {
-  return new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value)
+export function formatNumber(value: number, locale: Locale, maximumFractionDigits = 2) {
+  return new Intl.NumberFormat(locale, { maximumFractionDigits }).format(value)
 }
 
 export function formatEurosPerKwh(value: number, locale: Locale) {

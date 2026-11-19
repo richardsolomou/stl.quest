@@ -5,6 +5,8 @@ import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { Inbox, SearchX } from 'lucide-react'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '@/components/ui/empty'
 import { requestQueueOrder, type BoardSort, type PrintGroup, type PublicPrintRequest } from '../../core/types'
 import { compareCompletedQueue, compareRequesterPriorityQueues, compareRoundRobinQueue } from '../../core/requestQueue'
 import { printGroupPaths } from '../../core/printGroups'
@@ -505,10 +507,11 @@ export function Board({
   }
   if (requests.length === 0) {
     return (
-      <main className="grid min-h-0 flex-1 place-items-center p-6 text-center">
-        <div className="max-w-md rounded-xl border bg-card/40 p-7">
-          <h2 className="font-heading text-xl font-semibold">{filtered ? b.filteredEmptyTitle : b.emptyTitle}</h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+      <Empty className="min-h-0 p-6">
+        <EmptyHeader className="max-w-md">
+          <EmptyMedia variant="icon">{filtered ? <SearchX aria-hidden="true" /> : <Inbox aria-hidden="true" />}</EmptyMedia>
+          <h2 className="font-heading text-xl font-medium tracking-tight">{filtered ? b.filteredEmptyTitle : b.emptyTitle}</h2>
+          <EmptyDescription>
             {filtered
               ? b.filteredEmptyHint
               : uploadsEnabled
@@ -517,14 +520,14 @@ export function Board({
                     statusText(t, 'label', workflow.statuses.at(-1)?.id ?? workflow.statuses[0].id),
                   )
                 : b.emptyLinkHint}
-          </p>
-        </div>
-      </main>
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     )
   }
 
   return (
-    <main
+    <section
       className="board relative flex min-h-0 flex-1 flex-col overflow-x-auto @container"
       onPointerDown={(event) => {
         if (!selection) return
@@ -887,6 +890,6 @@ export function Board({
           }}
         />
       )}
-    </main>
+    </section>
   )
 }
