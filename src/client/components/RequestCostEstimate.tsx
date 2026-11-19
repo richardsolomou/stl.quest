@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { Calculator } from 'lucide-react'
-import { printerCostSettings, priceRequest, priceRequestOnPrinters } from '../../core/priceCalculator'
+import { printerCostSettings, priceRequest, priceRequestOnPrinters, withConsumables } from '../../core/priceCalculator'
 import type { PublicPrintRequest } from '../../core/types'
 import { calculatorSearch } from '../calculatorSearch'
-import { priceCalculatorSettingsQuery, printersQuery } from '../queries'
+import { consumablesQuery, priceCalculatorSettingsQuery, printersQuery } from '../queries'
 import { useWorkspaceSlug } from '../workspace'
 import { DetailRow } from './DetailRow'
 import { requestPrintEstimate } from './PrintEstimate'
@@ -17,14 +17,15 @@ export function RequestCostEstimate({ request }: { request: PublicPrintRequest }
   const workspaceSlug = useWorkspaceSlug()
   const query = useQuery(priceCalculatorSettingsQuery(workspaceSlug))
   const printers = useQuery(printersQuery(workspaceSlug)).data?.profiles ?? []
+  const consumables = useQuery(consumablesQuery(workspaceSlug)).data?.consumables ?? []
   const estimate = requestPrintEstimate(request)
   if (!request.printType || !estimate || !query.data?.saved) return null
   const { settings } = query.data
   const input = { ...estimate, printType: request.printType, quantity: request.quantity }
   const assigned = printers.find((printer) => printer.id === request.printer?.id && printer.printType === request.printType)
-  const quote = priceRequest(assigned ? printerCostSettings(settings, assigned) : settings, input)
+  const quote = priceRequest(withConsumables(assigned ? printerCostSettings(settings, assigned) : settings, consumables), input)
   if (!quote) return null
-  const comparison = priceRequestOnPrinters(settings, printers, input)
+  const comparison = priceRequestOnPrinters(settings, printers, input, consumables)
   const money = (value: number) => formatMoney(value, settings.currency, locale)
   return (
     <DetailRow label={t.requests.cost.label}>

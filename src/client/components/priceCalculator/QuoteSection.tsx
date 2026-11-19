@@ -95,7 +95,7 @@ export function QuoteSection({
           <dd className="font-mono font-medium tabular-nums">{money(result.estimatedCost)}</dd>
         </dl>
         {!empty && comparison.length > 1 && (
-          <div className="grid gap-1 border-t border-border/70 pt-3">
+          <div className="grid min-w-0 gap-1 border-t border-border/70 pt-3">
             <div className="font-heading text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
               {copy.onEachPrinter}
             </div>
@@ -105,13 +105,13 @@ export function QuoteSection({
                 type="button"
                 aria-pressed={printer.id === printerId}
                 className={cn(
-                  'flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted',
+                  'flex min-w-0 items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted',
                   printer.id === printerId && 'bg-muted font-medium',
                 )}
                 onClick={() => onPrinterChange(printer.id)}
               >
                 <span className="min-w-0 truncate">{printer.name}</span>
-                <span className="font-mono tabular-nums">
+                <span className="shrink-0 font-mono tabular-nums">
                   {money(mode === 'standard' ? printerResult.standardPrice : printerResult.estimatedCost)}
                 </span>
               </button>

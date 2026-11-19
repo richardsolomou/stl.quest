@@ -16,6 +16,7 @@ import { MAX_USER_NAME_LENGTH, normalizeEmail } from '../core/identity'
 import { MAX_PRINT_GROUP_NAME_LENGTH } from '../core/printGroups'
 import { PRINT_TYPES, printGroupColors, REQUEST_SORTS } from '../core/types'
 import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
+import { MAX_CONSUMABLES } from '../core/consumables'
 import { PRICE_CALCULATOR_CURRENCIES } from '../core/priceCalculator'
 import {
   emailTemplateKinds,
@@ -84,9 +85,13 @@ const priceCalculatorEquipmentSchema = z.object({
   dryMinutesPerPlate: z.number().nonnegative().max(100_000),
   curePowerWatts: z.number().nonnegative().max(100_000),
   cureMinutesPerPlate: z.number().nonnegative().max(100_000),
+  partIds: z.array(z.string().trim().min(1).max(200)).max(MAX_CONSUMABLES).default([]),
 })
+const consumableIdSchema = z.string().trim().min(1).max(200).optional()
 const printerCostsSchema = z.object({
   resinPresetId: z.string().trim().min(1).max(200).optional(),
+  resinConsumableId: consumableIdSchema,
+  filamentConsumableId: consumableIdSchema,
   resinPricePerLitre: z.number().positive().max(100_000),
   resinDensityGramsPerMl: z.number().positive().max(100),
   filamentPricePerKg: z.number().positive().max(100_000),
@@ -98,6 +103,8 @@ export const priceCalculatorSettingsSchema = z.object({
   currency: z.enum(PRICE_CALCULATOR_CURRENCIES),
   printType: z.enum(PRINT_TYPES),
   resinPresetId: z.string().trim().min(1).max(200).optional(),
+  resinConsumableId: consumableIdSchema,
+  filamentConsumableId: consumableIdSchema,
   resinPricePerLitre: z.number().positive().max(100_000),
   resinDensityGramsPerMl: z.number().positive().max(100),
   filamentPricePerKg: z.number().positive().max(100_000),
@@ -115,6 +122,40 @@ export const priceCalculatorSettingsSchema = z.object({
     .refine((costs) => Object.keys(costs).length <= MAX_PRINTER_PROFILES)
     .default({}),
 })
+const consumableBaseSchema = { id: z.string().trim().min(1).max(200), name: z.string().trim().min(1).max(120) }
+export const consumablesSchema = z
+  .object({
+    consumables: z
+      .array(
+        z.discriminatedUnion('kind', [
+          z.object({
+            ...consumableBaseSchema,
+            kind: z.literal('resin'),
+            resinPresetId: z.string().trim().min(1).max(200).optional(),
+            pricePerLitre: z.number().positive().max(100_000),
+            densityGramsPerMl: z.number().positive().max(100),
+          }),
+          z.object({ ...consumableBaseSchema, kind: z.literal('filament'), pricePerKg: z.number().positive().max(100_000) }),
+          z.object({
+            ...consumableBaseSchema,
+            kind: z.literal('part'),
+            printType: z.enum(PRINT_TYPES),
+            price: z.number().nonnegative().max(1_000_000),
+            lifespan: z.number().positive().max(10_000_000),
+            lifespanUnit: z.enum(['plates', 'hours']),
+          }),
+        ]),
+      )
+      .max(MAX_CONSUMABLES),
+  })
+  .superRefine(({ consumables }, context) => {
+    const ids = new Set<string>()
+    for (const [index, consumable] of consumables.entries()) {
+      if (ids.has(consumable.id))
+        context.addIssue({ code: 'custom', path: ['consumables', index, 'id'], message: 'consumable IDs must be unique' })
+      ids.add(consumable.id)
+    }
+  })
 export const emailLogoSchema = z.object({
   data: z
     .string()

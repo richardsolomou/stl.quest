@@ -15,7 +15,9 @@ import {
   selectPriceCalculatorCurrency,
   selectPriceCalculatorPrintType,
   updateEquipmentSettings,
+  withConsumables,
 } from './priceCalculator'
+import type { Consumable } from './consumables'
 
 const settings = {
   ...DEFAULT_PRICE_CALCULATOR_SETTINGS,
@@ -33,6 +35,7 @@ const settings = {
     dryMinutesPerPlate: 0,
     curePowerWatts: 60,
     cureMinutesPerPlate: 15,
+    partIds: [],
   },
   equipmentCostPerHour: 1.15,
   consumablesCostPerPlate: 0.5,
@@ -285,24 +288,88 @@ describe('per-printer costs', () => {
   })
 
   it('prices a request on every active printer of its print type', () => {
-    const quotes = priceRequestOnPrinters(withForm4, [saturn, form4, bambu, { ...saturn, id: 'old', archived: true }], {
-      printType: 'resin',
-      material: 100,
-      materialUnit: 'ml',
-      minutes: 60,
-      quantity: 1,
-    })
+    const quotes = priceRequestOnPrinters(
+      withForm4,
+      [saturn, form4, bambu, { ...saturn, id: 'old', archived: true }],
+      {
+        printType: 'resin',
+        material: 100,
+        materialUnit: 'ml',
+        minutes: 60,
+        quantity: 1,
+      },
+      [],
+    )
     expect(quotes.map(({ printer }) => printer.id)).toEqual(['saturn', 'form4'])
   })
 
   it('prices a request on each printer with that printer costs', () => {
-    const quotes = priceRequestOnPrinters(withForm4, [saturn, form4], {
-      printType: 'resin',
-      material: 100,
-      materialUnit: 'ml',
-      minutes: 60,
-      quantity: 1,
-    })
+    const quotes = priceRequestOnPrinters(
+      withForm4,
+      [saturn, form4],
+      {
+        printType: 'resin',
+        material: 100,
+        materialUnit: 'ml',
+        minutes: 60,
+        quantity: 1,
+      },
+      [],
+    )
     expect(quotes.map(({ quote }) => quote?.result.material)).toEqual([7, 16])
+  })
+})
+
+describe('consumables in quotes', () => {
+  const library: Consumable[] = [
+    { id: 'grey', kind: 'resin', name: 'Grey', pricePerLitre: 120, densityGramsPerMl: 1.2 },
+    { id: 'pla', kind: 'filament', name: 'PLA', pricePerKg: 18 },
+    { id: 'tank', kind: 'part', name: 'Tank', printType: 'resin', price: 60, lifespan: 200, lifespanUnit: 'plates' },
+    { id: 'screen', kind: 'part', name: 'Screen', printType: 'resin', price: 120, lifespan: 2000, lifespanUnit: 'hours' },
+  ]
+  const withGrey = { ...settings, resinConsumableId: 'grey' }
+
+  it('prices resin from the chosen consumable', () => {
+    expect(withConsumables(withGrey, library).resinPricePerLitre).toBe(120)
+  })
+
+  it('uses the chosen resin density', () => {
+    expect(withConsumables(withGrey, library).resinDensityGramsPerMl).toBe(1.2)
+  })
+
+  it('prices filament from the chosen consumable', () => {
+    expect(withConsumables({ ...settings, filamentConsumableId: 'pla' }, library).filamentPricePerKg).toBe(18)
+  })
+
+  it('keeps the entered resin price when the chosen consumable no longer exists', () => {
+    expect(withConsumables({ ...settings, resinConsumableId: 'gone' }, library).resinPricePerLitre).toBe(70)
+  })
+
+  it('adds plate-rated wear parts to the consumables per plate', () => {
+    const parts = updateEquipmentSettings(settings, { ...settings.resinEquipment, partIds: ['tank'] })
+    expect(withConsumables(parts, library).consumablesCostPerPlate).toBe(0.8)
+  })
+
+  it('adds hour-rated wear parts to the equipment wear per hour', () => {
+    const parts = updateEquipmentSettings(settings, { ...settings.resinEquipment, partIds: ['screen'] })
+    expect(withConsumables(parts, library).equipmentCostPerHour).toBeCloseTo(1.21)
+  })
+
+  it('compares printers with their consumables', () => {
+    const form4 = { id: 'form4', printType: 'resin' as const }
+    const own = withPrinterCostSettings(settings, 'form4', { ...printerCostSettings(settings, form4), resinConsumableId: 'grey' })
+    const [quote] = priceRequestOnPrinters(
+      own,
+      [form4],
+      { printType: 'resin', material: 100, materialUnit: 'ml', minutes: 60, quantity: 1 },
+      library,
+    )
+    expect(quote?.quote?.result.material).toBe(12)
+  })
+
+  it('keeps a printer own resin when pricing it', () => {
+    const form4 = { id: 'form4', printType: 'resin' as const }
+    const own = withPrinterCostSettings(settings, 'form4', { ...printerCostSettings(settings, form4), resinConsumableId: 'grey' })
+    expect(withConsumables(printerCostSettings(own, form4), library).resinPricePerLitre).toBe(120)
   })
 })

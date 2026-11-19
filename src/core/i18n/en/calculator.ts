@@ -89,6 +89,10 @@ export const calculator = {
     presetCount: (count: number) => `${count} sourced presets available.`,
     resinDensity: 'Resin density (g/mL)',
     resinPrice: (symbol: string) => `Resin price (${symbol}/L)`,
+    fromConsumables: 'From your consumables',
+    enterHere: 'Enter the price here',
+    libraryResin: (price: string, density: string) => `${price}/L · ${density} g/mL from your consumables`,
+    libraryFilament: (price: string) => `${price}/kg from your consumables`,
   },
   electricity: {
     title: 'Electricity',
@@ -113,6 +117,10 @@ export const calculator = {
     labour: (symbol: string) => `Labour (${symbol}/h)`,
     failureAllowance: 'Failure allowance (%)',
     standardMargin: 'Standard margin (%)',
+    wearParts: 'Wear parts',
+    wearPartsHint: 'Each part adds its share to the consumables per plate or the equipment wear per hour.',
+    noWearParts: 'Add resin tanks, build plates, and other parts that wear out in',
+    manageConsumables: 'Consumables settings',
   },
   equipment: {
     title: 'Equipment',

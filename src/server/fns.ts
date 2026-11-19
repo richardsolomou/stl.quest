@@ -46,6 +46,7 @@ import { managedStorageAvailable } from './managedStorage'
 import { storagePlans } from '../core/plans'
 import { billingAvailable } from './billing'
 import { workflow } from '../core/workflow'
+import { CONSUMABLES_SETTING, consumablesOfKind, type Consumable } from '../core/consumables'
 import {
   DEFAULT_PRICE_CALCULATOR_SETTINGS,
   PRICE_CALCULATOR_SETTING,
@@ -106,6 +107,7 @@ import {
   updatePrintCopyTagsSchema,
   reorderPrintGroupItemSchema,
   printerProfilesSchema,
+  consumablesSchema,
   reorderRequestSchema,
   requestFiltersSchema,
   repeatRequestSchema,
@@ -1113,6 +1115,33 @@ export const getBoardSettings = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       return resolveBoardConfig((await workspaceAdmin(instance, data.workspaceSlug)).repository)
+    }),
+  )
+
+export const getConsumables = createServerFn({ method: 'GET' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      const context = await workspaceAdmin(instance, data.workspaceSlug)
+      return { consumables: (await context.repository.getSetting<Consumable[]>(CONSUMABLES_SETTING)) ?? [] }
+    }),
+  )
+
+export const saveConsumables = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(consumablesSchema))
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      const context = await workspaceAdmin(instance, data.workspaceSlug)
+      await context.repository.setSetting(CONSUMABLES_SETTING, data.consumables)
+      context.events.publish('settings.changed')
+      instance.telemetry.capture(context.identity.id, 'consumables_saved', {
+        resin_count: consumablesOfKind(data.consumables, 'resin').length,
+        filament_count: consumablesOfKind(data.consumables, 'filament').length,
+        part_count: consumablesOfKind(data.consumables, 'part').length,
+      })
+      return { consumables: data.consumables }
     }),
   )
 

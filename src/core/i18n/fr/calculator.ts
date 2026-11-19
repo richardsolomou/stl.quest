@@ -93,6 +93,10 @@ export const calculator: typeof en = {
       count <= 1 ? `${count} résine prédéfinie référencée disponible.` : `${count} résines prédéfinies référencées disponibles.`,
     resinDensity: 'Densité de la résine (g/mL)',
     resinPrice: (symbol: string) => `Prix de la résine (${symbol}/L)`,
+    fromConsumables: 'Depuis vos consommables',
+    enterHere: 'Saisir le prix ici',
+    libraryResin: (price: string, density: string) => `${price}/L · ${density} g/mL depuis vos consommables`,
+    libraryFilament: (price: string) => `${price}/kg depuis vos consommables`,
   },
   electricity: {
     title: 'Électricité',
@@ -119,6 +123,10 @@ export const calculator: typeof en = {
     labour: (symbol: string) => `Main-d’œuvre (${symbol}/h)`,
     failureAllowance: 'Marge pour échecs (%)',
     standardMargin: 'Marge standard (%)',
+    wearParts: 'Pièces d’usure',
+    wearPartsHint: 'Chaque pièce ajoute sa part aux consommables par plateau ou à l’usure de l’équipement par heure.',
+    noWearParts: 'Ajoutez bacs à résine, plateaux et autres pièces d’usure dans',
+    manageConsumables: 'les réglages des consommables',
   },
   equipment: {
     title: 'Matériel',

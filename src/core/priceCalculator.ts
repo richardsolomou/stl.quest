@@ -1,3 +1,4 @@
+import { consumablesOfKind, partCostPerHour, partCostPerPlate, type Consumable } from './consumables'
 import { DEFAULT_PRINTER_POWER_WATTS, equipmentPowerTotals } from './equipmentPresets'
 import { getPrinterPreset } from './printerPresets'
 import type { PrinterProfile } from './types'
@@ -51,15 +52,20 @@ export type PriceCalculatorEquipmentSettings = {
   dryMinutesPerPlate: number
   curePowerWatts: number
   cureMinutesPerPlate: number
+  /** Wear parts from the workspace consumables, costed over their lifespan on top of the entered rates. */
+  partIds: string[]
 }
 
 export type PriceCalculatorSettings = {
   currency: PriceCalculatorCurrency
   printType: 'resin' | 'filament'
   resinPresetId?: string
+  /** A resin from the workspace consumables; when it exists, its price and density replace the entered ones. */
+  resinConsumableId?: string
   resinPricePerLitre: number
   resinDensityGramsPerMl: number
   filamentPricePerKg: number
+  filamentConsumableId?: string
   electricityCountryCode?: string
   electricityPricePerKwh: number
   resinEquipment: PriceCalculatorEquipmentSettings
@@ -77,6 +83,8 @@ export type PriceCalculatorSettings = {
 export type PrinterCosts = Pick<
   PriceCalculatorSettings,
   | 'resinPresetId'
+  | 'resinConsumableId'
+  | 'filamentConsumableId'
   | 'resinPricePerLitre'
   | 'resinDensityGramsPerMl'
   | 'filamentPricePerKg'
@@ -111,6 +119,7 @@ export const DEFAULT_PRICE_CALCULATOR_SETTINGS: PriceCalculatorSettings = {
     dryMinutesPerPlate: 0,
     curePowerWatts: 50,
     cureMinutesPerPlate: 15,
+    partIds: [],
   },
   filamentEquipment: {
     mode: 'preset',
@@ -122,6 +131,7 @@ export const DEFAULT_PRICE_CALCULATOR_SETTINGS: PriceCalculatorSettings = {
     dryMinutesPerPlate: 0,
     curePowerWatts: 0,
     cureMinutesPerPlate: 0,
+    partIds: [],
   },
   equipmentCostPerHour: 1,
   consumablesCostPerPlate: 0.75,
@@ -284,6 +294,8 @@ export function withPrinterCostSettings(
 ): PriceCalculatorSettings {
   const costs: PrinterCosts = {
     resinPresetId: edited.resinPresetId,
+    resinConsumableId: edited.resinConsumableId,
+    filamentConsumableId: edited.filamentConsumableId,
     resinPricePerLitre: edited.resinPricePerLitre,
     resinDensityGramsPerMl: edited.resinDensityGramsPerMl,
     filamentPricePerKg: edited.filamentPricePerKg,
@@ -327,10 +339,31 @@ export function priceRequestOnPrinters<Printer extends CostedPrinter>(
   settings: PriceCalculatorSettings,
   printers: Printer[],
   request: RequestPriceInput,
+  consumables: Consumable[],
 ) {
   return printers
     .filter((printer) => !printer.archived && printer.printType === request.printType)
-    .map((printer) => ({ printer, quote: priceRequest(printerCostSettings(settings, printer), request) }))
+    .map((printer) => ({ printer, quote: priceRequest(withConsumables(printerCostSettings(settings, printer), consumables), request) }))
+}
+
+/** Resolves workspace consumables into the rates a quote uses, so a price changed in the library reaches every setup using it. */
+export function withConsumables(settings: PriceCalculatorSettings, consumables: Consumable[]): PriceCalculatorSettings {
+  const resin = consumablesOfKind(consumables, 'resin').find(({ id }) => id === settings.resinConsumableId)
+  const filament = consumablesOfKind(consumables, 'filament').find(({ id }) => id === settings.filamentConsumableId)
+  const parts = consumablesOfKind(consumables, 'part').filter(
+    (part) => part.printType === settings.printType && equipmentSettingsFor(settings).partIds.includes(part.id),
+  )
+  return {
+    ...settings,
+    ...(resin && { resinPricePerLitre: resin.pricePerLitre, resinDensityGramsPerMl: resin.densityGramsPerMl }),
+    ...(filament && { filamentPricePerKg: filament.pricePerKg }),
+    consumablesCostPerPlate: settings.consumablesCostPerPlate + sum(parts.map(partCostPerPlate)),
+    equipmentCostPerHour: settings.equipmentCostPerHour + sum(parts.map(partCostPerHour)),
+  }
+}
+
+function sum(values: number[]) {
+  return values.reduce((total, value) => total + value, 0)
 }
 
 function phaseElectricity(plates: number, minutesPerPlate: number, powerWatts: number, pricePerKwh: number) {

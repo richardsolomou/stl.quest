@@ -7,6 +7,7 @@ import {
   removePrinterCosts,
   selectPriceCalculatorPrintType,
   startPrinterCosts,
+  withConsumables,
   withPrinterCostSettings,
   type PriceCalculatorJob,
   type PriceCalculatorSettings,
@@ -15,7 +16,8 @@ import type { PrinterProfile } from '../../core/types'
 import { savePriceCalculatorSettings } from '../../server/fns'
 import type { calculatorPrefill } from '../calculatorSearch'
 import { useI18n } from '../i18n'
-import { priceCalculatorSettingsQuery, printersQuery } from '../queries'
+import { consumablesQuery, priceCalculatorSettingsQuery, printersQuery } from '../queries'
+import type { Consumable } from '../../core/consumables'
 import { QueryState } from './QueryState'
 import { JobSection } from './priceCalculator/JobSection'
 import { QuoteSection, type PriceMode } from './priceCalculator/QuoteSection'
@@ -37,6 +39,7 @@ export function PriceCalculator({ workspaceSlug, prefill }: { workspaceSlug: str
   const { t } = useI18n()
   const query = useQuery(priceCalculatorSettingsQuery(workspaceSlug))
   const printers = useQuery(printersQuery(workspaceSlug)).data?.profiles.filter((printer) => !printer.archived) ?? []
+  const consumables = useQuery(consumablesQuery(workspaceSlug)).data?.consumables ?? []
   if (!query.data) {
     return (
       <SettingsPage>
@@ -57,6 +60,7 @@ export function PriceCalculator({ workspaceSlug, prefill }: { workspaceSlug: str
       savedSettings={query.data.settings}
       saved={query.data.saved}
       printers={printers}
+      consumables={consumables}
       prefill={prefill}
     />
   )
@@ -67,12 +71,14 @@ function LoadedPriceCalculator({
   savedSettings,
   saved,
   printers,
+  consumables,
   prefill,
 }: {
   workspaceSlug: string
   savedSettings: PriceCalculatorSettings
   saved: boolean
   printers: PrinterProfile[]
+  consumables: Consumable[]
   prefill?: Prefill
 }) {
   const { t } = useI18n()
@@ -110,10 +116,10 @@ function LoadedPriceCalculator({
   const ownCosts = printer !== undefined && settings.printerCosts[printer.id] !== undefined
   // The form and quote see the selected printer's view; edits are split back into its own costs and the shared setup.
   const scoped = printer ? printerCostSettings(settings, printer) : settings
-  const result = calculatePrintPrice(scoped, job)
+  const result = calculatePrintPrice(withConsumables(scoped, consumables), job)
   const comparison = choices.map((choice) => ({
     printer: choice,
-    result: calculatePrintPrice(printerCostSettings(settings, choice), job),
+    result: calculatePrintPrice(withConsumables(printerCostSettings(settings, choice), consumables), job),
   }))
   const syncResinMode = (next: PriceCalculatorSettings) => setResinMode(next.resinPresetId ? 'preset' : 'custom')
   const selectPrinter = (id: string | undefined) => {
@@ -162,6 +168,7 @@ function LoadedPriceCalculator({
         />
         <SetupForm
           settings={scoped}
+          consumables={consumables}
           scope={printer && { printerName: printer.name, ownCosts, onOwnCostsChange: setOwnCosts }}
           resinMode={resinMode}
           electricityMode={electricityMode}

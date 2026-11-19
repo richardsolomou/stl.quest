@@ -2,6 +2,7 @@ import { queryOptions, type QueryClient } from '@tanstack/react-query'
 import {
   getBoardSettings,
   getPriceCalculatorSettings,
+  getConsumables,
   getAuthCapabilities,
   getAccountMethods,
   getAdminAccount,
@@ -116,6 +117,9 @@ export const emailBrandingQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['email-branding', workspaceSlug], queryFn: () => getEmailBranding({ data: { workspaceSlug } }) })
 export const boardQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['board-settings', workspaceSlug], queryFn: () => getBoardSettings({ data: { workspaceSlug } }) })
+export const consumablesQuery = (workspaceSlug: string) =>
+  queryOptions({ queryKey: ['consumables', workspaceSlug], queryFn: () => getConsumables({ data: { workspaceSlug } }) })
+
 export const priceCalculatorSettingsQuery = (workspaceSlug: string) =>
   queryOptions({
     queryKey: ['price-calculator-settings', workspaceSlug],

@@ -95,6 +95,10 @@ export const calculator: typeof en = {
       count === 1 ? `${count} Vorgabe mit Quellenangabe verfügbar.` : `${count} Vorgaben mit Quellenangabe verfügbar.`,
     resinDensity: 'Harzdichte (g/mL)',
     resinPrice: (symbol: string) => `Harzpreis (${symbol}/L)`,
+    fromConsumables: 'Aus Ihrem Verbrauchsmaterial',
+    enterHere: 'Preis hier eingeben',
+    libraryResin: (price: string, density: string) => `${price}/L · ${density} g/mL aus Ihrem Verbrauchsmaterial`,
+    libraryFilament: (price: string) => `${price}/kg aus Ihrem Verbrauchsmaterial`,
   },
   electricity: {
     title: 'Strom',
@@ -124,6 +128,10 @@ export const calculator: typeof en = {
     labour: (symbol: string) => `Arbeitszeit (${symbol}/h)`,
     failureAllowance: 'Ausfallreserve (%)',
     standardMargin: 'Standardmarge (%)',
+    wearParts: 'Verschleißteile',
+    wearPartsHint: 'Jedes Teil fügt seinen Anteil zu den Verbrauchsmaterialien pro Platte oder zum Verschleiß pro Stunde hinzu.',
+    noWearParts: 'Fügen Sie Harzwannen, Druckplatten und andere Verschleißteile hinzu unter',
+    manageConsumables: 'Einstellungen für Verbrauchsmaterial',
   },
   equipment: {
     title: 'Geräte',
