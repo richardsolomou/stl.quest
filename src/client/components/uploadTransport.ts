@@ -58,10 +58,19 @@ export function uploadFingerprint(workspaceSlug: string, entry: UploadEntry, fil
   return parts.join('-')
 }
 
-type UploadRejection = 'proxy_blocked' | 'proxy_unavailable' | 'storage_paused' | 'upload_limit' | 'storage_quota'
+type UploadRejection =
+  | 'file_unreadable'
+  | 'proxy_blocked'
+  | 'proxy_unavailable'
+  | 'storage_paused'
+  | 'upload_limit'
+  | 'server_busy'
+  | 'storage_quota'
 
 // An answer the upload dialog can explain to the person, so it is an expected rejection rather than a fault.
 export function uploadRejection(error: unknown): UploadRejection | undefined {
+  // Chrome reports a moved or deleted file as NotFoundError and a changed one as NotReadableError.
+  if (error instanceof DOMException && (error.name === 'NotFoundError' || error.name === 'NotReadableError')) return 'file_unreadable'
   const response = uploadResponse(error)
   if (!response) return undefined
   const status = response.getStatus()
@@ -70,7 +79,7 @@ export function uploadRejection(error: unknown): UploadRejection | undefined {
   if (status === 423 && responseError(response.getBody()) === 'storage migration is in progress — uploads are temporarily paused') {
     return 'storage_paused'
   }
-  if (status === 429) return 'upload_limit'
+  if (status === 429) return responseError(response.getBody()) === 'too many concurrent upload requests' ? 'server_busy' : 'upload_limit'
   // A 413 from the upload endpoint always means the plan allowance was the limit.
   if (status === 413) return 'storage_quota'
   return undefined
@@ -79,6 +88,8 @@ export function uploadRejection(error: unknown): UploadRejection | undefined {
 export function uploadErrorMessage(error: unknown, t: Messages['requests']) {
   const response = uploadResponse(error)
   switch (uploadRejection(error)) {
+    case 'file_unreadable':
+      return t.transport.fileUnreadable
     case 'proxy_blocked':
       return t.transport.proxyBlocked(response?.getStatus())
     case 'proxy_unavailable':
@@ -87,6 +98,8 @@ export function uploadErrorMessage(error: unknown, t: Messages['requests']) {
       return t.transport.storagePaused
     case 'upload_limit':
       return t.transport.uploadLimit
+    case 'server_busy':
+      return t.transport.serverBusy
     case 'storage_quota':
       return responseError(response?.getBody() ?? '') === 'managed storage quota exceeded'
         ? t.transport.largerThanAllowance

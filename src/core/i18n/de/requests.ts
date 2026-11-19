@@ -182,7 +182,10 @@ export const requests: typeof en = {
     proxyUnavailable: (status) =>
       `STL Quest hat über seinen Proxy nicht geantwortet (HTTP ${status}). Versuchen Sie es gleich noch einmal.`,
     storagePaused: 'Uploads sind pausiert, während der Speicher umzieht. Warten Sie, bis die Migration abgeschlossen ist.',
-    uploadLimit: 'Es laufen noch zu viele Uploads. Warten Sie, bis einer abgeschlossen ist, und versuchen Sie es dann erneut.',
+    fileUnreadable:
+      'Diese Datei wurde nach dem Hinzufügen verschoben, umbenannt oder geändert. Entfernen Sie sie und fügen Sie sie erneut hinzu.',
+    uploadLimit: 'Sie haben zu viele unfertige Uploads. Versuchen Sie es in ein paar Minuten erneut.',
+    serverBusy: 'STL Quest ist mit anderen Uploads beschäftigt. Versuchen Sie es gleich noch einmal.',
     largerThanAllowance: 'Dieses Modell ist größer als Ihr gesamtes Speicherkontingent.',
     notEnoughStorage: 'Für dieses Modell ist nicht mehr genug Speicher frei.',
     failed: 'Upload fehlgeschlagen.',

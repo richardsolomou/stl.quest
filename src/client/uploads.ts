@@ -21,7 +21,8 @@ const chunkSize = 32 * 1024 * 1024
 /**
  * Uploads `file` to `/api/upload`, resuming an earlier interrupted upload of the same file. Resolves with the upload's URL,
  * whose last segment is its id; rejects with an `AbortError` when `signal` aborts, or with tus-js-client's error, whose
- * `originalResponse` carries the server's status and message.
+ * `originalResponse` carries the server's status and message, or with the browser's read error when the file was moved or
+ * changed on disk after it was picked. A failed upload is deleted, so retrying starts it over.
  */
 export async function uploadFile(file: File, { metadata = {}, onProgress, signal, fingerprint, shouldRetry }: UploadFileOptions = {}) {
   if (signal?.aborted) throw abortError()
@@ -51,11 +52,15 @@ export async function uploadFile(file: File, { metadata = {}, onProgress, signal
   signal?.addEventListener('abort', abort, { once: true })
 
   const run = async () => {
+    await assertReadable(file)
     const [previous] = await upload.findPreviousUploads()
     if (signal?.aborted) throw abortError()
     if (previous) upload.resumeFromPreviousUpload(previous)
     return new Promise<string>((resolve, reject) => {
-      upload.options.onError = reject
+      upload.options.onError = (error) => {
+        void discard(upload)
+        void assertReadable(file).then(() => reject(error), reject)
+      }
       upload.options.onSuccess = () => resolve(upload.url!)
       upload.start()
     })
@@ -66,6 +71,25 @@ export async function uploadFile(file: File, { metadata = {}, onProgress, signal
   } finally {
     signal?.removeEventListener('abort', abort)
   }
+}
+
+/**
+ * Deletes an upload tus-js-client gave up on, so it stops holding one of the owner's few unfinished-upload slots. Unlike
+ * `upload.abort(true)`, this leaves the failed request alone: aborting it would erase the status and body the caller reads.
+ */
+async function discard(upload: Upload) {
+  const url = upload.url
+  if (!url) return
+  await Upload.terminate(url, upload.options).catch(() => undefined)
+  const storage = upload.options.urlStorage
+  if (!storage) return
+  const stored = (await upload.findPreviousUploads().catch(() => [])).filter((previous) => previous.uploadUrl === url)
+  await Promise.all(stored.map((previous) => storage.removeUpload(previous.urlStorageKey)))
+}
+
+// The browser reads a picked file lazily, so moving or changing it on disk fails every later chunk before it is sent.
+async function assertReadable(file: File) {
+  await file.slice(0, 1).arrayBuffer()
 }
 
 function abortError() {

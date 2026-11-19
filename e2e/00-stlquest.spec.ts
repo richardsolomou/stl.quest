@@ -1450,6 +1450,30 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('button', { name: 'Cancel' }).click()
   await page.getByRole('alertdialog', { name: 'Discard this draft?' }).getByRole('button', { name: 'Discard' }).click()
 
+  // A file moved away mid-upload fails with an explanation, and its upload is deleted so it frees the owner's slot.
+  const movingModel = test.info().outputPath('moved-upload.stl')
+  await fs.writeFile(movingModel, boxStl('moved-upload', 10, 10, 10))
+  await page.route('**/api/upload/*', async (route) => {
+    if (route.request().method() !== 'PATCH') return await route.continue()
+    await fs.rename(movingModel, `${movingModel}.moved`).catch(() => undefined)
+    await route.abort('connectionreset')
+  })
+  await page.getByRole('button', { name: 'Add a print' }).click()
+  await page.getByRole('button', { name: 'Upload files' }).click()
+  await page.locator('input[type=file]').setInputFiles(movingModel)
+  const movedPrintType = page.getByLabel('Print type for moved-upload')
+  if (await movedPrintType.count()) await choose(movedPrintType, 'Resin')
+  const deleted = page.waitForRequest((request) => request.method() === 'DELETE' && request.url().includes('/api/upload/'))
+  await page.getByRole('button', { name: 'Add 1 print' }).click()
+  await deleted
+  const movedMessage = page.getByText('This file was moved, renamed, or changed after you added it. Remove it and add it again.')
+  await expect(movedMessage).toBeVisible({ timeout: 30_000 })
+  await movedMessage.scrollIntoViewIfNeeded()
+  await screenshot(page, 'upload-file-moved')
+  await page.unroute('**/api/upload/*')
+  await page.getByRole('button', { name: 'Cancel' }).click()
+  await page.getByRole('alertdialog', { name: 'Discard this draft?' }).getByRole('button', { name: 'Discard' }).click()
+
   // A model the browser cannot render keeps its placeholder, which names the model's own format.
   await page.getByRole('button', { name: 'Add a print' }).click()
   await page.getByRole('button', { name: 'Upload files' }).click()
