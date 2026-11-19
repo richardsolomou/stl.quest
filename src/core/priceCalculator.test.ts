@@ -9,7 +9,6 @@ import {
   printerCostSettings,
   prunePrinterCosts,
   removePrinterCosts,
-  startPrinterCosts,
   withPrinterCostSettings,
   selectEquipmentMode,
   selectPriceCalculatorCurrency,
@@ -238,7 +237,7 @@ describe('per-printer costs', () => {
   const saturn = { id: 'saturn', name: 'Saturn', printType: 'resin' as const, presetId: 'resin-elegoo-saturn-4-ultra' }
   const form4 = { id: 'form4', name: 'Form 4', printType: 'resin' as const, presetId: 'resin-formlabs-form-4' }
   const bambu = { id: 'bambu', name: 'P1S', printType: 'filament' as const }
-  const withForm4 = withPrinterCostSettings(settings, 'form4', { ...printerCostSettings(settings, form4), resinPricePerLitre: 160 })
+  const withForm4 = withPrinterCostSettings(settings, form4, { ...printerCostSettings(settings, form4), resinPricePerLitre: 160 })
 
   it('uses the workspace setup for a printer without its own costs', () => {
     expect(printerCostSettings(settings, saturn).resinPricePerLitre).toBe(70)
@@ -261,18 +260,31 @@ describe('per-printer costs', () => {
   })
 
   it('shares labour edits made while a printer is selected', () => {
-    const edited = withPrinterCostSettings(withForm4, 'form4', { ...printerCostSettings(withForm4, form4), labourCostPerHour: 30 })
+    const edited = withPrinterCostSettings(withForm4, form4, { ...printerCostSettings(withForm4, form4), labourCostPerHour: 30 })
     expect(printerCostSettings(edited, saturn).labourCostPerHour).toBe(30)
   })
 
-  it('starts a printer own costs from its own rated power', () => {
-    expect(printerCostSettings(startPrinterCosts(settings, saturn), saturn).resinEquipment.printPowerWatts).toBe(144 + 25)
+  it('prices a printer without its own costs with its own rated power', () => {
+    expect(printerCostSettings(settings, saturn).resinEquipment.printPowerWatts).toBe(144 + 25)
   })
 
-  it('keeps workspace accessories when starting a printer own costs', () => {
-    expect(printerCostSettings(startPrinterCosts(settings, form4), form4).resinEquipment.presetIds).toContain(
-      'postprocess-elegoo-mercury-plus-v3',
-    )
+  it('keeps workspace accessories on a printer without its own costs', () => {
+    expect(printerCostSettings(settings, saturn).resinEquipment.presetIds).toContain('postprocess-elegoo-mercury-plus-v3')
+  })
+
+  it('keeps entered power for a printer when the setup uses custom equipment', () => {
+    const custom = updateEquipmentSettings(settings, { ...settings.resinEquipment, mode: 'custom', printPowerWatts: 321 })
+    expect(printerCostSettings(custom, saturn).resinEquipment.printPowerWatts).toBe(321)
+  })
+
+  it('gives a printer its own costs when its material changes', () => {
+    const edited = withPrinterCostSettings(settings, saturn, { ...printerCostSettings(settings, saturn), resinPricePerLitre: 90 })
+    expect(edited.printerCosts.saturn?.resinPricePerLitre).toBe(90)
+  })
+
+  it('keeps a printer on the workspace setup when only shared costs change', () => {
+    const edited = withPrinterCostSettings(settings, saturn, { ...printerCostSettings(settings, saturn), labourCostPerHour: 30 })
+    expect(edited.printerCosts.saturn).toBeUndefined()
   })
 
   it('returns a printer to the workspace setup when its own costs are removed', () => {
@@ -357,7 +369,7 @@ describe('consumables in quotes', () => {
 
   it('compares printers with their consumables', () => {
     const form4 = { id: 'form4', printType: 'resin' as const }
-    const own = withPrinterCostSettings(settings, 'form4', { ...printerCostSettings(settings, form4), resinConsumableId: 'grey' })
+    const own = withPrinterCostSettings(settings, form4, { ...printerCostSettings(settings, form4), resinConsumableId: 'grey' })
     const [quote] = priceRequestOnPrinters(
       own,
       [form4],
@@ -369,7 +381,7 @@ describe('consumables in quotes', () => {
 
   it('keeps a printer own resin when pricing it', () => {
     const form4 = { id: 'form4', printType: 'resin' as const }
-    const own = withPrinterCostSettings(settings, 'form4', { ...printerCostSettings(settings, form4), resinConsumableId: 'grey' })
+    const own = withPrinterCostSettings(settings, form4, { ...printerCostSettings(settings, form4), resinConsumableId: 'grey' })
     expect(withConsumables(printerCostSettings(own, form4), library).resinPricePerLitre).toBe(120)
   })
 })

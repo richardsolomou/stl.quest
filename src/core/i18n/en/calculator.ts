@@ -63,10 +63,10 @@ export const calculator = {
     save: 'Save setup',
     saveError: 'The setup could not be saved.',
     scope: {
-      shared: (printer: string) => `${printer} uses the workspace setup.`,
+      shared: (printer: string) =>
+        `${printer} uses the workspace setup with its own rated power. Changing its material, equipment, wear, or consumables here gives it its own costs.`,
       own: (printer: string) =>
         `${printer} has its own material, equipment, wear, and consumables. Currency, electricity, labour, failure allowance, and margin are shared by every printer.`,
-      useOwn: 'Give it its own costs',
       useShared: 'Use the workspace setup',
     },
   },
@@ -152,6 +152,7 @@ export const calculator = {
     resinPrinterSearch: 'Search resin printers…',
     filamentPrinterSearch: 'Search filament printers…',
     printerEmpty: 'No matching printer preset.',
+    printerFromFleet: 'Set by the printer you are pricing on.',
     printerClosest: 'No exact match. Closest models:',
     printerCount: (count: number) => `${count} printers available from the main printer catalogue.`,
     accessories: 'Accessories',

@@ -66,10 +66,10 @@ export const calculator: typeof en = {
     save: 'Enregistrer la configuration',
     saveError: 'La configuration n’a pas pu être enregistrée.',
     scope: {
-      shared: (printer: string) => `${printer} utilise la configuration de l’espace de travail.`,
+      shared: (printer: string) =>
+        `${printer} utilise la configuration de l’espace de travail avec sa propre puissance nominale. Modifier ici son matériau, son équipement, son usure ou ses consommables lui donne ses propres coûts.`,
       own: (printer: string) =>
         `${printer} a son propre matériau, son équipement, son usure et ses consommables. La devise, l’électricité, la main-d’œuvre, la marge pour échecs et la marge sont communes à toutes les imprimantes.`,
-      useOwn: 'Lui donner ses propres coûts',
       useShared: 'Utiliser la configuration de l’espace de travail',
     },
   },
@@ -158,6 +158,7 @@ export const calculator: typeof en = {
     resinPrinterSearch: 'Rechercher des imprimantes résine…',
     filamentPrinterSearch: 'Rechercher des imprimantes filament…',
     printerEmpty: 'Aucune imprimante prédéfinie correspondante.',
+    printerFromFleet: 'Défini par l’imprimante chiffrée.',
     printerClosest: 'Aucun résultat exact. Modèles les plus proches :',
     printerCount: (count: number) =>
       count <= 1

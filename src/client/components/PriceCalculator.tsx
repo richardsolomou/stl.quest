@@ -6,12 +6,12 @@ import {
   printerCostSettings,
   removePrinterCosts,
   selectPriceCalculatorPrintType,
-  startPrinterCosts,
   withConsumables,
   withPrinterCostSettings,
   type PriceCalculatorJob,
   type PriceCalculatorSettings,
 } from '../../core/priceCalculator'
+import { getPrinterPreset } from '../../core/printerPresets'
 import type { PrinterProfile } from '../../core/types'
 import { savePriceCalculatorSettings } from '../../server/fns'
 import type { calculatorPrefill } from '../calculatorSearch'
@@ -86,7 +86,8 @@ function LoadedPriceCalculator({
     prefill ? selectPriceCalculatorPrintType(savedSettings, prefill.printType) : savedSettings,
   )
   const [job, setJob] = useState(() => (prefill ? { ...emptyJob, ...prefill.job } : emptyJob))
-  const [printerId, setPrinterId] = useState(prefill?.printerId)
+  // Undefined opens the first printer of the print type; null is the workspace setup chosen explicitly.
+  const [printerId, setPrinterId] = useState<string | null | undefined>(prefill?.printerId)
   const syncedSettings = useRef(savedSettings)
   const [priceMode, setPriceMode] = useState<PriceMode>('standard')
   const [setupOpen, setSetupOpen] = useState(!saved)
@@ -112,7 +113,10 @@ function LoadedPriceCalculator({
   }, [savedSettings])
 
   const choices = printers.filter((printer) => printer.printType === settings.printType)
-  const printer = choices.find((choice) => choice.id === printerId)
+  const printer =
+    printerId === null
+      ? undefined
+      : (choices.find((choice) => choice.id === printerId) ?? (printerId === undefined ? choices[0] : undefined))
   const ownCosts = printer !== undefined && settings.printerCosts[printer.id] !== undefined
   // The form and quote see the selected printer's view; edits are split back into its own costs and the shared setup.
   const scoped = printer ? printerCostSettings(settings, printer) : settings
@@ -122,14 +126,16 @@ function LoadedPriceCalculator({
     result: calculatePrintPrice(withConsumables(printerCostSettings(settings, choice), consumables), job),
   }))
   const syncResinMode = (next: PriceCalculatorSettings) => setResinMode(next.resinPresetId ? 'preset' : 'custom')
-  const selectPrinter = (id: string | undefined) => {
-    setPrinterId(id)
-    const selected = choices.find((choice) => choice.id === id)
-    syncResinMode(selected ? printerCostSettings(settings, selected) : settings)
+  const selectPrinter = (id: string | undefined) => setPrinterId(id ?? null)
+  // The resin preset toggle follows whichever setup is shown, including the default printer once the fleet loads.
+  const [resinModeScope, setResinModeScope] = useState(printer?.id)
+  if (resinModeScope !== printer?.id) {
+    setResinModeScope(printer?.id)
+    syncResinMode(scoped)
   }
-  const setOwnCosts = (own: boolean) => {
+  const followWorkspaceSetup = () => {
     if (!printer) return
-    const next = own ? startPrinterCosts(settings, printer) : removePrinterCosts(settings, printer.id)
+    const next = removePrinterCosts(settings, printer.id)
     setSettings(next)
     syncResinMode(printerCostSettings(next, printer))
   }
@@ -169,7 +175,14 @@ function LoadedPriceCalculator({
         <SetupForm
           settings={scoped}
           consumables={consumables}
-          scope={printer && { printerName: printer.name, ownCosts, onOwnCostsChange: setOwnCosts }}
+          scope={
+            printer && {
+              printerName: printer.name,
+              printerFixed: Boolean(getPrinterPreset(printer.presetId)),
+              ownCosts,
+              onUseWorkspaceSetup: followWorkspaceSetup,
+            }
+          }
           resinMode={resinMode}
           electricityMode={electricityMode}
           dirty={setupDirty}
@@ -177,9 +190,7 @@ function LoadedPriceCalculator({
           error={mutation.error}
           open={setupOpen}
           onOpenChange={setSetupOpen}
-          onSettingsChange={(edited) =>
-            setSettings((current) => (printer && ownCosts ? withPrinterCostSettings(current, printer.id, edited) : edited))
-          }
+          onSettingsChange={(edited) => setSettings((current) => (printer ? withPrinterCostSettings(current, printer, edited) : edited))}
           onResinModeChange={setResinMode}
           onElectricityModeChange={setElectricityMode}
           onSave={() => mutation.mutate({ data: { workspaceSlug, ...settings } })}

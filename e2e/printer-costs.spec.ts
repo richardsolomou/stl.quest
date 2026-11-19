@@ -41,18 +41,21 @@ test('prices one job on each printer with its own costs', async ({ page }) => {
   const quote = page.getByRole('group', { name: 'Rough quote' })
   const saturn = quote.getByRole('button', { name: new RegExp(`^${printers[0]} `) })
   const anycubic = quote.getByRole('button', { name: new RegExp(`^${printers[1]} `) })
-  // Without their own costs, every printer prices the job with the workspace setup.
-  await expect(saturn).toHaveText((await anycubic.textContent())!.replace(printers[1], printers[0]))
+  // The calculator opens on the first printer, which inherits the workspace setup at its own rated power.
+  await expect(page.getByLabel('Price on')).toContainText(printers[0])
+  await expect(page.getByText(`${printers[0]} uses the workspace setup`)).toBeVisible()
+  await expect(saturn).not.toHaveText((await anycubic.textContent())!.replace(printers[1], printers[0]))
+  const inherited = (await saturn.textContent())!
 
-  await page.getByLabel('Price on').click()
-  await page.getByRole('option', { name: printers[0] }).click()
-  await page.getByRole('button', { name: 'Give it its own costs' }).click()
-  // The printer uses a resin from the consumables library rather than its own price.
+  const editSetup = page.getByRole('button', { name: 'Edit setup' })
+  if (await editSetup.isVisible()) await editSetup.click()
+  // Choosing a resin from the consumables library gives the printer its own costs.
   await page.getByLabel('From your consumables').click()
   await page.getByRole('option', { name: resin }).click()
+  await expect(page.getByText(`${printers[0]} has its own material`)).toBeVisible()
   await page.getByRole('button', { name: 'Save setup' }).click()
   await expect(page.getByRole('button', { name: 'Edit setup' })).toBeVisible()
-  await expect(saturn).not.toHaveText((await anycubic.textContent())!.replace(printers[1], printers[0]))
+  await expect(saturn).not.toHaveText(inherited)
   await expect(saturn).toHaveAttribute('aria-pressed', 'true')
   await screenshot(page, 'printer-costs-calculator')
 

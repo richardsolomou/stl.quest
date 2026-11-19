@@ -68,10 +68,10 @@ export const calculator: typeof en = {
     save: 'Einrichtung speichern',
     saveError: 'Die Einrichtung konnte nicht gespeichert werden.',
     scope: {
-      shared: (printer: string) => `${printer} verwendet die Workspace-Einrichtung.`,
+      shared: (printer: string) =>
+        `${printer} verwendet die Workspace-Einrichtung mit seiner eigenen Nennleistung. Wenn Sie hier Material, Ausrüstung, Verschleiß oder Verbrauchsmaterial ändern, erhält er eigene Kosten.`,
       own: (printer: string) =>
         `${printer} hat eigenes Material, eigene Ausrüstung, eigenen Verschleiß und eigene Verbrauchsmaterialien. Währung, Strom, Arbeit, Ausschusszuschlag und Marge gelten für alle Drucker.`,
-      useOwn: 'Eigene Kosten festlegen',
       useShared: 'Workspace-Einrichtung verwenden',
     },
   },
@@ -163,6 +163,7 @@ export const calculator: typeof en = {
     resinPrinterSearch: 'Harzdrucker suchen…',
     filamentPrinterSearch: 'Filamentdrucker suchen…',
     printerEmpty: 'Keine passende Druckervorgabe.',
+    printerFromFleet: 'Vom kalkulierten Drucker vorgegeben.',
     printerClosest: 'Kein genauer Treffer. Ähnlichste Modelle:',
     printerCount: (count: number) => `${count} Drucker aus dem Hauptdruckerkatalog verfügbar.`,
     accessories: 'Zubehör',

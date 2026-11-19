@@ -42,7 +42,7 @@ const resinOptions = RESIN_PRESETS.map((preset) => ({
   type: preset.type,
 }))
 
-export type SetupScope = { printerName: string; ownCosts: boolean; onOwnCostsChange: (own: boolean) => void }
+export type SetupScope = { printerName: string; printerFixed: boolean; ownCosts: boolean; onUseWorkspaceSetup: () => void }
 
 export function SetupForm({
   settings,
@@ -107,7 +107,7 @@ export function SetupForm({
                   if (!electricityPresetsAvailable(currency)) onElectricityModeChange('custom')
                 }}
               />
-              <EquipmentSetup settings={settings} onSettingsChange={onSettingsChange} />
+              <EquipmentSetup settings={settings} printerFixed={scope?.printerFixed} onSettingsChange={onSettingsChange} />
               <MaterialSetup
                 settings={settings}
                 consumables={consumables}
@@ -153,9 +153,11 @@ function ScopeNotice({ scope }: { scope: SetupScope }) {
       <p className="min-w-0 flex-[1_1_12rem] text-muted-foreground">
         {scope.ownCosts ? copy.own(scope.printerName) : copy.shared(scope.printerName)}
       </p>
-      <Button type="button" variant="outline" size="sm" onClick={() => scope.onOwnCostsChange(!scope.ownCosts)}>
-        {scope.ownCosts ? copy.useShared : copy.useOwn}
-      </Button>
+      {scope.ownCosts && (
+        <Button type="button" variant="outline" size="sm" onClick={scope.onUseWorkspaceSetup}>
+          {copy.useShared}
+        </Button>
+      )}
     </div>
   )
 }
