@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.50.1
+
+### Patch Changes
+
+- 84876c8: Use Formlabs printer, wash, and cure power ratings in the price calculator and serve smaller printer pictures so that Formlabs cost estimates match the hardware and the printer picker loads faster.
+
 ## 1.50.0
 
 ### Minor Changes
