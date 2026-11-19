@@ -41,8 +41,11 @@ test('prices one job on each printer with its own costs', async ({ page }) => {
   const quote = page.getByRole('group', { name: 'Rough quote' })
   const saturn = quote.getByRole('button', { name: new RegExp(`^${printers[0]} `) })
   const anycubic = quote.getByRole('button', { name: new RegExp(`^${printers[1]} `) })
-  // The calculator opens on the first printer, which inherits the workspace setup at its own rated power.
-  await expect(page.getByLabel('Price on')).toContainText(printers[0])
+  // The calculator opens on a printer rather than the workspace setup; earlier journeys may leave other printers first.
+  await expect(page.getByLabel('Price on')).not.toContainText('Workspace setup')
+  await page.getByLabel('Price on').click()
+  await page.getByRole('option', { name: printers[0] }).click()
+  // A printer without its own costs inherits the workspace setup at its own rated power.
   await expect(page.getByText(`${printers[0]} uses the workspace setup`)).toBeVisible()
   await expect(saturn).not.toHaveText((await anycubic.textContent())!.replace(printers[1], printers[0]))
   const inherited = (await saturn.textContent())!
