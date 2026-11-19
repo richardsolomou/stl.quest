@@ -99,6 +99,8 @@ export const requests: typeof en = {
     suggested: (price, quantity) => (quantity > 1 ? `${price} suggéré pour l’ensemble des ${quantity} copies` : `${price} suggéré`),
     hint: 'D’après votre configuration enregistrée du calculateur, en supposant un plateau par copie et aucun temps de manipulation.',
     openCalculator: 'Ouvrir dans le calculateur',
+    onPrinter: (printer: string) => `sur ${printer}`,
+    onEachPrinter: 'Sur chaque imprimante',
   },
   repeat: {
     title: 'Imprimer à nouveau',

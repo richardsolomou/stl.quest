@@ -28,7 +28,7 @@ export function PrinterPresetPicker({
   const [search, setSearch] = useState('')
   const [expandedBrand, setExpandedBrand] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const results = useMemo(() => filterPrinterPresets(search), [search])
+  const { presets: results, closest } = useMemo(() => filterPrinterPresets(search), [search])
   const resultRows = useMemo(() => pairPresets(results), [results])
   const groups = useMemo(() => groupPresets(PRINTER_PRESETS), [])
   const searching = !!search.trim()
@@ -76,32 +76,35 @@ export function PrinterPresetPicker({
           <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto pr-1">
             {searching ? (
               results.length ? (
-                <div className="relative" style={{ height: virtualizer.getTotalSize() }}>
-                  {virtualizer.getVirtualItems().map((row) => {
-                    const presets = resultRows[row.index]
-                    return (
-                      <div
-                        key={presets.map((preset) => preset.id).join(':')}
-                        ref={virtualizer.measureElement}
-                        data-index={row.index}
-                        className="absolute top-0 left-0 w-full py-1"
-                        style={{ transform: `translateY(${row.start}px)` }}
-                      >
-                        <div className="grid min-h-20 grid-cols-1 gap-2 sm:grid-cols-2">
-                          {presets.map((preset) => (
-                            <PresetButton
-                              key={preset.id}
-                              preset={preset}
-                              added={added?.has(preset.id)}
-                              onClick={() => choose(() => onSelect(preset))}
-                              showBrand
-                            />
-                          ))}
+                <>
+                  {closest && <p className="pb-2 text-sm text-muted-foreground">{copy.closestMatches(search.trim())}</p>}
+                  <div className="relative" style={{ height: virtualizer.getTotalSize() }}>
+                    {virtualizer.getVirtualItems().map((row) => {
+                      const presets = resultRows[row.index]
+                      return (
+                        <div
+                          key={presets.map((preset) => preset.id).join(':')}
+                          ref={virtualizer.measureElement}
+                          data-index={row.index}
+                          className="absolute top-0 left-0 w-full py-1"
+                          style={{ transform: `translateY(${row.start}px)` }}
+                        >
+                          <div className="grid min-h-20 grid-cols-1 gap-2 sm:grid-cols-2">
+                            {presets.map((preset) => (
+                              <PresetButton
+                                key={preset.id}
+                                preset={preset}
+                                added={added?.has(preset.id)}
+                                onClick={() => choose(() => onSelect(preset))}
+                                showBrand
+                              />
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                      )
+                    })}
+                  </div>
+                </>
               ) : (
                 <p className="py-10 text-center text-sm text-muted-foreground">{copy.noMatch(search.trim())}</p>
               )

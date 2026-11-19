@@ -10,7 +10,7 @@ This directory contains the source data, a record of where it came from, and the
 - UVtools supplies the primary resin printer catalog and usable build dimensions.
 - Open Resin Alliance supplies supplemental resin definitions and transparent printer artwork for supported manufacturers.
 - PrusaSlicer supplies transparent profile thumbnails for Prusa resin printers.
-- Official manufacturer product feeds and product pages supply remaining models and images that are missing from the community catalogs, currently HeyGears, Phrozen, and Formlabs. Formlabs build volumes come from its resin printer tech specs comparison and images from its printer product listing.
+- Official manufacturer product feeds and product pages supply remaining models and images that are missing from the community catalogs, currently HeyGears, Phrozen, and Formlabs. Formlabs build volumes come from its resin printer tech specs comparison and images from its printer product listing. Phrozen build volumes and images come from its product pages, and help center specifications cover discontinued models without one.
 
 `sources.json` lists the main catalog repositories and the exact revisions in use. `image-sources.json` lists additional catalog and image sources. `manufacturer-printers.json` stores snapshots of manufacturer catalogs. The generator finds Open Resin printer definitions below each configured repository path.
 

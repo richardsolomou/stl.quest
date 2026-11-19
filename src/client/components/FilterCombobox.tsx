@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import {
   Combobox,
   ComboboxCollection,
@@ -24,6 +24,7 @@ export function FilterCombobox<T extends Option>({
   redacted = false,
   renderOption,
   optionAriaLabel,
+  search,
 }: {
   id?: string
   ariaLabel?: string
@@ -37,11 +38,29 @@ export function FilterCombobox<T extends Option>({
   renderOption?: (option: T) => ReactNode
   /** Overrides the option's accessible name; needed alongside `renderOption` when the visible text no longer disambiguates on its own. */
   optionAriaLabel?: (option: T) => string
+  /** Replaces the built-in substring filter; `notice` renders above the results. */
+  search?: (query: string) => { options: T[]; notice?: ReactNode }
 }) {
   const selected = options.find((option) => option.value === value) ?? null
+  const label = selected?.label ?? ''
+  const [query, setQuery] = useState(label)
+  const [queryLabel, setQueryLabel] = useState(label)
+  if (queryLabel !== label) {
+    setQueryLabel(label)
+    setQuery(label)
+  }
+  // The input shows the selected label until someone types, and reopening a chosen value should list every option.
+  const searched = search && query !== label ? search(query) : undefined
 
   return (
-    <Combobox value={selected} onValueChange={(next: T | null) => onChange(next?.value)} items={options}>
+    <Combobox
+      value={selected}
+      onValueChange={(next: T | null) => onChange(next?.value)}
+      items={options}
+      isItemEqualToValue={(item: T, current: T) => item.value === current.value}
+      filteredItems={searched?.options}
+      onInputValueChange={setQuery}
+    >
       <ComboboxInput
         id={id}
         aria-label={ariaLabel}
@@ -51,6 +70,7 @@ export function FilterCombobox<T extends Option>({
       />
       <ComboboxContent className={cn(redacted && 'ph-no-capture')}>
         <ComboboxEmpty>{emptyLabel}</ComboboxEmpty>
+        {searched?.notice && <p className="px-2 pt-2 pb-1 text-xs text-muted-foreground">{searched.notice}</p>}
         <ComboboxList>
           <ComboboxCollection>
             {(option: T) => (

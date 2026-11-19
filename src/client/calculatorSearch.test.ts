@@ -17,6 +17,18 @@ describe('calculator search', () => {
     })
   })
 
+  it('links a request job to its assigned printer', () => {
+    expect(calculatorSearch('resin', job, 'form4').printer).toBe('form4')
+  })
+
+  it('prefills the printer the link names', () => {
+    expect(calculatorPrefill(validateCalculatorSearch({ printType: 'resin', printer: 'form4' }))?.printerId).toBe('form4')
+  })
+
+  it('ignores a printer that is not an ID', () => {
+    expect(validateCalculatorSearch({ printType: 'resin', printer: 42 }).printer).toBeUndefined()
+  })
+
   it('prefills nothing without a print type', () => {
     expect(calculatorPrefill(validateCalculatorSearch({ material: '30', unit: 'ml', hours: '4' }))).toBeUndefined()
   })

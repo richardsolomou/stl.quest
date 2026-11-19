@@ -11,6 +11,12 @@
       "repository": "https://www.heygears.com/material",
       "revision": "2026-08-27",
       "license": "manufacturer product data"
+    },
+    {
+      "id": "formlabs-materials",
+      "repository": "https://formlabs.com/global/products/materials/",
+      "revision": "2026-11-19",
+      "license": "manufacturer product data"
     }
   ],
   "presets": [
@@ -412,6 +418,815 @@
       "source": {
         "id": "prusaslicer",
         "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
+      }
+    },
+    {
+      "id": "resin-formlabs-alpha-black",
+      "brand": "Formlabs",
+      "name": "Alpha Black",
+      "type": "Model",
+      "densityGramsPerMl": 1.08,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/3345d6af-92c9-4ab2-a9ea-7f4827570a1f/-ENUS-Safety-Data-Sheet-Alpha-Black-V1.pdf",
+        "note": "Stated as 1.08 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/alpha-black-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-alpha-clear",
+      "brand": "Formlabs",
+      "name": "Alpha Clear",
+      "type": "Model",
+      "densityGramsPerMl": 1.08,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/7b0f8bf7-634e-4007-bc9c-a517f66e0422/-ENUS-Safety-Data-Sheet-Alpha-Clear-V1.pdf",
+        "note": "Stated as 1.08 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/alpha-clear-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-alpha-fast",
+      "brand": "Formlabs",
+      "name": "Alpha Fast",
+      "type": "Model",
+      "densityGramsPerMl": 1.08,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/9c455c47-fd53-4ab3-a367-5fc0c68621cd/-ENUS-Safety-Data-Sheet-Alpha-Fast-V1.pdf",
+        "note": "Stated as 1.08 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/alpha-fast-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-alpha-grey",
+      "brand": "Formlabs",
+      "name": "Alpha Grey",
+      "type": "Model",
+      "densityGramsPerMl": 1.08,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/e6e84edc-0050-4d68-9424-d50f41983f04/-ENUS-Safety-Data-Sheet-Alpha-Grey-V1.pdf",
+        "note": "Stated as 1.08 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/alpha-grey-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-alpha-model",
+      "brand": "Formlabs",
+      "name": "Alpha Model",
+      "type": "Model",
+      "densityGramsPerMl": 1.08,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/98dc68d0-bb1c-4cd1-81ff-48828c6bedeb/-ENUS-Safety-Data-Sheet-Alpha-Model-V1.pdf",
+        "note": "Stated as 1.08 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/alpha-model-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-alpha-white",
+      "brand": "Formlabs",
+      "name": "Alpha White",
+      "type": "Model",
+      "densityGramsPerMl": 1.08,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/08d887fa-2f69-4830-b6be-89eed63422b2/-ENUS-Safety-Data-Sheet-Alpha-White-V1.pdf",
+        "note": "Stated as 1.08 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/alpha-white-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-bego-varseosmile-triniq",
+      "brand": "Formlabs",
+      "name": "BEGO VarseoSmile TriniQ",
+      "type": "Medical",
+      "densityGramsPerMl": 1.375,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/6d87bea2fd6b1f9d/original/-ENUS-Safety-Data-Sheet-BEGO-VarseoSmile-TriniQ.pdf",
+        "note": "Midpoint of the 1.25–1.5 g/cm³ range stated in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/bego-varseosmile-triniq-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-biomed-amber",
+      "brand": "Formlabs",
+      "name": "BioMed Amber",
+      "type": "Medical",
+      "densityGramsPerMl": 1.09,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/32497cee12db3ce5/original/-ENUS-Safety-Data-Sheet-BioMed-Amber-Resin.pdf",
+        "note": "Stated as 1.09 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/biomed-amber-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-biomed-black",
+      "brand": "Formlabs",
+      "name": "BioMed Black",
+      "type": "Medical",
+      "densityGramsPerMl": 1.13,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/2fa26cb33b4546e8/original/-ENUS-Safety-Data-Sheet-BioMed-Black-Resin.pdf",
+        "note": "Stated as 1.13 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/biomed-black-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-biomed-clear",
+      "brand": "Formlabs",
+      "name": "BioMed Clear",
+      "type": "Medical",
+      "densityGramsPerMl": 1.09,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/1f5f8ab0efaac055/original/-ENUS-Safety-Data-Sheet-BioMed-Clear-Resin.pdf",
+        "note": "Stated as 1.09 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/biomed-clear-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-biomed-durable",
+      "brand": "Formlabs",
+      "name": "BioMed Durable",
+      "type": "Medical",
+      "densityGramsPerMl": 1.074,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/0f86c949-e9e8-419a-8a32-e8e580931f08/-ENUS-Safety-Data-Sheet-BioMed-Durable-Resin.pdf",
+        "note": "Stated as 1.074 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/biomed-durable-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-biomed-flex-50a",
+      "brand": "Formlabs",
+      "name": "BioMed Flex 50A",
+      "type": "Flexible",
+      "densityGramsPerMl": 1.01,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/61d1eabb-abb7-44c1-a883-27dbe6123016/-ENUS-Safety-Data-Sheet-BioMed-Flex-50A.pdf",
+        "note": "Stated as 1.01 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/biomed-flex-50a-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-biomed-flex-80a",
+      "brand": "Formlabs",
+      "name": "BioMed Flex 80A",
+      "type": "Flexible",
+      "densityGramsPerMl": 1.05,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/7bc1f0c0-8f5e-4b89-a7e3-f176fb6cc19d/-ENUS-Safety-Data-Sheet-BioMed-Flex-Resin.pdf",
+        "note": "Stated as 1.05 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/biomed-flex-80a-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-biomed-white",
+      "brand": "Formlabs",
+      "name": "BioMed White",
+      "type": "Medical",
+      "densityGramsPerMl": 1.15,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/8fa927a2befd444/original/-ENUS-Safety-Data-Sheet-BioMed-White-Resin.pdf",
+        "note": "Stated as 1.15 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/biomed-white-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-black-v4-1",
+      "brand": "Formlabs",
+      "name": "Black V4.1",
+      "type": "Model",
+      "densityGramsPerMl": 1.11,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/5c5174e7a2603b9c/original/-ENUS-Safety-Data-Sheet-Black-V4-1-Resin.pdf",
+        "note": "Stated as 1.11 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/black-resin-v4-1/"
+      }
+    },
+    {
+      "id": "resin-formlabs-black-v5",
+      "brand": "Formlabs",
+      "name": "Black V5",
+      "type": "Model",
+      "densityGramsPerMl": 1.11,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/4eb2a8ce7e2c2294/original/-ENUS-Safety-Data-Sheet-Black-V5-Resin.pdf",
+        "note": "Stated as 1.11 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/black-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-castable-wax",
+      "brand": "Formlabs",
+      "name": "Castable Wax",
+      "type": "Casting",
+      "densityGramsPerMl": 1.11,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/cacc43a3-04c5-470c-ba87-b4cd74513fb3/-ENUS-Safety-Data-Sheet-Castable-Wax-Resin.pdf",
+        "note": "Stated as 1.11 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/castable-wax-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-clear-cast",
+      "brand": "Formlabs",
+      "name": "Clear Cast",
+      "type": "Casting",
+      "densityGramsPerMl": 1.09,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/58080728c808a0f9/original/-ENUS-Safety-Data-Sheet-Clear-Cast-Resin-V1.pdf",
+        "note": "Stated as 1.09 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/clear-cast-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-clear-v4-1",
+      "brand": "Formlabs",
+      "name": "Clear V4.1",
+      "type": "Model",
+      "densityGramsPerMl": 1.09,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/2e4666e1dc86f854/original/-ENUS-Safety-Data-Sheet-Clear-V4-1-Resin.pdf",
+        "note": "Stated as 1.09 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/clear-resin-v4-1/"
+      }
+    },
+    {
+      "id": "resin-formlabs-clear-v5",
+      "brand": "Formlabs",
+      "name": "Clear V5",
+      "type": "Model",
+      "densityGramsPerMl": 1.11,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/5c817a1977882bbe/original/-ENUS-Safety-Data-Sheet-Clear-V5-Resin.pdf",
+        "note": "Stated as 1.11 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/clear-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-color",
+      "brand": "Formlabs",
+      "name": "Color",
+      "type": "Model",
+      "densityGramsPerMl": 1.11,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/6184909c4c9b260/original/-ENUS-Safety-Data-Sheet-Color-V5-Resin.pdf",
+        "note": "Stated as 1.11 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/color-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-color-base",
+      "brand": "Formlabs",
+      "name": "Color Base",
+      "type": "Model",
+      "densityGramsPerMl": 1.081,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/4c2d7b2c-b394-4b96-b91e-603672d03d0f/-ENUS-Safety-Data-Sheet-Color-Base.pdf",
+        "note": "Stated as 1.081 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/color-base-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-custom-tray",
+      "brand": "Formlabs",
+      "name": "Custom Tray",
+      "type": "Medical",
+      "densityGramsPerMl": 1.09,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/7e4b85ce-2aef-421c-8498-e27bab751b28/-ENUS-Safety-Data-Sheet-Custom-Tray-Resin.pdf",
+        "note": "Stated as 1.09 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/custom-tray-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-dental-lt-clear",
+      "brand": "Formlabs",
+      "name": "Dental LT Clear",
+      "type": "Medical",
+      "densityGramsPerMl": 1.09,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/3b2e44ce5640abd/original/-ENUS-Safety-Data-Sheet-Dental-LT-Clear-Resin-V2.pdf",
+        "note": "Stated as 1.09 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/dental-lt-clear-v2-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-dental-lt-comfort",
+      "brand": "Formlabs",
+      "name": "Dental LT Comfort",
+      "type": "Medical",
+      "densityGramsPerMl": 1.14,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/373c2d2d6e8548f0/original/-ENUS-Safety-Data-Sheet-Dental-LT-Comfort.pdf",
+        "note": "Stated as 1.14 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/dental-lt-comfort-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-denture-base-v2",
+      "brand": "Formlabs",
+      "name": "Denture Base V2",
+      "type": "Medical",
+      "densityGramsPerMl": 1.08,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/51a48cbb-c527-40d7-9a61-d31183b53ff4/-ENUS-Safety-Data-Sheet-Denture-Base-Resin-V2.pdf",
+        "note": "Stated as 1.08 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/denture-base-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-draft",
+      "brand": "Formlabs",
+      "name": "Draft",
+      "type": "Model",
+      "densityGramsPerMl": 1.11,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/3ef086fad996f88/original/-ENUS-Safety-Data-Sheet-Draft-V2-Resin.pdf",
+        "note": "Stated as 1.11 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/draft-v2-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-durable",
+      "brand": "Formlabs",
+      "name": "Durable",
+      "densityGramsPerMl": 1.07,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/d7bd17ac-00b5-451d-ba33-1e38d96f9635/-ENUS-Safety-Data-Sheet-Durable-V2-Resin.pdf",
+        "note": "Stated as 1.07 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/durable-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-esd",
+      "brand": "Formlabs",
+      "name": "ESD",
+      "type": "Engineering",
+      "densityGramsPerMl": 1.11,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/9e840c70-f2e7-4088-87c2-6b66de206adf/-ENUS-Safety-Data-Sheet-ESD-Resin.pdf",
+        "note": "Stated as 1.11 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/esd-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-fast-model",
+      "brand": "Formlabs",
+      "name": "Fast Model",
+      "type": "Model",
+      "densityGramsPerMl": 1.12,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/3c6e1ff78d581c7e/original/-ENUS-Safety-Data-Sheet-Fast-Model-V1-Resin.pdf",
+        "note": "Stated as 1.12 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/fast-model-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-flame-retardant",
+      "brand": "Formlabs",
+      "name": "Flame Retardant",
+      "type": "Engineering",
+      "densityGramsPerMl": 1.18,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/a1bc5411e78fc6e/original/-ENUS-Safety-Data-Sheet-Flame-Retardant-Resin.pdf",
+        "note": "Stated as 1.18 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/flame-retardant-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-flexible-50a",
+      "brand": "Formlabs",
+      "name": "Flexible 50A",
+      "type": "Flexible",
+      "densityGramsPerMl": 1.01,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/dcb104c0-468f-4ffc-8af7-62640c449e54/-ENUS-Safety-Data-Sheet-Flexible-80A-Resin-V2.pdf",
+        "note": "Stated as 1.01 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/flexible-50a-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-flexible-80a",
+      "brand": "Formlabs",
+      "name": "Flexible 80A",
+      "type": "Flexible",
+      "densityGramsPerMl": 1.06,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/7c1ad08c0729c233/original/-ENUS-Safety-Data-Sheet-Flexible-80A-Resin.pdf",
+        "note": "Stated as 1.06 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/flexible-80a-resin-v1/"
+      }
+    },
+    {
+      "id": "resin-formlabs-grey-pro",
+      "brand": "Formlabs",
+      "name": "Grey Pro",
+      "type": "Model",
+      "densityGramsPerMl": 1.08,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/187488ba2c39909d/original/-ENUS-Safety-Data-Sheet-Grey-Pro-Resin.pdf",
+        "note": "Stated as 1.08 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/grey-pro-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-grey-v4-1",
+      "brand": "Formlabs",
+      "name": "Grey V4.1",
+      "type": "Model",
+      "densityGramsPerMl": 1.11,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/5dd7afde7dd62165/original/-ENUS-Safety-Data-Sheet-Grey-V4-1-Resin.pdf",
+        "note": "Stated as 1.11 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/grey-resin-v4-1/"
+      }
+    },
+    {
+      "id": "resin-formlabs-grey-v5",
+      "brand": "Formlabs",
+      "name": "Grey V5",
+      "type": "Model",
+      "densityGramsPerMl": 1.11,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/6930e81e16e86e28/original/-ENUS-Safety-Data-Sheet-Grey-V5-Resin.pdf",
+        "note": "Stated as 1.11 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/grey-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-high-temp",
+      "brand": "Formlabs",
+      "name": "High Temp",
+      "type": "Engineering",
+      "densityGramsPerMl": 1.14,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/451f0db671a9ee49/original/-ENUS-Safety-Data-Sheet-High-Temp-Resin-V2.pdf",
+        "note": "Stated as 1.14 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/high-temp-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-ibt-flex",
+      "brand": "Formlabs",
+      "name": "IBT Flex",
+      "type": "Medical",
+      "densityGramsPerMl": 1.05,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/d5dbac74-4df5-4fdc-9a7a-aacafa089a78/-ENUS-Safety-Data-Sheet-IBT-Flex-Resin.pdf",
+        "note": "Stated as 1.05 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/ibt-flex-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-model-v2",
+      "brand": "Formlabs",
+      "name": "Model V2",
+      "type": "Model",
+      "densityGramsPerMl": 1.09,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/78a75c7a4211495e/original/-ENUS-Safety-Data-Sheet-Model-Resin.pdf",
+        "note": "Stated as 1.09 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/model-resin-v2/"
+      }
+    },
+    {
+      "id": "resin-formlabs-model-v3",
+      "brand": "Formlabs",
+      "name": "Model V3",
+      "type": "Model",
+      "densityGramsPerMl": 1.12,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/66b46947967068d7/original/-ENUS-Safety-Data-Sheet-Model-V3-Resin.pdf",
+        "note": "Stated as 1.12 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/model-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-precision-model",
+      "brand": "Formlabs",
+      "name": "Precision Model",
+      "type": "Model",
+      "densityGramsPerMl": 1.12,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/5dd1479eb4e75ae1/original/-ENUS-Safety-Data-Sheet-Precision-Model-V1-Resin.pdf",
+        "note": "Stated as 1.12 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/precision-model-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-premium-teeth",
+      "brand": "Formlabs",
+      "name": "Premium Teeth",
+      "type": "Medical",
+      "densityGramsPerMl": 1.23,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/4c9755ba1a45e6d3/original/-ENUS-Safety-Data-Sheet-Premium-Teeth-Resin.pdf",
+        "note": "Stated as 1.23 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/premium-teeth-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-rigid-10k",
+      "brand": "Formlabs",
+      "name": "Rigid 10K",
+      "type": "Engineering",
+      "densityGramsPerMl": 1.63,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/3cc2feae0929233/original/-ENUS-Safety-Data-Sheet-Rigid-10K-Resin.pdf",
+        "note": "Stated as 1.63 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/rigid-10k-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-rigid-4000",
+      "brand": "Formlabs",
+      "name": "Rigid 4000",
+      "type": "Engineering",
+      "densityGramsPerMl": 1.26,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/002a3adf-e144-46da-86a8-9ee47e613fc2/-ENUS-Safety-Data-Sheet-Rigid-Resin.pdf",
+        "note": "Stated as 1.26 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/rigid-4000-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-silicone-40a",
+      "brand": "Formlabs",
+      "name": "Silicone 40A",
+      "type": "Flexible",
+      "densityGramsPerMl": 1.02,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/32e7870f5d5cb04a/original/-ENUS-Safety-Data-Sheet-Silicone-40A-Resin.pdf",
+        "note": "Stated as 1.02 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/silicone-40a-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-surgical-guide",
+      "brand": "Formlabs",
+      "name": "Surgical Guide",
+      "type": "Medical",
+      "densityGramsPerMl": 1.09,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/3161887e-9b77-4532-ae97-c5202fab9710/-ENUS-Safety-Data-Sheet-Surgical-Guide.pdf",
+        "note": "Stated as 1.09 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/surgical-guide-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-tough-1000",
+      "brand": "Formlabs",
+      "name": "Tough 1000",
+      "type": "Tough",
+      "densityGramsPerMl": 1.01,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/b2b357fa-9a6d-435b-add6-e0087e787996/-ENUS-Safety-Data-Sheet-Tough-1000-Resin.pdf",
+        "note": "Stated as 1.01 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/tough-1000-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-tough-1500",
+      "brand": "Formlabs",
+      "name": "Tough 1500",
+      "type": "Tough",
+      "densityGramsPerMl": 1.07,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/6070391d2cc1a030/original/-ENUS-Safety-Data-Sheet-Tough-1500-Resin.pdf",
+        "note": "Stated as 1.07 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/tough-1500-resin-v1/"
+      }
+    },
+    {
+      "id": "resin-formlabs-tough-1500-v2",
+      "brand": "Formlabs",
+      "name": "Tough 1500 V2",
+      "type": "Tough",
+      "densityGramsPerMl": 1.12,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/536002a06b58aa4f/original/-ENUS-Safety-Data-Sheet-Tough-1500-V2-Resin.pdf",
+        "note": "Stated as 1.12 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/tough-1500-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-tough-2000",
+      "brand": "Formlabs",
+      "name": "Tough 2000",
+      "type": "Tough",
+      "densityGramsPerMl": 1.11,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/61b4fe77922fa8a8/original/-ENUS-Safety-Data-Sheet-Tough-2000-Resin.pdf",
+        "note": "Stated as 1.11 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/tough-2000-resin-v1/"
+      }
+    },
+    {
+      "id": "resin-formlabs-tough-2000-v2",
+      "brand": "Formlabs",
+      "name": "Tough 2000 V2",
+      "type": "Tough",
+      "densityGramsPerMl": 1.12,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/6c5e188e-48c9-4776-9e0e-55865c3f79bb/-ENUS-Safety-Data-Sheet-Tough-2000-V2-Resin.pdf",
+        "note": "Stated as 1.12 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/tough-2000-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-true-cast",
+      "brand": "Formlabs",
+      "name": "True Cast",
+      "type": "Casting",
+      "densityGramsPerMl": 1.07,
+      "densitySource": {
+        "url": "https://media.formlabs.com/asset/724df0fe-91d7-406c-b0f0-81dd36bfc889/-ENUS-Safety-Data-Sheet-True-Cast-Resin.pdf",
+        "note": "Stated as 1.07 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/true-cast-resin/"
+      }
+    },
+    {
+      "id": "resin-formlabs-white-v4-1",
+      "brand": "Formlabs",
+      "name": "White V4.1",
+      "type": "Model",
+      "densityGramsPerMl": 1.11,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/3633fda7180d5929/original/-ENUS-Safety-Data-Sheet-White-V4-1-Resin.pdf",
+        "note": "Stated as 1.11 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/white-resin-v4-1/"
+      }
+    },
+    {
+      "id": "resin-formlabs-white-v5",
+      "brand": "Formlabs",
+      "name": "White V5",
+      "type": "Model",
+      "densityGramsPerMl": 1.11,
+      "densitySource": {
+        "url": "https://media.formlabs.com/m/41a495372da91d05/original/-ENUS-Safety-Data-Sheet-White-V5-Resin.pdf",
+        "note": "Stated as 1.11 g/cm³ in section 9 of the manufacturer's US safety data sheet."
+      },
+      "source": {
+        "id": "formlabs-materials",
+        "url": "https://formlabs.com/global/products/white-resin/"
       }
     },
     {

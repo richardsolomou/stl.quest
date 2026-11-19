@@ -70,6 +70,8 @@ export type ManufacturerImageSource =
     })
   | (ImageSourceBase & {
       kind: 'webpage'
+      siteUrl: string
+      /** Model name to official page; with `catalog`, models missing from community catalogs take their build volume from it. */
       pages: Record<string, string>
     })
   | (ImageSourceBase & {
@@ -298,13 +300,21 @@ export function normalizePrinterModel(value: string, brand = '') {
     .replace(/\s+/g, ' ')
 }
 
+// Matches storefront spec lists, schema.org properties ("W 218 × D 123 × H 235 mm"), and support articles ("L21.8 x W12.3 x H23.5 cm").
 export function parseBuildVolumeHtml(html: string) {
-  const match = html.match(
-    /Build Volume:\s*<\/h6>\s*<p[^>]*>\s*(\d+(?:\.\d+)?)\s*(?:×|x|\*)\s*(\d+(?:\.\d+)?)\s*(?:×|x|\*)\s*(\d+(?:\.\d+)?)\s*mm/i,
-  )
+  const dimension = String.raw`[a-z]?\s*(\d+(?:\.\d+)?)`
+  const match = html
+    .replace(/<[^>]*>/g, ' ')
+    .match(
+      new RegExp(
+        String.raw`\b(?:build|print(?:ing)?) volume\W*(?:value\W*)?${dimension}\s*[×x*]\s*${dimension}\s*[×x*]\s*${dimension}\s*(mm|cm)\b`,
+        'i',
+      ),
+    )
   if (!match) return undefined
-  const [, width, depth, height] = match.map(Number)
-  return { widthMm: width, depthMm: depth, heightMm: height }
+  const scale = match[4].toLocaleLowerCase() === 'cm' ? 10 : 1
+  const [widthMm, depthMm, heightMm] = match.slice(1, 4).map((value) => roundDimension(Number(value) * scale))
+  return { widthMm, depthMm, heightMm }
 }
 
 type NextCmsPlugin = { pluginType: string; id: number; props: string; parent: { id: number } | null }
@@ -341,7 +351,7 @@ export function formlabsPresetId(brand: string, model: string) {
   return printerPresetId('resin', brand, model.replaceAll('+', ' plus'))
 }
 
-function nextCmsPlugins(html: string) {
+export function nextCmsPlugins(html: string) {
   const json = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/)?.[1]
   if (!json) throw new Error('Page has no Next.js data')
   const data = JSON.parse(json) as {
@@ -352,6 +362,7 @@ function nextCmsPlugins(html: string) {
 
 export function extractProductImageUrl(html: string, pageUrl: string) {
   const candidates = [
+    html.match(/"@type"\s*:\s*"Product"[^{}]*?"image"\s*:\s*\[?\s*"([^"]+)"/)?.[1],
     html.match(/<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]+content=["']([^"']+)["']/i)?.[1],
     html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["'](?:og:image|twitter:image)["']/i)?.[1],
     html.match(/&quot;product_image&quot;:\{&quot;image&quot;:&quot;([^&]+)&quot;/i)?.[1],

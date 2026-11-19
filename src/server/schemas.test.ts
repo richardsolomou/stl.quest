@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { MAX_EMAIL_TEMPLATE_PLACEHOLDERS } from '../core/email'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from '../core/priceCalculator'
 import {
+  consumablesSchema,
   acceptInviteSchema,
   boardSettingsSchema,
   createLinkedRequestSchema,
@@ -292,5 +293,33 @@ describe('OIDC account creation settings', () => {
         allowSignup,
       }),
     ).toMatchObject({ allowSignup })
+  })
+})
+
+describe('consumables schema', () => {
+  const tank = { id: 'tank', kind: 'part', name: 'Resin tank', printType: 'resin', price: 60, lifespan: 200, lifespanUnit: 'plates' }
+
+  it('accepts resins, filaments, and wear parts', () => {
+    expect(
+      consumablesSchema.safeParse({
+        consumables: [
+          { id: 'grey', kind: 'resin', name: 'Grey', pricePerLitre: 50, densityGramsPerMl: 1.1 },
+          { id: 'pla', kind: 'filament', name: 'PLA', pricePerKg: 20 },
+          tank,
+        ],
+      }).success,
+    ).toBe(true)
+  })
+
+  it('rejects two consumables with one ID', () => {
+    expect(consumablesSchema.safeParse({ consumables: [tank, tank] }).success).toBe(false)
+  })
+
+  it('rejects a wear part that never wears out', () => {
+    expect(consumablesSchema.safeParse({ consumables: [{ ...tank, lifespan: 0 }] }).success).toBe(false)
+  })
+
+  it('rejects a consumable without a name', () => {
+    expect(consumablesSchema.safeParse({ consumables: [{ ...tank, name: ' ' }] }).success).toBe(false)
   })
 })

@@ -46,7 +46,13 @@ import { managedStorageAvailable } from './managedStorage'
 import { storagePlans } from '../core/plans'
 import { billingAvailable } from './billing'
 import { workflow } from '../core/workflow'
-import { DEFAULT_PRICE_CALCULATOR_SETTINGS, PRICE_CALCULATOR_SETTING, type PriceCalculatorSettings } from '../core/priceCalculator'
+import { CONSUMABLES_SETTING, consumablesOfKind, type Consumable } from '../core/consumables'
+import {
+  DEFAULT_PRICE_CALCULATOR_SETTINGS,
+  PRICE_CALCULATOR_SETTING,
+  prunePrinterCosts,
+  type PriceCalculatorSettings,
+} from '../core/priceCalculator'
 import {
   cloudStorageProviderName,
   oidcDisplayName,
@@ -101,6 +107,7 @@ import {
   updatePrintCopyTagsSchema,
   reorderPrintGroupItemSchema,
   printerProfilesSchema,
+  consumablesSchema,
   reorderRequestSchema,
   requestFiltersSchema,
   repeatRequestSchema,
@@ -1111,6 +1118,33 @@ export const getBoardSettings = createServerFn({ method: 'GET' })
     }),
   )
 
+export const getConsumables = createServerFn({ method: 'GET' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      const context = await workspaceAdmin(instance, data.workspaceSlug)
+      return { consumables: (await context.repository.getSetting<Consumable[]>(CONSUMABLES_SETTING)) ?? [] }
+    }),
+  )
+
+export const saveConsumables = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(consumablesSchema))
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      const context = await workspaceAdmin(instance, data.workspaceSlug)
+      await context.repository.setSetting(CONSUMABLES_SETTING, data.consumables)
+      context.events.publish('settings.changed')
+      instance.telemetry.capture(context.identity.id, 'consumables_saved', {
+        resin_count: consumablesOfKind(data.consumables, 'resin').length,
+        filament_count: consumablesOfKind(data.consumables, 'filament').length,
+        part_count: consumablesOfKind(data.consumables, 'part').length,
+      })
+      return { consumables: data.consumables }
+    }),
+  )
+
 export const getPriceCalculatorSettings = createServerFn({ method: 'GET' })
   .validator(workspaceInputSchema)
   .handler(async ({ data }) =>
@@ -1132,7 +1166,8 @@ export const savePriceCalculatorSettings = createServerFn({ method: 'POST' })
     mutationRpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      const { workspaceSlug: _, ...settings } = data
+      const { workspaceSlug: _, ...edited } = data
+      const settings = prunePrinterCosts(edited, await storedPrinterProfiles(context.repository))
       await context.repository.setSetting(PRICE_CALCULATOR_SETTING, settings)
       context.events.publish('settings.changed')
       instance.telemetry.capture(context.identity.id, 'price_calculator_settings_saved', {
@@ -1140,6 +1175,7 @@ export const savePriceCalculatorSettings = createServerFn({ method: 'POST' })
         resin_preset: Boolean(settings.resinPresetId),
         electricity_preset: Boolean(settings.electricityCountryCode),
         equipment_preset_count: settings.resinEquipment.presetIds.length + settings.filamentEquipment.presetIds.length,
+        printer_cost_count: Object.keys(settings.printerCosts).length,
       })
       return settings
     }),

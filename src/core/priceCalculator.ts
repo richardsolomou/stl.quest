@@ -1,4 +1,7 @@
+import { consumablesOfKind, partCostPerHour, partCostPerPlate, type Consumable } from './consumables'
 import { DEFAULT_PRINTER_POWER_WATTS, equipmentPowerTotals } from './equipmentPresets'
+import { getPrinterPreset } from './printerPresets'
+import type { PrinterProfile } from './types'
 
 export const PRICE_CALCULATOR_SETTING = 'price_calculator'
 
@@ -49,15 +52,20 @@ export type PriceCalculatorEquipmentSettings = {
   dryMinutesPerPlate: number
   curePowerWatts: number
   cureMinutesPerPlate: number
+  /** Wear parts from the workspace consumables, costed over their lifespan on top of the entered rates. */
+  partIds: string[]
 }
 
 export type PriceCalculatorSettings = {
   currency: PriceCalculatorCurrency
   printType: 'resin' | 'filament'
   resinPresetId?: string
+  /** A resin from the workspace consumables; when it exists, its price and density replace the entered ones. */
+  resinConsumableId?: string
   resinPricePerLitre: number
   resinDensityGramsPerMl: number
   filamentPricePerKg: number
+  filamentConsumableId?: string
   electricityCountryCode?: string
   electricityPricePerKwh: number
   resinEquipment: PriceCalculatorEquipmentSettings
@@ -67,7 +75,24 @@ export type PriceCalculatorSettings = {
   labourCostPerHour: number
   failureAllowancePercent: number
   standardMarginPercent: number
+  /** Keyed by printer ID; a printer without an entry uses the workspace setup above. */
+  printerCosts: Record<string, PrinterCosts>
 }
+
+/** What differs between printers; currency, electricity, labour, failure allowance, and margin stay shared. */
+export type PrinterCosts = Pick<
+  PriceCalculatorSettings,
+  | 'resinPresetId'
+  | 'resinConsumableId'
+  | 'filamentConsumableId'
+  | 'resinPricePerLitre'
+  | 'resinDensityGramsPerMl'
+  | 'filamentPricePerKg'
+  | 'equipmentCostPerHour'
+  | 'consumablesCostPerPlate'
+> & { equipment: PriceCalculatorEquipmentSettings }
+
+type CostedPrinter = Pick<PrinterProfile, 'id' | 'printType' | 'presetId' | 'archived'>
 
 export type PriceCalculatorJob = {
   materialAmount: number
@@ -94,6 +119,7 @@ export const DEFAULT_PRICE_CALCULATOR_SETTINGS: PriceCalculatorSettings = {
     dryMinutesPerPlate: 0,
     curePowerWatts: 50,
     cureMinutesPerPlate: 15,
+    partIds: [],
   },
   filamentEquipment: {
     mode: 'preset',
@@ -105,12 +131,14 @@ export const DEFAULT_PRICE_CALCULATOR_SETTINGS: PriceCalculatorSettings = {
     dryMinutesPerPlate: 0,
     curePowerWatts: 0,
     cureMinutesPerPlate: 0,
+    partIds: [],
   },
   equipmentCostPerHour: 1,
   consumablesCostPerPlate: 0.75,
   labourCostPerHour: 15,
   failureAllowancePercent: 10,
   standardMarginPercent: 25,
+  printerCosts: {},
 }
 
 export function calculatePrintPrice(settings: PriceCalculatorSettings, job: PriceCalculatorJob) {
@@ -247,6 +275,97 @@ export function priceRequest(settings: PriceCalculatorSettings, request: Request
     handsOnMinutes: 0,
   }
   return { job, result: calculatePrintPrice(selectPriceCalculatorPrintType(settings, request.printType), job) }
+}
+
+/** The setup a printer prices with: its own costs over the workspace setup, in its own print type, with its own rated power. */
+export function printerCostSettings(settings: PriceCalculatorSettings, printer: CostedPrinter): PriceCalculatorSettings {
+  const typed = selectPriceCalculatorPrintType(settings, printer.printType)
+  const costs = settings.printerCosts[printer.id]
+  const { equipment, ...rates } = costs ?? {}
+  const configured = equipment ? updateEquipmentSettings({ ...typed, ...rates }, equipment) : typed
+  const current = equipmentSettingsFor(configured)
+  if (current.mode !== 'preset' || !printer.presetId || !getPrinterPreset(printer.presetId)) return configured
+  return applyEquipmentPresets(configured, [printer.presetId, ...current.presetIds.filter((id) => !getPrinterPreset(id))])
+}
+
+/**
+ * Stores a setup edited while a printer is selected: shared fields go to the workspace, and the printer gets its own
+ * costs only once they differ from what it inherits, so changing labour alone keeps it following the workspace setup.
+ */
+export function withPrinterCostSettings(
+  settings: PriceCalculatorSettings,
+  printer: CostedPrinter,
+  edited: PriceCalculatorSettings,
+): PriceCalculatorSettings {
+  const costs = printerCostsOf(edited)
+  const inherits =
+    !settings.printerCosts[printer.id] && JSON.stringify(costs) === JSON.stringify(printerCostsOf(printerCostSettings(settings, printer)))
+  return {
+    ...settings,
+    currency: edited.currency,
+    electricityCountryCode: edited.electricityCountryCode,
+    electricityPricePerKwh: edited.electricityPricePerKwh,
+    labourCostPerHour: edited.labourCostPerHour,
+    failureAllowancePercent: edited.failureAllowancePercent,
+    standardMarginPercent: edited.standardMarginPercent,
+    printerCosts: inherits ? settings.printerCosts : { ...settings.printerCosts, [printer.id]: costs },
+  }
+}
+
+function printerCostsOf(settings: PriceCalculatorSettings): PrinterCosts {
+  return {
+    resinPresetId: settings.resinPresetId,
+    resinConsumableId: settings.resinConsumableId,
+    filamentConsumableId: settings.filamentConsumableId,
+    resinPricePerLitre: settings.resinPricePerLitre,
+    resinDensityGramsPerMl: settings.resinDensityGramsPerMl,
+    filamentPricePerKg: settings.filamentPricePerKg,
+    equipmentCostPerHour: settings.equipmentCostPerHour,
+    consumablesCostPerPlate: settings.consumablesCostPerPlate,
+    equipment: equipmentSettingsFor(settings),
+  }
+}
+
+export function removePrinterCosts(settings: PriceCalculatorSettings, printerId: string): PriceCalculatorSettings {
+  const { [printerId]: _, ...printerCosts } = settings.printerCosts
+  return { ...settings, printerCosts }
+}
+
+export function prunePrinterCosts(settings: PriceCalculatorSettings, printers: Pick<PrinterProfile, 'id'>[]): PriceCalculatorSettings {
+  const ids = new Set(printers.map((printer) => printer.id))
+  return { ...settings, printerCosts: Object.fromEntries(Object.entries(settings.printerCosts).filter(([id]) => ids.has(id))) }
+}
+
+/** Prices a request on each active printer of its print type, so the operator can compare where to run it. */
+export function priceRequestOnPrinters<Printer extends CostedPrinter>(
+  settings: PriceCalculatorSettings,
+  printers: Printer[],
+  request: RequestPriceInput,
+  consumables: Consumable[],
+) {
+  return printers
+    .filter((printer) => !printer.archived && printer.printType === request.printType)
+    .map((printer) => ({ printer, quote: priceRequest(withConsumables(printerCostSettings(settings, printer), consumables), request) }))
+}
+
+/** Resolves workspace consumables into the rates a quote uses, so a price changed in the library reaches every setup using it. */
+export function withConsumables(settings: PriceCalculatorSettings, consumables: Consumable[]): PriceCalculatorSettings {
+  const resin = consumablesOfKind(consumables, 'resin').find(({ id }) => id === settings.resinConsumableId)
+  const filament = consumablesOfKind(consumables, 'filament').find(({ id }) => id === settings.filamentConsumableId)
+  const parts = consumablesOfKind(consumables, 'part').filter(
+    (part) => part.printType === settings.printType && equipmentSettingsFor(settings).partIds.includes(part.id),
+  )
+  return {
+    ...settings,
+    ...(resin && { resinPricePerLitre: resin.pricePerLitre, resinDensityGramsPerMl: resin.densityGramsPerMl }),
+    ...(filament && { filamentPricePerKg: filament.pricePerKg }),
+    consumablesCostPerPlate: settings.consumablesCostPerPlate + sum(parts.map(partCostPerPlate)),
+    equipmentCostPerHour: settings.equipmentCostPerHour + sum(parts.map(partCostPerHour)),
+  }
+}
+
+function sum(values: number[]) {
+  return values.reduce((total, value) => total + value, 0)
 }
 
 function phaseElectricity(plates: number, minutesPerPlate: number, powerWatts: number, pricePerKwh: number) {

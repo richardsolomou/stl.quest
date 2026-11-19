@@ -27,6 +27,9 @@ export const calculator: typeof en = {
     plateRuns: 'Druckplattendurchläufe',
     handsOnTime: 'Arbeitszeit (Minuten)',
     handsOnHint: 'Entfernen von Stützen, Reinigung, Montage und weitere Zeit, die Sie für den Auftrag aufwenden.',
+    priceOn: 'Kalkulieren für',
+    workspaceSetup: 'Workspace-Einrichtung',
+    printerHint: 'Kalkulieren Sie mit einem Ihrer Drucker, um dessen eigene Kosten zu verwenden.',
   },
   quote: {
     emptyHint: 'Geben Sie Material und Druckzeit aus Ihrem Slicer ein, um einen Preis zu sehen.',
@@ -51,6 +54,7 @@ export const calculator: typeof en = {
     failureAllowance: 'Ausfallreserve',
     labour: 'Arbeitszeit',
     estimatedCost: 'Geschätzte Kosten',
+    onEachPrinter: 'Auf jedem Drucker',
   },
   setup: {
     edit: 'Einrichtung bearbeiten',
@@ -63,6 +67,13 @@ export const calculator: typeof en = {
       'Diese Standardwerte gehören zu diesem Arbeitsbereich und bleiben beim nächsten Mal erhalten. Die Auftragswerte oben bleiben ein Notizblock zum Wegwerfen.',
     save: 'Einrichtung speichern',
     saveError: 'Die Einrichtung konnte nicht gespeichert werden.',
+    scope: {
+      shared: (printer: string) =>
+        `${printer} verwendet die Workspace-Einrichtung mit seiner eigenen Nennleistung. Wenn Sie hier Material, Ausrüstung, Verschleiß oder Verbrauchsmaterial ändern, erhält er eigene Kosten.`,
+      own: (printer: string) =>
+        `${printer} hat eigenes Material, eigene Ausrüstung, eigenen Verschleiß und eigene Verbrauchsmaterialien. Währung, Strom, Arbeit, Ausschusszuschlag und Marge gelten für alle Drucker.`,
+      useShared: 'Workspace-Einrichtung verwenden',
+    },
   },
   currency: {
     title: 'Währung',
@@ -84,6 +95,10 @@ export const calculator: typeof en = {
       count === 1 ? `${count} Vorgabe mit Quellenangabe verfügbar.` : `${count} Vorgaben mit Quellenangabe verfügbar.`,
     resinDensity: 'Harzdichte (g/mL)',
     resinPrice: (symbol: string) => `Harzpreis (${symbol}/L)`,
+    fromConsumables: 'Aus Ihrem Verbrauchsmaterial',
+    enterHere: 'Preis hier eingeben',
+    libraryResin: (price: string, density: string) => `${price}/L · ${density} g/mL aus Ihrem Verbrauchsmaterial`,
+    libraryFilament: (price: string) => `${price}/kg aus Ihrem Verbrauchsmaterial`,
   },
   electricity: {
     title: 'Strom',
@@ -113,6 +128,10 @@ export const calculator: typeof en = {
     labour: (symbol: string) => `Arbeitszeit (${symbol}/h)`,
     failureAllowance: 'Ausfallreserve (%)',
     standardMargin: 'Standardmarge (%)',
+    wearParts: 'Verschleißteile',
+    wearPartsHint: 'Jedes Teil fügt seinen Anteil zu den Verbrauchsmaterialien pro Platte oder zum Verschleiß pro Stunde hinzu.',
+    noWearParts: 'Fügen Sie Harzwannen, Druckplatten und andere Verschleißteile hinzu unter',
+    manageConsumables: 'Einstellungen für Verbrauchsmaterial',
   },
   equipment: {
     title: 'Geräte',
@@ -144,6 +163,8 @@ export const calculator: typeof en = {
     resinPrinterSearch: 'Harzdrucker suchen…',
     filamentPrinterSearch: 'Filamentdrucker suchen…',
     printerEmpty: 'Keine passende Druckervorgabe.',
+    printerFromFleet: 'Vom kalkulierten Drucker vorgegeben.',
+    printerClosest: 'Kein genauer Treffer. Ähnlichste Modelle:',
     printerCount: (count: number) => `${count} Drucker aus dem Hauptdruckerkatalog verfügbar.`,
     accessories: 'Zubehör',
     accessorySearch: 'Zubehör hinzufügen…',

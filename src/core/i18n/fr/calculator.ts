@@ -25,6 +25,9 @@ export const calculator: typeof en = {
     plateRuns: 'Plateaux imprimés',
     handsOnTime: 'Temps de travail manuel (minutes)',
     handsOnHint: 'Retrait des supports, nettoyage, assemblage et tout autre temps passé sur la tâche.',
+    priceOn: 'Chiffrer sur',
+    workspaceSetup: 'Configuration de l’espace de travail',
+    printerHint: 'Chiffrez avec l’une de vos imprimantes pour utiliser ses propres coûts.',
   },
   quote: {
     emptyHint: 'Saisissez la matière et la durée d’impression de votre trancheur pour voir un prix.',
@@ -49,6 +52,7 @@ export const calculator: typeof en = {
     failureAllowance: 'Marge pour échecs',
     labour: 'Main-d’œuvre',
     estimatedCost: 'Coût estimé',
+    onEachPrinter: 'Sur chaque imprimante',
   },
   setup: {
     edit: 'Modifier la configuration',
@@ -61,6 +65,13 @@ export const calculator: typeof en = {
       'Ces valeurs par défaut appartiennent à cet espace de travail et seront conservées. Les valeurs de la tâche ci-dessus restent un brouillon jetable.',
     save: 'Enregistrer la configuration',
     saveError: 'La configuration n’a pas pu être enregistrée.',
+    scope: {
+      shared: (printer: string) =>
+        `${printer} utilise la configuration de l’espace de travail avec sa propre puissance nominale. Modifier ici son matériau, son équipement, son usure ou ses consommables lui donne ses propres coûts.`,
+      own: (printer: string) =>
+        `${printer} a son propre matériau, son équipement, son usure et ses consommables. La devise, l’électricité, la main-d’œuvre, la marge pour échecs et la marge sont communes à toutes les imprimantes.`,
+      useShared: 'Utiliser la configuration de l’espace de travail',
+    },
   },
   currency: {
     title: 'Devise',
@@ -82,6 +93,10 @@ export const calculator: typeof en = {
       count <= 1 ? `${count} résine prédéfinie référencée disponible.` : `${count} résines prédéfinies référencées disponibles.`,
     resinDensity: 'Densité de la résine (g/mL)',
     resinPrice: (symbol: string) => `Prix de la résine (${symbol}/L)`,
+    fromConsumables: 'Depuis vos consommables',
+    enterHere: 'Saisir le prix ici',
+    libraryResin: (price: string, density: string) => `${price}/L · ${density} g/mL depuis vos consommables`,
+    libraryFilament: (price: string) => `${price}/kg depuis vos consommables`,
   },
   electricity: {
     title: 'Électricité',
@@ -108,6 +123,10 @@ export const calculator: typeof en = {
     labour: (symbol: string) => `Main-d’œuvre (${symbol}/h)`,
     failureAllowance: 'Marge pour échecs (%)',
     standardMargin: 'Marge standard (%)',
+    wearParts: 'Pièces d’usure',
+    wearPartsHint: 'Chaque pièce ajoute sa part aux consommables par plateau ou à l’usure de l’équipement par heure.',
+    noWearParts: 'Ajoutez bacs à résine, plateaux et autres pièces d’usure dans',
+    manageConsumables: 'les réglages des consommables',
   },
   equipment: {
     title: 'Matériel',
@@ -139,6 +158,8 @@ export const calculator: typeof en = {
     resinPrinterSearch: 'Rechercher des imprimantes résine…',
     filamentPrinterSearch: 'Rechercher des imprimantes filament…',
     printerEmpty: 'Aucune imprimante prédéfinie correspondante.',
+    printerFromFleet: 'Défini par l’imprimante chiffrée.',
+    printerClosest: 'Aucun résultat exact. Modèles les plus proches :',
     printerCount: (count: number) =>
       count <= 1
         ? `${count} imprimante disponible dans le catalogue principal.`

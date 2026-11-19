@@ -23,6 +23,9 @@ export const calculator = {
     plateRuns: 'Plate runs',
     handsOnTime: 'Hands-on time (minutes)',
     handsOnHint: 'Support removal, cleaning, assembly, and other time you spend on the job.',
+    priceOn: 'Price on',
+    workspaceSetup: 'Workspace setup',
+    printerHint: 'Quote with one of your printers to use its own costs.',
   },
   quote: {
     emptyHint: "Enter your slicer's material and print time to see a price.",
@@ -47,6 +50,7 @@ export const calculator = {
     failureAllowance: 'Failure allowance',
     labour: 'Labour',
     estimatedCost: 'Estimated cost',
+    onEachPrinter: 'On each printer',
   },
   setup: {
     edit: 'Edit setup',
@@ -58,6 +62,13 @@ export const calculator = {
     description: 'These defaults belong to this workspace and will be here next time. Job values above remain a disposable scratchpad.',
     save: 'Save setup',
     saveError: 'The setup could not be saved.',
+    scope: {
+      shared: (printer: string) =>
+        `${printer} uses the workspace setup with its own rated power. Changing its material, equipment, wear, or consumables here gives it its own costs.`,
+      own: (printer: string) =>
+        `${printer} has its own material, equipment, wear, and consumables. Currency, electricity, labour, failure allowance, and margin are shared by every printer.`,
+      useShared: 'Use the workspace setup',
+    },
   },
   currency: {
     title: 'Currency',
@@ -78,6 +89,10 @@ export const calculator = {
     presetCount: (count: number) => `${count} sourced presets available.`,
     resinDensity: 'Resin density (g/mL)',
     resinPrice: (symbol: string) => `Resin price (${symbol}/L)`,
+    fromConsumables: 'From your consumables',
+    enterHere: 'Enter the price here',
+    libraryResin: (price: string, density: string) => `${price}/L · ${density} g/mL from your consumables`,
+    libraryFilament: (price: string) => `${price}/kg from your consumables`,
   },
   electricity: {
     title: 'Electricity',
@@ -102,6 +117,10 @@ export const calculator = {
     labour: (symbol: string) => `Labour (${symbol}/h)`,
     failureAllowance: 'Failure allowance (%)',
     standardMargin: 'Standard margin (%)',
+    wearParts: 'Wear parts',
+    wearPartsHint: 'Each part adds its share to the consumables per plate or the equipment wear per hour.',
+    noWearParts: 'Add resin tanks, build plates, and other parts that wear out in',
+    manageConsumables: 'Consumables settings',
   },
   equipment: {
     title: 'Equipment',
@@ -133,6 +152,8 @@ export const calculator = {
     resinPrinterSearch: 'Search resin printers…',
     filamentPrinterSearch: 'Search filament printers…',
     printerEmpty: 'No matching printer preset.',
+    printerFromFleet: 'Set by the printer you are pricing on.',
+    printerClosest: 'No exact match. Closest models:',
     printerCount: (count: number) => `${count} printers available from the main printer catalogue.`,
     accessories: 'Accessories',
     accessorySearch: 'Add accessories…',

@@ -10,7 +10,7 @@ import {
   ComboboxList,
   useComboboxAnchor,
 } from '@/components/ui/combobox'
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Field, FieldDescription, FieldLabel, FieldTitle } from '@/components/ui/field'
 import { EQUIPMENT_PRESETS, getEquipmentPreset, printerPowerProfile, type EquipmentPreset } from '../../../core/equipmentPresets'
 import {
   applyEquipmentPresets,
@@ -20,7 +20,7 @@ import {
   type PriceCalculatorEquipmentSettings,
   type PriceCalculatorSettings,
 } from '../../../core/priceCalculator'
-import { getPrinterPreset, PRINTER_PRESETS, type PrinterPreset } from '../../../core/printerPresets'
+import { filterPrinterPresets, getPrinterPreset, PRINTER_PRESETS, type PrinterPreset } from '../../../core/printerPresets'
 import { useI18n } from '../../i18n'
 import { FilterCombobox } from '../FilterCombobox'
 import { ModeSelector, NumberSetting, SetupGroup } from './fields'
@@ -31,9 +31,12 @@ type PrinterOption = { value: string; label: string; preset: PrinterPreset }
 
 export function EquipmentSetup({
   settings,
+  printerFixed = false,
   onSettingsChange,
 }: {
   settings: PriceCalculatorSettings
+  /** The printer being priced on is a catalog model, so its preset is shown rather than chosen. */
+  printerFixed?: boolean
   onSettingsChange: (settings: PriceCalculatorSettings) => void
 }) {
   const copy = useI18n().t.calculator.equipment
@@ -64,6 +67,7 @@ export function EquipmentSetup({
             <PrinterPresetPicker
               printType={settings.printType}
               value={printerPresetId}
+              fixed={printerFixed}
               onChange={(id) => applyPresets([...(id ? [id] : []), ...accessoryPresetIds])}
             />
             <AccessoryPresetPicker
@@ -162,20 +166,32 @@ function PowerSummary({
 function PrinterPresetPicker({
   printType,
   value,
+  fixed,
   onChange,
 }: {
   printType: PriceCalculatorSettings['printType']
   value?: string
+  fixed: boolean
   onChange: (value?: string) => void
 }) {
   const { t, locale } = useI18n()
   const copy = t.calculator.equipment
-  const options: PrinterOption[] = PRINTER_PRESETS.filter((preset) => preset.printType === printType).map((preset) => ({
-    value: preset.id,
-    label: `${preset.brand} ${preset.model}`,
-    preset,
-  }))
+  const presets = PRINTER_PRESETS.filter((preset) => preset.printType === printType)
+  const options: PrinterOption[] = presets.map(printerOption)
   const selectedPower = value ? printerPowerProfile(value) : undefined
+  const selected = value ? getPrinterPreset(value) : undefined
+  if (fixed && selected) {
+    return (
+      <Field className="sm:col-span-2">
+        <FieldTitle>{copy.printer}</FieldTitle>
+        <p className="text-sm font-medium">{`${selected.brand} ${selected.model}`}</p>
+        <FieldDescription>
+          {selectedPower && `${formatNumber(selectedPower.watts, locale)} W · ${selectedPower.basis ?? t.calculator.defaultPowerBasis} · `}
+          {copy.printerFromFleet}
+        </FieldDescription>
+      </Field>
+    )
+  }
   return (
     <Field className="sm:col-span-2">
       <FieldLabel htmlFor="calculator-printer-preset">{copy.printer}</FieldLabel>
@@ -186,6 +202,10 @@ function PrinterPresetPicker({
         options={options}
         placeholder={printType === 'resin' ? copy.resinPrinterSearch : copy.filamentPrinterSearch}
         emptyLabel={copy.printerEmpty}
+        search={(query) => {
+          const result = filterPrinterPresets(query, presets)
+          return { options: result.presets.map(printerOption), notice: result.closest && copy.printerClosest }
+        }}
         renderOption={(option) => <PresetOption label={option.label} detail={formatPrinterPower(option.value, locale)} />}
       />
       <FieldDescription>
@@ -195,6 +215,10 @@ function PrinterPresetPicker({
       </FieldDescription>
     </Field>
   )
+}
+
+function printerOption(preset: PrinterPreset): PrinterOption {
+  return { value: preset.id, label: `${preset.brand} ${preset.model}`, preset }
 }
 
 function AccessoryPresetPicker({

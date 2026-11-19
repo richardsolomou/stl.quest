@@ -1,7 +1,8 @@
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { Field, FieldDescription, FieldLabel, FieldTitle } from '@/components/ui/field'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { PriceCalculation, PriceCalculatorJob, PriceCalculatorSettings } from '../../../core/priceCalculator'
-import { PRINT_TYPES } from '../../../core/types'
+import { PRINT_TYPES, type PrinterSummary } from '../../../core/types'
 import { useI18n } from '../../i18n'
 import { SettingsSection } from '../settings/SettingsLayout'
 import { NumberInput } from './fields'
@@ -11,14 +12,20 @@ export function JobSection({
   settings,
   job,
   result,
+  printers,
+  printerId,
   onJobChange,
   onPrintTypeChange,
+  onPrinterChange,
 }: {
   settings: PriceCalculatorSettings
   job: PriceCalculatorJob
   result: PriceCalculation
+  printers: PrinterSummary[]
+  printerId?: string
   onJobChange: (job: PriceCalculatorJob) => void
   onPrintTypeChange: (printType: PriceCalculatorSettings['printType']) => void
+  onPrinterChange: (printerId: string | undefined) => void
 }) {
   const { t, locale } = useI18n()
   const copy = t.calculator.job
@@ -34,6 +41,7 @@ export function JobSection({
             onChange={onPrintTypeChange}
           />
         </Field>
+        {printers.length > 0 && <PrinterChoice printers={printers} printerId={printerId} onPrinterChange={onPrinterChange} />}
         <Field className="sm:col-span-2">
           <div className="flex items-center justify-between gap-3">
             <FieldLabel htmlFor="calculator-material">{copy.expectedMaterial}</FieldLabel>
@@ -105,5 +113,46 @@ export function JobSection({
         </Field>
       </div>
     </SettingsSection>
+  )
+}
+
+// Base UI reserves an empty value for no selection, so the workspace setup needs its own value.
+const WORKSPACE_SETUP = 'workspace'
+
+function PrinterChoice({
+  printers,
+  printerId,
+  onPrinterChange,
+}: {
+  printers: PrinterSummary[]
+  printerId?: string
+  onPrinterChange: (printerId: string | undefined) => void
+}) {
+  const copy = useI18n().t.calculator.job
+  const options = [
+    { value: WORKSPACE_SETUP, label: copy.workspaceSetup },
+    ...printers.map((printer) => ({ value: printer.id, label: printer.name })),
+  ]
+  return (
+    <Field className="sm:col-span-2">
+      <FieldLabel htmlFor="calculator-price-on">{copy.priceOn}</FieldLabel>
+      <Select
+        items={options}
+        value={printerId ?? WORKSPACE_SETUP}
+        onValueChange={(value) => onPrinterChange(value && value !== WORKSPACE_SETUP ? value : undefined)}
+      >
+        <SelectTrigger className="w-full" id="calculator-price-on">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <FieldDescription>{copy.printerHint}</FieldDescription>
+    </Field>
   )
 }

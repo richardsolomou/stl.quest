@@ -7,10 +7,22 @@ export type CalculatorSearch = {
   unit?: PriceCalculatorJob['materialUnit']
   hours?: number
   plates?: number
+  printer?: string
 }
 
-export function calculatorSearch(printType: PriceCalculatorSettings['printType'], job: PriceCalculatorJob): CalculatorSearch {
-  return { printType, material: round(job.materialAmount), unit: job.materialUnit, hours: round(job.printHours), plates: job.plates }
+export function calculatorSearch(
+  printType: PriceCalculatorSettings['printType'],
+  job: PriceCalculatorJob,
+  printerId?: string,
+): CalculatorSearch {
+  return {
+    printType,
+    material: round(job.materialAmount),
+    unit: job.materialUnit,
+    hours: round(job.printHours),
+    plates: job.plates,
+    printer: printerId,
+  }
 }
 
 export function validateCalculatorSearch(input: Record<string, unknown>): CalculatorSearch {
@@ -21,6 +33,7 @@ export function validateCalculatorSearch(input: Record<string, unknown>): Calcul
     unit: input.unit === 'ml' || input.unit === 'g' ? input.unit : undefined,
     hours: amount(input.hours),
     plates: Number.isInteger(plates) ? plates : undefined,
+    printer: typeof input.printer === 'string' && input.printer.length > 0 && input.printer.length <= 200 ? input.printer : undefined,
   }
 }
 
@@ -28,6 +41,7 @@ export function calculatorPrefill(search: CalculatorSearch) {
   if (!search.printType) return undefined
   return {
     printType: search.printType,
+    printerId: search.printer,
     job: {
       materialAmount: search.material ?? 0,
       materialUnit: search.printType === 'filament' ? 'g' : (search.unit ?? 'ml'),

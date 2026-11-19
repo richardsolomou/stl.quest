@@ -12,7 +12,7 @@ Filament printer definitions and cover images under `catalogs/printers/catalog.g
 
 Supplemental resin definitions and images are derived from the pinned [Open Resin Alliance](https://github.com/Open-Resin-Alliance) Elegoo, Anycubic, and Uniformation plugins. Prusa resin thumbnails are derived from [PrusaSlicer](https://github.com/prusa3d/PrusaSlicer). Their pinned revisions and source paths are recorded in `catalogs/printers/image-sources.json`.
 
-HeyGears printer definitions, build volumes, and product images are synchronized from its official storefront. Selected Phrozen images are synchronized from exact official product pages. Formlabs printer definitions and build volumes are synchronized from its official resin printer tech specs, and its printer images from its official product listing. Manufacturer names, product data, and product images remain the property of their respective owners.
+HeyGears printer definitions, build volumes, and product images are synchronized from its official storefront. Phrozen printer definitions, build volumes, and product images are synchronized from exact official product pages, and build volumes for discontinued models from its official help center. Formlabs printer definitions and build volumes are synchronized from its official resin printer tech specs, and its printer images from its official product listing. Manufacturer names, product data, and product images remain the property of their respective owners.
 
 Every synchronized manufacturer image records its source page and original image URL in `catalogs/printers/manufacturer-images.json`. Printer images are resized and converted to WebP. The generated catalog and images are committed so installed applications do not contact these services at runtime.
 
@@ -22,7 +22,7 @@ OrcaSlicer, UVtools, and PrusaSlicer content is licensed under AGPL-3.0-only. Th
 
 ## Resin catalog
 
-Resin names, categories, and available density values under `catalogs/resins/catalog.generated.json` are derived from pinned [PrusaSlicer](https://github.com/prusa3d/PrusaSlicer) SLA material profiles and selected official HeyGears material pages. Their revisions and exact source URLs are recorded alongside the generated presets. PrusaSlicer content is licensed under AGPL-3.0-only; manufacturer names and product data remain the property of their respective owners.
+Resin names, categories, and available density values under `catalogs/resins/catalog.generated.json` are derived from pinned [PrusaSlicer](https://github.com/prusa3d/PrusaSlicer) SLA material profiles, selected official HeyGears material pages, and Formlabs' official materials listing and safety data sheets. Their revisions or checked dates and exact source URLs are recorded alongside the generated presets. PrusaSlicer content is licensed under AGPL-3.0-only; manufacturer names and product data remain the property of their respective owners.
 
 ## Electricity price catalog
 
