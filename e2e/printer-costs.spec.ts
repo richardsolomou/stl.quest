@@ -34,6 +34,8 @@ test('prices one job on each printer with its own costs', async ({ page }) => {
   await screenshot(page, 'consumables-settings')
 
   await page.goto('/calculator')
+  // Earlier journeys save the setup on another print type, and the calculator reopens on the saved one.
+  await page.getByRole('group', { name: 'Print type' }).getByRole('button', { name: 'Resin' }).click()
   await page.getByLabel('Expected material').fill('100')
   await page.getByLabel('Total print hours').fill('3')
   const quote = page.getByRole('group', { name: 'Rough quote' })
