@@ -158,6 +158,7 @@ export const calculator: typeof en = {
     resinPrinterSearch: 'Rechercher des imprimantes résine…',
     filamentPrinterSearch: 'Rechercher des imprimantes filament…',
     printerEmpty: 'Aucune imprimante prédéfinie correspondante.',
+    printerClosest: 'Aucun résultat exact. Modèles les plus proches :',
     printerCount: (count: number) =>
       count <= 1
         ? `${count} imprimante disponible dans le catalogue principal.`

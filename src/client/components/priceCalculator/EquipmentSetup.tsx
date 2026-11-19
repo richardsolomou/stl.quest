@@ -20,7 +20,7 @@ import {
   type PriceCalculatorEquipmentSettings,
   type PriceCalculatorSettings,
 } from '../../../core/priceCalculator'
-import { getPrinterPreset, PRINTER_PRESETS, type PrinterPreset } from '../../../core/printerPresets'
+import { filterPrinterPresets, getPrinterPreset, PRINTER_PRESETS, type PrinterPreset } from '../../../core/printerPresets'
 import { useI18n } from '../../i18n'
 import { FilterCombobox } from '../FilterCombobox'
 import { ModeSelector, NumberSetting, SetupGroup } from './fields'
@@ -170,11 +170,8 @@ function PrinterPresetPicker({
 }) {
   const { t, locale } = useI18n()
   const copy = t.calculator.equipment
-  const options: PrinterOption[] = PRINTER_PRESETS.filter((preset) => preset.printType === printType).map((preset) => ({
-    value: preset.id,
-    label: `${preset.brand} ${preset.model}`,
-    preset,
-  }))
+  const presets = PRINTER_PRESETS.filter((preset) => preset.printType === printType)
+  const options: PrinterOption[] = presets.map(printerOption)
   const selectedPower = value ? printerPowerProfile(value) : undefined
   return (
     <Field className="sm:col-span-2">
@@ -186,6 +183,10 @@ function PrinterPresetPicker({
         options={options}
         placeholder={printType === 'resin' ? copy.resinPrinterSearch : copy.filamentPrinterSearch}
         emptyLabel={copy.printerEmpty}
+        search={(query) => {
+          const result = filterPrinterPresets(query, presets)
+          return { options: result.presets.map(printerOption), notice: result.closest && copy.printerClosest }
+        }}
         renderOption={(option) => <PresetOption label={option.label} detail={formatPrinterPower(option.value, locale)} />}
       />
       <FieldDescription>
@@ -195,6 +196,10 @@ function PrinterPresetPicker({
       </FieldDescription>
     </Field>
   )
+}
+
+function printerOption(preset: PrinterPreset): PrinterOption {
+  return { value: preset.id, label: `${preset.brand} ${preset.model}`, preset }
 }
 
 function AccessoryPresetPicker({

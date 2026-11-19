@@ -152,6 +152,7 @@ export const calculator = {
     resinPrinterSearch: 'Search resin printers…',
     filamentPrinterSearch: 'Search filament printers…',
     printerEmpty: 'No matching printer preset.',
+    printerClosest: 'No exact match. Closest models:',
     printerCount: (count: number) => `${count} printers available from the main printer catalogue.`,
     accessories: 'Accessories',
     accessorySearch: 'Add accessories…',

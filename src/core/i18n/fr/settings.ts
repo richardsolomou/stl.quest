@@ -264,6 +264,7 @@ export const settings: typeof en = {
     searchLabel: 'Rechercher des imprimantes',
     searchPlaceholder: 'Rechercher par marque, modèle ou type d’impression',
     noMatch: (search: string) => `Aucune imprimante prédéfinie ne correspond à « ${search} ».`,
+    closestMatches: (search: string) => `Aucun résultat exact pour « ${search} ». Modèles les plus proches :`,
     custom: 'Imprimante personnalisée',
     customDescription: 'Saisissez manuellement un nom d’imprimante et un type d’impression.',
     addPreset: (printer: string) => `Ajouter ${printer}`,

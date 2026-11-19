@@ -257,6 +257,7 @@ export const settings = {
     searchLabel: 'Search printers',
     searchPlaceholder: 'Search by brand, model, or print type',
     noMatch: (search: string) => `No predefined printers match “${search}”.`,
+    closestMatches: (search: string) => `No exact match for “${search}”. Closest models:`,
     custom: 'Custom printer',
     customDescription: 'Enter a printer name and print type manually.',
     addPreset: (printer: string) => `Add ${printer}`,

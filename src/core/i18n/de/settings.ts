@@ -265,6 +265,7 @@ export const settings: typeof en = {
     searchLabel: 'Drucker suchen',
     searchPlaceholder: 'Nach Marke, Modell oder Druckart suchen',
     noMatch: (search: string) => `Keine vordefinierten Drucker entsprechen „${search}“.`,
+    closestMatches: (search: string) => `Kein genauer Treffer für „${search}“. Ähnlichste Modelle:`,
     custom: 'Eigener Drucker',
     customDescription: 'Druckername und Druckart manuell eingeben.',
     addPreset: (printer: string) => `${printer} hinzufügen`,

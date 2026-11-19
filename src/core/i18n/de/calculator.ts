@@ -163,6 +163,7 @@ export const calculator: typeof en = {
     resinPrinterSearch: 'Harzdrucker suchen…',
     filamentPrinterSearch: 'Filamentdrucker suchen…',
     printerEmpty: 'Keine passende Druckervorgabe.',
+    printerClosest: 'Kein genauer Treffer. Ähnlichste Modelle:',
     printerCount: (count: number) => `${count} Drucker aus dem Hauptdruckerkatalog verfügbar.`,
     accessories: 'Zubehör',
     accessorySearch: 'Zubehör hinzufügen…',

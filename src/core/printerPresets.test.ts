@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filterPrinterPresets, PRINTER_PRESETS } from './printerPresets'
+import { CLOSEST_PRINTER_PRESET_LIMIT, filterPrinterPresets, PRINTER_PRESETS } from './printerPresets'
 
 describe('printer presets', () => {
   it('keeps stable unique IDs', () => {
@@ -20,11 +20,64 @@ describe('printer presets', () => {
   })
 
   it('searches by brand, model, and print type', () => {
-    expect(filterPrinterPresets('mars 5 ultra').map((preset) => preset.id)).toContain('resin-elegoo-mars-5-ultra')
-    expect(filterPrinterPresets('Elegoo Mars 2').map((preset) => preset.id)).toContain('resin-elegoo-mars-2')
-    expect(filterPrinterPresets('HeyGears Reflex 2').map((preset) => preset.id)).toContain('resin-heygears-reflex-2')
-    expect(filterPrinterPresets('bambu').length).toBeGreaterThan(2)
-    expect(filterPrinterPresets('resin').every((preset) => preset.printType === 'resin')).toBe(true)
+    expect(filterPrinterPresets('mars 5 ultra').presets.map((preset) => preset.id)).toContain('resin-elegoo-mars-5-ultra')
+    expect(filterPrinterPresets('Elegoo Mars 2').presets.map((preset) => preset.id)).toContain('resin-elegoo-mars-2')
+    expect(filterPrinterPresets('HeyGears Reflex 2').presets.map((preset) => preset.id)).toContain('resin-heygears-reflex-2')
+    expect(filterPrinterPresets('bambu').presets.length).toBeGreaterThan(2)
+    expect(filterPrinterPresets('resin').presets.every((preset) => preset.printType === 'resin')).toBe(true)
+  })
+
+  it('returns every preset for an empty search', () => {
+    expect(filterPrinterPresets('  ').presets).toBe(PRINTER_PRESETS)
+  })
+
+  it('reports full-word matches as exact', () => {
+    expect(filterPrinterPresets('mars 5 ultra').closest).toBe(false)
+  })
+
+  it('matches compact typing that drops the spaces between words', () => {
+    expect(filterPrinterPresets('saturn4').presets.map((preset) => preset.model)).toContain('Saturn 4')
+  })
+
+  it('matches compact typing that spans several words', () => {
+    expect(filterPrinterPresets('m7pro').presets.map((preset) => preset.model)).toContain('Photon Mono M7 Pro')
+  })
+
+  it('treats compact matches as exact', () => {
+    expect(filterPrinterPresets('mars4ultra').closest).toBe(false)
+  })
+
+  it('falls back to closest matches when no preset matches every word', () => {
+    expect(filterPrinterPresets('Sonic Mighty 99K').closest).toBe(true)
+  })
+
+  it('ranks closest matches by how many words they match', () => {
+    expect(
+      filterPrinterPresets('Sonic Mighty 99K')
+        .presets.slice(0, 2)
+        .map((preset) => preset.model),
+    ).toEqual(['Sonic Mighty 4K', 'Sonic Mighty 8K'])
+  })
+
+  it('caps the closest matches', () => {
+    expect(filterPrinterPresets('resin zzqx').presets).toHaveLength(CLOSEST_PRINTER_PRESET_LIMIT)
+  })
+
+  it('returns no closest matches when no word matches', () => {
+    expect(filterPrinterPresets('zzqx').presets).toEqual([])
+  })
+
+  it('does not flag an empty result as closest matches', () => {
+    expect(filterPrinterPresets('zzqx').closest).toBe(false)
+  })
+
+  it('does not tolerate typos', () => {
+    expect(filterPrinterPresets('satrun').presets).toEqual([])
+  })
+
+  it('searches only the given presets', () => {
+    const filament = PRINTER_PRESETS.filter((preset) => preset.printType === 'filament')
+    expect(filterPrinterPresets('elegoo', filament).presets.every((preset) => preset.printType === 'filament')).toBe(true)
   })
 
   it('includes the Bambu Lab range used by the calculator picker', () => {
