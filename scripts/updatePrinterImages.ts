@@ -1,12 +1,17 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import https from 'node:https'
 import path from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import pRetry from 'p-retry'
 import {
   definitionPathsFromTree,
   extractProductImageUrl,
+  formlabsPresetId,
   normalizePrinterModel,
   openResinBuildVolume,
   parseBuildVolumeHtml,
+  parseFormlabsProductImages,
+  parseFormlabsTechSpecs,
   printerPresetId,
   type GeneratedPrinterPreset,
   type ManufacturerCatalogSource,
@@ -35,11 +40,14 @@ const outputPath = path.join(root, 'catalogs/printers/manufacturer-images.json')
 const manufacturerCatalogPath = path.join(root, 'catalogs/printers/manufacturer-printers.json')
 const previousManufacturerCatalog = JSON.parse(readFileSync(manufacturerCatalogPath, 'utf8')) as {
   sources: ManufacturerCatalogSource[]
+  presets: GeneratedPrinterPreset[]
 }
+const previousPresetsByUrl = new Map(previousManufacturerCatalog.presets.map((preset) => [preset.source.url, preset]))
 const previousManufacturerSourceIds = new Set(previousManufacturerCatalog.sources.map((source) => source.id))
 const communityPresets = catalog.presets.filter((preset) => !previousManufacturerSourceIds.has(preset.source.id))
 const checkedAt = new Date().toISOString().slice(0, 10)
 const update = process.argv.includes('--update')
+const lastRequestAt = new Map<string, number>()
 const shopifyProducts = new Map<string, ShopifyProduct[]>()
 const openResinPrinters = new Map<string, { printer: OpenResinPrinter; definitionPath: string }[]>()
 
@@ -54,7 +62,12 @@ const manufacturerSources: ManufacturerCatalogSource[] = []
 const claimedCatalogPresetIds = new Set(communityPresets.map((preset) => preset.id))
 for (const source of manifest.sources) {
   if (!source.catalog || source.kind === 'github' || source.kind === 'webpage') continue
-  const synchronized = source.kind === 'open-resin' ? await synchronizeGithubCatalog(source) : await synchronizeShopifyCatalog(source)
+  const synchronized =
+    source.kind === 'open-resin'
+      ? await synchronizeGithubCatalog(source)
+      : source.kind === 'formlabs'
+        ? await synchronizeFormlabsCatalog(source)
+        : await synchronizeShopifyCatalog(source)
   for (const preset of synchronized) {
     if (claimedCatalogPresetIds.has(preset.id)) continue
     manufacturerPresets.push(preset)
@@ -63,7 +76,12 @@ for (const source of manifest.sources) {
   manufacturerSources.push({
     id: source.id,
     kind: 'resin',
-    repository: source.kind === 'open-resin' ? `https://github.com/${source.repository}` : source.storefrontUrl,
+    repository:
+      source.kind === 'open-resin'
+        ? `https://github.com/${source.repository}`
+        : source.kind === 'formlabs'
+          ? source.techSpecsUrl
+          : source.storefrontUrl,
     revision: source.kind === 'open-resin' ? source.revision : checkedAt,
     license: source.kind === 'open-resin' ? source.license : 'manufacturer product data',
   })
@@ -84,7 +102,9 @@ for (const source of manifest.sources) {
         ? await synchronizeGithubImages(source, claimedPresetIds)
         : source.kind === 'webpage'
           ? await synchronizeWebpageImages(source, claimedPresetIds)
-          : await synchronizeShopifySource(source, claimedPresetIds)
+          : source.kind === 'formlabs'
+            ? await synchronizeFormlabsImages(source, claimedPresetIds)
+            : await synchronizeShopifySource(source, claimedPresetIds)
   images.push(...synchronized)
   for (const image of synchronized) claimedPresetIds.add(image.presetId)
 }
@@ -135,10 +155,7 @@ async function synchronizeShopifyCatalog(source: Extract<ManufacturerImageSource
   for (const product of await loadShopifyProducts(source)) {
     if (!source.productTypes.includes(product.product_type) || excluded?.test(product.title)) continue
     const sourcePageUrl = `${source.storefrontUrl}/products/${product.handle}`
-    const response = await fetchWithRetry(sourcePageUrl)
-    if (!response.ok) throw new Error(`${source.id} product page ${product.handle} returned ${response.status}`)
-    const dimensions = parseBuildVolumeHtml(await response.text())
-    if (!dimensions) throw new Error(`${source.id} product ${product.title} has no parseable build volume`)
+    const dimensions = snapshotDimensions(sourcePageUrl) ?? (await storefrontBuildVolume(source, product, sourcePageUrl))
     const normalizedTitle = normalizePrinterModel(product.title, source.brand)
     const model = source.titleAliases?.[normalizedTitle] ?? storefrontModelName(product.title, source.brand)
     presets.push({
@@ -151,6 +168,24 @@ async function synchronizeShopifyCatalog(source: Extract<ManufacturerImageSource
     })
   }
   return presets
+}
+
+// Build volumes never change after launch, so only products missing from the snapshot cost a product page request.
+function snapshotDimensions(sourcePageUrl: string) {
+  const preset = previousPresetsByUrl.get(sourcePageUrl)
+  return preset && { widthMm: preset.widthMm, depthMm: preset.depthMm, heightMm: preset.heightMm }
+}
+
+async function storefrontBuildVolume(
+  source: Extract<ManufacturerImageSource, { kind: 'shopify' }>,
+  product: ShopifyProduct,
+  sourcePageUrl: string,
+) {
+  const response = await fetchWithRetry(sourcePageUrl)
+  if (!response.ok) throw new Error(`${source.id} product page ${product.handle} returned ${response.status}`)
+  const dimensions = parseBuildVolumeHtml(await response.text())
+  if (!dimensions) throw new Error(`${source.id} product ${product.title} has no parseable build volume`)
+  return dimensions
 }
 
 async function loadShopifyProducts(source: Extract<ManufacturerImageSource, { kind: 'shopify' }>) {
@@ -243,6 +278,47 @@ async function synchronizeWebpageImages(source: Extract<ManufacturerImageSource,
   return synchronizedImages
 }
 
+async function synchronizeFormlabsCatalog(source: Extract<ManufacturerImageSource, { kind: 'formlabs' }>) {
+  const response = await fetchWithRetry(source.techSpecsUrl)
+  if (!response.ok) throw new Error(`${source.id} tech specs returned ${response.status}`)
+  const printers = parseFormlabsTechSpecs(await response.text())
+  if (!printers.length) throw new Error(`${source.id} tech specs have no parseable build volumes`)
+  return printers.map(({ model, ...dimensions }) => ({
+    id: formlabsPresetId(source.brand, model),
+    brand: source.brand,
+    model,
+    printType: 'resin' as const,
+    ...dimensions,
+    source: { id: source.id, url: source.techSpecsUrl },
+  }))
+}
+
+async function synchronizeFormlabsImages(source: Extract<ManufacturerImageSource, { kind: 'formlabs' }>, existingPresetIds: Set<string>) {
+  const response = await fetchWithRetry(source.productsUrl)
+  if (!response.ok) throw new Error(`${source.id} products page returned ${response.status}`)
+  const products = new Map(parseFormlabsProductImages(await response.text()).map((product) => [product.model, product]))
+  const matched: ManufacturerImage[] = []
+  for (const preset of catalogPresets.filter((candidate) => candidate.brand === source.brand)) {
+    if (existingPresetIds.has(preset.id)) continue
+    const product = products.get(source.imageAliases[preset.model] ?? preset.model)
+    if (!product) continue
+    const extension = imageExtension(product.imageUrl)
+    const src = `/printer-presets/manufacturer/${preset.id}.${extension}`
+    const imageResponse = await fetchWithRetry(product.imageUrl)
+    if (!imageResponse.ok) throw new Error(`${source.id} image for ${preset.id} returned ${imageResponse.status}`)
+    writeFileSync(path.join(root, 'public', src), Buffer.from(await imageResponse.arrayBuffer()))
+    matched.push({
+      presetId: preset.id,
+      sourceId: source.id,
+      sourcePageUrl: new URL(product.pagePath, source.productsUrl).href,
+      sourceUrl: product.imageUrl,
+      src,
+      checkedAt,
+    })
+  }
+  return matched
+}
+
 async function synchronizeGithubCatalog(source: Extract<ManufacturerImageSource, { kind: 'open-resin' }>) {
   const excludeTitlePattern = source.catalog?.excludeTitlePattern ? new RegExp(source.catalog.excludeTitlePattern, 'i') : undefined
   return (await loadOpenResinPrinters(source)).flatMap(({ printer, definitionPath }) => {
@@ -308,15 +384,55 @@ function rawGithubUrl(source: Extract<ManufacturerImageSource, { kind: 'github' 
   return `https://raw.githubusercontent.com/${source.repository}/${source.revision}/${filePath}`
 }
 
+async function paceHost(hostname: string) {
+  const wait = (lastRequestAt.get(hostname) ?? 0) + 1000 - Date.now()
+  if (wait > 0) await delay(wait)
+  lastRequestAt.set(hostname, Date.now())
+}
+
 function fetchWithRetry(url: string) {
   return pRetry(
     async () => {
-      const response = await fetch(url, { headers: { 'user-agent': 'STL Quest printer catalog sync' } })
+      await paceHost(new URL(url).hostname)
+      const response = await httpsGet(url)
+      if (response.status === 429) await delay(Math.min(Number(response.headers.get('retry-after')) || 5, 120) * 1000)
       if (response.status === 429 || response.status >= 500) throw new Error(`${url} returned ${response.status}`)
       return response
     },
-    { retries: 2, minTimeout: 500 },
+    { retries: 3, minTimeout: 500 },
   )
+}
+
+// Shopify storefronts answer Node's fetch() with 429 but accept a plain request carrying only these headers.
+function httpsGet(url: string, redirects = 5): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    https
+      .get(url, { headers: requestHeaders(url) }, (response) => {
+        const status = response.statusCode ?? 0
+        if (status >= 300 && status < 400 && response.headers.location && redirects > 0) {
+          response.resume()
+          resolve(httpsGet(new URL(response.headers.location, url).href, redirects - 1))
+          return
+        }
+        const chunks: Buffer[] = []
+        response
+          .on('data', (chunk: Buffer) => chunks.push(chunk))
+          .on('end', () => {
+            const headers = new Headers()
+            for (const [name, value] of Object.entries(response.headers)) if (typeof value === 'string') headers.set(name, value)
+            resolve(new Response(Buffer.concat(chunks), { status, headers }))
+          })
+          .on('error', reject)
+      })
+      .on('error', reject)
+  })
+}
+
+function requestHeaders(url: string) {
+  const headers: Record<string, string> = { accept: '*/*', 'user-agent': 'STL Quest printer catalog sync' }
+  const token = process.env.GITHUB_TOKEN
+  if (token && new URL(url).hostname === 'api.github.com') headers.authorization = `Bearer ${token}`
+  return headers
 }
 
 function storefrontModelName(title: string, brand: string) {

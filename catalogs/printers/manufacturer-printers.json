@@ -4,28 +4,35 @@
       "id": "open-resin-alliance-elegoo",
       "kind": "resin",
       "repository": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo",
-      "revision": "fde92e67c25a06830012b54f2b7a39279c70fb0f",
+      "revision": "be59b1597ac5f5551ddbdae97145f584f05be056",
       "license": "MIT"
     },
     {
       "id": "open-resin-alliance-anycubic",
       "kind": "resin",
       "repository": "https://github.com/Open-Resin-Alliance/df-plugin-anycubic",
-      "revision": "fa48c8c3318fe3388ac36fdd7f91036d4f6e2866",
+      "revision": "c93aa7770289fe20048d216ef29f93b7428e21e5",
       "license": "MIT"
     },
     {
       "id": "open-resin-alliance-uniformation",
       "kind": "resin",
       "repository": "https://github.com/Open-Resin-Alliance/df-plugin-uniformation",
-      "revision": "a6791d43640b8157cf52af2c5ae30eeea399a589",
+      "revision": "10388ae183c948b4fb5071b32082b2b4c7b2f9e2",
       "license": "MIT"
     },
     {
       "id": "heygears",
       "kind": "resin",
       "repository": "https://store.heygears.com",
-      "revision": "2026-07-20",
+      "revision": "2026-11-19",
+      "license": "manufacturer product data"
+    },
+    {
+      "id": "formlabs",
+      "kind": "resin",
+      "repository": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
+      "revision": "2026-11-19",
       "license": "manufacturer product data"
     }
   ],
@@ -40,7 +47,7 @@
       "heightMm": 300,
       "source": {
         "id": "open-resin-alliance-elegoo",
-        "url": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/jupiter-series.json"
+        "url": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/be59b1597ac5f5551ddbdae97145f584f05be056/printers/jupiter-series.json"
       }
     },
     {
@@ -53,7 +60,7 @@
       "heightMm": 175,
       "source": {
         "id": "open-resin-alliance-elegoo",
-        "url": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/mars-series.json"
+        "url": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/be59b1597ac5f5551ddbdae97145f584f05be056/printers/mars-series.json"
       }
     },
     {
@@ -66,7 +73,7 @@
       "heightMm": 220,
       "source": {
         "id": "open-resin-alliance-elegoo",
-        "url": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/saturn-series.json"
+        "url": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/be59b1597ac5f5551ddbdae97145f584f05be056/printers/saturn-series.json"
       }
     },
     {
@@ -79,7 +86,7 @@
       "heightMm": 250,
       "source": {
         "id": "open-resin-alliance-elegoo",
-        "url": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/fde92e67c25a06830012b54f2b7a39279c70fb0f/printers/saturn-series.json"
+        "url": "https://github.com/Open-Resin-Alliance/df-plugin-elegoo/blob/be59b1597ac5f5551ddbdae97145f584f05be056/printers/saturn-series.json"
       }
     },
     {
@@ -92,7 +99,7 @@
       "heightMm": 240,
       "source": {
         "id": "open-resin-alliance-uniformation",
-        "url": "https://github.com/Open-Resin-Alliance/df-plugin-uniformation/blob/a6791d43640b8157cf52af2c5ae30eeea399a589/printers/gk3-series.json"
+        "url": "https://github.com/Open-Resin-Alliance/df-plugin-uniformation/blob/10388ae183c948b4fb5071b32082b2b4c7b2f9e2/printers/gk3-series.json"
       }
     },
     {
@@ -105,7 +112,7 @@
       "heightMm": 240,
       "source": {
         "id": "open-resin-alliance-uniformation",
-        "url": "https://github.com/Open-Resin-Alliance/df-plugin-uniformation/blob/a6791d43640b8157cf52af2c5ae30eeea399a589/printers/gk3-series.json"
+        "url": "https://github.com/Open-Resin-Alliance/df-plugin-uniformation/blob/10388ae183c948b4fb5071b32082b2b4c7b2f9e2/printers/gk3-series.json"
       }
     },
     {
@@ -118,7 +125,7 @@
       "heightMm": 300,
       "source": {
         "id": "open-resin-alliance-uniformation",
-        "url": "https://github.com/Open-Resin-Alliance/df-plugin-uniformation/blob/a6791d43640b8157cf52af2c5ae30eeea399a589/printers/gk3-series.json"
+        "url": "https://github.com/Open-Resin-Alliance/df-plugin-uniformation/blob/10388ae183c948b4fb5071b32082b2b4c7b2f9e2/printers/gk3-series.json"
       }
     },
     {
@@ -197,6 +204,162 @@
       "source": {
         "id": "heygears",
         "url": "https://store.heygears.com/products/ultracraft-reflex-rs-3d-printer"
+      }
+    },
+    {
+      "id": "resin-formlabs-form-studio-1",
+      "brand": "Formlabs",
+      "model": "Form Studio 1",
+      "printType": "resin",
+      "widthMm": 200,
+      "depthMm": 125,
+      "heightMm": 235,
+      "source": {
+        "id": "formlabs",
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/"
+      }
+    },
+    {
+      "id": "resin-formlabs-form-4",
+      "brand": "Formlabs",
+      "model": "Form 4",
+      "printType": "resin",
+      "widthMm": 200,
+      "depthMm": 125,
+      "heightMm": 210,
+      "source": {
+        "id": "formlabs",
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/"
+      }
+    },
+    {
+      "id": "resin-formlabs-form-4b",
+      "brand": "Formlabs",
+      "model": "Form 4B",
+      "printType": "resin",
+      "widthMm": 200,
+      "depthMm": 125,
+      "heightMm": 210,
+      "source": {
+        "id": "formlabs",
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/"
+      }
+    },
+    {
+      "id": "resin-formlabs-form-4l",
+      "brand": "Formlabs",
+      "model": "Form 4L",
+      "printType": "resin",
+      "widthMm": 353,
+      "depthMm": 196,
+      "heightMm": 350,
+      "source": {
+        "id": "formlabs",
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/"
+      }
+    },
+    {
+      "id": "resin-formlabs-form-4bl",
+      "brand": "Formlabs",
+      "model": "Form 4BL",
+      "printType": "resin",
+      "widthMm": 353,
+      "depthMm": 196,
+      "heightMm": 350,
+      "source": {
+        "id": "formlabs",
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/"
+      }
+    },
+    {
+      "id": "resin-formlabs-form-3-plus",
+      "brand": "Formlabs",
+      "model": "Form 3+",
+      "printType": "resin",
+      "widthMm": 145,
+      "depthMm": 145,
+      "heightMm": 193,
+      "source": {
+        "id": "formlabs",
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/"
+      }
+    },
+    {
+      "id": "resin-formlabs-form-3b-plus",
+      "brand": "Formlabs",
+      "model": "Form 3B+",
+      "printType": "resin",
+      "widthMm": 145,
+      "depthMm": 145,
+      "heightMm": 193,
+      "source": {
+        "id": "formlabs",
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/"
+      }
+    },
+    {
+      "id": "resin-formlabs-form-3l",
+      "brand": "Formlabs",
+      "model": "Form 3L",
+      "printType": "resin",
+      "widthMm": 335,
+      "depthMm": 200,
+      "heightMm": 320,
+      "source": {
+        "id": "formlabs",
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/"
+      }
+    },
+    {
+      "id": "resin-formlabs-form-3bl",
+      "brand": "Formlabs",
+      "model": "Form 3BL",
+      "printType": "resin",
+      "widthMm": 335,
+      "depthMm": 200,
+      "heightMm": 320,
+      "source": {
+        "id": "formlabs",
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/"
+      }
+    },
+    {
+      "id": "resin-formlabs-form-3",
+      "brand": "Formlabs",
+      "model": "Form 3",
+      "printType": "resin",
+      "widthMm": 145,
+      "depthMm": 145,
+      "heightMm": 193,
+      "source": {
+        "id": "formlabs",
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/"
+      }
+    },
+    {
+      "id": "resin-formlabs-form-3b",
+      "brand": "Formlabs",
+      "model": "Form 3B",
+      "printType": "resin",
+      "widthMm": 145,
+      "depthMm": 145,
+      "heightMm": 193,
+      "source": {
+        "id": "formlabs",
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/"
+      }
+    },
+    {
+      "id": "resin-formlabs-form-2",
+      "brand": "Formlabs",
+      "model": "Form 2",
+      "printType": "resin",
+      "widthMm": 145,
+      "depthMm": 145,
+      "heightMm": 175,
+      "source": {
+        "id": "formlabs",
+        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/"
       }
     }
   ]

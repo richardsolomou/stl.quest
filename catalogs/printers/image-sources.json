@@ -6,7 +6,7 @@
       "brand": "Elegoo",
       "repository": "Open-Resin-Alliance/df-plugin-elegoo",
       "branch": "main",
-      "revision": "fde92e67c25a06830012b54f2b7a39279c70fb0f",
+      "revision": "be59b1597ac5f5551ddbdae97145f584f05be056",
       "license": "MIT",
       "definitionsPath": "printers",
       "catalog": {},
@@ -19,7 +19,7 @@
       "brand": "Anycubic",
       "repository": "Open-Resin-Alliance/df-plugin-anycubic",
       "branch": "main",
-      "revision": "fa48c8c3318fe3388ac36fdd7f91036d4f6e2866",
+      "revision": "c93aa7770289fe20048d216ef29f93b7428e21e5",
       "license": "MIT",
       "definitionsPath": "printers",
       "catalog": {
@@ -34,7 +34,7 @@
       "brand": "Uniformation",
       "repository": "Open-Resin-Alliance/df-plugin-uniformation",
       "branch": "main",
-      "revision": "a6791d43640b8157cf52af2c5ae30eeea399a589",
+      "revision": "10388ae183c948b4fb5071b32082b2b4c7b2f9e2",
       "license": "MIT",
       "definitionsPath": "printers",
       "catalog": {},
@@ -46,8 +46,8 @@
       "kind": "github",
       "brand": "Prusa",
       "repository": "prusa3d/PrusaSlicer",
-      "branch": "master",
-      "revision": "b028299c770b8380ee81c921a2867d522f288123",
+      "branch": "stable",
+      "revision": "450d70dd81c9b8990bc6bc8e690e31f82ddceb11",
       "images": {
         "resin-prusa-uvtools-prusa-sl1": "resources/profiles/PrusaResearchSLA/SL1_thumbnail.png",
         "resin-prusa-uvtools-prusa-sl1s-speed": "resources/profiles/PrusaResearchSLA/SL1S_thumbnail.png"
@@ -104,6 +104,19 @@
       "titleAliases": {
         "gktwo 10 3 8k": "GKtwo"
       }
+    },
+    {
+      "id": "formlabs",
+      "kind": "formlabs",
+      "brand": "Formlabs",
+      "techSpecsUrl": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
+      "productsUrl": "https://formlabs.com/global/products/3d-printers/",
+      "imageAliases": {
+        "Form 3+": "Form 3",
+        "Form 3B": "Form 3",
+        "Form 3B+": "Form 3"
+      },
+      "catalog": {}
     }
   ]
 }

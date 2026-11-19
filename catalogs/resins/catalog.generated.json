@@ -3,7 +3,7 @@
     {
       "id": "prusaslicer",
       "repository": "https://github.com/prusa3d/PrusaSlicer",
-      "revision": "b028299c770b8380ee81c921a2867d522f288123",
+      "revision": "450d70dd81c9b8990bc6bc8e690e31f82ddceb11",
       "license": "AGPL-3.0-only"
     },
     {
@@ -21,7 +21,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -31,7 +31,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -41,7 +41,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -51,7 +51,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -61,7 +61,7 @@
       "type": "Engineering",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -71,7 +71,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -81,7 +81,7 @@
       "type": "Medical",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -91,7 +91,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -101,7 +101,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -111,7 +111,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -121,7 +121,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -131,7 +131,7 @@
       "type": "Casting",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -141,7 +141,7 @@
       "type": "Engineering",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -151,7 +151,7 @@
       "type": "Engineering",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -161,7 +161,7 @@
       "type": "Engineering",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -171,7 +171,7 @@
       "type": "Engineering",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -181,7 +181,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -191,7 +191,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -201,7 +201,7 @@
       "type": "Medical",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -211,7 +211,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -221,7 +221,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -231,7 +231,7 @@
       "type": "Casting",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -241,7 +241,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -251,7 +251,7 @@
       "type": "Medical",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -261,7 +261,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -271,7 +271,7 @@
       "type": "Medical",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -281,7 +281,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -291,7 +291,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -301,7 +301,7 @@
       "type": "Casting",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -311,7 +311,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -321,7 +321,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -331,7 +331,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -341,7 +341,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -351,7 +351,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -361,7 +361,7 @@
       "type": "Medical",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -371,7 +371,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -381,7 +381,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -391,7 +391,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -401,7 +401,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -411,7 +411,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -421,7 +421,7 @@
       "type": "Flexible",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -431,7 +431,7 @@
       "type": "Flexible",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -441,7 +441,7 @@
       "type": "Engineering",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -451,7 +451,7 @@
       "type": "Engineering",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -461,7 +461,7 @@
       "type": "Engineering",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -471,7 +471,7 @@
       "type": "Engineering",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -481,7 +481,7 @@
       "type": "Engineering",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -491,7 +491,7 @@
       "type": "Engineering",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -501,7 +501,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -511,7 +511,7 @@
       "type": "Casting",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -521,7 +521,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -531,7 +531,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -541,7 +541,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -551,7 +551,7 @@
       "type": "Medical",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -561,7 +561,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -571,7 +571,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -581,7 +581,7 @@
       "type": "Engineering",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -591,7 +591,7 @@
       "type": "Flexible",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -601,7 +601,7 @@
       "type": "Engineering",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -786,7 +786,7 @@
       "type": "Medical",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -796,7 +796,7 @@
       "type": "Engineering",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -806,7 +806,7 @@
       "type": "Medical",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -816,7 +816,7 @@
       "type": "Medical",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -826,7 +826,7 @@
       "type": "Flexible",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -836,7 +836,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -846,7 +846,7 @@
       "type": "Engineering",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -856,7 +856,7 @@
       "type": "Engineering",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -866,7 +866,7 @@
       "type": "Casting",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -876,7 +876,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -886,7 +886,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -896,7 +896,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -906,7 +906,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -916,7 +916,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -926,7 +926,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -936,7 +936,7 @@
       "type": "Casting",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -946,7 +946,7 @@
       "type": "Medical",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -956,7 +956,7 @@
       "type": "Medical",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -966,7 +966,7 @@
       "type": "Medical",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -976,7 +976,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -986,7 +986,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -996,7 +996,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1006,7 +1006,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1016,7 +1016,7 @@
       "type": "Flexible",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1026,7 +1026,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1036,7 +1036,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1046,7 +1046,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1056,7 +1056,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1066,7 +1066,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1076,7 +1076,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1086,7 +1086,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1096,7 +1096,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1106,7 +1106,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1116,7 +1116,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1126,7 +1126,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1136,7 +1136,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1146,7 +1146,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1156,7 +1156,7 @@
       "type": "Medical",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1166,7 +1166,7 @@
       "type": "Medical",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1176,7 +1176,7 @@
       "type": "Flexible",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1186,7 +1186,7 @@
       "type": "Flexible",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1196,7 +1196,7 @@
       "type": "Flexible",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1206,7 +1206,7 @@
       "type": "Engineering",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1216,7 +1216,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1226,7 +1226,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1236,7 +1236,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1246,7 +1246,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1256,7 +1256,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1266,7 +1266,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1276,7 +1276,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1286,7 +1286,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1296,7 +1296,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1306,7 +1306,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1316,7 +1316,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1326,7 +1326,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1336,7 +1336,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1346,7 +1346,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1356,7 +1356,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1366,7 +1366,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1376,7 +1376,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1386,7 +1386,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1396,7 +1396,7 @@
       "type": "Model",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1406,7 +1406,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1416,7 +1416,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1426,7 +1426,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1436,7 +1436,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1446,7 +1446,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1456,7 +1456,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1466,7 +1466,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1476,7 +1476,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1486,7 +1486,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1496,7 +1496,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1506,7 +1506,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1516,7 +1516,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1526,7 +1526,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1536,7 +1536,7 @@
       "type": "Casting",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1546,7 +1546,7 @@
       "type": "Casting",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1556,7 +1556,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1566,7 +1566,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1576,7 +1576,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1586,7 +1586,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1596,7 +1596,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1606,7 +1606,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1616,7 +1616,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1626,7 +1626,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     },
     {
@@ -1636,7 +1636,7 @@
       "type": "Tough",
       "source": {
         "id": "prusaslicer",
-        "url": "https://github.com/prusa3d/PrusaSlicer/blob/b028299c770b8380ee81c921a2867d522f288123/resources/profiles/PrusaResearchSLA.ini"
+        "url": "https://github.com/prusa3d/PrusaSlicer/blob/450d70dd81c9b8990bc6bc8e690e31f82ddceb11/resources/profiles/PrusaResearchSLA.ini"
       }
     }
   ]

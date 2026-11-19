@@ -148,9 +148,8 @@
     {
       "countryCode": "HR",
       "countryName": "Croatia",
-      "eurPerKwh": 0.1658,
+      "eurPerKwh": 0.1652,
       "period": "2025-S2",
-      "status": "p",
       "source": {
         "id": "eurostat-nrg-pc-204",
         "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
@@ -277,6 +276,16 @@
       }
     },
     {
+      "countryCode": "IS",
+      "countryName": "Iceland",
+      "eurPerKwh": 0.208,
+      "period": "2025-S2",
+      "source": {
+        "id": "eurostat-nrg-pc-204",
+        "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
+      }
+    },
+    {
       "countryCode": "IN",
       "countryName": "India",
       "eurPerKwh": 0.04824,
@@ -369,9 +378,8 @@
     {
       "countryCode": "MT",
       "countryName": "Malta",
-      "eurPerKwh": 0.1282,
+      "eurPerKwh": 0.1296,
       "period": "2025-S2",
-      "status": "p",
       "source": {
         "id": "eurostat-nrg-pc-204",
         "url": "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/nrg_pc_204?lang=en&siec=E7000&nrg_cons=KWH2500-4999&unit=KWH&tax=I_TAX&currency=EUR&time=2025-S2"
@@ -410,7 +418,7 @@
     {
       "countryCode": "NL",
       "countryName": "Netherlands",
-      "eurPerKwh": 0.2558,
+      "eurPerKwh": 0.2551,
       "period": "2025-S2",
       "source": {
         "id": "eurostat-nrg-pc-204",
@@ -450,7 +458,7 @@
     {
       "countryCode": "PH",
       "countryName": "Philippines",
-      "eurPerKwh": 0.195435,
+      "eurPerKwh": 0.195448,
       "period": "2025",
       "source": {
         "id": "iea-end-use-prices",
@@ -490,7 +498,7 @@
     {
       "countryCode": "RU",
       "countryName": "Russia",
-      "eurPerKwh": 0.057553,
+      "eurPerKwh": 0.057642,
       "period": "2025",
       "source": {
         "id": "iea-end-use-prices",
@@ -500,7 +508,7 @@
     {
       "countryCode": "SN",
       "countryName": "Senegal",
-      "eurPerKwh": 0.197022,
+      "eurPerKwh": 0.195432,
       "period": "2025",
       "source": {
         "id": "iea-end-use-prices",
@@ -620,7 +628,7 @@
     {
       "countryCode": "VN",
       "countryName": "Vietnam",
-      "eurPerKwh": 0.074724,
+      "eurPerKwh": 0.074393,
       "period": "2025",
       "source": {
         "id": "iea-end-use-prices",
