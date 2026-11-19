@@ -7,11 +7,17 @@ type Options = {
   onError?: (error: Error) => void
   onSuccess?: () => void
   onProgress?: (sent: number, total: number) => void
+  urlStorage?: { removeUpload: (key: string) => Promise<void> }
 }
 
 const mocks = vi.hoisted(() => {
-  const state = { uploads: [] as InstanceType<typeof MockUpload>[], previous: [] as unknown[] }
+  const state = {
+    uploads: [] as InstanceType<typeof MockUpload>[],
+    previous: [] as unknown[],
+    urlStorage: { removeUpload: vi.fn(async (_key: string) => undefined) },
+  }
   class MockUpload {
+    static terminate = vi.fn(async (_url: string, _options: unknown) => undefined)
     url: string | null = '/api/uploads/one'
     abort = vi.fn(async (_terminate?: boolean) => undefined)
     findPreviousUploads = vi.fn(async () => state.previous)
@@ -26,7 +32,7 @@ const mocks = vi.hoisted(() => {
 
     constructor(file: File, options: Options) {
       this.file = file
-      this.options = options
+      this.options = { urlStorage: state.urlStorage, ...options }
       state.uploads.push(this)
     }
   }
@@ -40,9 +46,16 @@ const uploads = mocks.state.uploads
 beforeEach(() => {
   uploads.length = 0
   mocks.state.previous = []
+  vi.clearAllMocks()
 })
 
 const file = (name: string) => new File(['data'], name, { type: 'text/plain' })
+
+function unreadable(name: string) {
+  const moved = file(name)
+  moved.slice = () => ({ arrayBuffer: () => Promise.reject(new DOMException('gone', 'NotReadableError')) }) as unknown as Blob
+  return moved
+}
 
 describe('uploadFile', () => {
   it('resolves with the upload URL', async () => {
@@ -86,6 +99,32 @@ describe('uploadFile', () => {
 
   it('rejects with the upload error', async () => {
     await expect(uploadFile(file('fail.txt'))).rejects.toThrow('upload failed')
+  })
+
+  it('deletes a failed upload on the server', async () => {
+    await uploadFile(file('fail.txt')).catch(() => undefined)
+    await vi.waitFor(() => expect(mocks.MockUpload.terminate).toHaveBeenCalledWith('/api/uploads/one', expect.anything()))
+  })
+
+  it('forgets a failed upload so the next attempt creates a new one', async () => {
+    mocks.state.previous = [{ uploadUrl: '/api/uploads/one', urlStorageKey: 'stored-one' }]
+    await uploadFile(file('fail.txt')).catch(() => undefined)
+    await vi.waitFor(() => expect(mocks.state.urlStorage.removeUpload).toHaveBeenCalledWith('stored-one'))
+  })
+
+  it('leaves the failed request intact so its response can still be read', async () => {
+    await uploadFile(file('fail.txt')).catch(() => undefined)
+    expect(uploads[0]!.abort).not.toHaveBeenCalled()
+  })
+
+  it('reports a failed upload whose file can no longer be read', async () => {
+    const moved = unreadable('fail.txt')
+    await expect(uploadFile(moved)).rejects.toMatchObject({ name: 'NotReadableError' })
+  })
+
+  it('does not start an upload whose file can no longer be read', async () => {
+    await uploadFile(unreadable('notes.txt')).catch(() => undefined)
+    expect(uploads[0]!.start).not.toHaveBeenCalled()
   })
 
   it('cancels a running upload and deletes it on the server', async () => {

@@ -101,11 +101,21 @@ describe('uploadErrorMessage', () => {
   })
 
   it('explains that too many unfinished uploads are open', () => {
-    const error = Object.assign(new Error('tus protocol detail'), {
-      originalResponse: { getStatus: () => 429, getBody: () => 'too many incomplete uploads' },
-    })
+    expect(uploadErrorMessage(tusError(429, 'too many incomplete uploads'), t)).toBe(
+      'You have too many unfinished uploads. Try again in a few minutes.',
+    )
+  })
 
-    expect(uploadErrorMessage(error, t)).toBe('Too many uploads are still in progress. Wait for one to finish, then try again.')
+  it('explains that the server is busy with other uploads', () => {
+    expect(uploadErrorMessage(tusError(429, JSON.stringify({ error: 'too many concurrent upload requests' })), t)).toBe(
+      'STL Quest is busy with other uploads. Try again in a moment.',
+    )
+  })
+
+  it('explains a file that was moved or changed after it was added', () => {
+    expect(uploadErrorMessage(new DOMException('gone', 'NotReadableError'), t)).toBe(
+      'This file was moved, renamed, or changed after you added it. Remove it and add it again.',
+    )
   })
 
   it('keeps unexpected upload errors available for diagnosis', () => {
@@ -146,9 +156,20 @@ describe('uploadRejection', () => {
     expect(uploadRejection(error)).toBe('proxy_blocked')
   })
 
-  it('treats a rejected upload creation as an explained limit', () => {
+  it('treats too many unfinished uploads as an explained limit', () => {
     expect(uploadRejection(tusError(429, 'too many incomplete uploads'))).toBe('upload_limit')
-    expect(uploadRejection(tusError(429, JSON.stringify({ error: 'too many concurrent upload requests' })))).toBe('upload_limit')
+  })
+
+  it('treats too many concurrent upload requests as a busy server', () => {
+    expect(uploadRejection(tusError(429, JSON.stringify({ error: 'too many concurrent upload requests' })))).toBe('server_busy')
+  })
+
+  it('treats a file moved away after it was added as an explained failure', () => {
+    expect(uploadRejection(new DOMException('gone', 'NotFoundError'))).toBe('file_unreadable')
+  })
+
+  it('treats a file changed after it was added as an explained failure', () => {
+    expect(uploadRejection(new DOMException('changed', 'NotReadableError'))).toBe('file_unreadable')
   })
 
   it('leaves server faults and lost connections for error tracking', () => {
