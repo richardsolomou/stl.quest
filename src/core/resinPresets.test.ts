@@ -14,4 +14,8 @@ describe('resin presets', () => {
       densityGramsPerMl: 1.25,
     })
   })
+
+  it('includes Formlabs resins with safety data sheet densities', () => {
+    expect(getResinPreset('resin-formlabs-grey-v5')).toMatchObject({ brand: 'Formlabs', name: 'Grey V5', densityGramsPerMl: 1.11 })
+  })
 })

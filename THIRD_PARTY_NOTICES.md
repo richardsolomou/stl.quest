@@ -22,7 +22,7 @@ OrcaSlicer, UVtools, and PrusaSlicer content is licensed under AGPL-3.0-only. Th
 
 ## Resin catalog
 
-Resin names, categories, and available density values under `catalogs/resins/catalog.generated.json` are derived from pinned [PrusaSlicer](https://github.com/prusa3d/PrusaSlicer) SLA material profiles and selected official HeyGears material pages. Their revisions and exact source URLs are recorded alongside the generated presets. PrusaSlicer content is licensed under AGPL-3.0-only; manufacturer names and product data remain the property of their respective owners.
+Resin names, categories, and available density values under `catalogs/resins/catalog.generated.json` are derived from pinned [PrusaSlicer](https://github.com/prusa3d/PrusaSlicer) SLA material profiles, selected official HeyGears material pages, and Formlabs' official materials listing and safety data sheets. Their revisions or checked dates and exact source URLs are recorded alongside the generated presets. PrusaSlicer content is licensed under AGPL-3.0-only; manufacturer names and product data remain the property of their respective owners.
 
 ## Electricity price catalog
 

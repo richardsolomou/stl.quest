@@ -341,7 +341,7 @@ export function formlabsPresetId(brand: string, model: string) {
   return printerPresetId('resin', brand, model.replaceAll('+', ' plus'))
 }
 
-function nextCmsPlugins(html: string) {
+export function nextCmsPlugins(html: string) {
   const json = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/)?.[1]
   if (!json) throw new Error('Page has no Next.js data')
   const data = JSON.parse(json) as {
