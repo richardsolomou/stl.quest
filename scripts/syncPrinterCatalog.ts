@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { assertRevisions, checkoutSource, writeSourceLicense } from './catalogSources'
@@ -13,6 +13,7 @@ import {
   type ManufacturerCatalogSource,
   type ManufacturerImage,
   type ManufacturerImageSource,
+  writePresetImage,
 } from './printerCatalog'
 
 const root = path.resolve(import.meta.dirname, '..')
@@ -39,10 +40,10 @@ const manufacturerCatalog = JSON.parse(readFileSync(manufacturerCatalogPath, 'ut
 if (check) {
   validateCommittedCatalog(manifest.sources)
 } else {
-  synchronizeCatalog(manifest.sources)
+  await synchronizeCatalog(manifest.sources)
 }
 
-function synchronizeCatalog(sources: CatalogSource[]) {
+async function synchronizeCatalog(sources: CatalogSource[]) {
   const temporaryRoot = mkdtempSync(path.join(os.tmpdir(), 'stlquest-printer-catalog-'))
   try {
     const presets: GeneratedPrinterPreset[] = []
@@ -80,7 +81,7 @@ function synchronizeCatalog(sources: CatalogSource[]) {
       if (!referencedImages.has(destination)) continue
       const output = path.join(root, 'public', destination)
       mkdirSync(path.dirname(output), { recursive: true })
-      copyFileSync(sourceImage, output)
+      await writePresetImage(sourceImage, output)
     }
     if (update) writeFileSync(sourcesPath, `${JSON.stringify({ sources }, null, 2)}\n`)
     console.log(`Synchronized ${catalog.presets.length} printers with ${referencedImages.size} local images.`)

@@ -45,6 +45,23 @@ describe('equipment presets', () => {
     })
   })
 
+  it('uses rated power for Formlabs printers', () => {
+    expect(printerPowerProfile('resin-formlabs-form-4')).toMatchObject({ watts: 480, basis: 'rated power' })
+  })
+
+  it('shares rated power between Formlabs plus models and their base models', () => {
+    expect(printerPowerProfile('resin-formlabs-form-3b-plus')?.watts).toBe(220)
+  })
+
+  it('counts Formlabs wash and cure units in their own phases', () => {
+    expect(equipmentPowerTotals(['postprocess-formlabs-form-wash-v2', 'postprocess-formlabs-form-cure-v1'])).toEqual({
+      printing: 0,
+      washing: 50,
+      drying: 0,
+      curing: 144,
+    })
+  })
+
   it('counts filament drying separately from printing', () => {
     expect(equipmentPowerTotals(['filament-bambu-lab-p1s', 'accessory-bambu-lab-ams-2-pro'])).toEqual({
       printing: 1000,

@@ -12,12 +12,14 @@ import {
   parseBuildVolumeHtml,
   parseFormlabsProductImages,
   parseFormlabsTechSpecs,
+  presetImageSrc,
   printerPresetId,
   type GeneratedPrinterPreset,
   type ManufacturerCatalogSource,
   type ManufacturerImage,
   type ManufacturerImageSource,
   type OpenResinPrinter,
+  writePresetImage,
 } from './printerCatalog'
 
 type ShopifyProduct = {
@@ -131,11 +133,7 @@ async function synchronizeShopifySource(source: Extract<ManufacturerImageSource,
     const product = productsByModel.get(normalizePrinterModel(preset.model))
     const sourceUrl = product?.images?.[0]?.src
     if (!product || !sourceUrl) continue
-    const extension = imageExtension(sourceUrl)
-    const src = `/printer-presets/manufacturer/${preset.id}.${extension}`
-    const imageResponse = await fetchWithRetry(sourceUrl)
-    if (!imageResponse.ok) throw new Error(`${source.id} image for ${preset.id} returned ${imageResponse.status}`)
-    writeFileSync(path.join(root, 'public', src), Buffer.from(await imageResponse.arrayBuffer()))
+    const src = await downloadPresetImage(source.id, preset.id, sourceUrl)
     matched.push({
       presetId: preset.id,
       sourceId: source.id,
@@ -218,11 +216,7 @@ async function synchronizeGithubSource(source: Extract<ManufacturerImageSource, 
     if (!match?.printer.imageAssetPath) continue
     const imagePath = path.posix.normalize(path.posix.join(path.posix.dirname(match.definitionPath), match.printer.imageAssetPath))
     const sourceUrl = rawGithubUrl(source, imagePath)
-    const extension = imageExtension(sourceUrl)
-    const src = `/printer-presets/manufacturer/${preset.id}.${extension}`
-    const imageResponse = await fetchWithRetry(sourceUrl)
-    if (!imageResponse.ok) throw new Error(`${source.id} image for ${preset.id} returned ${imageResponse.status}`)
-    writeFileSync(path.join(root, 'public', src), Buffer.from(await imageResponse.arrayBuffer()))
+    const src = await downloadPresetImage(source.id, preset.id, sourceUrl)
     matched.push({
       presetId: preset.id,
       sourceId: source.id,
@@ -242,11 +236,7 @@ async function synchronizeGithubImages(source: Extract<ManufacturerImageSource, 
   for (const [presetId, imagePath] of Object.entries(source.images)) {
     if (!catalogPresetIds.has(presetId) || existingPresetIds.has(presetId)) continue
     const sourceUrl = rawGithubUrl(source, imagePath)
-    const extension = imageExtension(sourceUrl)
-    const src = `/printer-presets/manufacturer/${presetId}.${extension}`
-    const response = await fetchWithRetry(sourceUrl)
-    if (!response.ok) throw new Error(`${source.id} image for ${presetId} returned ${response.status}`)
-    writeFileSync(path.join(root, 'public', src), Buffer.from(await response.arrayBuffer()))
+    const src = await downloadPresetImage(source.id, presetId, sourceUrl)
     synchronizedImages.push({
       presetId,
       sourceId: source.id,
@@ -268,11 +258,7 @@ async function synchronizeWebpageImages(source: Extract<ManufacturerImageSource,
     if (!pageResponse.ok) throw new Error(`${source.id} page for ${presetId} returned ${pageResponse.status}`)
     const sourceUrl = extractProductImageUrl(await pageResponse.text(), sourcePageUrl)
     if (!sourceUrl) throw new Error(`${source.id} page for ${presetId} has no product image`)
-    const extension = imageExtension(sourceUrl)
-    const src = `/printer-presets/manufacturer/${presetId}.${extension}`
-    const imageResponse = await fetchWithRetry(sourceUrl)
-    if (!imageResponse.ok) throw new Error(`${source.id} image for ${presetId} returned ${imageResponse.status}`)
-    writeFileSync(path.join(root, 'public', src), Buffer.from(await imageResponse.arrayBuffer()))
+    const src = await downloadPresetImage(source.id, presetId, sourceUrl)
     synchronizedImages.push({ presetId, sourceId: source.id, sourcePageUrl, sourceUrl, src, checkedAt })
   }
   return synchronizedImages
@@ -302,11 +288,7 @@ async function synchronizeFormlabsImages(source: Extract<ManufacturerImageSource
     if (existingPresetIds.has(preset.id)) continue
     const product = products.get(source.imageAliases[preset.model] ?? preset.model)
     if (!product) continue
-    const extension = imageExtension(product.imageUrl)
-    const src = `/printer-presets/manufacturer/${preset.id}.${extension}`
-    const imageResponse = await fetchWithRetry(product.imageUrl)
-    if (!imageResponse.ok) throw new Error(`${source.id} image for ${preset.id} returned ${imageResponse.status}`)
-    writeFileSync(path.join(root, 'public', src), Buffer.from(await imageResponse.arrayBuffer()))
+    const src = await downloadPresetImage(source.id, preset.id, product.imageUrl)
     matched.push({
       presetId: preset.id,
       sourceId: source.id,
@@ -442,8 +424,10 @@ function storefrontModelName(title: string, brand: string) {
     .trim()
 }
 
-function imageExtension(url: string) {
-  const extension = path.extname(new URL(url).pathname).slice(1).toLocaleLowerCase()
-  if (['jpg', 'jpeg', 'png', 'webp'].includes(extension)) return extension
-  throw new Error(`Unsupported manufacturer image extension: ${url}`)
+async function downloadPresetImage(sourceId: string, presetId: string, sourceUrl: string) {
+  const response = await fetchWithRetry(sourceUrl)
+  if (!response.ok) throw new Error(`${sourceId} image for ${presetId} returned ${response.status}`)
+  const src = presetImageSrc('manufacturer', presetId)
+  await writePresetImage(Buffer.from(await response.arrayBuffer()), path.join(root, 'public', src))
+  return src
 }

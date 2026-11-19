@@ -1,3 +1,7 @@
+import { mkdtempSync } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import sharp from 'sharp'
 import { describe, expect, it } from 'vitest'
 import {
   applyCatalogOverrides,
@@ -12,6 +16,7 @@ import {
   parseBuildVolumeHtml,
   parseIni,
   printableAreaDimensions,
+  writePresetImage,
   type GeneratedPrinterPreset,
 } from './printerCatalog'
 
@@ -135,6 +140,18 @@ describe('printer catalog synchronization', () => {
     ).toEqual([])
   })
 
+  it('writes preset images as WebP', async () => {
+    expect((await sharp(await presetImage(1000, 500)).metadata()).format).toBe('webp')
+  })
+
+  it('shrinks large preset images to fit the preset image size', async () => {
+    expect((await sharp(await presetImage(1000, 500)).metadata()).width).toBe(256)
+  })
+
+  it('never enlarges small preset images', async () => {
+    expect((await sharp(await presetImage(100, 80)).metadata()).width).toBe(100)
+  })
+
   it('keeps Formlabs plus models distinct from their base models', () => {
     expect(formlabsPresetId('Formlabs', 'Form 3+')).not.toBe(formlabsPresetId('Formlabs', 'Form 3'))
   })
@@ -156,6 +173,15 @@ describe('printer catalog synchronization', () => {
     ).toEqual([{ model: 'Form 4', pagePath: '/global/products/form-4/', imageUrl: 'https://formlabs-media.formlabs.com/f4.png' }])
   })
 })
+
+async function presetImage(width: number, height: number) {
+  const output = path.join(mkdtempSync(path.join(os.tmpdir(), 'preset-image-')), 'image.webp')
+  const input = await sharp({ create: { width, height, channels: 4, background: '#ff6600' } })
+    .png()
+    .toBuffer()
+  await writePresetImage(input, output)
+  return output
+}
 
 function nextDataPage(plugins: unknown[]) {
   const data = { props: { pageProps: { getContentData: { title: { page: { placeholders: [{ plugins }] } } } } } }
