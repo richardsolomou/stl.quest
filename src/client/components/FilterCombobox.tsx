@@ -42,8 +42,15 @@ export function FilterCombobox<T extends Option>({
   search?: (query: string) => { options: T[]; notice?: ReactNode }
 }) {
   const selected = options.find((option) => option.value === value) ?? null
-  const [query, setQuery] = useState(selected?.label ?? '')
-  const searched = search?.(query)
+  const label = selected?.label ?? ''
+  const [query, setQuery] = useState(label)
+  const [queryLabel, setQueryLabel] = useState(label)
+  if (queryLabel !== label) {
+    setQueryLabel(label)
+    setQuery(label)
+  }
+  // The input shows the selected label until someone types, and reopening a chosen value should list every option.
+  const searched = search && query !== label ? search(query) : undefined
 
   return (
     <Combobox
