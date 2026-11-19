@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils'
 import type { PrinterPreset } from '../../../core/printerPresets'
+import { appPath } from '../../../basePath'
 
 type PrinterVisual = Pick<PrinterPreset, 'image' | 'printType'> & { widthMm?: number }
 
@@ -10,7 +11,7 @@ export function PrinterPresetImage({ printer, className }: { printer: PrinterVis
         className={cn('flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted', className)}
         aria-hidden="true"
       >
-        <img src={printer.image.src} alt="" className="size-full object-contain p-1" loading="lazy" />
+        <img src={appPath(printer.image.src)} alt="" className="size-full object-contain p-1" loading="lazy" />
       </span>
     )
   }

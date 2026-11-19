@@ -1310,3 +1310,30 @@ describe('better-auth integration', () => {
     expect((await repository.findInvite(hashToken('token-a')))?.usedAt).toBeTruthy()
   })
 })
+
+describe('auth under a base path', () => {
+  afterEach(() => vi.unstubAllEnvs())
+
+  async function signUpUnder(prefix: string) {
+    vi.stubEnv('BASE_PATH', prefix)
+    const { repository, auth } = await build()
+    const response = await auth.handler(
+      new Request(`http://localhost${prefix}/api/auth/sign-up/email`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({ email: 'user@example.com', password: 'password1234', name: 'User' }),
+      }),
+    )
+    await repository.close()
+    return response
+  }
+
+  it('serves its routes under the base path', async () => {
+    expect((await signUpUnder('/stlquest')).status).toBe(200)
+  })
+
+  it('scopes its cookies to the base path', async () => {
+    const paths = (await signUpUnder('/stlquest')).headers.getSetCookie().map((cookie) => /Path=([^;]+)/.exec(cookie)?.[1])
+    expect(new Set(paths)).toEqual(new Set(['/stlquest']))
+  })
+})

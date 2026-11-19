@@ -24,6 +24,7 @@ import { PostHogIdentity } from '../client/postHogIdentity'
 import { themeScript } from '../client/theme'
 import { WorkspaceProvider } from '../client/workspace'
 import { faviconHref } from '../favicon'
+import { appPath, assetPath, basePath, basePathMetaName } from '../basePath'
 import { DEFAULT_LOCALE, messagesFor } from '../core/i18n'
 import { showsEnglishLandingPage } from '../client/landing/site'
 import { I18nProvider } from '../client/i18n'
@@ -44,10 +45,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: 'og:title', content: 'STL Quest' },
       { property: 'og:description', content: description },
       { property: 'og:site_name', content: 'STL Quest' },
+      { name: basePathMetaName, content: basePath() },
     ],
     links: [
       { rel: 'icon', type: 'image/svg+xml', href: faviconHref(__APP_VERSION__) },
-      { rel: 'stylesheet', href: appCss },
+      { rel: 'stylesheet', href: assetPath(appCss) },
     ],
     scripts: [{ children: themeScript }, { children: chunkRecoveryScript }, { children: translationGuardScript }],
   }),
@@ -71,7 +73,7 @@ function LiveUpdates() {
 }
 
 // The server moves the session to another workspace, or a new personal one, on the next page load.
-const leaveDeletedWorkspace = () => window.location.assign('/')
+const leaveDeletedWorkspace = () => window.location.assign(appPath('/'))
 
 function RootComponent() {
   const { data: session } = useSuspenseQuery(sessionQuery())

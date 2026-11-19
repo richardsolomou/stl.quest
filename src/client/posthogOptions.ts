@@ -1,12 +1,13 @@
 import type { PostHogConfig } from 'posthog-js'
 import { ingestPath, serviceName, type PostHogEnvironment } from '../contracts/posthog'
 import { dropDuplicateServerFunctionException, dropExpectedStorageProblems, dropOpaqueScriptError } from './telemetry'
+import { appPath } from '../basePath'
 
 /** Browser SDK options; `defaults` pins the SDK's behavior to a dated snapshot, so raise it only after reading what changed. */
 export function postHogOptions(environment: PostHogEnvironment, hostname: string, mode = import.meta.env.MODE): Partial<PostHogConfig> {
   const service = { serviceName: `${serviceName}-web`, serviceVersion: __APP_VERSION__, environment: mode }
   return {
-    api_host: ingestPath,
+    api_host: appPath(ingestPath),
     ui_host: environment.uiHost,
     defaults: '2026-05-30',
     person_profiles: 'identified_only',

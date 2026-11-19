@@ -155,12 +155,13 @@ import {
 import { assertStorageAllowed, hostedStorageRequiresRemote, localStorageEnabled, storageConfigured } from './storagePolicy'
 import { HOSTED_OWNED_WORKSPACE_LIMIT, hostedDeployment } from './hosted'
 import { cloudStorageApp, requireCloudStorageApp, setCloudStorageApp } from './cloudStorage'
-import { INVITE_COOKIE, normalizeAuthHeaders, writeAuthCookies } from './authCookies'
+import { INVITE_COOKIE, inviteCookiePath, normalizeAuthHeaders, writeAuthCookies } from './authCookies'
 import { mutationRpc, rpc } from './rpc'
 import { requestLocale, serverMessages } from './locale'
 import { LOCALES } from '../core/i18n/locales'
 import { workspaceMutation } from './workspaceRpc'
 import { resolveSourceImage } from './sourcePreview'
+import { appPath } from '../basePath'
 
 const INVITE_TTL = 7 * 24 * 60 * 60 * 1000
 
@@ -876,7 +877,7 @@ export const createInvite = createServerFn({ method: 'POST' })
         recipientEmail: data.email,
         expiresAt: Date.now() + INVITE_TTL,
       })
-      const url = `${new URL(getRequest().url).origin}/invite/${token}`
+      const url = `${new URL(getRequest().url).origin}${appPath(`/invite/${token}`)}`
       if (data.email) {
         try {
           await sendInviteEmail(mailer!, await readEmailBranding(context.repository), {
@@ -958,7 +959,7 @@ export const beginProviderInvite = createServerFn({ method: 'POST' })
         httpOnly: true,
         sameSite: 'lax',
         secure: new URL(getRequest().url).protocol === 'https:',
-        path: '/api/auth',
+        path: inviteCookiePath(),
         maxAge: 10 * 60,
       })
       return { provider: data.provider }

@@ -1,4 +1,5 @@
 import { createContext, useContext, type ReactNode } from 'react'
+import { appPath } from '../basePath'
 
 const WorkspaceSlugContext = createContext<string | undefined>(undefined)
 
@@ -6,7 +7,7 @@ export const WORKSPACE_CHANGED_KEY = 'stlquest-workspace-changed'
 
 export function reloadAfterWorkspaceChange() {
   localStorage.setItem(WORKSPACE_CHANGED_KEY, String(Date.now()))
-  window.location.assign('/')
+  window.location.assign(appPath('/'))
 }
 
 export function WorkspaceProvider({ slug, children }: { slug: string; children: ReactNode }) {

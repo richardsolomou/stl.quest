@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { ButtonLink } from '@/components/ui/button'
 import { updateNoticeId } from '../chunkRecovery'
 import { useI18n } from '../i18n'
+import { appPath } from '../../basePath'
 
 export function UpdateNotices({ serverVersion }: { serverVersion: string }) {
   const { t } = useI18n()
@@ -26,7 +27,7 @@ export function UpdateNotices({ serverVersion }: { serverVersion: string }) {
 function RefreshNotice({ id, hidden, message }: { id?: string; hidden?: boolean; message: string }) {
   const { t } = useI18n()
   // A plain link works before hydration; dropping the fragment makes it reload rather than scroll.
-  const currentPage = useLocation({ select: (location) => location.pathname + location.searchStr })
+  const currentPage = useLocation({ select: (location) => appPath(location.pathname + location.searchStr) })
   return (
     <div
       id={id}

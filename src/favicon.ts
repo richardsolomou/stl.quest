@@ -1,3 +1,5 @@
+import { appPath } from './basePath'
+
 export function faviconHref(version: string) {
-  return `/favicon.svg?v=${encodeURIComponent(version)}`
+  return appPath(`/favicon.svg?v=${encodeURIComponent(version)}`)
 }

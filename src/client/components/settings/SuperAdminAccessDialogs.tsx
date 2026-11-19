@@ -12,6 +12,7 @@ import { DialogProblem } from '../DialogProblem'
 import { DialogShell } from '../DialogShell'
 import { UserSummary } from '../UserSummary'
 import { accountRoleOptions } from './SuperAdminUsersTable'
+import { appPath } from '../../../basePath'
 
 export const roleLabel = (user: Account, t: Messages) => t.superAdmin.roles[user.role]
 
@@ -23,7 +24,7 @@ export function ImpersonateUserDialog({ user, onDone }: { user: Account; onDone:
       const { error } = await authClient.admin.impersonateUser({ userId: user.id })
       if (error) throw new Error(copy.failed(user.name))
     },
-    onSuccess: () => window.location.assign('/'),
+    onSuccess: () => window.location.assign(appPath('/')),
   })
   return (
     <DialogShell title={copy.title} onClose={onDone} preventClose={mutation.isPending}>

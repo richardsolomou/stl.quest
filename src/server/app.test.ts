@@ -291,6 +291,37 @@ describe('app initialization', () => {
     expect(resolveAuthUrl()).toBe('http://localhost:3000')
   })
 
+  it('accepts an auth URL that ends in the base path', async () => {
+    vi.stubEnv('BETTER_AUTH_URL', 'https://example.com/stlquest/')
+    vi.stubEnv('BASE_PATH', '/stlquest')
+    const { resolveAuthUrl } = await import('./app')
+
+    expect(resolveAuthUrl()).toBe('https://example.com')
+  })
+
+  it('keeps an auth URL with a path as it is without a base path', async () => {
+    vi.stubEnv('BETTER_AUTH_URL', 'https://example.com/api/auth/')
+    const { resolveAuthUrl } = await import('./app')
+
+    expect(resolveAuthUrl()).toBe('https://example.com/api/auth')
+  })
+
+  it('accepts an auth URL without the base path', async () => {
+    vi.stubEnv('BETTER_AUTH_URL', 'https://example.com')
+    vi.stubEnv('BASE_PATH', '/stlquest')
+    const { resolveAuthUrl } = await import('./app')
+
+    expect(resolveAuthUrl()).toBe('https://example.com')
+  })
+
+  it('rejects an auth URL whose path is not the base path', async () => {
+    vi.stubEnv('BETTER_AUTH_URL', 'https://example.com/other')
+    vi.stubEnv('BASE_PATH', '/stlquest')
+    const { resolveAuthUrl } = await import('./app')
+
+    expect(() => resolveAuthUrl()).toThrow('BASE_PATH')
+  })
+
   it('does not initialize workspace storage until the workspace is accessed', async () => {
     temporary = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-app-lazy-'))
     process.env.DATA_DIR = path.join(temporary, 'data')

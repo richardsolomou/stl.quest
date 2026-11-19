@@ -24,6 +24,7 @@ import { hasSocialSignInError, socialSignInErrorCode, startSocialSignIn } from '
 import { AuthMethodIcon } from './AuthMethodIcon'
 import { PasswordAuthDivider } from './PasswordAuthDivider'
 import { TwoFactorSignInForm } from './TwoFactorSignInForm'
+import { appPath } from '../../basePath'
 
 export function AuthenticationMethods({
   auth,
@@ -58,7 +59,7 @@ export function AuthenticationMethods({
     setError('')
     const started = await startSocialSignIn({
       provider,
-      callbackURL: '/',
+      callbackURL: appPath('/'),
       // Back to the screen that started sign-in, which on the hosted service is not the landing page at /.
       errorCallbackURL: window.location.pathname,
       requestSignUp: signingUp,
@@ -187,7 +188,7 @@ export function AuthenticationMethods({
                 try {
                   const { error: failed } = await authClient.requestPasswordReset({
                     email: values.email,
-                    redirectTo: '/reset-password',
+                    redirectTo: appPath('/reset-password'),
                   })
                   if (failed) setError(t.auth.methods.resetEmailFailed)
                   else {

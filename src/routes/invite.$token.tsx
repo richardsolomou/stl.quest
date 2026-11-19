@@ -21,6 +21,7 @@ import { errorMessage } from '../core/error'
 import { socialProviderName, type SocialAuthProvider } from '../core/auth'
 import { authCapabilitiesQuery } from '../client/queries'
 import { MAX_USER_NAME_LENGTH } from '../core/identity'
+import { appPath } from '../basePath'
 
 export const Route = createFileRoute('/invite/$token')({
   loader: async ({ params }) => {
@@ -48,7 +49,7 @@ function InvitePage() {
 
   const joinWorkspace = async () => {
     await callAcceptWorkspace({ data: { token } })
-    window.location.href = '/'
+    window.location.href = appPath('/')
   }
 
   const continueWithProvider = async (provider: SocialAuthProvider) => {
@@ -58,8 +59,8 @@ function InvitePage() {
       await callBeginProvider({ data: { token, provider } })
       const { error: failed } = await authClient.signIn.social({
         provider,
-        callbackURL: `/invite/${token}`,
-        errorCallbackURL: `/invite/${token}`,
+        callbackURL: appPath(`/invite/${token}`),
+        errorCallbackURL: appPath(`/invite/${token}`),
         requestSignUp: true,
       })
       if (failed) setError(t.auth.continueFailed(socialProviderName(provider, auth.oidcName)))
@@ -85,7 +86,7 @@ function InvitePage() {
         } else {
           const workspace = await callAccept({ data: { token, ...value } })
           await callSwitchWorkspace({ data: { workspaceId: workspace.workspaceId } })
-          window.location.href = '/'
+          window.location.href = appPath('/')
         }
       } catch (err) {
         setError(errorMessage(err, copy.acceptFailed))

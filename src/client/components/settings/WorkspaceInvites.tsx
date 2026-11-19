@@ -21,6 +21,7 @@ import { SettingNotice, errorNotice, successNotice, noticeDetail } from '../Sett
 import { CopyButtonLabel, useCopied } from '../useCopied'
 import { SettingsSection } from './SettingsLayout'
 import { useI18n } from '../../i18n'
+import { appPath } from '../../../basePath'
 
 export function InviteDialog({ smtpConfigured, onDone }: { smtpConfigured: boolean; onDone: () => void }) {
   const workspaceSlug = useWorkspaceSlug()
@@ -38,7 +39,7 @@ export function InviteDialog({ smtpConfigured, onDone }: { smtpConfigured: boole
   const mutation = useMutation({
     mutationFn: callCreateInvite,
     onSuccess: async ({ token, emailed }, variables) => {
-      setLink(`${window.location.origin}/invite/${token}`)
+      setLink(`${window.location.origin}${appPath(`/invite/${token}`)}`)
       setEmailedTo(emailed ? variables.data.email : undefined)
       await queryClient.invalidateQueries({ queryKey: ['invites'] })
       signalProductTourProgress('invite')

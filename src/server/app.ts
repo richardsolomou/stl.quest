@@ -71,6 +71,8 @@ import { startLeasedSweep } from './leasedSweep'
 import { WorkspaceRuntimeRegistry } from './workspaceRuntimeRegistry'
 import { buildManagedAssetStore, clearManagedStoragePrefix, QuotaAssetStore, QuotaUploadStaging } from './managedStorage'
 import { deploymentType, HOSTED_OWNED_WORKSPACE_LIMIT, hostedDeployment } from './hosted'
+import { basePath } from '../basePath'
+import { normalizeBasePath } from '../core/basePath'
 
 const workflowVersion = workflow.statuses.map((status) => status.id).join(':')
 // Storage recovery runs a full crash-recovery and asset-migration pass, which can run far longer
@@ -216,7 +218,12 @@ export function resolveAuthUrl() {
   if (!configured) return undefined
   const url = new URL(configured)
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('BETTER_AUTH_URL must use http or https')
-  return configured.replace(/\/$/, '')
+  const prefix = basePath()
+  if (!prefix) return configured.replace(/\/$/, '')
+  // Under a base path Better Auth gets the origin and its own prefixed `basePath`, so any path here must be that prefix.
+  if (!['', prefix].includes(normalizeBasePath(url.pathname)))
+    throw new Error(`BETTER_AUTH_URL must not have a path other than BASE_PATH (${prefix})`)
+  return url.origin
 }
 
 async function createApp() {
@@ -389,7 +396,7 @@ async function createApp() {
           workLocker: distributedRuntime?.workLocker,
           publish: realtime.publish,
           replicaEvents: distributedRuntime?.events,
-          notifications: { email, appUrl: () => authUrl ?? currentRequestOrigin(), deliveries: notificationDeliveries },
+          notifications: { email, appUrl: () => appUrl(authUrl ?? currentRequestOrigin()), deliveries: notificationDeliveries },
           invalidate: async () => await runtimeRegistry.invalidate(workspace.id),
         }),
       current: async (runtime) => await storageRuntimeIsCurrent(runtime.repository, runtime.storageRevision),
@@ -691,6 +698,10 @@ async function createApp() {
     await releaseResources()
     throw error
   }
+}
+
+function appUrl(origin: string | undefined) {
+  return origin && `${origin}${basePath()}`
 }
 
 function currentRequestOrigin() {

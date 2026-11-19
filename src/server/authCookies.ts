@@ -1,9 +1,20 @@
 import { getRequest, setCookie } from '@tanstack/react-start/server'
 import { parseSetCookieHeader, toCookieOptions } from 'better-auth/cookies'
+import { appPath } from '../basePath'
 import { copyRequest } from './copyRequest'
 
 /** Carries a pending invite token through a social sign-in round trip. */
 export const INVITE_COOKIE = 'stlquest_invite'
+
+/** Only the auth routes read the invite cookie, so it is scoped to them. */
+export function inviteCookiePath() {
+  return appPath('/api/auth')
+}
+
+/** Clears the invite cookie; it must name the path it was set under or the browser keeps it. */
+export function expiredInviteCookie() {
+  return `${INVITE_COOKIE}=; Path=${inviteCookiePath()}; HttpOnly; SameSite=Lax; Max-Age=0`
+}
 const SECURE_PREFIX = '__Secure-'
 const AUTH_PREFIX = 'better-auth.'
 

@@ -73,4 +73,19 @@ describe('cloud connections', () => {
 
     expect(response.headers.get('location')).toBe('https://print.example.com/settings/storage?cloud=onedrive&outcome=missing-permissions')
   })
+
+  it('redirects under the base path', async () => {
+    vi.stubEnv('BASE_PATH', '/stlquest')
+    mocks.completeGoogleDrive.mockResolvedValue('/settings/storage')
+
+    const response = await cloudStorageAuthorizationCallback(
+      new Request('https://print.example.com/stlquest/api/storage/google-drive/callback?code=code&state=state'),
+      'google-drive',
+    )
+    vi.unstubAllEnvs()
+
+    expect(response.headers.get('location')).toBe(
+      'https://print.example.com/stlquest/settings/storage?cloud=google-drive&outcome=connected',
+    )
+  })
 })

@@ -10,6 +10,7 @@ import {
 } from './cloudStorage'
 import type { SettingStore } from './integrations'
 import { logger } from './logger'
+import { appPath } from '../basePath'
 
 const STATE_TTL = 10 * 60 * 1_000
 const TELEMETRY_PROVIDERS = { dropbox: 'dropbox', 'google-drive': 'google_drive', onedrive: 'one_drive', box: 'box' } as const
@@ -68,7 +69,7 @@ export async function beginCloudAuthorization(
   authorizeUrl: string,
   parameters: Record<string, string>,
 ) {
-  const redirectUri = `${origin}/api/storage/${provider}/callback`
+  const redirectUri = `${origin}${appPath(`/api/storage/${provider}/callback`)}`
   const { state, stateHash, expiresAt } = createConnectionState()
   await setPendingCloudAuthorization(workspace, { provider, stateHash, adminId, redirectUri, returnTo, expiresAt })
   const url = new URL(authorizeUrl)

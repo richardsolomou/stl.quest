@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useLocation } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -151,6 +152,7 @@ function StorageForm({
   const callCancelMigration = useServerFn(cancelStorageMigration)
   const callAcknowledgeMigration = useServerFn(acknowledgeStorageMigration)
   const callBeginCloud = useServerFn(beginCloudConnection)
+  const pathname = useLocation({ select: (location) => location.pathname })
   const callRemoveCloud = useServerFn(removeCloudConnection)
   const queryClient = useQueryClient()
   const [pendingChange, setPendingChange] = useState<{
@@ -272,7 +274,7 @@ function StorageForm({
     setConnectingProvider(provider)
     try {
       const result = await callBeginCloud({
-        data: { provider, workspaceSlug, returnTo: window.location.pathname },
+        data: { provider, workspaceSlug, returnTo: pathname },
       })
       window.location.assign(result.url)
     } catch (error) {

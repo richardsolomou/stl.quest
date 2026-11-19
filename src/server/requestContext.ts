@@ -4,6 +4,7 @@ import type { Identity } from '../core/types'
 import { withRequestLocale } from './locale'
 import { logger } from './logger'
 import { requestContext as postHogRequestContext } from './telemetry'
+import { appPath } from '../basePath'
 
 type LogContext = {
   request_id: string
@@ -56,7 +57,7 @@ export async function withRequestContext(request: Request, handler: () => Promis
       }
       const headers = new Headers(response.headers)
       headers.set('x-request-id', requestId)
-      if (path !== '/api/health') {
+      if (path !== appPath('/api/health')) {
         const context = {
           event: 'http_request',
           outcome: response.status >= 500 ? 'error' : response.status >= 400 ? 'rejected' : 'success',

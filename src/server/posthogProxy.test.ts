@@ -1,7 +1,7 @@
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { gzipSync } from 'node:zlib'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { forwardToPostHog } from './posthogProxy'
 
 type Received = { host: string; method: string; url: string; headers: IncomingHttpHeaders; body: string }
@@ -98,5 +98,12 @@ describe('forwardToPostHog', () => {
   it('drops cookies PostHog tries to set on this origin', async () => {
     const response = await proxied('/t/e/', { method: 'POST', body: 'payload' })
     expect(response.headers.get('set-cookie')).toBeNull()
+  })
+
+  it('removes the base path with the proxy path', async () => {
+    vi.stubEnv('BASE_PATH', '/stlquest')
+    await proxied('/stlquest/t/static/recorder.js')
+    vi.unstubAllEnvs()
+    expect(received.map(({ host, url }) => [host, url])).toEqual([['assets', '/static/recorder.js']])
   })
 })
