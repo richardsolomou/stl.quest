@@ -9,11 +9,15 @@
     "UniFormation": "Uniformation"
   },
   "excludeIds": [
+    "filament-custom-printer-generic-belt-printer",
     "filament-custom-printer-generic-klipper-printer",
     "filament-custom-printer-generic-marlin-printer",
     "filament-custom-printer-generic-repetier-printer",
     "filament-custom-printer-generic-rrf-printer",
     "filament-custom-printer-generic-toolchanger-printer",
+    "filament-felix-printers-food-double",
+    "filament-felix-printers-food-single",
+    "filament-felix-printers-food-switch",
     "filament-orca-arena-printer-arena-x1-carbon"
   ],
   "patches": {}

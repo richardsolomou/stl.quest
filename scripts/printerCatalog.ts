@@ -71,6 +71,12 @@ export type ManufacturerImageSource =
       kind: 'webpage'
       pages: Record<string, string>
     })
+  | (ImageSourceBase & {
+      kind: 'formlabs'
+      techSpecsUrl: string
+      productsUrl: string
+      imageAliases: Record<string, string>
+    })
 
 export type ManufacturerImage = {
   presetId: string
@@ -298,6 +304,49 @@ export function parseBuildVolumeHtml(html: string) {
   if (!match) return undefined
   const [, width, depth, height] = match.map(Number)
   return { widthMm: width, depthMm: depth, heightMm: height }
+}
+
+type NextCmsPlugin = { pluginType: string; id: number; props: string; parent: { id: number } | null }
+
+export function parseFormlabsTechSpecs(html: string) {
+  const plugins = nextCmsPlugins(html)
+  const byId = new Map(plugins.map((plugin) => [plugin.id, plugin]))
+  return plugins.flatMap((cell) => {
+    if (cell.pluginType !== 'TableData' || !cell.parent) return []
+    const label = (JSON.parse(cell.props) as { label?: string }).label ?? ''
+    if (!/^Build Volume\b/i.test(label)) return []
+    const column = byId.get(cell.parent.id)
+    const text = plugins.find((plugin) => plugin.parent?.id === cell.id && plugin.pluginType === 'Text')
+    if (column?.pluginType !== 'TableColumn' || !text) return []
+    const body = (JSON.parse(text.props) as { body?: string }).body ?? ''
+    const match = body.match(/(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)\s*(cm|mm)\b/i)
+    if (!match) return []
+    const scale = match[4].toLocaleLowerCase() === 'cm' ? 10 : 1
+    const [width, depth, height] = match.slice(1, 4).map((value) => roundDimension(Number(value) * scale))
+    return [{ model: (JSON.parse(column.props) as { title: string }).title, widthMm: width, depthMm: depth, heightMm: height }]
+  })
+}
+
+export function parseFormlabsProductImages(html: string) {
+  return nextCmsPlugins(html).flatMap((plugin) => {
+    if (plugin.pluginType !== 'V3Comparison') return []
+    const { items = [] } = JSON.parse(plugin.props) as { items?: { title: string; link: string; media?: { src?: string } }[] }
+    return items.flatMap((item) => (item.media?.src ? [{ model: item.title, pagePath: item.link, imageUrl: item.media.src }] : []))
+  })
+}
+
+// Form 3 and Form 3+ are distinct printers, so "+" can't vanish from the slug.
+export function formlabsPresetId(brand: string, model: string) {
+  return printerPresetId('resin', brand, model.replaceAll('+', ' plus'))
+}
+
+function nextCmsPlugins(html: string) {
+  const json = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/)?.[1]
+  if (!json) throw new Error('Page has no Next.js data')
+  const data = JSON.parse(json) as {
+    props: { pageProps: { getContentData: { title: { page: { placeholders: { plugins: NextCmsPlugin[] }[] } } } } }
+  }
+  return data.props.pageProps.getContentData.title.page.placeholders.flatMap((placeholder) => placeholder.plugins)
 }
 
 export function extractProductImageUrl(html: string, pageUrl: string) {

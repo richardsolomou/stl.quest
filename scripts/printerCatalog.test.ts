@@ -3,8 +3,11 @@ import {
   applyCatalogOverrides,
   definitionPathsFromTree,
   extractProductImageUrl,
+  formlabsPresetId,
   mergePrinterPresets,
   normalizePrinterModel,
+  parseFormlabsProductImages,
+  parseFormlabsTechSpecs,
   openResinBuildVolume,
   parseBuildVolumeHtml,
   parseIni,
@@ -102,7 +105,62 @@ describe('printer catalog synchronization', () => {
       ),
     ).toEqual(['printers/gk3-series.json', 'printers/nested/gktwo-series.json'])
   })
+
+  it('parses Formlabs build volumes from tech specs comparison columns', () => {
+    expect(
+      parseFormlabsTechSpecs(
+        nextDataPage([
+          { pluginType: 'TableColumn', id: 1, props: JSON.stringify({ title: 'Form 4' }), parent: null },
+          { pluginType: 'TableData', id: 2, props: JSON.stringify({ label: 'Build Volume (W x D x H)' }), parent: { id: 1 } },
+          {
+            pluginType: 'Text',
+            id: 3,
+            props: JSON.stringify({ body: '<p>20.0 × 12.5 × 21.0 cm<br>7.9 × 4.9 × 8.3 in</p>' }),
+            parent: { id: 2 },
+          },
+        ]),
+      ),
+    ).toEqual([{ model: 'Form 4', widthMm: 200, depthMm: 125, heightMm: 210 }])
+  })
+
+  it('ignores Formlabs comparison cells other than build volume', () => {
+    expect(
+      parseFormlabsTechSpecs(
+        nextDataPage([
+          { pluginType: 'TableColumn', id: 1, props: JSON.stringify({ title: 'Form 4' }), parent: null },
+          { pluginType: 'TableData', id: 2, props: JSON.stringify({ label: 'Printer Dimensions (W x D x H)' }), parent: { id: 1 } },
+          { pluginType: 'Text', id: 3, props: JSON.stringify({ body: '<p>34.2 x 31.5 x 50.2 cm</p>' }), parent: { id: 2 } },
+        ]),
+      ),
+    ).toEqual([])
+  })
+
+  it('keeps Formlabs plus models distinct from their base models', () => {
+    expect(formlabsPresetId('Formlabs', 'Form 3+')).not.toBe(formlabsPresetId('Formlabs', 'Form 3'))
+  })
+
+  it('reads Formlabs product images from the printer comparison', () => {
+    expect(
+      parseFormlabsProductImages(
+        nextDataPage([
+          {
+            pluginType: 'V3Comparison',
+            id: 1,
+            props: JSON.stringify({
+              items: [{ title: 'Form 4', link: '/global/products/form-4/', media: { src: 'https://formlabs-media.formlabs.com/f4.png' } }],
+            }),
+            parent: null,
+          },
+        ]),
+      ),
+    ).toEqual([{ model: 'Form 4', pagePath: '/global/products/form-4/', imageUrl: 'https://formlabs-media.formlabs.com/f4.png' }])
+  })
 })
+
+function nextDataPage(plugins: unknown[]) {
+  const data = { props: { pageProps: { getContentData: { title: { page: { placeholders: [{ plugins }] } } } } } }
+  return `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify(data)}</script>`
+}
 
 function preset(id: string, brand: string): GeneratedPrinterPreset {
   return {
