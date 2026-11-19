@@ -9,6 +9,7 @@ import { planOverviewQuery } from '../../queries'
 import { planSummary } from './planCopy'
 import { PageHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { useI18n } from '../../i18n'
+import { appPath } from '../../../basePath'
 
 export function PlanPane() {
   const { data } = useSuspenseQuery(planOverviewQuery())
@@ -19,7 +20,7 @@ export function PlanPane() {
   const plan = data.plan
   const paid = plan !== 'free'
   // Stripe returns the customer here rather than to the account page.
-  const returnUrl = () => `${window.location.origin}/plan`
+  const returnUrl = () => `${window.location.origin}${appPath('/plan')}`
 
   const subscribe = async (nextPlan: Exclude<StoragePlan, 'free'>) => {
     setPending(nextPlan)

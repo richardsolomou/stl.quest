@@ -30,6 +30,7 @@ import { OIDC_DISCOVERY_TIMEOUT_MS } from './integrations'
 import { publicOrigin, trustedOrigins } from './origins'
 import { requestLocale, serverMessages } from './locale'
 import { isLocale, messagesFor } from '../core/i18n'
+import { appPath, basePath } from '../basePath'
 
 // Every auth call awaits Better Auth's startup, which runs OIDC discovery, so an unreachable or mismatched issuer skips the provider
 // until the next restart or settings save. Better Auth verifies ID tokens against the discovered issuer without comparing it to ours.
@@ -161,8 +162,14 @@ export function createAuth(
     database: drizzleAdapter(database, { provider: databaseProvider(database), schema }),
     secret,
     baseURL: options?.baseURL,
+    basePath: appPath('/api/auth'),
     // Better Auth skips its origin check under test unless this is set, so tests exercise the check production runs.
-    advanced: { useSecureCookies: false, disableOriginCheck: false },
+    advanced: {
+      useSecureCookies: false,
+      disableOriginCheck: false,
+      // Under a base path the host is shared with other sites, which should not receive the session.
+      defaultCookieAttributes: { path: basePath() || '/' },
+    },
     rateLimit: {
       enabled: true,
       storage: 'database',
@@ -312,7 +319,7 @@ export function createAuth(
           .map((account) => account.providerId),
       changeEmail: async ({ headers, newEmail, password }: { headers: Headers; newEmail: string; password: string }) => {
         await authInstance.api.verifyPassword({ body: { password }, headers })
-        return authInstance.api.changeEmail({ body: { newEmail, callbackURL: '/account' }, headers })
+        return authInstance.api.changeEmail({ body: { newEmail, callbackURL: appPath('/account') }, headers })
       },
       unlinkAccount: async ({ headers, providerId }: { headers: Headers; providerId: string }) => {
         const session = await authInstance.api.getSession({ headers })

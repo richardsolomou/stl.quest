@@ -112,11 +112,22 @@ describe('request context', () => {
   })
 
   it('does not log health checks', async () => {
-    const logged = vi.spyOn(logger, 'info').mockImplementation(() => logger)
+    const logged = vi.spyOn(logger, 'debug').mockImplementation(() => logger)
 
     await withRequestContext(new Request('http://print.test/api/health'), async () => Response.json({ ok: true }))
 
     expect(logged).not.toHaveBeenCalled()
     logged.mockRestore()
+  })
+
+  it('does not log health checks under the base path', async () => {
+    vi.stubEnv('BASE_PATH', '/stlquest')
+    const logged = vi.spyOn(logger, 'debug').mockImplementation(() => logger)
+
+    await withRequestContext(new Request('http://print.test/stlquest/api/health'), async () => Response.json({ ok: true }))
+
+    expect(logged).not.toHaveBeenCalled()
+    logged.mockRestore()
+    vi.unstubAllEnvs()
   })
 })

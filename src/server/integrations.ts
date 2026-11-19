@@ -14,6 +14,7 @@ import type {
 import { environmentFlag } from '../adapters/environment'
 import { CLOUD_STORAGE_APP_KEYS, CLOUD_STORAGE_PROVIDERS, oidcDiscoveryUrl, oidcIssuerMatches, SOCIAL_AUTH_PROVIDERS } from '../core/auth'
 import { serverMessages } from './locale'
+import { appPath } from '../basePath'
 
 const SETTING_KEY = 'integrations'
 const KEY_BYTES = 32
@@ -143,7 +144,7 @@ function publicCloudStorageApp(provider: CloudStorageProvider, stored: Integrati
     enabled: Boolean(app?.clientId && app.clientSecret && app.enabled !== false),
     clientId: app?.clientId ?? '',
     secretConfigured: Boolean(app?.clientSecret),
-    callbackUrl: `${origin}/api/storage/${provider}/callback`,
+    callbackUrl: `${origin}${appPath(`/api/storage/${provider}/callback`)}`,
   }
 }
 

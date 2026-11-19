@@ -1,4 +1,5 @@
 import { ingestPath, type PostHogEnvironment } from '../contracts/posthog'
+import { appPath } from '../basePath'
 
 // A same-origin request carries the application's session cookie and any bearer token, and PostHog reads neither.
 const credentialHeaders = ['cookie', 'authorization']
@@ -21,7 +22,7 @@ const transportHeaders = [
  */
 export async function forwardToPostHog(request: Request, environment: Pick<PostHogEnvironment, 'host' | 'assetsHost'>) {
   const url = new URL(request.url)
-  const path = url.pathname.slice(ingestPath.length) || '/'
+  const path = url.pathname.slice(appPath(ingestPath).length) || '/'
   const upstream = /^\/(?:static|array)\//.test(path) ? environment.assetsHost : environment.host
 
   const dropped = new Set([...credentialHeaders, ...transportHeaders])

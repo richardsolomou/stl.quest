@@ -43,7 +43,8 @@ Most settings belong in **Workspace Settings** or **Super Admin**. Environment v
 | `STLQUEST_HOSTED_STORAGE_FORCE_PATH_STYLE`                                           | `false`                    | Enables path-style requests for a managed S3-compatible provider that requires them.                                                                                                                                                                                |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`                                         | —                          | Enables Stripe Managed Payments on hosted deployments when both plan price IDs below are also configured.                                                                                                                                                           |
 | `STRIPE_SUPPORTER_PRICE_ID`, `STRIPE_PRO_PRICE_ID`                                   | —                          | Monthly Stripe Price IDs for the 25 GB Supporter and 100 GB Pro plans.                                                                                                                                                                                              |
-| `BETTER_AUTH_URL`                                                                    | —                          | Optional public HTTP or HTTPS origin override for reverse proxies and custom domains.                                                                                                                                                                               |
+| `BASE_PATH`                                                                          | —                          | Optional path prefix, such as `/stlquest`, for serving STL Quest under a subpath of another site. See [Serving under a subpath](#serving-under-a-subpath).                                                                                                          |
+| `BETTER_AUTH_URL`                                                                    | —                          | Optional public HTTP or HTTPS URL override for reverse proxies and custom domains. With `BASE_PATH` set, its path must be empty or `BASE_PATH`.                                                                                                                     |
 | `BETTER_AUTH_TRUSTED_ORIGINS`                                                        | —                          | Additional trusted origins, comma-separated.                                                                                                                                                                                                                        |
 | `AUTH_PASSWORD_ENABLED`                                                              | stored                     | Overrides the Super Admin setting for password sign-in. Defaults to enabled when neither source has a value.                                                                                                                                                        |
 | `AUTH_PASSWORD_RECOVERY`                                                             | `false`                    | Forces password sign-in on regardless of stored settings or `AUTH_PASSWORD_ENABLED`; see [Account recovery](#account-recovery).                                                                                                                                     |
@@ -77,7 +78,7 @@ The container accepts forwarded headers only when its immediate proxy peer is on
 
 STL Quest checks the origin of every request that changes data. If the proxy rewrites the public URL without preserving or configuring it, sign-in and save actions will fail.
 
-Model uploads use resumable 32 MB chunks. Allow request bodies larger than 32 MB; the nginx example below uses 64 MB. STL Quest limits each uploaded file to 1 GB. Realtime updates use a WebSocket at `/connection/websocket`, so the proxy must pass protocol upgrades.
+Model uploads use resumable 32 MB chunks. Allow request bodies larger than 32 MB; the nginx example below uses 64 MB. STL Quest limits each uploaded file to 1 GB. Realtime updates use a WebSocket at `/connection/websocket` (below `BASE_PATH` when set), so the proxy must pass protocol upgrades.
 
 An upload sends a quick series of large `POST` and `PATCH` requests to `/api/upload`. Web application firewalls, CrowdSec, fail2ban, and proxy rate limits can identify this traffic as an attack and answer with a 403 or 429 page. When this occurs, the upload dialog tells the person that a proxy or firewall blocked the upload. Exclude `/api/upload` from these rules, or increase their limits. For CrowdSec, add a parser whitelist, for example in `/etc/crowdsec/parsers/s02-enrich/stlquest-uploads.yaml`, then restart CrowdSec and remove a ban that is already active with `cscli decisions delete --ip <address>`:
 
@@ -88,6 +89,25 @@ whitelist:
   reason: STL Quest resumable uploads
   expression:
     - evt.Meta.http_path startsWith '/api/upload'
+```
+
+### Serving under a subpath
+
+To serve STL Quest from a path such as `https://example.com/stlquest/` instead of its own hostname, set `BASE_PATH=/stlquest`. Every page, asset, API route, sign-in callback, upload, and realtime WebSocket then lives below that path, and the published image needs no rebuild. The proxy may forward requests with or without the prefix. If you set `BETTER_AUTH_URL`, give the origin or include the same path, for example `https://example.com/stlquest`. Sign-in cookies are scoped to the path, so other sites on the same host don't receive them.
+
+OAuth apps for sign-in and cloud storage must use callback URLs that include the path. **Super Admin → Integrations** shows the exact URLs to register. The container's own health check still uses `/api/health`, while checks through the proxy use `/stlquest/api/health`.
+
+nginx:
+
+```nginx
+location /stlquest/ {
+  proxy_pass http://127.0.0.1:30455;
+  proxy_http_version 1.1;
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_set_header Upgrade $http_upgrade;
+  proxy_set_header Connection $http_connection;
+}
 ```
 
 ### Sample configurations

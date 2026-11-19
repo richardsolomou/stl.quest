@@ -401,7 +401,7 @@ jobs:
       - uses: richardsolomou/ras-stack/actions/setup-playwright@v1
         with:
           install-dependencies: 'false'
-      - run: sh scripts/runE2e.sh --project hosted-managed --project self-hosted-http --project self-hosted-https --project preview-seed
+      - run: sh scripts/runE2e.sh --project hosted-managed --project self-hosted-http --project self-hosted-https --project preview-seed --project base-path
       - if: failure()
         uses: actions/upload-artifact@v7
         with:

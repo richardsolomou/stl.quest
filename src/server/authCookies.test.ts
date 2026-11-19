@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { normalizeAuthHeaders, prepareAuthRequest, secureResponseCookies, writeAuthCookies } from './authCookies'
+import {
+  expiredInviteCookie,
+  inviteCookiePath,
+  normalizeAuthHeaders,
+  prepareAuthRequest,
+  secureResponseCookies,
+  writeAuthCookies,
+} from './authCookies'
 
 const { getRequestMock, setCookieMock } = vi.hoisted(() => ({
   getRequestMock: vi.fn(),
@@ -168,5 +175,19 @@ describe('auth response cookies', () => {
     )
 
     expect(secured.headers.getSetCookie()[0]).toContain('Secure')
+  })
+})
+
+describe('invite cookie', () => {
+  it('expires the cookie at the path it was set under', () => {
+    vi.stubEnv('BASE_PATH', '/stlquest')
+    expect(expiredInviteCookie()).toContain(`Path=${inviteCookiePath()};`)
+    vi.unstubAllEnvs()
+  })
+
+  it('lives under the base path', () => {
+    vi.stubEnv('BASE_PATH', '/stlquest')
+    expect(inviteCookiePath()).toBe('/stlquest/api/auth')
+    vi.unstubAllEnvs()
   })
 })

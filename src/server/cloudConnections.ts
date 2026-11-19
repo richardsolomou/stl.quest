@@ -9,6 +9,7 @@ import type { SettingStore } from './integrations'
 import { logger } from './logger'
 import { beginOneDriveAuthorization, completeOneDriveAuthorization } from './oneDriveConnection'
 import { withRequestContext } from './requestContext'
+import { appPath } from '../basePath'
 
 type BeginAuthorization = (
   app: CloudStorageApp,
@@ -64,7 +65,7 @@ export function cloudStorageAuthorizationCallback(request: Request, provider: Cl
         logger.warn({ err: error, event: 'cloud_authorization_failed', provider }, 'cloud authorization failed')
       }
     }
-    const url = new URL(returnTo, request.url)
+    const url = new URL(appPath(returnTo), request.url)
     url.searchParams.set('cloud', provider)
     url.searchParams.set('outcome', outcome)
     return Response.redirect(url)

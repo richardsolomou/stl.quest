@@ -32,12 +32,14 @@ export default defineConfig(({ mode }) => {
       proxy: { '/connection': { target: 'http://127.0.0.1:8000', ws: true } },
     },
     define: { __APP_VERSION__: JSON.stringify(packageJson.version) },
+    // Browser bundles find their chunks, workers, and fonts relative to themselves, so they work under any runtime `BASE_PATH`.
+    experimental: { renderBuiltUrl: (_file, { ssr }) => (ssr ? undefined : { relative: true }) },
     plugins: [
       devApiImages,
       tanstackStart(),
       nitro({
         preset: 'node-server',
-        plugins: ['./src/server/shutdown.ts'],
+        plugins: ['./src/server/basePath.ts', './src/server/shutdown.ts'],
         // The server bundle inlines React Query, whose `'use client'` directives mean nothing on the server.
         rolldownConfig: { checks: { moduleLevelDirective: false } },
         routeRules: { '/api/**': { headers: { 'X-Robots-Tag': 'noindex, nofollow' } } },

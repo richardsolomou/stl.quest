@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { app } from '../../server/app'
 import { parseCookies } from 'better-auth/cookies'
-import { INVITE_COOKIE, prepareAuthRequest, secureResponseCookies } from '../../server/authCookies'
+import { expiredInviteCookie, INVITE_COOKIE, prepareAuthRequest, secureResponseCookies } from '../../server/authCookies'
 import { withAuthInvite, withAuthProvisioning } from '../../server/authInvite'
 import { withRequestContext } from '../../server/requestContext'
 
@@ -14,7 +14,7 @@ const handle = (request: Request) =>
       const response = await (provisioning ? withAuthProvisioning(run) : run())
       if (!new URL(request.url).pathname.includes('/callback/')) return secureResponseCookies(request, response)
       const headers = new Headers(response.headers)
-      headers.append('set-cookie', `${INVITE_COOKIE}=; Path=/api/auth; HttpOnly; SameSite=Lax; Max-Age=0`)
+      headers.append('set-cookie', expiredInviteCookie())
       return secureResponseCookies(
         request,
         new Response(response.body, { status: response.status, statusText: response.statusText, headers }),

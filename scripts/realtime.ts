@@ -57,11 +57,20 @@ export function developmentArguments(environment: NodeJS.ProcessEnv, directory: 
   ]
 }
 
+// The app validates `BASE_PATH` and refuses to start with an invalid one; this script runs without the app's modules.
+function configuredBasePath(environment: NodeJS.ProcessEnv) {
+  const trimmed = environment.BASE_PATH?.trim().replace(/^\/+|\/+$/g, '')
+  return trimmed ? `/${trimmed}` : ''
+}
+
 /**
  * Caddy in front of the app and Centrifugo. The app gets the visitor's address as a single-value `X-Forwarded-For`, which
  * Better Auth trusts for rate limits; Caddy's default appends Traefik's address, and Better Auth then trusts neither.
  */
-export function caddyfile(publicPort: number) {
+export function caddyfile(publicPort: number, basePath = '') {
+  const prefixes = basePath ? ['', basePath] : ['']
+  const realtimePaths = prefixes.map((prefix) => `${prefix}/connection/*`).join(' ')
+  const realtimeRequest = prefixes.map((prefix) => `{path}.startsWith('${prefix}/connection/')`).join(' || ')
   return `{
 \tgrace_period ${caddyGracePeriod}
 \tservers {
@@ -73,11 +82,12 @@ export function caddyfile(publicPort: number) {
 :${publicPort} {
 \tencode zstd gzip
 \troute {
-\t\t@foreignWebSocketOrigin \`{path}.startsWith('/connection/') && {http.request.header.Origin} != '' && {http.request.header.Origin} != 'http://' + {http.request.hostport} && {http.request.header.Origin} != 'https://' + {http.request.hostport}\`
+\t\t@foreignWebSocketOrigin \`(${realtimeRequest}) && {http.request.header.Origin} != '' && {http.request.header.Origin} != 'http://' + {http.request.hostport} && {http.request.header.Origin} != 'https://' + {http.request.hostport}\`
 \t\trespond @foreignWebSocketOrigin 403
 
-\t\thandle /connection/* {
-\t\t\treverse_proxy 127.0.0.1:${realtimePort}
+\t\t@realtime path ${realtimePaths}
+\t\thandle @realtime {
+${basePath ? `\t\t\turi strip_prefix ${basePath}\n` : ''}\t\t\treverse_proxy 127.0.0.1:${realtimePort}
 \t\t}
 
 \t\thandle {
@@ -284,7 +294,7 @@ if (import.meta.main) {
       execFileSync(process.execPath, ['.output/server/seed-preview.mjs'], { stdio: 'inherit' })
     const config = '/tmp/caddy/Caddyfile'
     fs.mkdirSync(path.dirname(config), { recursive: true })
-    fs.writeFileSync(config, caddyfile(Number(process.env.PORT?.trim() || 3000)))
+    fs.writeFileSync(config, caddyfile(Number(process.env.PORT?.trim() || 3000), configuredBasePath(process.env)))
     process.exitCode = await supervise(containerProcesses(process.env, secret, config))
   } else {
     console.error('usage: node scripts/realtime.ts dev | container')

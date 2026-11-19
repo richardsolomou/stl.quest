@@ -128,9 +128,19 @@ describe('Caddy configuration', () => {
 
   it('routes WebSockets to Centrifugo and everything else to the app', () => {
     expect([
-      config.includes('handle /connection/* {\n\t\t\treverse_proxy 127.0.0.1:8000'),
+      config.includes('@realtime path /connection/*\n\t\thandle @realtime {\n\t\t\treverse_proxy 127.0.0.1:8000'),
       config.includes('reverse_proxy 127.0.0.1:3001'),
     ]).toEqual([true, true])
+  })
+
+  it('routes WebSockets under the base path to Centrifugo without it', () => {
+    expect(caddyfile(3000, '/stlquest')).toContain(
+      '@realtime path /connection/* /stlquest/connection/*\n\t\thandle @realtime {\n\t\t\turi strip_prefix /stlquest\n',
+    )
+  })
+
+  it('refuses WebSockets under the base path opened from another origin', () => {
+    expect(caddyfile(3000, '/stlquest')).toContain("{path}.startsWith('/stlquest/connection/')")
   })
 
   it('stops waiting for requests after three seconds, so the app still gets its turn before the deadline', () => {

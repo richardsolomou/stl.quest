@@ -22,6 +22,7 @@ import { hostedStorageRequiresRemote } from './storagePolicy'
 import { logger } from './logger'
 import { serverMessages } from './locale'
 import { storagePlans } from '../core/plans'
+import { appPath } from '../basePath'
 
 const WORKSPACE_METADATA_KEY = 'stlQuestWorkspaceId'
 const uploadRequests = new UploadRequestLimiter()
@@ -137,7 +138,7 @@ function serverFor(instance: AppInstance, workspaceId: string) {
   if (current) return current
   const store = instance.uploadDatastore
   const server = new Server({
-    path: '/api/upload',
+    path: appPath('/api/upload'),
     datastore: store,
     locker: instance.uploadLocker,
     maxSize: MAX_UPLOAD_BYTES,

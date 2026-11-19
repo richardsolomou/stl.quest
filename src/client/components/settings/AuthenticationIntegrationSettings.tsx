@@ -24,6 +24,7 @@ import { SettingRow } from '../SettingRow'
 import { SettingsSection } from './SettingsLayout'
 import { SocialProviderSetupInstructions } from './SocialProviderSetupInstructions'
 import { useI18n } from '../../i18n'
+import { appPath } from '../../../basePath'
 
 const refreshIntegrationSettings = (queryClient: ReturnType<typeof useQueryClient>) =>
   invalidateQueries(queryClient, 'integrations', 'session', 'auth-capabilities')
@@ -31,7 +32,7 @@ const refreshIntegrationSettings = (queryClient: ReturnType<typeof useQueryClien
 /** A provider test result lives in the callback URL, so any provider change makes it stale. */
 function useClearProviderTestResult() {
   const router = useRouter()
-  return () => router.history.replace(router.state.location.pathname)
+  return () => router.history.replace(appPath(router.state.location.pathname))
 }
 
 export function AuthenticationSettings({
@@ -184,7 +185,7 @@ export function ProviderDialog({
   const { t } = useI18n()
   const copy = t.settings.signIn.dialog
   const name = SOCIAL_PROVIDER_SETTINGS[provider].name
-  const callbackUrl = `${origin}/api/auth/callback/${provider}`
+  const callbackUrl = `${origin}${appPath(`/api/auth/callback/${provider}`)}`
   const oidc = provider === 'oidc'
   return (
     <DialogShell open title={copy.title(name)} className="sm:max-w-[640px]" onClose={onDone}>

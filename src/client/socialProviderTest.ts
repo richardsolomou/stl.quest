@@ -2,6 +2,7 @@ import type { Messages } from '../core/i18n'
 import type { SocialAuthProvider } from '../core/auth'
 import { authClient } from './authClient'
 import { socialSignInErrorCode } from './socialSignIn'
+import { appPath } from '../basePath'
 
 export function socialProviderTestResult(search: string, provider: SocialAuthProvider) {
   const params = new URLSearchParams(search)
@@ -44,7 +45,7 @@ export function socialProviderTestFailure(search: string, provider: SocialAuthPr
 }
 
 export async function startSocialProviderTest(provider: SocialAuthProvider, fallback: string) {
-  const callbackURL = `/admin/integrations?authTest=${provider}`
+  const callbackURL = appPath(`/admin/integrations?authTest=${provider}`)
   const { error } = await authClient.linkSocial({
     provider,
     callbackURL,

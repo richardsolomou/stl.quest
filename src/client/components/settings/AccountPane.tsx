@@ -23,6 +23,7 @@ import { AccountAppearance } from './AccountAppearance'
 import { AccountNotifications } from './AccountNotifications'
 import { AccountLanguage } from './AccountLanguage'
 import { MethodRow, RemoveMethodForm } from './AccountMethodForms'
+import { appPath } from '../../../basePath'
 
 export function AccountPane({ me }: { me: Identity }) {
   const { t } = useI18n()
@@ -161,7 +162,9 @@ export function AccountPane({ me }: { me: Identity }) {
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => void authClient.linkSocial({ provider, callbackURL: '/account', errorCallbackURL: '/account' })}
+                      onClick={() =>
+                        void authClient.linkSocial({ provider, callbackURL: appPath('/account'), errorCallbackURL: appPath('/account') })
+                      }
                     >
                       <AuthMethodIcon method={provider} /> {methodCopy.link(socialProviderName(provider, methods.oidcName))}
                     </Button>

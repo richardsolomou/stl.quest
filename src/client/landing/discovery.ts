@@ -5,6 +5,7 @@ import plexSans400 from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-400
 import plexSans500 from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-500-normal.woff2?url'
 import { REPOSITORY_URL } from '@/client/sourceCode'
 import landingCss from './landing.css?url'
+import { assetPath } from '../../basePath'
 import { HOME_DESCRIPTION, PAGES, SELF_HOSTING_GUIDE_URL, SITE_ORIGIN, type SitePage } from './site'
 
 const SOCIAL_CARD = `${SITE_ORIGIN}/social-card.png`
@@ -65,12 +66,12 @@ export function landingHead(page: SitePage) {
     ],
     links: [
       { rel: 'canonical', href: url },
-      { rel: 'stylesheet', href: landingCss },
+      { rel: 'stylesheet', href: assetPath(landingCss) },
       ...[oswald500, plexSans400, plexSans500, plexMono400].map((href) => ({
         rel: 'preload',
         as: 'font',
         type: 'font/woff2',
-        href,
+        href: assetPath(href),
         crossOrigin: 'anonymous' as const,
       })),
     ],

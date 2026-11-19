@@ -5,6 +5,7 @@ import type { Identity } from '../../core/types'
 import { authClient } from '../authClient'
 import { useI18n } from '../i18n'
 import { ProtectedEmail } from './ProtectedEmail'
+import { appPath } from '../../basePath'
 
 export function ImpersonationBanner({ identity }: { identity: Identity }) {
   const { t } = useI18n()
@@ -14,7 +15,7 @@ export function ImpersonationBanner({ identity }: { identity: Identity }) {
       const { error } = await authClient.admin.stopImpersonating()
       if (error) throw new Error(copy.exitFailed)
     },
-    onSuccess: () => window.location.assign('/'),
+    onSuccess: () => window.location.assign(appPath('/')),
   })
 
   return (

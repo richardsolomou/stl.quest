@@ -21,6 +21,9 @@ const httpsRoot = `${root}-https`
 const previewPort = port + 6
 const previewServerURL = `http://127.0.0.1:${previewPort}`
 const previewRoot = `${root}-preview`
+const basePathPort = port + 8
+const basePathServerURL = `http://127.0.0.1:${basePathPort}`
+const basePathRoot = `${root}-base-path`
 const trace = process.env.PLAYWRIGHT_TRACE ? 'on' : process.env.CI ? 'retain-on-failure' : 'off'
 
 function appServer(name: string, appPort: number, dataRoot: string, environment: Record<string, string> = {}, publishedHost = '127.0.0.1') {
@@ -63,6 +66,7 @@ export default defineConfig({
         'preview-seed.spec.ts',
         'hosted-managed.spec.ts',
         'distributed-realtime.spec.ts',
+        'base-path.spec.ts',
       ],
       use: { ...devices['Desktop Chrome'] },
     },
@@ -92,6 +96,11 @@ export default defineConfig({
               ignoreHTTPSErrors: true,
               launchOptions: { args: ['--host-resolver-rules=MAP stlquest.test 127.0.0.1'] },
             },
+          },
+          {
+            name: 'base-path',
+            testMatch: 'base-path.spec.ts',
+            use: { ...devices['Desktop Chrome'], baseURL: `${basePathServerURL}/stlquest/` },
           },
           {
             name: 'preview-seed',
@@ -135,6 +144,15 @@ export default defineConfig({
           {
             command: httpsProxyServer(),
             url: `http://127.0.0.1:${httpsProxyHealthPort}/outer-health`,
+            reuseExistingServer: false,
+            timeout: 120_000,
+          },
+          {
+            command: appServer(`stlquest-e2e-base-path${containerSuffix}`, basePathPort, basePathRoot, {
+              BASE_PATH: '/stlquest',
+              BETTER_AUTH_URL: `${basePathServerURL}/stlquest`,
+            }),
+            url: `${basePathServerURL}/api/health`,
             reuseExistingServer: false,
             timeout: 120_000,
           },

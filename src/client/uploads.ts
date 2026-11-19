@@ -1,4 +1,5 @@
 import { defaultOptions, Upload } from 'tus-js-client'
+import { appPath } from '../basePath'
 
 export type UploadProgress = { sent: number; total: number }
 
@@ -25,7 +26,7 @@ const chunkSize = 32 * 1024 * 1024
 export async function uploadFile(file: File, { metadata = {}, onProgress, signal, fingerprint, shouldRetry }: UploadFileOptions = {}) {
   if (signal?.aborted) throw abortError()
   const upload = new Upload(file, {
-    endpoint: '/api/upload',
+    endpoint: appPath('/api/upload'),
     metadata: { filename: file.name, filetype: file.type, ...metadata },
     chunkSize,
     retryDelays: [0, 1_000, 3_000, 5_000],

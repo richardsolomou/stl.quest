@@ -5,13 +5,14 @@ import {
   type ServerSubscribedContext,
   type SubscriptionOptions,
 } from 'centrifuge'
+import { appPath } from '../basePath'
 
 /**
  * Fetches a connection token, or a subscription token for `channel`. A 401 or 403 becomes Centrifuge's `UnauthorizedError`,
  * which stops the client retrying a refusal; any other failure is retried with backoff.
  */
 export async function realtimeToken(channel?: string, request: typeof fetch = fetch) {
-  const response = await request('/api/realtime/token', {
+  const response = await request(appPath('/api/realtime/token'), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(channel === undefined ? {} : { channel }),
@@ -23,7 +24,7 @@ export async function realtimeToken(channel?: string, request: typeof fetch = fe
 
 /** A client for this page's own origin; it fetches and refreshes its connection token itself. Call `connect()` to start it. */
 export function createRealtimeClient(location: Pick<Location, 'host' | 'protocol'> = window.location) {
-  const url = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/connection/websocket`
+  const url = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}${appPath('/connection/websocket')}`
   return new Centrifuge(url, { getToken: () => realtimeToken() })
 }
 
