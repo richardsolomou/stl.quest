@@ -320,7 +320,7 @@ const calculator: PriceCalculatorSettings = {
   electricityPricePerKwh: required(getElectricityPricePreset(electricityCatalog.presets, 'NL'), 'NL electricity preset').eurPerKwh,
   labourCostPerHour: 28,
   failureAllowancePercent: 8,
-  standardMarginPercent: 40,
+  markupPercent: 66.67,
 }
 
 // What each model prints with, weighted by repetition, and the finishing set it goes through.

@@ -57,7 +57,8 @@ export type PriceCalculatorSettings = {
   electricityPricePerKwh: number
   labourCostPerHour: number
   failureAllowancePercent: number
-  standardMarginPercent: number
+  /** Added on top of what a print costs to make, labour included, so 50 prices a €10 print at €15. */
+  markupPercent: number
 }
 
 /** The highest value each business rate accepts; every rate is at least zero. */
@@ -65,8 +66,14 @@ export const PRICE_CALCULATOR_MAXIMUMS = {
   electricityPricePerKwh: 1_000,
   labourCostPerHour: 100_000,
   failureAllowancePercent: 100,
-  standardMarginPercent: 95,
+  markupPercent: 2_000,
 } as const
+
+/** The share of the price a markup keeps as profit, as a percentage: a 50% markup keeps a third of each sale. */
+export function profitSharePercent(markupPercent: number) {
+  const markup = nonNegative(markupPercent)
+  return (markup / (100 + markup)) * 100
+}
 
 /** Whether every rate is a number from zero to its maximum, as storing them requires. */
 export function validPriceCalculatorSettings(settings: PriceCalculatorSettings) {
@@ -80,7 +87,7 @@ export const DEFAULT_PRICE_CALCULATOR_SETTINGS: PriceCalculatorSettings = {
   electricityPricePerKwh: 0.135,
   labourCostPerHour: 15,
   failureAllowancePercent: 10,
-  standardMarginPercent: 25,
+  markupPercent: 50,
 }
 
 /** Stand-ins for a material nobody picked, so a rough quote always appears; the breakdown marks them as typical. */
@@ -142,7 +149,7 @@ export type EquipmentCost = {
 
 /**
  * Itemises a print's cost from what it uses: material, the printer's power and wear, its model's wear parts, and each
- * piece of equipment once per plate. Failure allowance applies to production, never to labour; the margin to both.
+ * piece of equipment once per plate. Failure allowance applies to production, never to labour; the markup to both.
  */
 export function costPrint({ rates, printType, job, consumables, printer, material, equipment = [] }: PrintCostInput) {
   const pricePerKwh = nonNegative(rates.electricityPricePerKwh)
@@ -187,7 +194,7 @@ export function costPrint({ rates, printType, job, consumables, printer, materia
   const failureAllowance = production * (nonNegative(rates.failureAllowancePercent) / 100)
   const estimatedCost = production + failureAllowance
   const labour = (nonNegative(job.handsOnMinutes) / 60) * nonNegative(rates.labourCostPerHour)
-  const suggestedPrice = (estimatedCost + labour) / (1 - Math.min(nonNegative(rates.standardMarginPercent), 95) / 100)
+  const markup = (estimatedCost + labour) * (nonNegative(rates.markupPercent) / 100)
   return {
     materialMl,
     materialGrams,
@@ -204,12 +211,68 @@ export function costPrint({ rates, printType, job, consumables, printer, materia
     failureAllowance,
     estimatedCost,
     labour,
-    margin: suggestedPrice - estimatedCost - labour,
-    suggestedPrice,
+    markup,
+    suggestedPrice: estimatedCost + labour + markup,
   }
 }
 
 export type PrintCost = ReturnType<typeof costPrint>
+
+/**
+ * A quote in whole minor units of its currency, as the breakdown lists it: each line rounded so the lines add up to the
+ * rounded cost to make, and the markup to the rounded price, which stays what the unrounded quote rounds to.
+ */
+export function roundQuote(cost: PrintCost, currency: PriceCalculatorCurrency) {
+  const digits = new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2
+  const lines = [
+    cost.material.cost,
+    cost.printing.electricity,
+    cost.printing.wear,
+    ...cost.wearParts.map(({ cost: part }) => part),
+    ...cost.equipment.flatMap(({ electricity, supplies, wear }) => [electricity, supplies, wear]),
+    cost.failureAllowance,
+    cost.labour,
+  ]
+  const rounded = roundToTotal(lines, digits)
+  const costToMake = roundTo(sum(rounded), digits)
+  const suggestedPrice = roundTo(cost.suggestedPrice, digits)
+  let line = 0
+  const next = () => rounded[line++]
+  return {
+    ...cost,
+    material: { ...cost.material, cost: next() },
+    printing: { ...cost.printing, electricity: next(), wear: next() },
+    wearParts: cost.wearParts.map((part) => ({ ...part, cost: next() })),
+    equipment: cost.equipment.map((item) => ({ ...item, electricity: next(), supplies: next(), wear: next() })),
+    failureAllowance: next(),
+    labour: next(),
+    estimatedCost: roundTo(costToMake - rounded[rounded.length - 1], digits),
+    costToMake,
+    markup: roundTo(suggestedPrice - costToMake, digits),
+    suggestedPrice,
+  }
+}
+
+/** Rounds each value to `digits` places so they sum to their rounded total, nudging the ones that lost most to rounding. */
+function roundToTotal(values: number[], digits: number) {
+  const scale = 10 ** digits
+  // Drops floating-point noise first, so 299.99999999 minor units counts as 300 rather than 299 plus a remainder.
+  const units = values.map((value) => Math.round(value * scale * 1e6) / 1e6)
+  const floors = units.map(Math.floor)
+  let shortfall = Math.round(sum(units)) - sum(floors)
+  const byRemainder = units.map((unit, index) => ({ index, remainder: unit - floors[index] })).sort((a, b) => b.remainder - a.remainder)
+  for (const { index } of byRemainder) {
+    if (shortfall <= 0) break
+    floors[index] += 1
+    shortfall -= 1
+  }
+  return floors.map((unit) => unit / scale)
+}
+
+function roundTo(value: number, digits: number) {
+  const scale = 10 ** digits
+  return Math.round(Math.round(value * scale * 1e6) / 1e6) / scale
+}
 
 /** A representative job of each print type, so the quote can show its breakdown before the slicer totals are in. */
 export const TYPICAL_JOBS: Record<PrintType, PriceCalculatorJob> = {

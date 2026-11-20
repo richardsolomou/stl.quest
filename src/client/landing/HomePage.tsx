@@ -339,7 +339,7 @@ export function HomePage() {
                   width={800}
                   height={1123}
                   sizes="22rem"
-                  alt="A rough quote: the suggested price, what it costs to make at a 40% margin, and the cost basis of the printer, its wear parts, the resin, and wash and cure."
+                  alt="A rough quote: the suggested price, what it costs to make and the profit a 66.67% markup adds, and the cost basis of the printer, its wear parts, the resin, and wash and cure."
                 />
               </div>
               <DemoCaption>A typical resin job on the demo print farm</DemoCaption>

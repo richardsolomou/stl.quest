@@ -89,7 +89,7 @@ export const priceCalculatorSettingsSchema = z.object({
   electricityPricePerKwh: z.number().nonnegative().max(PRICE_CALCULATOR_MAXIMUMS.electricityPricePerKwh),
   labourCostPerHour: z.number().nonnegative().max(PRICE_CALCULATOR_MAXIMUMS.labourCostPerHour),
   failureAllowancePercent: z.number().nonnegative().max(PRICE_CALCULATOR_MAXIMUMS.failureAllowancePercent),
-  standardMarginPercent: z.number().nonnegative().max(PRICE_CALCULATOR_MAXIMUMS.standardMarginPercent),
+  markupPercent: z.number().nonnegative().max(PRICE_CALCULATOR_MAXIMUMS.markupPercent),
 })
 const consumableBaseSchema = {
   id: z.string().trim().min(1).max(200),

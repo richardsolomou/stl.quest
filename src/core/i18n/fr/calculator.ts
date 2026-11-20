@@ -49,9 +49,9 @@ export const calculator: typeof en = {
     tryTypicalJob: 'Essayer une tâche type',
     copyPrice: 'Copier le prix',
     title: 'Devis approximatif',
-    costAndMargin: (cost: string, margin: string) => `Coûte ${cost} à produire · marge de ${margin} %`,
+    costAndProfit: (cost: string, profit: string, share: string) => `Coûte ${cost} à produire · ${profit} de bénéfice (${share} % du prix)`,
     breakdown: 'Détail du calcul',
-    marginAmount: (margin: string) => `Marge (${margin} %)`,
+    markupAmount: (markup: string) => `Majoration (${markup} %)`,
     compare: (count: number, range: string) => `${range} sur ${count} imprimantes`,
     suggestedPrice: 'Prix suggéré',
     resinAmount: (amount: string) => `${amount} mL de résine`,
@@ -59,7 +59,7 @@ export const calculator: typeof en = {
     printElectricity: 'Électricité d’impression',
     failureAllowance: 'Marge pour échecs',
     labour: 'Main-d’œuvre',
-    estimatedCost: 'Coût estimé',
+    costToMake: 'Coût de production',
     printerWear: 'Usure de l’imprimante',
     equipmentPower: (name: string) => `${name} · électricité`,
     equipmentSupplies: (name: string) => `${name} · fournitures`,
@@ -89,7 +89,7 @@ export const calculator: typeof en = {
   basis: {
     title: 'Base de coût',
     description:
-      'Ce que coûtent chaque heure d’impression, chaque plateau et chaque unité de matière, avant marge pour échecs, main-d’œuvre et marge.',
+      'Ce que coûtent chaque heure d’impression, chaque plateau et chaque unité de matière, avant marge pour échecs, main-d’œuvre et majoration.',
     typicalPrinter: 'Imprimante typique',
     typicalResin: 'Résine typique',
     typicalFilament: 'Filament typique',
@@ -109,7 +109,8 @@ export const calculator: typeof en = {
     perKilogram: (cost: string) => `${cost}/kg`,
   },
   rates: {
-    summary: (labour: string, failure: string, margin: string) => `Main-d’œuvre ${labour} · marge pour échecs ${failure} · marge ${margin}`,
+    summary: (labour: string, failure: string, markup: string) =>
+      `Main-d’œuvre ${labour} · marge pour échecs ${failure} · majoration ${markup}`,
     defaults: 'par défaut',
     edit: 'Paramètres des tarifs',
   },
@@ -136,10 +137,11 @@ export const calculator: typeof en = {
     eurostatSource: (period: string) => `Moyenne des ménages Eurostat pour ${period}`,
   },
   pricing: {
-    businessTitle: 'Main-d’œuvre et marge',
+    businessTitle: 'Main-d’œuvre et majoration',
     businessDescription: 'Ce que coûte votre temps, la fréquence des échecs et ce que vous ajoutez.',
     labour: (symbol: string) => `Main-d’œuvre (${symbol}/h)`,
     failureAllowance: 'Marge pour échecs (%)',
-    standardMargin: 'Marge standard (%)',
+    markup: 'Majoration sur le coût (%)',
+    markupHint: (markup: string, share: string) => `Une majoration de ${markup} % garde ${share} % de chaque vente comme bénéfice.`,
   },
 }

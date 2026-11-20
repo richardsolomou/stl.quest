@@ -17,7 +17,7 @@ export function RatesLink({ settings, saved }: { settings: PriceCalculatorSettin
         {copy.summary(
           `${symbol}${formatNumber(settings.labourCostPerHour, locale)}/h`,
           percent(settings.failureAllowancePercent),
-          percent(settings.standardMarginPercent),
+          percent(settings.markupPercent),
         )}
         {!saved && <TypicalTag label={copy.defaults} />}
       </span>

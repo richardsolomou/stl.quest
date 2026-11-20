@@ -7,14 +7,16 @@ import {
   DEFAULT_PRICE_CALCULATOR_SETTINGS,
   priceRequest,
   priceRequestOnPrinters,
+  profitSharePercent,
   printerCostPerMinute,
+  roundQuote,
   selectPriceCalculatorCurrency,
   validPriceCalculatorSettings,
   type PriceCalculatorJob,
   type PrintCostInput,
 } from './priceCalculator'
 
-const rates = { ...DEFAULT_PRICE_CALCULATOR_SETTINGS, electricityPricePerKwh: 0.2, failureAllowancePercent: 10, standardMarginPercent: 25 }
+const rates = { ...DEFAULT_PRICE_CALCULATOR_SETTINGS, electricityPricePerKwh: 0.2, failureAllowancePercent: 10, markupPercent: 25 }
 const job: PriceCalculatorJob = { materialAmount: 100, materialUnit: 'ml', printHours: 10, plates: 2, handsOnMinutes: 0 }
 const grey: ResinConsumable = { id: 'grey', kind: 'resin', name: 'Grey', pricePerLitre: 120, densityGramsPerMl: 1.2 }
 const pla: FilamentConsumable = { id: 'pla', kind: 'filament', name: 'PLA', pricePerKg: 18 }
@@ -204,12 +206,79 @@ describe('quote totals', () => {
     expect(cost({ job: { ...materialOnly, handsOnMinutes: 30 } }).labour).toBe(7.5)
   })
 
-  it('puts the margin on cost and labour', () => {
-    expect(cost({ material: grey, job: { ...materialOnly, handsOnMinutes: 60 } }).suggestedPrice).toBeCloseTo(37.6)
+  it('marks up cost and labour', () => {
+    expect(cost({ material: grey, job: { ...materialOnly, handsOnMinutes: 60 } }).suggestedPrice).toBeCloseTo(35.25)
   })
 
-  it('caps the margin so a price always exists', () => {
-    expect(cost({ material: grey, job: materialOnly, rates: { ...rates, standardMarginPercent: 100 } }).suggestedPrice).toBeCloseTo(264)
+  it('doubles the cost at a 100% markup', () => {
+    expect(cost({ material: grey, job: materialOnly, rates: { ...rates, markupPercent: 100 } }).suggestedPrice).toBeCloseTo(26.4)
+  })
+})
+
+describe('profit share', () => {
+  it('keeps a third of the price at a 50% markup', () => {
+    expect(profitSharePercent(50)).toBeCloseTo(33.333)
+  })
+
+  it('keeps nothing without a markup', () => {
+    expect(profitSharePercent(0)).toBe(0)
+  })
+})
+
+describe('rounded quote', () => {
+  // 120 g of typical filament for 6 hours at 411 W: lines of 3, 0.333, 1.2, 0.453, and 2.5 that each round down.
+  const filamentJob: PriceCalculatorJob = { materialAmount: 120, materialUnit: 'g', printHours: 6, plates: 1, handsOnMinutes: 10 }
+  const quote = (markupPercent = 33.33, currency: PrintCostInput['rates']['currency'] = 'EUR') =>
+    roundQuote(
+      costPrint({
+        rates: { ...DEFAULT_PRICE_CALCULATOR_SETTINGS, currency, markupPercent },
+        printType: 'filament',
+        job: filamentJob,
+        consumables: [],
+        printer: { id: 'mk4', printType: 'filament', powerWatts: 411 },
+      }),
+      currency,
+    )
+  const lines = (rounded: ReturnType<typeof quote>) => [
+    rounded.material.cost,
+    rounded.printing.electricity,
+    rounded.printing.wear,
+    rounded.failureAllowance,
+    rounded.labour,
+  ]
+  const total = (values: number[]) => Math.round(values.reduce((sum, value) => sum + value, 0) * 100) / 100
+
+  it('lists lines that add up to the rounded cost to make', () => {
+    expect(total(lines(quote()))).toBe(7.49)
+  })
+
+  it('totals the cost to make from its lines', () => {
+    const rounded = quote()
+    expect(total(lines(rounded))).toBe(rounded.costToMake)
+  })
+
+  it('adds the markup to the cost to make for the price', () => {
+    const rounded = quote()
+    expect(total([rounded.costToMake, rounded.markup])).toBe(rounded.suggestedPrice)
+  })
+
+  it('keeps the price the unrounded quote rounds to', () => {
+    expect(quote().suggestedPrice).toBe(9.98)
+  })
+
+  it('rounds to whole units in a currency without minor units', () => {
+    expect(lines(quote(33.33, 'JPY')).every(Number.isInteger)).toBe(true)
+  })
+
+  // Rounded one by one, these lines come to 20.14, a cent short of the exact cost.
+  it('adds up wear parts and equipment lines to the rounded cost to make', () => {
+    const rounded = roundQuote(cost({ material: grey, consumables: library, equipment: [wash], job: { ...job, handsOnMinutes: 7 } }), 'EUR')
+    const all = [
+      ...lines(rounded),
+      ...rounded.wearParts.map(({ cost: part }) => part),
+      ...rounded.equipment.flatMap(({ electricity, supplies, wear }) => [electricity, supplies, wear]),
+    ]
+    expect(total(all)).toBe(20.15)
   })
 })
 
@@ -324,8 +393,8 @@ describe('rate limits', () => {
     expect(validPriceCalculatorSettings(DEFAULT_PRICE_CALCULATOR_SETTINGS)).toBe(true)
   })
 
-  it('rejects a margin above its maximum', () => {
-    expect(validPriceCalculatorSettings({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, standardMarginPercent: 96 })).toBe(false)
+  it('rejects a markup above its maximum', () => {
+    expect(validPriceCalculatorSettings({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, markupPercent: 2_001 })).toBe(false)
   })
 
   it('rejects a negative rate', () => {
