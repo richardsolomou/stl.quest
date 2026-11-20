@@ -46,7 +46,7 @@ STL Quest replaces spreadsheets and chat threads for hobbyists printing for frie
 
 - Is STL Quest free? Yes. The software is free and open source under AGPL-3.0, and self-hosted installs have no storage plans: files live wherever the operator puts them. Hosted accounts include ${formatBytes(storagePlans.free.quotaBytes)} of storage on the ${storagePlans.free.name} plan, with optional paid plans for larger libraries, or can connect storage they manage: [storage guide](${LATEST_DOCUMENTATION_URL}/storage.md).
 - Where are model files stored? In a folder on the server, in ${list(remoteStorage, 'disjunction')} storage the operator connects, or in included hosted storage. Settings → Storage migrates existing files when switching providers.
-- Which file formats does it preview? ${list(MODEL_FORMATS.map((format) => format.toUpperCase()))}, with interactive previews and generated thumbnails. Links to MakerWorld, Printables, MyMiniFactory, Cults3D, and Thingiverse get a cover preview.
+- Which file formats does it preview? ${list(MODEL_FORMATS.map((format) => format.toUpperCase()))}, with interactive previews and generated thumbnails. Links to MakerWorld and Printables get a cover preview, and any linked print can take a cover image someone pastes or uploads.
 - Does it work with both resin and filament printers? Yes. Mixed fleets are supported, and each job is matched to a printer by build volume and print type.
 - How is the queue ordered? Round robin between requesters, oldest first, requester priority, or manual ordering.
 - Can several groups share one install? Yes. Each workspace has its own board, printers, members, and storage, and users can join several workspaces by invitation or be added directly by a super admin.

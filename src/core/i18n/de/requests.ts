@@ -92,6 +92,19 @@ export const requests: typeof en = {
     linkOnlyHint: 'Dieser Druck ist als Link gespeichert. Wählen Sie ein Modell, um ihn druckbar zu machen.',
     deleteToReplace: 'Löschen Sie dieses Modell, um ein anderes an seine Stelle zu setzen.',
   },
+  cover: {
+    label: 'Titelbild',
+    prompt: 'Bild einfügen, ablegen oder auswählen',
+    hint: 'Kopieren Sie das Bild auf der Modellseite und fügen Sie es hier ein.',
+    choose: 'Bild auswählen',
+    replace: 'Titelbild ersetzen',
+    remove: 'Titelbild entfernen',
+    saving: 'Titelbild wird gespeichert…',
+    failedTitle: 'Das Titelbild wurde nicht gespeichert',
+    failedHint: 'Der Druck behält sein bisheriges Bild. Versuchen Sie ein anderes Bild.',
+    unreadable: 'Diese Datei ist kein Bild, das dieser Browser lesen kann.',
+    rejected: 'Der Server hat dieses Bild nicht angenommen.',
+  },
   thumb: {
     linkedPrint: 'Verlinkter Druck',
     loadingThumbnail: 'Vorschaubild wird geladen',
@@ -120,7 +133,8 @@ export const requests: typeof en = {
   },
   linked: {
     sourcePlaceholder: 'https://…',
-    linkHint: 'Jeder Link funktioniert. Vorschauen werden für MakerWorld, Printables, MyMiniFactory, Cults3D und Thingiverse abgerufen.',
+    linkHint:
+      'Jeder Link funktioniert. Links zu MakerWorld und Printables bringen ihr Titelbild mit; für andere Seiten fügen Sie unten eines hinzu.',
     notesPlaceholder: 'Farbe, für wen es ist – alles, was die druckende Person wissen sollte',
     failedTitle: 'Dieser Druck konnte nicht hinzugefügt werden',
     failedHint: 'Es wurde nichts hinzugefügt. Prüfen Sie die Angaben und Ihre Verbindung und versuchen Sie es dann erneut.',

@@ -79,6 +79,9 @@ export const server = {
     storageNotReady: 'storage is not ready — an admin needs to fix Settings → Storage first',
   },
   request: {
+    coverTooLarge: (megabytes: number) => `the cover image is larger than ${megabytes} MB`,
+    coverNotImage: 'the cover must be a PNG, JPEG, GIF, WebP, or AVIF image',
+    coverHasModel: 'this print has a model, so its thumbnail is its picture',
     invalidLinkedRequest: 'invalid linked request',
     changeStillFinishing: 'another change to this print is still finishing',
     invalidQuantity: 'invalid quantity',

@@ -83,6 +83,9 @@ export const server: typeof en = {
     storageNotReady: 'der Speicher ist nicht bereit – ein Administrator muss zuerst Einstellungen → Speicher korrigieren',
   },
   request: {
+    coverTooLarge: (megabytes: number) => `das Titelbild ist größer als ${megabytes} MB`,
+    coverNotImage: 'das Titelbild muss ein PNG-, JPEG-, GIF-, WebP- oder AVIF-Bild sein',
+    coverHasModel: 'dieser Druck hat ein Modell, daher dient sein Vorschaubild als Bild',
     invalidLinkedRequest: 'ungültige verknüpfte Anfrage',
     changeStillFinishing: 'eine andere Änderung an diesem Druck wird noch abgeschlossen',
     invalidQuantity: 'ungültige Menge',

@@ -90,6 +90,19 @@ export const requests = {
     linkOnlyHint: 'This print is saved from a link. Choose a model to make it printable.',
     deleteToReplace: 'Delete this model to put a different one in its place.',
   },
+  cover: {
+    label: 'Cover image',
+    prompt: 'Paste, drop, or choose an image',
+    hint: 'Copy the picture on the model page, then paste it here.',
+    choose: 'Choose image',
+    replace: 'Replace cover',
+    remove: 'Remove cover image',
+    saving: 'Saving cover…',
+    failedTitle: 'The cover was not saved',
+    failedHint: 'The print keeps the picture it had. Try another image.',
+    unreadable: 'That file is not an image this browser can read.',
+    rejected: 'The server did not accept this image.',
+  },
   thumb: {
     linkedPrint: 'Linked print',
     loadingThumbnail: 'Loading thumbnail',
@@ -117,7 +130,7 @@ export const requests = {
   },
   linked: {
     sourcePlaceholder: 'https://…',
-    linkHint: 'Any link works. Previews are fetched for MakerWorld, Printables, MyMiniFactory, Cults3D and Thingiverse.',
+    linkHint: 'Any link works. MakerWorld and Printables links bring their own cover; for other sites, add one below.',
     notesPlaceholder: 'colour, who it is for — anything the printer should know',
     failedTitle: 'This print could not be added',
     failedHint: 'Nothing was added. Check the details and your connection, then try again.',

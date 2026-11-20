@@ -39,6 +39,7 @@ import {
   type LinkedRequestValues,
 } from '../linkedRequest'
 import { LinkedRequestForm } from './LinkedRequestForm'
+import { encodeCover, UnreadableCover } from '../coverImage'
 import { useI18n } from '../i18n'
 
 export function UploadForm({
@@ -75,14 +76,15 @@ export function UploadForm({
   const [splitFailure, setSplitFailure] = useState<string>()
   const [inspectingFiles, setInspectingFiles] = useState(0)
   const linkedMutation = useMutation({
-    mutationFn: callCreateLinkedRequest,
+    mutationFn: async ({ data, cover }: { data: NonNullable<ReturnType<typeof linkedRequestData>>; cover?: File }) =>
+      callCreateLinkedRequest({ data: { ...data, cover: cover && (await encodeCover(cover)) } }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['requests', workspaceSlug] })
       signalProductTourProgress('upload')
       onClose()
     },
     onError: (error) => {
-      if (isReportableMutationError(error)) {
+      if (!(error instanceof UnreadableCover) && isReportableMutationError(error)) {
         posthog.captureException(error, { action: 'create_linked_request', print_type: linkedValues.printType })
       }
     },
@@ -270,7 +272,7 @@ export function UploadForm({
     setLinkedValidation(validationError ?? '')
     if (validationError) return
     const data = linkedRequestData(workspaceSlug, linkedValues)
-    if (data) linkedMutation.mutate({ data })
+    if (data) linkedMutation.mutate({ data, cover: linkedValues.cover })
   }
 
   const remaining = entries.filter((entry) => entry.state !== 'done')
@@ -311,7 +313,13 @@ export function UploadForm({
             printTypes={printTypes}
             pending={linkedMutation.isPending}
             validation={linkedValidation}
-            failure={linkedMutation.error ? errorMessage(linkedMutation.error, t.requests.linked.rejected) : undefined}
+            failure={
+              linkedMutation.error instanceof UnreadableCover
+                ? t.requests.cover.unreadable
+                : linkedMutation.error
+                  ? errorMessage(linkedMutation.error, t.requests.linked.rejected)
+                  : undefined
+            }
             onChange={(patch) => {
               setLinkedValidation('')
               setLinkedValues((current) => ({ ...current, ...patch }))

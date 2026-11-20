@@ -2,8 +2,11 @@ import { createFileRoute } from '@tanstack/react-router'
 import { app } from '../../server/app'
 import { withRequestContext } from '../../server/requestContext'
 import { authorizedRequestAsset } from '../../server/requestAssetAccess'
-import { loadSourceImage, sourceImageContentType, sourceImageFailure } from '../../server/sourcePreview'
+import { imageContentType } from '../../core/coverImage'
+import { loadSourceImage, sourceImageFailure } from '../../server/sourcePreview'
 import { logger } from '../../server/logger'
+
+const notFound = () => new Response('not found', { status: 404, headers: { 'Cache-Control': 'no-store' } })
 
 const imageResponse = (bytes: Uint8Array<ArrayBuffer>, contentType: string) =>
   new Response(bytes, {
@@ -22,11 +25,11 @@ export const Route = createFileRoute('/api/source-images/$requestId')({
           const instance = await app()
           const context = await instance.workspace(request.headers)
           const printRequest = await authorizedRequestAsset(context, params.requestId)
-          if (!printRequest?.sourceImageUrl) {
-            return new Response('not found', { status: 404, headers: { 'Cache-Control': 'no-store' } })
-          }
+          if (!printRequest) return notFound()
           const cached = await context.service.cachedSourceImage(printRequest)
-          if (cached) return imageResponse(cached, sourceImageContentType(cached) ?? 'application/octet-stream')
+          if (cached) return imageResponse(cached, imageContentType(cached) ?? 'application/octet-stream')
+          // A cover someone supplied has no source to fetch it from again.
+          if (!printRequest.sourceImageUrl) return notFound()
           try {
             // First view of a cover fetches it from the source and stores it, so later views — other
             // people, other devices, cold browser caches — never hit the source site again.

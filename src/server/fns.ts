@@ -2,6 +2,8 @@ import crypto from 'node:crypto'
 import path from 'node:path'
 import { z } from 'zod'
 import { errorMessage } from '../core/error'
+import { imageContentType } from '../core/coverImage'
+import { sourceCoverChange } from '../core/request'
 import { inviteIsActive } from '../core/invites'
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest, setCookie } from '@tanstack/react-start/server'
@@ -75,7 +77,6 @@ import {
 } from './integrations'
 import { userImage } from './avatar'
 import { readEmailBranding, readWorkspaceSmtp, sendInviteEmail, workspaceEmailConfigured, workspaceMailer } from './notifications'
-import { sourceImageContentType } from './sourcePreview'
 import {
   acceptInviteSchema,
   addAdminWorkspaceMemberSchema,
@@ -88,6 +89,7 @@ import {
   changeOwnEmailSchema,
   createInviteSchema,
   createLinkedRequestSchema,
+  requestCoverSchema,
   createPrintGroupSchema,
   emailLogoSchema,
   emailSenderSchema,
@@ -1344,7 +1346,7 @@ export const removeWorkspaceSmtp = createServerFn({ method: 'POST' })
 export function parseEmailLogo(data: string): EmailLogo {
   const bytes = Buffer.from(data, 'base64')
   if (bytes.byteLength > MAX_EMAIL_LOGO_BYTES) throw new Response(errors().email.logoTooLarge(MAX_EMAIL_LOGO_BYTES / 1024), { status: 413 })
-  const contentType = sourceImageContentType(bytes)
+  const contentType = imageContentType(bytes)
   if (!contentType || !isEmailLogoType(contentType)) throw new Response(errors().email.logoType, { status: 400 })
   return { contentType, data: bytes.toString('base64') }
 }
@@ -1847,12 +1849,23 @@ export const getUsagePrefills = createServerFn({ method: 'GET' })
 export const createLinkedRequest = createServerFn({ method: 'POST' })
   .validator(inWorkspace(createLinkedRequestSchema))
   .handler(async ({ data }) => {
-    const { workspaceSlug, ...input } = data
+    const { workspaceSlug, cover, ...input } = data
     return workspaceMutation(workspaceSlug, async (context) => {
+      if (cover !== undefined) {
+        return context.service.createLinkedRequest({ ...input, cover: Buffer.from(cover, 'base64') }, context.identity)
+      }
       const sourceImageUrl = await resolveSourceImage(input.sourceUrl)
       return context.service.createLinkedRequest({ ...input, sourceImageUrl }, context.identity)
     })
   })
+
+export const setRequestCover = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(requestCoverSchema))
+  .handler(async ({ data }) =>
+    workspaceMutation(data.workspaceSlug, (context) =>
+      context.service.setCover(data.id, Buffer.from(data.image, 'base64'), context.identity),
+    ),
+  )
 
 export const moveCopiesBatch = createServerFn({ method: 'POST' })
   .validator(inWorkspace(moveCopiesBatchSchema))
@@ -1910,7 +1923,10 @@ export const updateRequest = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const { id, workspaceSlug, ...fields } = data
     return workspaceMutation(workspaceSlug, async (context) => {
-      const sourceImageUrl = fields.sourceUrl === undefined ? undefined : ((await resolveSourceImage(fields.sourceUrl)) ?? null)
+      const current = await context.service.getRequest(id)
+      const coverChange = current ? sourceCoverChange(current, fields.sourceUrl) : 'keep'
+      const found = coverChange === 'keep' ? undefined : await resolveSourceImage(fields.sourceUrl!)
+      const sourceImageUrl = coverChange === 'replace' ? (found ?? null) : found
       return context.service.update(id, { ...fields, sourceImageUrl }, context.identity)
     })
   })

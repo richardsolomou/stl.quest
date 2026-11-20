@@ -83,6 +83,9 @@ export const server: typeof en = {
     storageNotReady: 'le stockage n’est pas prêt — un administrateur doit d’abord corriger Paramètres → Stockage',
   },
   request: {
+    coverTooLarge: (megabytes: number) => `l’image de couverture dépasse ${megabytes} Mo`,
+    coverNotImage: 'la couverture doit être une image PNG, JPEG, GIF, WebP ou AVIF',
+    coverHasModel: 'cette impression a un modèle, sa miniature lui sert donc d’image',
     invalidLinkedRequest: 'demande liée invalide',
     changeStillFinishing: 'une autre modification de cette impression est encore en cours',
     invalidQuantity: 'quantité invalide',

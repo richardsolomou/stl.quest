@@ -6,6 +6,7 @@ export const board = {
     loadError: 'Could not load the board',
     dropToReplace: 'Drop a model to replace this one',
     dropToAttach: 'Drop a model to attach it',
+    dropToCover: 'Drop an image to make it the cover',
     dropToAdd: 'Drop models to add prints',
     tagCreateFailed: 'The tag could not be created.',
     tagUpdateFailed: 'The tag could not be updated.',

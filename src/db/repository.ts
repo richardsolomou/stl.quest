@@ -1421,6 +1421,7 @@ export class DrizzleRepository implements Repository {
       notes?: string
       sourceUrl?: string
       sourceImageUrl?: string | null
+      sourceImagePath?: string | null
       requestedPrintType?: PrintType | null
       printerId?: string | null
       automaticPrinterAssignment?: boolean
@@ -1477,6 +1478,7 @@ export class DrizzleRepository implements Repository {
           notes: fields.notes ?? request.notes ?? null,
           sourceUrl: fields.sourceUrl ?? request.sourceUrl ?? null,
           sourceImageUrl: fields.sourceImageUrl === undefined ? (request.sourceImageUrl ?? null) : fields.sourceImageUrl,
+          ...(fields.sourceImagePath === undefined ? {} : { sourceImagePath: fields.sourceImagePath }),
           printType: fields.requestedPrintType === undefined ? (request.requestedPrintType ?? null) : fields.requestedPrintType,
           printerId: fields.printerId === undefined ? (request.printerId ?? null) : fields.printerId,
           automaticPrinterAssignment: fields.automaticPrinterAssignment ?? request.automaticPrinterAssignment ?? false,

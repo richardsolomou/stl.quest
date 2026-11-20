@@ -19,6 +19,7 @@ import type { InventoryItems, InventoryKind } from './inventory'
 import { seesOnlyOwnRequests } from './visibility'
 import { PRINT_TYPE_SETTING } from './printTypes'
 import { USAGE_TRACKING_SETTING } from './usageTracking'
+import { MAX_COVER_BYTES } from './coverImage'
 
 const capture = vi.fn(async () => undefined)
 const telemetry: Telemetry = { capture, exception: async () => undefined }
@@ -278,6 +279,173 @@ describe('STLQuestService crash recovery', () => {
     await service.remove(id, requester)
 
     expect(await assets.exists(`covers/${id}`)).toBe(false)
+  })
+
+  describe('a supplied cover', () => {
+    const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 7, 7, 7])
+    const linked = (sourceImageUrl?: string) =>
+      service.createLinkedRequest(
+        {
+          name: 'Dragon',
+          quantity: 1,
+          sourceUrl: 'https://www.thingiverse.com/thing:763622',
+          sourceImageUrl,
+          requestedPrintType: 'filament',
+        },
+        requester,
+      )
+
+    it('is stored as the print cover', async () => {
+      const id = await linked()
+
+      await service.setCover(id, png, requester)
+
+      expect(await service.cachedSourceImage((await repository.getRequest(id))!)).toEqual(png)
+    })
+
+    it('shows on the board in place of the link placeholder', async () => {
+      const id = await linked()
+
+      await service.setCover(id, png, requester)
+
+      expect((await service.listRequests(requester)).requests.find((listed) => listed.id === id)?.hasSourceImage).toBe(true)
+    })
+
+    it('moves the print update time, so the versioned cover URL changes', async () => {
+      const id = await linked()
+      const before = (await repository.getRequest(id))!.updatedAt
+      await new Promise((resolve) => setTimeout(resolve, 2))
+
+      await service.setCover(id, png, requester)
+
+      expect((await repository.getRequest(id))!.updatedAt).toBeGreaterThan(before)
+    })
+
+    it('tells other viewers the print changed', async () => {
+      const publish = vi.fn()
+      const watched = new STLQuestService(repository, assets, staging, { publish }, telemetry, { remove: removeTusUpload })
+      const id = await linked()
+
+      await watched.setCover(id, png, requester)
+
+      expect(publish).toHaveBeenCalledWith('request.updated')
+    })
+
+    it('replaces the cover the source link resolved', async () => {
+      const id = await linked('https://makerworld.bblmw.com/logo.png')
+      await service.cacheSourceImage(id, new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 1]))
+
+      await service.setCover(id, png, requester)
+
+      const stored = (await repository.getRequest(id))!
+      expect({ sourceImageUrl: stored.sourceImageUrl, cover: await service.cachedSourceImage(stored) }).toEqual({
+        sourceImageUrl: undefined,
+        cover: png,
+      })
+    })
+
+    it('records an anonymous success event saying whether it replaced a cover', async () => {
+      const id = await linked('https://makerworld.bblmw.com/logo.png')
+      capture.mockClear()
+
+      await service.setCover(id, png, requester)
+
+      expect(capture).toHaveBeenCalledWith(requester.id, 'request_cover_added', { replaced: true })
+    })
+
+    it('is stored when the print is added from a link', async () => {
+      const id = await service.createLinkedRequest(
+        {
+          name: 'Dragon',
+          quantity: 1,
+          sourceUrl: 'https://cults3d.com/en/3d-model/game/dragon',
+          requestedPrintType: 'filament',
+          cover: png,
+        },
+        requester,
+      )
+
+      expect(await service.cachedSourceImage((await repository.getRequest(id))!)).toEqual(png)
+    })
+
+    it('adds no print when the cover supplied with it is not an image', async () => {
+      await expect(
+        service.createLinkedRequest(
+          {
+            name: 'Dragon',
+            quantity: 1,
+            sourceUrl: 'https://cults3d.com/en/3d-model/game/dragon',
+            requestedPrintType: 'filament',
+            cover: new TextEncoder().encode('<svg onload="alert(1)"/>'),
+          },
+          requester,
+        ),
+      ).rejects.toMatchObject({ status: 400 })
+      expect(await repository.listRequests()).toEqual([])
+    })
+
+    it('is refused when the bytes are not an image', async () => {
+      const id = await linked()
+
+      await expect(service.setCover(id, new TextEncoder().encode('<html></html>'), requester)).rejects.toMatchObject({ status: 400 })
+    })
+
+    it('is refused over the size limit', async () => {
+      const id = await linked()
+      const oversized = new Uint8Array(MAX_COVER_BYTES + 1)
+      oversized.set(png)
+
+      await expect(service.setCover(id, oversized, requester)).rejects.toMatchObject({ status: 413 })
+    })
+
+    it('is refused from a member who did not request the print', async () => {
+      const id = await linked()
+
+      await expect(service.setCover(id, png, otherRequester)).rejects.toMatchObject({ status: 403 })
+    })
+
+    it('is refused from the requester once a copy has started', async () => {
+      const id = await linked()
+      await service.moveCopies({ id, from: 'todo', to: 'up_next', count: 1 }, admin)
+
+      await expect(service.setCover(id, png, requester)).rejects.toMatchObject({ status: 403 })
+    })
+
+    it('can be set by an administrator on anyone’s print', async () => {
+      const id = await linked()
+
+      await service.setCover(id, png, admin)
+
+      expect((await repository.getRequest(id))?.sourceImagePath).toBe(`covers/${id}`)
+    })
+
+    it('is refused for a print with a model, whose thumbnail is its picture', async () => {
+      const id = await printWithModel('bracket.stl')
+
+      await expect(service.setCover(id, png, requester)).rejects.toMatchObject({ status: 409 })
+    })
+
+    it('cannot reach a print in another workspace', async () => {
+      await repository.listRequests()
+      await repository.database
+        .insert(organization)
+        .values({ id: 'other-workspace', name: 'Other', slug: 'other', createdAt: new Date() })
+        .run()
+      const other = await repository.scoped('other-workspace')
+      const id = await other.createRequest({ name: 'Other', quantity: 1, sourceUrl: 'https://cults3d.com/x', ownerUserId: requester.id })
+
+      await expect(service.setCover(id, png, admin)).rejects.toMatchObject({ status: 404 })
+      expect((await other.getRequest(id))?.sourceImagePath).toBeUndefined()
+    })
+
+    it('is copied to a print made again from it', async () => {
+      const id = await linked()
+      await service.setCover(id, png, requester)
+
+      const repeatedId = await service.repeatRequest(id, 1, requester)
+
+      expect(await service.cachedSourceImage((await repository.getRequest(repeatedId))!)).toEqual(png)
+    })
   })
 
   it('lists each request with the format of its stored model', async () => {

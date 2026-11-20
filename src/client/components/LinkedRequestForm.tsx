@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -10,6 +12,7 @@ import { MAX_REQUEST_NAME_LENGTH, MAX_REQUEST_QUANTITY, MAX_REQUEST_SOURCE_URL_L
 import type { LinkedRequestValues } from '../linkedRequest'
 import { printTypeLabel } from '../fleet'
 import { DialogProblem } from './DialogProblem'
+import { CoverDrop, CoverPrompt } from './CoverDrop'
 import { useI18n } from '../i18n'
 
 export function LinkedRequestForm({
@@ -55,6 +58,37 @@ export function LinkedRequestForm({
           maxLength={MAX_REQUEST_SOURCE_URL_LENGTH}
         />
         <p className="text-xs text-muted-foreground">{t.requests.linked.linkHint}</p>
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="linked-request-cover">{t.requests.cover.label}</FieldLabel>
+        <div className="relative">
+          <CoverDrop
+            id="linked-request-cover"
+            label={values.cover ? t.requests.cover.replace : t.requests.cover.choose}
+            disabled={pending}
+            className="block h-28"
+            onImage={(cover) => onChange({ cover })}
+          >
+            {values.cover ? (
+              <ChosenCover file={values.cover} />
+            ) : (
+              <CoverPrompt prompt={t.requests.cover.prompt} hint={t.requests.cover.hint} />
+            )}
+          </CoverDrop>
+          {values.cover && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon-sm"
+              aria-label={t.requests.cover.remove}
+              className="absolute top-2 right-2"
+              disabled={pending}
+              onClick={() => onChange({ cover: undefined })}
+            >
+              <X />
+            </Button>
+          )}
+        </div>
       </Field>
       {/* A workspace that prints one type has nothing to choose, so the field gives the row to the copies. */}
       <div className={cn('grid gap-3', printTypes.length > 1 ? 'grid-cols-[minmax(0,1fr)_5.5rem]' : 'grid-cols-[5.5rem]')}>
@@ -115,4 +149,15 @@ export function LinkedRequestForm({
       </div>
     </form>
   )
+}
+
+function ChosenCover({ file }: { file: File }) {
+  const [src, setSrc] = useState<string>()
+  // Made inside the effect, so a cleanup that revokes one URL is always followed by a fresh one.
+  useEffect(() => {
+    const url = URL.createObjectURL(file)
+    setSrc(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
+  return <img src={src} alt="" className="size-full rounded-lg border border-ticket-foreground/15 bg-thumb object-contain" />
 }

@@ -38,6 +38,7 @@ import type { PublicPrintRequest } from '../core/types'
 import { printGroupBranchIds } from '../core/printGroups'
 import { createPrintGroup, deletePrintGroup, updatePrintGroup } from '../server/fns'
 import { errorMessage } from '../core/error'
+import { droppedFileRole } from '../client/coverImage'
 import { useI18n } from '../client/i18n'
 export const Route = createFileRoute('/')({
   validateSearch: validateRequestSearch,
@@ -143,7 +144,8 @@ function AuthenticatedHome() {
   const [uploadOpen, setUploadOpen] = useState(false)
   const [addMode, setAddMode] = useState<'upload' | 'link'>('upload')
   const [droppedFiles, setDroppedFiles] = useState<File[]>([])
-  const [fileDragActive, setFileDragActive] = useState(false)
+  // The MIME type of the first file being dragged over the page, so the drop overlay can say what the drop will do.
+  const [draggedType, setDraggedType] = useState<string>()
   const [openRequestId, setOpenRequestId] = useState<string | null>(null)
   const [manageTags, setManageTags] = useState(false)
   const [tagError, setTagError] = useState<string>()
@@ -151,13 +153,13 @@ function AuthenticatedHome() {
   const updateTagMutation = useMutation({ mutationFn: useServerFn(updatePrintGroup), onSuccess: refreshRequests })
   const deleteTagMutation = useMutation({ mutationFn: useServerFn(deletePrintGroup), onSuccess: refreshRequests })
   const createTagMutation = useMutation({ mutationFn: useServerFn(createPrintGroup), onSuccess: refreshRequests })
-  const [droppedModel, setDroppedModel] = useState<File>()
+  const [droppedFile, setDroppedFile] = useState<File>()
   const uploadOpenRef = useRef(uploadOpen)
   uploadOpenRef.current = uploadOpen
 
   useEffect(() => {
     if (!storageReady) {
-      setFileDragActive(false)
+      setDraggedType(undefined)
       return
     }
     let depth = 0
@@ -165,7 +167,7 @@ function AuthenticatedHome() {
     const onDragEnter = (event: DragEvent) => {
       if (hasFiles(event)) {
         depth++
-        if (!uploadOpenRef.current) setFileDragActive(true)
+        if (!uploadOpenRef.current) setDraggedType(event.dataTransfer?.items[0]?.type ?? '')
       }
     }
     const onDragOver = (event: DragEvent) => {
@@ -174,20 +176,20 @@ function AuthenticatedHome() {
     const onDragLeave = (event: DragEvent) => {
       if (hasFiles(event)) {
         depth = Math.max(0, depth - 1)
-        if (!depth) setFileDragActive(false)
+        if (!depth) setDraggedType(undefined)
       }
     }
     const onDrop = (event: DragEvent) => {
       if (!hasFiles(event)) return
       event.preventDefault()
       depth = 0
-      setFileDragActive(false)
+      setDraggedType(undefined)
       if (uploadOpenRef.current) return
       const files = Array.from(event.dataTransfer?.files ?? [])
       if (!files.length) return
       // An open print takes the drop itself, so a tweaked file lands on that card instead of adding a second one.
       if (modelDropTargetRef.current) {
-        setDroppedModel(files[0])
+        setDroppedFile(files[0])
         return
       }
       posthog.capture('upload_opened', { source: 'drop', file_count: files.length })
@@ -223,6 +225,7 @@ function AuthenticatedHome() {
   }
   const selectedRequest = findRequest(openRequestId)
   const modelDropTarget = selectedRequest !== undefined && canAttachModel(selectedRequest, storageReady)
+  const dropRole = modelDropTarget && draggedType !== undefined ? droppedFileRole(selectedRequest, draggedType) : undefined
   const modelDropTargetRef = useRef(modelDropTarget)
   modelDropTargetRef.current = modelDropTarget
   if (!identity) return null
@@ -344,7 +347,7 @@ function AuthenticatedHome() {
           />
         </div>
       )}
-      {fileDragActive && !uploadOpen && (
+      {draggedType !== undefined && !uploadOpen && (!modelDropTarget || dropRole) && (
         <div
           className={cn(
             'pointer-events-none fixed inset-3 grid place-items-center rounded-lg border-2 border-dashed border-primary bg-background/85 font-heading text-lg tracking-wide uppercase text-primary',
@@ -352,7 +355,13 @@ function AuthenticatedHome() {
             modelDropTarget ? 'z-60' : 'z-9',
           )}
         >
-          {modelDropTarget ? (selectedRequest?.hasFile ? page.dropToReplace : page.dropToAttach) : page.dropToAdd}
+          {!modelDropTarget
+            ? page.dropToAdd
+            : dropRole === 'cover'
+              ? page.dropToCover
+              : selectedRequest.hasFile
+                ? page.dropToReplace
+                : page.dropToAttach}
         </div>
       )}
       {uploadOpen && (
@@ -374,8 +383,8 @@ function AuthenticatedHome() {
           isAdmin={isAdmin}
           printers={printers}
           uploadsEnabled={storageReady}
-          droppedModel={droppedModel}
-          onDroppedModelHandled={() => setDroppedModel(undefined)}
+          droppedFile={droppedFile}
+          onDroppedFileHandled={() => setDroppedFile(undefined)}
           onClose={() => setOpenRequestId(null)}
         />
       )}

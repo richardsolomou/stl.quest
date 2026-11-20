@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { notificationKinds, type NotificationKind } from '../core/notifications'
 import { onboardingTaskIds } from '../core/onboarding'
 import { MAX_AUTO_ARCHIVE_DAYS } from '../core/autoArchive'
+import { MAX_COVER_BYTES } from '../core/coverImage'
 import {
   MAX_REQUEST_NAME_LENGTH,
   MAX_REQUEST_NOTES_LENGTH,
@@ -63,13 +64,20 @@ export const createInviteSchema = z.object({
 })
 
 export const idSchema = z.object({ id })
+// Bounded as base64 text, so an oversized cover is refused before it is decoded.
+const coverImage = z
+  .string()
+  .max(Math.ceil(MAX_COVER_BYTES / 3) * 4)
+  .base64()
 export const createLinkedRequestSchema = z.object({
   name: z.string().trim().min(1).max(MAX_REQUEST_NAME_LENGTH),
   quantity: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY),
   notes: z.string().trim().max(MAX_REQUEST_NOTES_LENGTH).optional(),
   sourceUrl: requiredSourceUrl,
   requestedPrintType: z.enum(PRINT_TYPES),
+  cover: coverImage.optional(),
 })
+export const requestCoverSchema = z.object({ id, image: coverImage })
 export const inviteInfoSchema = z.object({ token: inviteToken })
 export const beginProviderInviteSchema = z.object({ token: inviteToken, provider: z.enum(SOCIAL_AUTH_PROVIDERS) })
 

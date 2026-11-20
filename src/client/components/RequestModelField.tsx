@@ -1,29 +1,38 @@
 import { useRef } from 'react'
-import { Link2, Trash2, Upload } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { ImageUp, Link2, Trash2, Upload } from 'lucide-react'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
+import { cn } from '@/lib/utils'
 import { LazyStlViewer } from './LazyStlViewer'
 import { SourcePreviewImage } from './SourcePreviewImage'
+import { CoverDrop, CoverPrompt } from './CoverDrop'
+import { DialogProblem } from './DialogProblem'
 import type { ModelAttachment } from '../modelAttachment'
+import type { RequestCover } from '../requestCover'
 import type { PublicPrintRequest } from '../../core/types'
 import { useI18n } from '../i18n'
 
-/** The model area of the print dialog: the viewer or cover when reading, and the model picker when editing. */
+/**
+ * The model area of the print dialog: the viewer or cover when reading, and the model picker when editing. A linked
+ * print's cover takes a pasted, dropped, or picked picture whenever `cover` is given.
+ */
 export function RequestModelField({
   request,
   editing,
   attachment,
+  cover,
 }: {
   request: PublicPrintRequest
   editing: boolean
   attachment: ModelAttachment
+  cover?: RequestCover
 }) {
   const { t } = useI18n()
   const input = useRef<HTMLInputElement>(null)
   const staged = attachment.staged.file
 
-  const cover = (
+  const coverImage = (
     <SourcePreviewImage
-      key={request.id}
       request={request}
       className="mb-3 h-40 w-full rounded-lg border border-ticket-foreground/15 bg-thumb object-contain sm:h-48"
       fallback={
@@ -34,7 +43,45 @@ export function RequestModelField({
     />
   )
 
-  if (!editing) return request.hasFile ? <LazyStlViewer request={request} hasPreview={request.hasPreview} /> : cover
+  if (!editing && request.hasFile) return <LazyStlViewer request={request} hasPreview={request.hasPreview} />
+  if (!editing && !cover) return coverImage
+  if (!editing && cover) {
+    const prompt = <CoverPrompt prompt={t.requests.cover.prompt} hint={t.requests.cover.hint} />
+    return (
+      <div className="mb-3">
+        <CoverDrop
+          noDrag
+          label={request.hasSourceImage ? t.requests.cover.replace : t.requests.cover.choose}
+          disabled={cover.pending}
+          className="block h-40 w-full sm:h-48"
+          onImage={cover.choose}
+        >
+          {request.hasSourceImage ? (
+            <SourcePreviewImage
+              request={request}
+              className="size-full rounded-lg border border-ticket-foreground/15 bg-thumb object-contain"
+              fallback={prompt}
+              overlay={
+                <span aria-hidden className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'absolute right-2 bottom-2')}>
+                  <ImageUp /> {t.requests.cover.replace}
+                </span>
+              }
+            />
+          ) : (
+            prompt
+          )}
+          {cover.pending && (
+            <output className="absolute inset-0 grid place-items-center rounded-lg bg-thumb/85 text-sm font-semibold">
+              <span className="inline-flex items-center gap-2">
+                <Spinner /> {t.requests.cover.saving}
+              </span>
+            </output>
+          )}
+        </CoverDrop>
+        <DialogProblem title={t.requests.cover.failedTitle} hint={t.requests.cover.failedHint} error={cover.error} />
+      </div>
+    )
+  }
 
   return (
     <div className="mb-3">

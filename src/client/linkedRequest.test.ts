@@ -40,4 +40,8 @@ describe('linked request form', () => {
     expect(linkedRequestDirty(values)).toBe(false)
     expect(linkedRequestDirty({ ...values, notes: 'Black PLA' })).toBe(true)
   })
+
+  it('counts a chosen cover image as an unsaved draft', () => {
+    expect(linkedRequestDirty({ ...linkedRequestValues('filament'), cover: new File([], 'cover.png', { type: 'image/png' }) })).toBe(true)
+  })
 })

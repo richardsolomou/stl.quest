@@ -443,6 +443,7 @@ interface RepositoryShape {
       notes?: string
       sourceUrl?: string
       sourceImageUrl?: string | null
+      sourceImagePath?: string | null
       requestedPrintType?: PrintType | null
       printerId?: string | null
       automaticPrinterAssignment?: boolean
