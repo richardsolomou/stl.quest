@@ -116,4 +116,11 @@ export const server = {
     nothingToUndo: 'nothing to undo',
     trackingOff: 'usage and stock tracking is off for this workspace',
   },
+  plates: {
+    notFound: 'plate not found',
+    invalid: 'this plate is not valid',
+    notOnPlate: 'that print is not on this plate',
+    printTypeUnknown: 'choose a printer for this plate first',
+    invalidCharge: 'enter what was charged as an amount of zero or more',
+  },
 }

@@ -50,6 +50,12 @@ export type UsageEvent = {
   userId?: string
   createdAt: number
   undoneAt?: number
+  /** Estimated from a past print's estimate rather than recorded at its step; counts as spend, never as stock or wear. */
+  estimated?: boolean
+  /** The plate whose slicer totals it was split from (see core/plates). */
+  plateId?: string
+  /** The plate transaction that replaced it; such an event is undone, and comes back if that plate's usage is undone. */
+  supersededBy?: string
 }
 
 /** What a step records: the printer and material when printing starts, the equipment when finishing. */
@@ -76,13 +82,14 @@ export type StockMovementInput =
 
 /**
  * Stock on hand for one consumable from its live events in the unit it is stocked in: restocks add, uses, waste, and
- * replacements subtract, a correction adds its signed amount. A wear part's use by the plate or minute is wear, not stock.
+ * replacements subtract, a correction adds its signed amount. A wear part's use by the plate or minute is wear, not
+ * stock, and an estimate of a past print took nothing from the stock counted since.
  */
 export function stockOnHand(events: UsageEvent[], consumable: Consumable) {
   const unit = consumableUnit(consumable)
   return events.reduce(
     (total, event) =>
-      event.undoneAt || event.consumableId !== consumable.id || event.unit !== unit
+      event.undoneAt || event.estimated || event.consumableId !== consumable.id || event.unit !== unit
         ? total
         : total + stockEffect(event.kind) * event.amount,
     0,
@@ -109,7 +116,7 @@ export type UsageFilters = {
 }
 
 /** An event before the action that records it stamps its IDs, user, currency, and time. */
-export type UsageDraft = Omit<UsageEvent, 'id' | 'transactionId' | 'currency' | 'userId' | 'createdAt' | 'undoneAt'>
+export type UsageDraft = Omit<UsageEvent, 'id' | 'transactionId' | 'currency' | 'userId' | 'createdAt' | 'undoneAt' | 'supersededBy'>
 
 /**
  * The events one step records, each priced as the calculator quotes it now. Printing records the printer's minutes (the
@@ -173,8 +180,9 @@ export type UsagePrefills = {
 }
 
 /**
- * The most recent choices in the log, limited to printers and equipment still in use. A finishing step takes its print
- * type from the printer its print was last recorded on, or else from equipment that serves only one print type.
+ * The most recent choices in the log, limited to printers and equipment still in use; estimates of past prints were
+ * nobody's choice. A finishing step takes its print type from the printer its print was last recorded on, or else from
+ * equipment that serves only one print type.
  */
 export function usagePrefills(
   events: UsageEvent[],
@@ -183,7 +191,9 @@ export function usagePrefills(
 ): UsagePrefills {
   const activePrinters = new Map(printers.filter(({ archived }) => !archived).map((printer) => [printer.id, printer]))
   const activeEquipment = new Map(equipment.filter(({ archived }) => !archived).map((item) => [item.id, item]))
-  const newest = events.filter((event) => !event.undoneAt && event.kind === 'use').sort((left, right) => right.createdAt - left.createdAt)
+  const newest = events
+    .filter((event) => !event.undoneAt && !event.estimated && event.kind === 'use')
+    .sort((left, right) => right.createdAt - left.createdAt)
   const prefills: UsagePrefills = { printers: {}, materials: {}, finishing: {} }
   const requestPrintTypes = new Map<string, PrintType>()
   for (const event of newest) {
@@ -214,7 +224,7 @@ export function usagePrefills(
   return prefills
 }
 
-/** Summed amounts of one consumable's live events of one kind and unit, as the repository aggregates them. */
+/** Summed amounts of one consumable's live, recorded events of one kind and unit, as the repository aggregates them. */
 export type StockTotal = { consumableId: string; kind: UsageKind; unit: UsageUnit; amount: number }
 
 export type StockLevel = {
@@ -258,12 +268,12 @@ export function consumed(consumable: Consumable) {
 }
 
 /** A supply or wear part as equipment and printers use it, in the unit and at the price the calculator quotes it. */
-function supplied(consumable: Consumable) {
+export function supplied(consumable: Consumable) {
   return { consumableId: consumable.id, unit: supplyUnit(consumable), ...priced(supplyUnitPrice(consumable)) }
 }
 
 /** An unpriced item records no price. */
-function priced(unitPrice: number) {
+export function priced(unitPrice: number) {
   return unitPrice > 0 ? { unitPrice } : {}
 }
 

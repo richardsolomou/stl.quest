@@ -85,8 +85,9 @@ function printTypeOf(request: PublicPrintRequest) {
   return request.printType ?? request.printer?.printType
 }
 
+/** Live uses someone recorded, newest first; estimates of past prints were nobody's choice. */
 function newestFirst(events: UsageEvent[]) {
-  return events.filter((event) => event.kind === 'use' && !event.undoneAt).sort((a, b) => b.createdAt - a.createdAt)
+  return events.filter((event) => event.kind === 'use' && !event.undoneAt && !event.estimated).sort((a, b) => b.createdAt - a.createdAt)
 }
 
 function only<T>(items: T[]) {

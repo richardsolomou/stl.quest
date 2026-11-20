@@ -26,6 +26,9 @@ import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { RequestThumb } from './RequestThumb'
 import { railStretch } from './EmptyZone'
+import { StationPlates } from './plates/StationPlates'
+import type { PlateMode } from './plates/PlateDialog'
+import type { PlateView } from '../queries'
 
 /**
  * How a stage lays out its copies: the queue as a dense backlog `list`, up next as tickets on a `rail`, printing as
@@ -53,6 +56,8 @@ export function Column({
   onSelectAll,
   entries,
   stations,
+  stationPlates,
+  onOpenPlate,
   groupShelfByRequester = false,
   countsOf,
   advanceTo,
@@ -95,6 +100,9 @@ export function Column({
   entries: BoardRequestEntry[]
   /** The printing stage split by printer: the `stations` layout draws it, and cards about to print start on its printers. */
   stations?: BoardStation<BoardRequestEntry>[]
+  /** The plates each printer's station shows, by printer. */
+  stationPlates?: ReadonlyMap<string, PlateView[]>
+  onOpenPlate?: (plateId: string, mode: PlateMode) => void
   groupShelfByRequester?: boolean
   countsOf: (request: PublicPrintRequest) => Record<string, number>
   /** The stage a card's advance action moves its copies to, when it has one. */
@@ -450,8 +458,10 @@ export function Column({
               ]
                 .filter(Boolean)
                 .join(' · ')
+              const plates = (station.printer && stationPlates?.get(station.printer.id)) || []
+              const platesLine = plates.length > 0 && onOpenPlate && <StationPlates plates={plates} onOpen={onOpenPlate} />
               // An idle printer with nothing waiting for it is one line, so a large fleet stays scannable.
-              if (copies === 0 && !station.next)
+              if (copies === 0 && !station.next && !platesLine)
                 return (
                   <Station
                     key={station.printer?.id ?? 'unassigned'}
@@ -481,7 +491,8 @@ export function Column({
                     <h3 className="min-w-0 truncate font-heading text-base leading-tight font-extrabold">{name}</h3>
                     <span className="ml-auto shrink-0 font-mono text-[11px] uppercase opacity-90">{summary}</span>
                   </header>
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-2 p-2">
+                  {platesLine}
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-2 p-2 empty:hidden">
                     {station.entries.map((entry) => (
                       <div key={entry.key}>{renderCard(entry, 'job')}</div>
                     ))}

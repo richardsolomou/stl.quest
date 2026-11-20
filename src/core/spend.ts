@@ -1,5 +1,6 @@
 import type { Consumable } from './consumables'
 import type { PriceCalculatorCurrency } from './priceCalculator'
+import type { PrintCharge } from './types'
 import { usageCost, type UsageEvent, type UsageStage, type UsageUnit } from './usage'
 
 /**
@@ -35,6 +36,15 @@ export function spendOutcome(event: UsageEvent): SpendOutcome {
   return event.kind === 'waste' ? 'wasted' : event.outcome === 'failed' ? 'failed' : 'used'
 }
 
+/**
+ * Where a printing cost's numbers came from: a plate's slicer totals, or the print's estimate (recorded at the step
+ * sheet or filled in for a past print). Finishing and stock record what was set per use, so they have no basis.
+ */
+export function costBasis(event: UsageEvent): 'slicer' | 'estimate' | undefined {
+  if (event.plateId) return 'slicer'
+  return event.stage === 'printing' && event.kind === 'use' ? 'estimate' : undefined
+}
+
 /** Whether an event belongs with spend in this currency: priced in it, or not priced at all. Spend is never converted. */
 function inCurrency(event: UsageEvent, currency: PriceCalculatorCurrency) {
   return !event.currency || event.currency === currency
@@ -43,10 +53,14 @@ function inCurrency(event: UsageEvent, currency: PriceCalculatorCurrency) {
 export type CurrencyTotal = { currency: PriceCalculatorCurrency; total: number }
 
 export type SpendItem = { category: SpendCategory; id?: string; unit: UsageUnit; amount: number; cost: number }
-export type PrintSpend = { requestId: string; cost: number; failed: boolean }
+export type PrintSpend = { requestId: string; cost: number; failed: boolean; estimated: boolean; slicer: boolean }
 
 export type SpendSummary = {
   total: number
+  /** The part of the total whose printing was taken from print estimates. */
+  estimated: number
+  /** The part of the total split from slicer totals on plates. */
+  slicer: number
   categories: Record<SpendCategory, number>
   outcomes: Record<SpendOutcome, number>
   /** Each thing used, most spent first. */
@@ -71,6 +85,8 @@ export function summariseSpend(events: UsageEvent[], consumables: Consumable[], 
   const items = new Map<string, SpendItem>()
   const prints = new Map<string, PrintSpend>()
   let total = 0
+  let estimated = 0
+  let slicer = 0
   let unpriced = 0
   const others = new Map<PriceCalculatorCurrency, number>()
   for (const event of events) {
@@ -83,6 +99,9 @@ export function summariseSpend(events: UsageEvent[], consumables: Consumable[], 
     const cost = usageCost(event)
     const category = spendCategory(event, library)
     total += cost
+    const basis = costBasis(event)
+    if (basis === 'estimate') estimated += cost
+    if (basis === 'slicer') slicer += cost
     categories[category] += cost
     outcomes[spendOutcome(event)] += cost
     const id = event.consumableId ?? event.equipmentId ?? event.printerId
@@ -92,14 +111,18 @@ export function summariseSpend(events: UsageEvent[], consumables: Consumable[], 
     item.cost += cost
     items.set(key, item)
     if (event.requestId) {
-      const print = prints.get(event.requestId) ?? { requestId: event.requestId, cost: 0, failed: false }
+      const print = prints.get(event.requestId) ?? { requestId: event.requestId, cost: 0, failed: false, estimated: false, slicer: false }
       print.cost += cost
       print.failed ||= event.outcome === 'failed'
+      print.estimated ||= basis === 'estimate'
+      print.slicer ||= basis === 'slicer'
       prints.set(event.requestId, print)
     }
   }
   return {
     total,
+    estimated,
+    slicer,
     categories,
     outcomes,
     items: [...items.values()].sort((a, b) => b.cost - a.cost || b.amount - a.amount),
@@ -107,6 +130,40 @@ export function summariseSpend(events: UsageEvent[], consumables: Consumable[], 
     unpriced,
     otherCurrencies: [...others].map(([other, spent]) => ({ currency: other, total: spent })).sort((a, b) => b.total - a.total),
   }
+}
+
+/**
+ * A print with a charge over its whole life: what its live usage priced in the workspace currency (or unpriced) cost in
+ * every period, and when the last of that usage was recorded, which is when it finished; absent when it has none.
+ */
+export type ChargedPrint = { requestId: string; charged: PrintCharge; cost: number; finishedAt?: number }
+
+export type ProfitSummary = {
+  earned: number
+  /** Everything the counted prints used, in every period. */
+  spent: number
+  profit: number
+  /** How many prints were counted. */
+  charged: number
+  byPrint: Map<string, number>
+}
+
+/**
+ * What the prints that finished in the period were charged against everything they used, so a print printed across
+ * two periods counts once, where it finished. Prints with no usage never finished, and charges in another currency are
+ * left out, so neither counts.
+ */
+export function summariseProfit(prints: ChargedPrint[], period: SpendPeriod, currency: PriceCalculatorCurrency): ProfitSummary {
+  const byPrint = new Map<string, number>()
+  let earned = 0
+  let spent = 0
+  for (const { requestId, charged, cost, finishedAt } of prints) {
+    if (charged.currency !== currency || finishedAt === undefined || finishedAt < period.from || finishedAt >= period.to) continue
+    earned += charged.amount
+    spent += cost
+    byPrint.set(requestId, charged.amount - cost)
+  }
+  return { earned, spent, profit: earned - spent, charged: byPrint.size, byPrint }
 }
 
 /** One recorded action on a print, such as moving it to Printing: who did it, when, and what it used. */
@@ -117,6 +174,8 @@ export type UsageStep = {
   userId?: string
   copies?: number
   failed: boolean
+  /** Filled in from a past print's estimate rather than recorded at the step. */
+  estimated: boolean
   /** In the step's own currency: one action prices all its events in the currency the workspace had then. */
   cost: number
   /** Absent when nothing in the step had a price. */
@@ -136,10 +195,12 @@ export function usageSteps(events: UsageEvent[]): UsageStep[] {
       ...(event.userId && { userId: event.userId }),
       ...(event.copies !== undefined && { copies: event.copies }),
       failed: false,
+      estimated: false,
       cost: 0,
       events: [],
     }
     step.failed ||= event.outcome === 'failed'
+    step.estimated ||= Boolean(event.estimated)
     step.cost += usageCost(event)
     if (event.currency) step.currency ??= event.currency
     step.events.push(event)

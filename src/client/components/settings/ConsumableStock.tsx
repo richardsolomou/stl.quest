@@ -271,7 +271,10 @@ function RecentMovements({
 }) {
   const { t, locale } = useI18n()
   const copy = t.settings.consumables.stock
-  const events = useQuery(usageQuery(workspaceSlug, { consumableId: consumable.id, limit: RECENT_MOVEMENTS })).data?.events
+  // Estimates of past prints never moved stock, so they are no movement either.
+  const events = useQuery(usageQuery(workspaceSlug, { consumableId: consumable.id, limit: RECENT_MOVEMENTS })).data?.events.filter(
+    (event) => !event.estimated,
+  )
   const { undo } = useStockMovements(workspaceSlug)
   if (!events) return null
   const when = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })

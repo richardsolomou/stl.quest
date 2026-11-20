@@ -120,4 +120,11 @@ export const server: typeof en = {
     nothingToUndo: 'rien à annuler',
     trackingOff: 'le suivi de la consommation et du stock est désactivé pour cet espace de travail',
   },
+  plates: {
+    notFound: 'plateau introuvable',
+    invalid: 'ce plateau n’est pas valide',
+    notOnPlate: 'cette impression n’est pas sur ce plateau',
+    printTypeUnknown: 'choisissez d’abord une imprimante pour ce plateau',
+    invalidCharge: 'saisissez le montant facturé, zéro ou plus',
+  },
 }

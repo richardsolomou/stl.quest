@@ -103,6 +103,10 @@ import {
   moveCopiesBatchSchema,
   recordStepUsageSchema,
   recordStockMovementSchema,
+  createPlateSchema,
+  plateIdSchema,
+  recordPlateSchema,
+  requestChargeSchema,
   undoUsageSchema,
   usageFiltersSchema,
   movePrintGroupSchema,
@@ -1844,6 +1848,63 @@ export const getUsagePrefills = createServerFn({ method: 'GET' })
       const context = await workspaceContext(await app(), data.workspaceSlug)
       return await context.service.usagePrefills(context.identity)
     }),
+  )
+
+export const getChargedPrints = createServerFn({ method: 'GET' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const context = await workspaceContext(await app(), data.workspaceSlug)
+      return { prints: await context.service.chargedPrints(context.identity) }
+    }),
+  )
+
+export const getUsageBackfillPreview = createServerFn({ method: 'GET' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const context = await workspaceContext(await app(), data.workspaceSlug)
+      return await context.service.usageBackfillPreview(context.identity)
+    }),
+  )
+
+export const backfillUsage = createServerFn({ method: 'POST' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) => workspaceMutation(data.workspaceSlug, (context) => context.service.backfillUsage(context.identity)))
+
+export const getPlates = createServerFn({ method: 'GET' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const context = await workspaceContext(await app(), data.workspaceSlug)
+      return { plates: await context.service.listPlates(context.identity) }
+    }),
+  )
+
+export const createPlate = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(createPlateSchema))
+  .handler(async ({ data }) => {
+    const { workspaceSlug, ...input } = data
+    return workspaceMutation(workspaceSlug, (context) => context.service.createPlate(input, context.identity))
+  })
+
+export const recordPlate = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(recordPlateSchema))
+  .handler(async ({ data }) => {
+    const { workspaceSlug, ...input } = data
+    return workspaceMutation(workspaceSlug, (context) => context.service.recordPlate(input, context.identity))
+  })
+
+export const deletePlate = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(plateIdSchema))
+  .handler(async ({ data }) =>
+    workspaceMutation(data.workspaceSlug, (context) => context.service.deletePlate(data.plateId, context.identity)),
+  )
+
+export const setRequestCharge = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(requestChargeSchema))
+  .handler(async ({ data }) =>
+    workspaceMutation(data.workspaceSlug, (context) => context.service.setRequestCharge(data.id, data.amount, context.identity)),
   )
 
 export const createLinkedRequest = createServerFn({ method: 'POST' })

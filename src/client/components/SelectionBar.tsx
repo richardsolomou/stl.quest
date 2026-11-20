@@ -1,4 +1,4 @@
-import { Archive, Calculator, Download, Layers3, Move, RotateCcw, Trash2, X } from 'lucide-react'
+import { Archive, Calculator, Download, Layers, Layers3, Move, RotateCcw, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { MAX_BULK_CARDS } from '../../core/request'
 import { useI18n } from '../i18n'
@@ -17,6 +17,7 @@ export function SelectionBar({
   download,
   repeat,
   estimate,
+  plate,
   archive,
   remove,
   overLimit,
@@ -29,6 +30,8 @@ export function SelectionBar({
   download: Action
   repeat: Action
   estimate: Action
+  /** Records the selected copies as one run of a printer, for its slicer totals to be split across. */
+  plate: Action
   archive: Action
   remove: Action
   /** More cards are selected than one bulk action takes, so no action is offered. */
@@ -44,6 +47,7 @@ export function SelectionBar({
     { action: download, icon: <Download />, label: actions.downloadModels(prints) },
     { action: repeat, icon: <RotateCcw />, label: actions.printAgain },
     { action: estimate, icon: <Calculator />, label: actions.estimate },
+    { action: plate, icon: <Layers />, label: t.plates.putOnPlate },
     { action: archive, icon: <Archive />, label: actions.archive },
   ]
   return (

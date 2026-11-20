@@ -120,4 +120,11 @@ export const server: typeof en = {
     nothingToUndo: 'nichts rückgängig zu machen',
     trackingOff: 'Verbrauchs- und Bestandserfassung ist für diesen Arbeitsbereich aus',
   },
+  plates: {
+    notFound: 'Druckplatte nicht gefunden',
+    invalid: 'diese Druckplatte ist ungültig',
+    notOnPlate: 'dieser Druck liegt nicht auf dieser Druckplatte',
+    printTypeUnknown: 'wähle zuerst einen Drucker für diese Druckplatte',
+    invalidCharge: 'gib den berechneten Betrag als Zahl ab null ein',
+  },
 }

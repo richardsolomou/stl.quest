@@ -8,6 +8,7 @@ import { useI18n } from '../i18n'
 import { consumablesQuery, equipmentQuery, priceCalculatorSettingsQuery, printersQuery, usageQuery } from '../queries'
 import { useWorkspaceSlug } from '../workspace'
 import { DetailRow } from './DetailRow'
+import { TypicalTag } from './priceCalculator/CostBasis'
 import { formatMoney } from './priceCalculator/format'
 import { formatUsageAmount, usedItemName } from './spend/format'
 
@@ -88,6 +89,8 @@ export function RequestActualCost({ requestId, people }: { requestId: string; pe
                       {copy.print.failed}
                     </Badge>
                   )}
+                  {step.estimated && <TypicalTag label={copy.estimated} />}
+                  {step.events.some((event) => event.plateId) && <TypicalTag label={copy.fromSlicer} />}
                 </span>
                 <span className="font-mono font-medium tabular-nums">{money(step.cost, step.currency)}</span>
               </div>

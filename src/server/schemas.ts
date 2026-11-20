@@ -25,7 +25,9 @@ import { INVENTORY_KINDS } from '../core/inventory'
 import { PRINT_TYPE_CHOICES } from '../core/printTypes'
 import { USAGE_TRACKING_SOURCES } from '../core/usageTracking'
 import { PRICE_CALCULATOR_CURRENCIES, PRICE_CALCULATOR_MAXIMUMS } from '../core/priceCalculator'
+import { MATERIAL_ESTIMATE_LIMITS } from '../core/printEstimates'
 import { MAX_USAGE_LIST, USAGE_OUTCOMES, type StepUsageInput, type StockMovementInput, type UsageFilters } from '../core/usage'
+import { MAX_PLATE_FILAMENTS, MAX_PLATE_OBJECTS, MAX_PLATE_PRINTS, type PlateRecordInput } from '../core/plates'
 import {
   emailTemplateKinds,
   MAX_EMAIL_LOGO_BYTES,
@@ -90,6 +92,10 @@ export const acceptInviteSchema = z.object({
 
 export const telemetrySettingsSchema = z.object({ enabled: z.boolean() })
 export const selfSignupSettingsSchema = z.object({ enabled: z.boolean() })
+const supportsAndWastePercentSchema = z
+  .number()
+  .min(MATERIAL_ESTIMATE_LIMITS.supportsAndWastePercent.min)
+  .max(MATERIAL_ESTIMATE_LIMITS.supportsAndWastePercent.max)
 // A stripping object, never strict: settings stored by older releases carry extra fields and must still load.
 export const priceCalculatorSettingsSchema = z.object({
   currency: z.enum(PRICE_CALCULATOR_CURRENCIES),
@@ -98,6 +104,13 @@ export const priceCalculatorSettingsSchema = z.object({
   labourCostPerHour: z.number().nonnegative().max(PRICE_CALCULATOR_MAXIMUMS.labourCostPerHour),
   failureAllowancePercent: z.number().nonnegative().max(PRICE_CALCULATOR_MAXIMUMS.failureAllowancePercent),
   markupPercent: z.number().nonnegative().max(PRICE_CALCULATOR_MAXIMUMS.markupPercent),
+  supportsAndWastePercent: z.object({ resin: supportsAndWastePercentSchema, filament: supportsAndWastePercentSchema }),
+  resinPerPartMl: z.number().min(MATERIAL_ESTIMATE_LIMITS.resinPerPartMl.min).max(MATERIAL_ESTIMATE_LIMITS.resinPerPartMl.max),
+  filamentInfillPercent: z
+    .number()
+    .min(MATERIAL_ESTIMATE_LIMITS.filamentInfillPercent.min)
+    .max(MATERIAL_ESTIMATE_LIMITS.filamentInfillPercent.max),
+  filamentWalls: z.int().min(MATERIAL_ESTIMATE_LIMITS.filamentWalls.min).max(MATERIAL_ESTIMATE_LIMITS.filamentWalls.max),
 })
 const consumableBaseSchema = {
   id: z.string().trim().min(1).max(200),
@@ -451,6 +464,35 @@ export const usageFiltersSchema = z.object({
   includeUndone: z.boolean().optional(),
   limit: z.number().int().min(1).max(MAX_USAGE_LIST).optional(),
 }) satisfies z.ZodType<UsageFilters>
+
+const plateAmount = z.number().min(-1_000_000).max(1_000_000)
+const plateMaterialChoice = z.union([
+  z.object({ consumableId: settingsItemId }),
+  z.object({ name: z.string().trim().min(1).max(120), price: z.number().positive().max(1_000_000).optional() }),
+])
+export const createPlateSchema = z.object({
+  printerId: settingsItemId.optional(),
+  otherStuff: z.boolean(),
+  items: z
+    .array(z.object({ requestId: id, copies: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY) }))
+    .min(1)
+    .max(MAX_PLATE_PRINTS),
+})
+const plateRecordBase = {
+  plateId: id,
+  minutes: z.number().min(0).max(1_000_000),
+  materials: z.array(plateMaterialChoice).min(1).max(MAX_PLATE_FILAMENTS),
+}
+export const recordPlateSchema = z.union([
+  z.object({
+    ...plateRecordBase,
+    objects: z.array(z.object({ requestId: id.optional(), amounts: z.array(plateAmount).max(MAX_PLATE_FILAMENTS) })).max(MAX_PLATE_OBJECTS),
+    overhead: z.array(plateAmount).max(MAX_PLATE_FILAMENTS),
+  }),
+  z.object({ ...plateRecordBase, total: z.number().positive().max(1_000_000), otherShare: z.number().min(0).lt(1) }),
+]) satisfies z.ZodType<PlateRecordInput>
+export const plateIdSchema = z.object({ plateId: id })
+export const requestChargeSchema = z.object({ id, amount: z.number().min(0).max(1_000_000_000).nullable() })
 
 export const createPrintGroupSchema = z.object({
   name: printGroupName.optional(),

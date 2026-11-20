@@ -178,6 +178,24 @@ describe('server input schemas', () => {
     expect(() => priceCalculatorSettingsSchema.parse({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, markupPercent: 2_001 })).toThrow()
   })
 
+  it('rejects a supports and waste allowance above 200%', () => {
+    expect(() =>
+      priceCalculatorSettingsSchema.parse({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, supportsAndWastePercent: { resin: 201, filament: 10 } }),
+    ).toThrow()
+  })
+
+  it('rejects a negative resin amount per part', () => {
+    expect(() => priceCalculatorSettingsSchema.parse({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, resinPerPartMl: -1 })).toThrow()
+  })
+
+  it('rejects part of a filament wall', () => {
+    expect(() => priceCalculatorSettingsSchema.parse({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, filamentWalls: 2.5 })).toThrow()
+  })
+
+  it('rejects filament infill above 100%', () => {
+    expect(() => priceCalculatorSettingsSchema.parse({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, filamentInfillPercent: 101 })).toThrow()
+  })
+
   it('rejects an unknown currency', () => {
     expect(() => priceCalculatorSettingsSchema.parse({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, currency: 'XYZ' })).toThrow()
   })

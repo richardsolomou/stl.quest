@@ -24,6 +24,28 @@ export const spend = {
     failed: 'Failed runs',
     wasted: 'Wasted stock',
     share: (percent: string) => `${percent} of spend`,
+    estimated: (amount: string) => `${amount} of this is estimated from print estimates.`,
+    slicer: (amount: string) => `${amount} came from your slicer.`,
+    earned: 'Earned',
+    earnedNote: (count: number) => `${count} ${count === 1 ? 'print' : 'prints'} with a charge finished`,
+    profit: 'Profit',
+    profitNote: (spent: string) => `Counted when each print finished, against everything it used: ${spent}.`,
+    noCharges:
+      'No print with a charge finished in this period. Record what you charged in a print’s details; it counts once its usage is recorded.',
+  },
+  estimated: 'Estimated',
+  fromSlicer: 'From your slicer',
+  backfill: {
+    action: 'Fill in from past prints',
+    since: (prints: number, month: string) => `${prints} ${prints === 1 ? 'print' : 'prints'} since ${month}`,
+    whatItDoes: 'What this does',
+    explanation:
+      'Prints finished before tracking was on have no usage. This records each one’s printing from its estimate, on its printer with your first material of its print type, at today’s prices and dated when it was done. It counts as spend, marked estimated, but never changes stock or part wear.',
+    filled: (prints: number) => `Filled in ${prints} past ${prints === 1 ? 'print' : 'prints'}.`,
+    failed: 'Past prints could not be filled in.',
+    undo: 'Undo',
+    undone: 'Filled-in prints removed.',
+    undoFailed: 'Filled-in prints could not be removed.',
   },
   trend: {
     title: 'Spend over time',
@@ -66,6 +88,7 @@ export const spend = {
     cost: 'Spent',
     removed: 'Removed print',
     failed: 'Had a failed run',
+    profit: (amount: string) => `${amount} profit`,
   },
   unpriced: (count: number) =>
     `${count} ${count === 1 ? 'use has' : 'uses have'} no price and ${count === 1 ? 'counts' : 'count'} as nothing. Set prices in`,

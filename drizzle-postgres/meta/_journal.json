@@ -176,6 +176,20 @@
       "when": 1795183614794,
       "tag": "0024_inventory_references",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1795193404280,
+      "tag": "0025_usage_estimates",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1795199609028,
+      "tag": "0026_plates",
+      "breakpoints": true
     }
   ]
 }

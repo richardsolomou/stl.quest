@@ -583,12 +583,15 @@ for (const [index, spec] of specs.entries()) {
   // The analysis the asset worker runs, ahead of time, so estimates exist before usage is recorded; a linked model has
   // no file, so its estimate is the admin's.
   if (linked) {
-    const estimate = automaticPrintEstimate({
-      printType: spec.printType,
-      modelVolumeMm3: geometry.modelVolumeMm3,
-      modelSurfaceAreaMm2: geometry.modelSurfaceAreaMm2,
-      modelHeightMm: geometry.modelDimensions.heightMm,
-    })
+    const estimate = automaticPrintEstimate(
+      {
+        printType: spec.printType,
+        modelVolumeMm3: geometry.modelVolumeMm3,
+        modelSurfaceAreaMm2: geometry.modelSurfaceAreaMm2,
+        modelHeightMm: geometry.modelDimensions.heightMm,
+      },
+      calculator,
+    )
     await scoped.updateRequest(id, {
       estimatedMaterialOverride: estimate?.material && cents(estimate.material),
       estimatedPrintMinutesOverride: estimate?.minutes && Math.round(estimate.minutes),
@@ -597,7 +600,11 @@ for (const [index, spec] of specs.entries()) {
     await scoped.setModelDimensions(id, geometry.modelDimensions, geometry.modelVolumeMm3, geometry.modelSurfaceAreaMm2)
   }
   const request = required(await scoped.getRequest(id), `request ${id}`)
-  const estimate = requestPrintEstimate({ ...request, printType: spec.printType, ...automaticEstimateFields(request, spec.printType) })
+  const estimate = requestPrintEstimate({
+    ...request,
+    printType: spec.printType,
+    ...automaticEstimateFields(request, spec.printType, calculator),
+  })
   const minutes = estimate?.minutes ?? 60
 
   // When it started printing, from its stage: today's prints, the last few days' finishing, and six weeks of done work.

@@ -145,4 +145,19 @@ export const calculator: typeof en = {
     markup: 'Aufschlag auf die Kosten (%)',
     markupHint: (markup: string, share: string) => `Bei ${markup} % Aufschlag bleiben ${share} % jedes Verkaufs als Gewinn.`,
   },
+  estimates: {
+    title: 'Materialschätzungen',
+    description:
+      'Stützen und Verschnitt werden zu jeder Materialschätzung addiert, um Stützen, Rafts, Spülmaterial und Fehldrucke abzudecken; erfasste Plattensummen ersetzen sie. Bereits erfasster Verbrauch behält seine Mengen.',
+    supportsAndWaste: 'Stützen und Verschnitt (%)',
+    resinExample: (model: string, estimated: string) => `Ein Modell mit ${model} wird auf ${estimated} geschätzt.`,
+    filamentExample: (estimated: string) => `Ein 20-mm-Würfel wird auf ${estimated} geschätzt.`,
+    infill: 'Füllung (%)',
+    resinPerPart: 'Pro Teil (mL)',
+    resinCalibration:
+      'Beide Standardwerte wurden an Harzminiaturen mit automatisch erzeugten Stützen gemessen; senken Sie sie für leichtere Stützen.',
+    walls: 'Wände',
+    filamentProfile:
+      'Füllung und Wände wie in Ihrem Slicer-Profil. Stark gestützte Figuren können etwa 50–75 % mehr brauchen, einfache Teile fast nichts.',
+  },
 }

@@ -162,6 +162,7 @@ export const board = {
     skip: 'Skip',
     recorded: (prints: number) => `Usage recorded for ${prints} ${prints === 1 ? 'print' : 'prints'}.`,
     recordFailed: 'Usage could not be recorded.',
+    coveredByPlate: 'Its plate already recorded what the slicer said it used, so this printing step is kept out of spend and stock.',
     undo: 'Undo',
     undone: 'Usage undone.',
     undoFailed: 'Usage could not be undone.',

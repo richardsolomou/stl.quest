@@ -14,10 +14,11 @@ export type PartWear = {
 /**
  * How worn one part is on one printer, from the printer's own printing events since the part's last `replace` there:
  * every copy it printed counts as a plate, failed runs included as they wore the part too, and its printing minutes
- * count as hours. Undone events count for nothing.
+ * count as hours. Undone events count for nothing, and neither do estimates of past prints, since no replacement before
+ * them was ever recorded.
  */
 export function partWear(events: UsageEvent[], printerId: string, part: PartConsumable): PartWear {
-  const live = events.filter((event) => !event.undoneAt && event.printerId === printerId)
+  const live = events.filter((event) => !event.undoneAt && !event.estimated && event.printerId === printerId)
   const replacements = live.filter((event) => event.kind === 'replace' && event.consumableId === part.id).map((event) => event.createdAt)
   const replacedAt = replacements.length ? Math.max(...replacements) : undefined
   const runs = live.filter(

@@ -66,6 +66,30 @@ describe('price calculator settings', () => {
     expect(storedPriceCalculatorSettings({ labourCostPerHour: 20 }).settings.currency).toBe('EUR')
   })
 
+  it('gives a setup saved before material estimate settings existed the default allowance', () => {
+    expect(storedPriceCalculatorSettings({ labourCostPerHour: 20 }).settings.supportsAndWastePercent).toEqual({ resin: 60, filament: 25 })
+  })
+
+  it('keeps a saved supports and waste allowance', () => {
+    const supportsAndWastePercent = { resin: 50, filament: 5 }
+    expect(storedPriceCalculatorSettings({ supportsAndWastePercent }).settings.supportsAndWastePercent).toEqual(supportsAndWastePercent)
+  })
+
+  it('gives a setup saved before material estimate settings existed the default resin amount per part', () => {
+    expect(storedPriceCalculatorSettings({ labourCostPerHour: 20 }).settings.resinPerPartMl).toBe(1)
+  })
+
+  it('keeps a saved resin amount per part', () => {
+    expect(storedPriceCalculatorSettings({ resinPerPartMl: 0.5 }).settings.resinPerPartMl).toBe(0.5)
+  })
+
+  it('keeps a saved filament profile', () => {
+    expect(storedPriceCalculatorSettings({ filamentInfillPercent: 5, filamentWalls: 3 }).settings).toMatchObject({
+      filamentInfillPercent: 5,
+      filamentWalls: 3,
+    })
+  })
+
   it('keeps a saved currency', () => {
     expect(storedPriceCalculatorSettings({ currency: 'CAD' }).settings.currency).toBe('CAD')
   })

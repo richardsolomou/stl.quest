@@ -6,6 +6,7 @@ import { createDatabase } from '../connection'
 
 const migrations = readMigrationFiles({ migrationsFolder: fileURLToPath(new URL('../../../drizzle', import.meta.url)) })
 const issuerBackfill = migrations.findIndex((migration) => migration.sql.some((statement) => statement.includes('`issuer`')))
+const usageEstimates = migrations.findIndex((migration) => migration.sql.some((statement) => statement.includes('`estimated`')))
 
 async function applyMigrations(database: ReturnType<typeof createDatabase>, from: number, to: number) {
   for (const migration of migrations.slice(from, to)) {
@@ -66,5 +67,20 @@ describe('SQLite migrations', () => {
       accounts: [{ id: 'account-google', providerId: 'google', accountId: 'google-subject' }],
       foreignKeys: [],
     })
+  })
+
+  it('keeps usage recorded before the upgrade as measured rather than estimated', async () => {
+    const database = createDatabase(':memory:')
+    await database.run(sql`PRAGMA foreign_keys = OFF`)
+    await applyMigrations(database, 0, usageEstimates)
+    await database.run(sql`PRAGMA foreign_keys = OFF`)
+    await database.run(sql`
+      INSERT INTO usage_events (id, workspace_id, transaction_id, stage, kind, amount, unit, created_at)
+      VALUES ('event-1', 'workspace-1', 'transaction-1', 'stock', 'restock', 1000, 'ml', 1)
+    `)
+
+    await applyMigrations(database, usageEstimates, usageEstimates + 1)
+
+    expect(await database.all(sql`SELECT id, estimated FROM usage_events`)).toEqual([{ id: 'event-1', estimated: 0 }])
   })
 })

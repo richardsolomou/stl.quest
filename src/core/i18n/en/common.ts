@@ -26,5 +26,6 @@ export const common = {
   refreshToRetry: 'Refresh the page to try again.',
   atLeast: (min: string) => `Enter ${min} or more.`,
   between: (min: string, max: string) => `Enter a number from ${min} to ${max}.`,
+  wholeBetween: (min: string, max: string) => `Enter a whole number from ${min} to ${max}.`,
   autosave: { saving: 'Saving…', saved: 'Saved', failed: 'Couldn’t save', retry: 'Retry' },
 }

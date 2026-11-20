@@ -28,5 +28,6 @@ export const common: typeof en = {
   refreshToRetry: 'Actualisez la page pour réessayer.',
   atLeast: (min: string) => `Saisissez ${min} ou plus.`,
   between: (min: string, max: string) => `Saisissez un nombre entre ${min} et ${max}.`,
+  wholeBetween: (min: string, max: string) => `Saisissez un nombre entier entre ${min} et ${max}.`,
   autosave: { saving: 'Enregistrement…', saved: 'Enregistré', failed: 'Échec de l’enregistrement', retry: 'Réessayer' },
 }

@@ -1,12 +1,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import postgres from 'postgres'
+import { sql } from 'drizzle-orm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PostgreSQLBackend } from '../backends/postgres'
 import { SQLiteBackend } from '../backends/sqlite'
 import { createDatabase } from '../connection'
 import { DrizzleRepository } from '../repository'
-import { dataMigrations as applied, organization, requests, settings, user } from '../schema'
+import { dataMigrations as applied, organization, settings, user } from '../schema'
 import type { DatabaseBackend } from '../backend'
 import type { STLQuestDatabase } from '../connection'
 import type { Consumable } from '../../core/consumables'
@@ -182,26 +183,20 @@ describe.each(backends)('upgrading stored inventory (%s)', (dialect) => {
     return await repository.scoped('farm')
   }
 
+  /** Written as the released schema stored it, since the repository writes columns added after it. */
   async function print(id: string, printerId?: string) {
-    await backend.database
-      .insert(requests)
-      .values({
-        id,
-        workspaceId: 'farm',
-        name: id,
-        fileName: `${id}.stl`,
-        filePath: `${id}.stl`,
-        quantity: 1,
-        ownerUserId: 'maker',
-        printerId,
-        createdAt: 0,
-        updatedAt: 0,
-      })
-      .run()
+    await backend.database.run(sql`
+      INSERT INTO requests (id, workspace_id, name, file_name, file_path, quantity, owner_user_id, printer_id, created_at, updated_at)
+      VALUES (${id}, 'farm', ${id}, ${`${id}.stl`}, ${`${id}.stl`}, 1, 'maker', ${printerId ?? null}, 0, 0)
+    `)
   }
 
-  function usage(id: string, fields: Partial<UsageEvent>): UsageEvent {
-    return { id, transactionId: id, stage: 'printing', kind: 'use', amount: 1, unit: 'minute', createdAt: 0, ...fields }
+  /** Written as the released schema stored it, since the repository writes columns added after it. */
+  async function usage(id: string, references: Pick<UsageEvent, 'printerId' | 'equipmentId' | 'consumableId'>) {
+    await backend.database.run(sql`
+      INSERT INTO usage_events (id, workspace_id, transaction_id, stage, kind, printer_id, equipment_id, consumable_id, amount, unit, created_at)
+      VALUES (${id}, 'farm', ${id}, 'printing', 'use', ${references.printerId ?? null}, ${references.equipmentId ?? null}, ${references.consumableId ?? null}, 1, 'minute', 0)
+    `)
   }
 
   async function upgrade(log = silent()) {
@@ -247,11 +242,9 @@ describe.each(backends)('upgrading stored inventory (%s)', (dialect) => {
     await workspace.setSettings({ printers: [resin], equipment: [wash], consumables: library })
     await print('kept', 'saturn')
     await print('orphaned', 'removed-printer')
-    await workspace.appendUsageEvents([
-      usage('printing', { printerId: 'removed-printer', consumableId: 'removed-resin', unit: 'ml' }),
-      usage('washing', { equipmentId: 'removed-wash', stage: 'finishing' }),
-      usage('tracked', { printerId: 'saturn', consumableId: 'grey', unit: 'ml' }),
-    ])
+    await usage('printing', { printerId: 'removed-printer', consumableId: 'removed-resin' })
+    await usage('washing', { equipmentId: 'removed-wash' })
+    await usage('tracked', { printerId: 'saturn', consumableId: 'grey' })
     const log = silent()
 
     const upgraded = await upgrade(log)

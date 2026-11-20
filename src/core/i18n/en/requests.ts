@@ -108,6 +108,13 @@ export const requests = {
     loadingThumbnail: 'Loading thumbnail',
   },
   downloadModel: 'Download model',
+  charge: {
+    label: 'Charged',
+    placeholder: 'Not recorded',
+    hint: 'What you charged for this print. Only admins see it; Spend uses it for profit.',
+    failed: 'What was charged could not be saved.',
+  },
+  plates: 'Plates',
   cost: {
     label: 'Estimated cost',
     suggested: (price: string, quantity: number) => (quantity > 1 ? `${price} suggested for all ${quantity} copies` : `${price} suggested`),

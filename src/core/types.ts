@@ -5,6 +5,9 @@ import type { OnboardingProgress } from './onboarding'
 import type { Locale } from './i18n/locales'
 import type { StockTotal, UsageEvent, UsageFilters } from './usage'
 import type { InventoryItems, InventoryKind } from './inventory'
+import type { Plate, PlateItem, PlateRecording } from './plates'
+import type { PriceCalculatorCurrency } from './priceCalculator'
+import type { ChargedPrint } from './spend'
 
 export type Role = 'admin' | 'requester'
 export type AccountRole = 'super_admin' | 'requester'
@@ -115,9 +118,13 @@ export type PrintRequest = {
   modelSurfaceAreaMm2?: number
   estimatedMaterialOverride?: number
   estimatedPrintMinutesOverride?: number
+  /** What the customer was charged, recorded by an admin; only admins see it. */
+  charged?: PrintCharge
   createdAt: number
   updatedAt: number
 }
+
+export type PrintCharge = { amount: number; currency: PriceCalculatorCurrency }
 
 export type PrintGroupItem = { requestId: string; status: string; count: number; order: number }
 export const printGroupColors = [
@@ -503,11 +510,40 @@ interface RepositoryShape {
   deleteSetting(key: string): void
   /** Appends every event in one transaction. */
   appendUsageEvents(events: UsageEvent[]): void
+  /** Appends, in one transaction, the events of prints that still have no live usage, and returns those it appended. */
+  appendUsageBackfill(events: UsageEvent[]): UsageEvent[]
+  /** Prints with live usage. */
+  usageRequestIds(): string[]
   listUsage(filters: UsageFilters): UsageEvent[]
-  /** Live events summed per consumable, kind, and unit. */
+  /** Live events summed per consumable, kind, and unit, leaving out estimates of past prints, which never moved stock. */
   stockTotals(): StockTotal[]
-  /** Marks the transaction's live events undone and returns how many it marked. */
+  /** Every print with a charge, its live spend in this currency or unpriced totalled over all time (see core/spend). */
+  chargedPrints(currency: PriceCalculatorCurrency): ChargedPrint[]
+  /**
+   * Marks the transaction's live events undone and returns how many it marked; events a plate's transaction replaced
+   * count again, and the plate goes back to unrecorded.
+   */
   undoUsageTransaction(transactionId: string, undoneAt: number): number
+  /** Every printing use of the prints, undone events included, so a plate can tell which of them it replaced. */
+  printingUsage(requestIds: string[]): UsageEvent[]
+  listPlates(): Plate[]
+  /** Numbers the plate after the workspace's last one. */
+  createPlate(plate: { id: string; printerId?: string; otherStuff: boolean; items: PlateItem[]; createdAt: number }): Plate
+  /** Undoes the plate's usage, if any, then deletes it; false when there is no such plate. */
+  deletePlate(id: string, undoneAt: number): boolean
+  /**
+   * Replaces the plate's recorded usage in one transaction: undoes what it recorded before, then lets `record` read the
+   * prints' printing usage as it stands and append new events, marking the events it replaces undone by it.
+   */
+  recordPlate(
+    id: string,
+    at: number,
+    record: (
+      plate: Plate,
+      printing: UsageEvent[],
+    ) => { recording: PlateRecording; items: PlateItem[]; events: UsageEvent[]; superseded: string[] },
+  ): Plate | undefined
+  setRequestCharge(id: string, charged: PrintCharge | null): void
   countUsers(): number
   /** Undefined clears the preference so the browser's languages decide. */
   setUserLocale(userId: string, locale: Locale | undefined): void
@@ -681,6 +717,7 @@ export type AppEvent =
   | 'usage.recorded'
   | 'usage.undone'
   | 'inventory.changed'
+  | 'plate.changed'
 
 export interface EventBus {
   publish(event: AppEvent): void

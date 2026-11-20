@@ -144,4 +144,19 @@ export const calculator: typeof en = {
     markup: 'Majoration sur le coût (%)',
     markupHint: (markup: string, share: string) => `Une majoration de ${markup} % garde ${share} % de chaque vente comme bénéfice.`,
   },
+  estimates: {
+    title: 'Estimations de matière',
+    description:
+      'Supports et pertes s’ajoutent à chaque estimation de matière pour couvrir supports, radeaux, purge et ratés ; les totaux de plateau que vous enregistrez la remplacent. L’usage déjà enregistré garde ses quantités.',
+    supportsAndWaste: 'Supports et pertes (%)',
+    resinExample: (model: string, estimated: string) => `Un modèle de ${model} est estimé à ${estimated}.`,
+    filamentExample: (estimated: string) => `Un cube de 20 mm est estimé à ${estimated}.`,
+    infill: 'Remplissage (%)',
+    resinPerPart: 'Par pièce (mL)',
+    resinCalibration:
+      'Les deux valeurs par défaut ont été mesurées sur des figurines en résine avec supports générés automatiquement ; baissez-les pour des supports plus légers.',
+    walls: 'Parois',
+    filamentProfile:
+      'Remplissage et parois comme dans votre profil de trancheur. Les figurines très supportées peuvent demander environ 50 à 75 % de plus, les pièces simples presque rien.',
+  },
 }

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getElectricityPricePreset } from '../../../core/electricityPresets'
 import {
@@ -14,11 +14,13 @@ import {
   type PriceCalculatorSettings,
   validPriceCalculatorSettings,
 } from '../../../core/priceCalculator'
+import { automaticPrintEstimate, formatEstimateMaterial, MATERIAL_ESTIMATE_LIMITS } from '../../../core/printEstimates'
+import type { PrintType } from '../../../core/types'
 import { savePriceCalculatorSettings } from '../../../server/fns'
 import { useI18n } from '../../i18n'
 import { catalogueQuery, priceCalculatorSettingsQuery } from '../../queries'
 import { useAutosavedDraft, type FocusBinding } from '../../useAutosave'
-import { useWorkspaceSlug } from '../../workspace'
+import { useWorkspacePrintTypes, useWorkspaceSlug } from '../../workspace'
 import { FilterCombobox } from '../FilterCombobox'
 import { QueryState } from '../QueryState'
 import { ModeSelector, NumberSetting, type SetupMode } from '../priceCalculator/fields'
@@ -109,6 +111,7 @@ function PricingForm({ workspaceSlug, stored }: { workspaceSlug: string; stored:
         onSettingsChange={setSettings}
       />
       <LabourSection bind={bind} settings={settings} onSettingsChange={setSettings} />
+      <EstimatesSection bind={bind} settings={settings} onSettingsChange={setSettings} />
     </>
   )
 }
@@ -280,6 +283,86 @@ function LabourSection({
           onChange={(markupPercent) => onSettingsChange({ ...settings, markupPercent })}
         />
       </div>
+    </SettingsSection>
+  )
+}
+
+/** Sample models the live examples estimate: a 2 mL resin part, and a 20 mm filament cube. */
+const RESIN_EXAMPLE = { printType: 'resin', modelVolumeMm3: 2_000 } as const
+const FILAMENT_EXAMPLE = { printType: 'filament', modelVolumeMm3: 8_000, modelSurfaceAreaMm2: 2_400 } as const
+
+function EstimatesSection({
+  bind,
+  settings,
+  onSettingsChange,
+}: {
+  bind: FocusBinding
+  settings: PriceCalculatorSettings
+  onSettingsChange: SettingsChange
+}) {
+  const { t, locale } = useI18n()
+  const printTypes = useWorkspacePrintTypes()
+  const copy = t.calculator.estimates
+  const material = (example: typeof RESIN_EXAMPLE | typeof FILAMENT_EXAMPLE) =>
+    formatEstimateMaterial(automaticPrintEstimate(example, settings)?.material ?? 0, locale)
+  const allowance = (printType: PrintType, description: string) => (
+    <NumberSetting
+      id={`calculator-${printType}-supports-and-waste`}
+      label={copy.supportsAndWaste}
+      value={settings.supportsAndWastePercent[printType]}
+      min={MATERIAL_ESTIMATE_LIMITS.supportsAndWastePercent.min}
+      max={MATERIAL_ESTIMATE_LIMITS.supportsAndWastePercent.max}
+      description={description}
+      onChange={(percent) =>
+        onSettingsChange({ ...settings, supportsAndWastePercent: { ...settings.supportsAndWastePercent, [printType]: percent } })
+      }
+    />
+  )
+  return (
+    <SettingsSection {...bind} title={copy.title} description={copy.description}>
+      {printTypes.includes('resin') && (
+        <FieldSet>
+          <FieldLegend>{t.calculator.job.resin}</FieldLegend>
+          <FieldDescription>{copy.resinCalibration}</FieldDescription>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {allowance('resin', copy.resinExample(`${formatEstimateMaterial(2, locale)} mL`, `${material(RESIN_EXAMPLE)} mL`))}
+            <NumberSetting
+              id="calculator-resin-per-part"
+              label={copy.resinPerPart}
+              value={settings.resinPerPartMl}
+              min={MATERIAL_ESTIMATE_LIMITS.resinPerPartMl.min}
+              max={MATERIAL_ESTIMATE_LIMITS.resinPerPartMl.max}
+              onChange={(resinPerPartMl) => onSettingsChange({ ...settings, resinPerPartMl })}
+            />
+          </div>
+        </FieldSet>
+      )}
+      {printTypes.includes('filament') && (
+        <FieldSet>
+          <FieldLegend>{t.calculator.job.filament}</FieldLegend>
+          <FieldDescription>{copy.filamentProfile}</FieldDescription>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {allowance('filament', copy.filamentExample(`${material(FILAMENT_EXAMPLE)} g`))}
+            <NumberSetting
+              id="calculator-filament-infill"
+              label={copy.infill}
+              value={settings.filamentInfillPercent}
+              min={MATERIAL_ESTIMATE_LIMITS.filamentInfillPercent.min}
+              max={MATERIAL_ESTIMATE_LIMITS.filamentInfillPercent.max}
+              onChange={(filamentInfillPercent) => onSettingsChange({ ...settings, filamentInfillPercent })}
+            />
+            <NumberSetting
+              id="calculator-filament-walls"
+              label={copy.walls}
+              value={settings.filamentWalls}
+              min={MATERIAL_ESTIMATE_LIMITS.filamentWalls.min}
+              max={MATERIAL_ESTIMATE_LIMITS.filamentWalls.max}
+              whole
+              onChange={(filamentWalls) => onSettingsChange({ ...settings, filamentWalls })}
+            />
+          </div>
+        </FieldSet>
+      )}
     </SettingsSection>
   )
 }

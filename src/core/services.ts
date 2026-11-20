@@ -38,6 +38,21 @@ import {
 } from './printers'
 import { storedWorkspacePrintTypes } from './printTypes'
 import { storedUsageTracking } from './usageTracking'
+import { backfillSummary, usageBackfill, type UsageBackfillSummary } from './usageBackfill'
+import {
+  coveringPlateTransaction,
+  isMeasured,
+  MAX_PLATE_FILAMENTS,
+  MAX_PLATE_OBJECTS,
+  MAX_PLATE_PRINTS,
+  plateUsageDrafts,
+  splitPlate,
+  supersededByPlate,
+  type Plate,
+  type PlateItem,
+  type PlateMaterialChoice,
+  type PlateRecordInput,
+} from './plates'
 import {
   MAX_REQUEST_NAME_LENGTH,
   MAX_BULK_CARDS,
@@ -50,11 +65,16 @@ import {
 } from './request'
 import { modelFormat, sourceImageKey } from './assetKeys'
 import { imageContentType, MAX_COVER_BYTES } from './coverImage'
-import { automaticEstimateFields, requestPrintEstimate } from './printEstimates'
+import { automaticEstimateFields, requestPrintEstimate, type MaterialEstimateSettings } from './printEstimates'
 import { consumablesOfKind, type Consumable } from './consumables'
 import type { EquipmentItem } from './equipment'
 import { activeItems, INVENTORY_LIMITS, type InventoryItems, type InventoryKind } from './inventory'
-import { DEFAULT_PRICE_CALCULATOR_SETTINGS, PRICE_CALCULATOR_SETTING, type PriceCalculatorSettings } from './priceCalculator'
+import {
+  DEFAULT_PRICE_CALCULATOR_SETTINGS,
+  PRICE_CALCULATOR_SETTING,
+  TYPICAL_RESIN_DENSITY_GRAMS_PER_ML,
+  type PriceCalculatorSettings,
+} from './priceCalculator'
 import {
   consumed,
   MAX_USAGE_LIST,
@@ -132,6 +152,7 @@ export class STLQuestService {
     const geometryJobs = new Map(
       (await this.repository.listAssetGenerationJobs('geometry')).map((job) => [job.requestId, job.status] as const),
     )
+    const estimateSettings = await this.rates()
     const mappedRequests = result.requests.map(
       ({
         fileName: _fileName,
@@ -148,6 +169,7 @@ export class STLQuestService {
         modelDimensions,
         modelVolumeMm3,
         modelSurfaceAreaMm2,
+        charged,
         ...request
       }) => {
         const mine = ownerUserId === identity.id
@@ -172,6 +194,7 @@ export class STLQuestService {
                     : undefined
         return {
           ...request,
+          ...(admin && charged && { charged }),
           requesterId: ownerUserId,
           requesterName: ownerName,
           mine,
@@ -179,7 +202,7 @@ export class STLQuestService {
           requestedPrintType,
           printer,
           fitState,
-          ...automaticEstimateFields({ modelDimensions, modelVolumeMm3, modelSurfaceAreaMm2 }, printType),
+          ...automaticEstimateFields({ modelDimensions, modelVolumeMm3, modelSurfaceAreaMm2 }, printType, estimateSettings),
           estimateGeometryStatus: geometryStatus,
           groups: allGroups.flatMap((group) => {
             return group.items
@@ -1227,15 +1250,25 @@ export class STLQuestService {
     const items = await this.repository.listInventory('equipment')
     const equipment = unique(input.equipmentIds ?? []).map((id) => items.find((item) => item.id === id))
     if (equipment.some((item) => !item)) throw new Response(this.text.usage.unknownEquipment, { status: 400 })
+    const rates = await this.rates()
     const drafts = stepUsageDrafts(input, {
-      rates: await this.rates(),
+      rates,
       printer,
-      estimate: requestPrintEstimate({ ...request, printType, ...automaticEstimateFields(request, printType) }),
+      estimate: requestPrintEstimate({ ...request, printType, ...automaticEstimateFields(request, printType, rates) }),
       material,
       equipment: equipment.filter((item): item is EquipmentItem => item !== undefined),
       consumables,
     })
-    const recorded = await this.appendUsage(drafts, identity)
+    const covering =
+      input.stage === 'printing' && input.outcome !== 'failed'
+        ? coveringPlateTransaction(
+            await this.repository.listPlates(),
+            await this.repository.printingUsage([request.id]),
+            request.id,
+            input.copies,
+          )
+        : undefined
+    const recorded = covering ? await this.appendCoveredUsage(drafts, covering, identity) : await this.appendUsage(drafts, identity)
     this.capture(identity.id, 'usage_step_recorded', {
       stage: input.stage,
       print_type: printType,
@@ -1299,6 +1332,253 @@ export class STLQuestService {
   async stockLevels(identity: Identity) {
     await this.requireUsageTracking(identity)
     return stockLevels(await this.consumables(), await this.repository.stockTotals())
+  }
+
+  /** Each charged print's whole-life cost and finish, so profit counts it once, against everything it used. */
+  async chargedPrints(identity: Identity) {
+    await this.requireUsageTracking(identity)
+    return await this.repository.chargedPrints((await this.rates()).currency)
+  }
+
+  /** What filling in past prints would record, so the spend overview can offer it. */
+  async usageBackfillPreview(identity: Identity) {
+    await this.requireUsageTracking(identity)
+    return backfillSummary(await this.pastPrintUsage())
+  }
+
+  /** Fills in every past print without usage from its estimate, as one transaction that undoes the whole fill. */
+  async backfillUsage(identity: Identity): Promise<UsageBackfillSummary & { transactionId?: string }> {
+    await this.requireUsageTracking(identity)
+    const prints = await this.pastPrintUsage()
+    const { transactionId, events } = await this.stampUsage(
+      prints.flatMap(({ usedAt, drafts }) => drafts.map((draft) => ({ ...draft, createdAt: usedAt }))),
+      identity,
+    )
+    const appended = new Set((await this.repository.appendUsageBackfill(events)).map(({ requestId }) => requestId))
+    const summary = backfillSummary(prints.filter(({ requestId }) => appended.has(requestId)))
+    if (summary.events === 0) return summary
+    this.changed('usage.recorded')
+    this.capture(identity.id, 'usage_backfilled', { print_count: summary.prints, copy_count: summary.copies, event_count: summary.events })
+    return { ...summary, transactionId }
+  }
+
+  /** The workspace's plates, newest first, each print with what matching and splitting a slicer file need. */
+  async listPlates(identity: Identity) {
+    await this.requireUsageTracking(identity)
+    const requests = new Map((await this.repository.listRequests()).map((request) => [request.id, request]))
+    const printers = await this.repository.listInventory('printers')
+    const estimateSettings = await this.rates()
+    return (await this.repository.listPlates()).map((plate) => {
+      const printTypes = unique(
+        plate.items.map(({ requestId }) => {
+          const request = requests.get(requestId)
+          return request && (printers.find(({ id }) => id === request.printerId)?.printType ?? request.requestedPrintType)
+        }),
+      )
+      const printType =
+        printers.find(({ id }) => id === plate.printerId)?.printType ?? (printTypes.length === 1 ? printTypes[0] : undefined)
+      return {
+        ...plate,
+        ...(printType && { printType }),
+        items: plate.items.map((item) => {
+          const request = requests.get(item.requestId)
+          const estimate = request && this.platePrintEstimate(request, printType, printers, estimateSettings)
+          return {
+            ...item,
+            name: request?.name ?? '',
+            ...(request?.fileName && { fileName: request.fileName }),
+            ...(request?.modelVolumeMm3 && { volumeMm3: request.modelVolumeMm3 }),
+            ...(estimate && { estimatedMaterial: estimate }),
+          }
+        }),
+      }
+    })
+  }
+
+  async createPlate(input: { printerId?: string; otherStuff: boolean; items: PlateItem[] }, identity: Identity) {
+    await this.requireUsageTracking(identity)
+    const ids = new Set(input.items.map(({ requestId }) => requestId))
+    if (input.items.length === 0 || input.items.length > MAX_PLATE_PRINTS || ids.size !== input.items.length)
+      throw new Response(this.text.plates.invalid, { status: 400 })
+    const printers = await this.repository.listInventory('printers')
+    const printer = input.printerId ? printers.find(({ id }) => id === input.printerId) : undefined
+    if (input.printerId && (!printer || printer.archived)) throw new Response(this.text.request.unknownPrinter, { status: 400 })
+    for (const item of input.items) {
+      const request = await this.repository.getRequest(item.requestId)
+      if (!request) throw new Response(this.text.access.notFound, { status: 404 })
+      if (!Number.isInteger(item.copies) || item.copies < 1 || item.copies > request.quantity)
+        throw new Response(this.text.plates.invalid, { status: 400 })
+      const printType = printers.find(({ id }) => id === request.printerId)?.printType ?? request.requestedPrintType
+      if (printer && printType && printType !== printer.printType) throw new Response(this.text.usage.materialMismatch, { status: 400 })
+    }
+    const plate = await this.repository.createPlate({
+      id: crypto.randomUUID(),
+      ...(printer && { printerId: printer.id }),
+      otherStuff: input.otherStuff,
+      items: input.items.map(({ requestId, copies }) => ({ requestId, copies })),
+      createdAt: Date.now(),
+    })
+    this.changed('plate.changed')
+    this.capture(identity.id, 'plate_created', {
+      print_count: input.items.length,
+      copy_count: input.items.reduce((total, item) => total + item.copies, 0),
+      has_printer: Boolean(printer),
+      other_stuff: input.otherStuff,
+    })
+    return plate
+  }
+
+  async deletePlate(id: string, identity: Identity) {
+    await this.requireUsageTracking(identity)
+    if (!(await this.repository.deletePlate(id, Date.now()))) throw new Response(this.text.plates.notFound, { status: 404 })
+    this.changed('plate.changed')
+  }
+
+  /**
+   * Records what the plate used from the slicer, replacing anything it recorded before: the split goes to its prints as
+   * measured usage that counts against stock, and replaces their printing usage from the step sheet or a fill-in.
+   */
+  async recordPlate(input: PlateRecordInput, identity: Identity) {
+    await this.requireUsageTracking(identity)
+    const plate = (await this.repository.listPlates()).find(({ id }) => id === input.plateId)
+    if (!plate) throw new Response(this.text.plates.notFound, { status: 404 })
+    this.validatePlateRecord(input, plate)
+    const printers = await this.repository.listInventory('printers')
+    const printer = printers.find(({ id }) => id === plate.printerId)
+    const requests = await Promise.all(plate.items.map(({ requestId }) => this.repository.getRequest(requestId)))
+    const printTypes = unique(
+      requests.map((request) => request && (printers.find(({ id }) => id === request.printerId)?.printType ?? request.requestedPrintType)),
+    )
+    const printType = printer?.printType ?? (printTypes.length === 1 ? printTypes[0] : undefined)
+    if (!printType) throw new Response(this.text.plates.printTypeUnknown, { status: 400 })
+    // Slicer files weigh filament per object; a resin slicer's summary is typed in as totals.
+    if (isMeasured(input) && printType === 'resin') throw new Response(this.text.plates.invalid, { status: 400 })
+    const materials = await this.plateMaterials(input.materials, printType, identity)
+    const rates = await this.rates()
+    const split = splitPlate(
+      input,
+      input.minutes,
+      plate.items.map((item, index) => {
+        const request = requests[index]
+        const estimate = request && this.platePrintEstimate(request, printType, printers, rates)
+        return {
+          requestId: item.requestId,
+          copies: item.copies,
+          ...(request?.modelVolumeMm3 && { volumeMm3: request.modelVolumeMm3 }),
+          ...(estimate && { estimatedMaterial: estimate }),
+        }
+      }),
+      materials.length,
+    )
+    const { transactionId, events } = await this.stampUsage(
+      plateUsageDrafts(split, { plateId: plate.id, rates, printer, materials, consumables: await this.consumables() }),
+      identity,
+    )
+    const replaced = Boolean(plate.recording)
+    const at = Date.now()
+    const recorded = await this.repository.recordPlate(plate.id, at, (current, printing) => ({
+      recording: {
+        transactionId,
+        source: isMeasured(input) ? 'file' : 'totals',
+        method: split.method,
+        unit: printType === 'resin' ? 'ml' : 'g',
+        minutes: input.minutes,
+        otherAmount: split.other.amounts.reduce((total, amount) => total + amount, 0),
+        overheadAmount: split.overhead,
+        recordedAt: at,
+      },
+      items: split.prints.map(({ requestId, copies, amounts, minutes }) => ({
+        requestId,
+        copies,
+        amount: amounts.reduce((total, amount) => total + amount, 0),
+        minutes,
+      })),
+      events,
+      superseded: current.items.flatMap(({ requestId, copies }) => supersededByPlate(printing, requestId, copies, transactionId)),
+    }))
+    if (!recorded) throw new Response(this.text.plates.notFound, { status: 404 })
+    this.changed('usage.recorded')
+    this.capture(identity.id, 'plate_recorded', {
+      source: recorded.recording?.source,
+      method: split.method,
+      print_count: plate.items.length,
+      filament_count: materials.length,
+      object_count: isMeasured(input) ? input.objects.length : 0,
+      matched_count: isMeasured(input) ? input.objects.filter((object) => object.requestId).length : 0,
+      has_other: split.other.amounts.some((amount) => amount > 0),
+      replaced,
+    })
+    return { plate: recorded, transactionId }
+  }
+
+  /** Records what a print was charged in the workspace currency, or clears it. */
+  async setRequestCharge(requestId: string, amount: number | null, identity: Identity) {
+    this.requireAdmin(identity)
+    if (amount !== null && !(Number.isFinite(amount) && amount >= 0 && amount <= 1_000_000_000))
+      throw new Response(this.text.plates.invalidCharge, { status: 400 })
+    await this.requiredRequest(requestId)
+    const { currency } = await this.rates()
+    await this.repository.setRequestCharge(requestId, amount === null ? null : { amount, currency })
+    this.changed('request.updated')
+    this.capture(identity.id, 'print_charge_recorded', { has_amount: amount !== null })
+  }
+
+  private validatePlateRecord(input: PlateRecordInput, plate: Plate) {
+    const onPlate = new Set(plate.items.map(({ requestId }) => requestId))
+    const slots = input.materials.length
+    const amount = (value: number) => Number.isFinite(value) && Math.abs(value) <= 1_000_000
+    const valid =
+      amount(input.minutes) &&
+      input.minutes >= 0 &&
+      slots >= 1 &&
+      slots <= MAX_PLATE_FILAMENTS &&
+      (isMeasured(input)
+        ? input.objects.length <= MAX_PLATE_OBJECTS &&
+          input.overhead.length === slots &&
+          input.overhead.every(amount) &&
+          input.objects.every((object) => object.amounts.length === slots && object.amounts.every(amount))
+        : slots === 1 && amount(input.total) && input.total > 0 && input.otherShare >= 0 && input.otherShare < 1)
+    if (!valid) throw new Response(this.text.plates.invalid, { status: 400 })
+    if (isMeasured(input) && input.objects.some(({ requestId }) => requestId !== undefined && !onPlate.has(requestId)))
+      throw new Response(this.text.plates.notOnPlate, { status: 400 })
+  }
+
+  /** The library material of each slot; one named on the spot joins the library, unpriced unless a price was given. */
+  private async plateMaterials(choices: PlateMaterialChoice[], printType: PrintType, identity: Identity) {
+    let library = await this.consumables()
+    const materials: Consumable[] = []
+    for (const choice of choices) {
+      if ('consumableId' in choice) {
+        const material = library.find(({ id }) => id === choice.consumableId)
+        if (!material) throw new Response(this.text.usage.unknownConsumable, { status: 400 })
+        if (material.kind !== printType) throw new Response(this.text.usage.materialMismatch, { status: 400 })
+        materials.push(material)
+        continue
+      }
+      const name = choice.name.trim()
+      // No price is stored as zero, which records usage unpriced and leaves the library asking for one.
+      const price = choice.price ?? 0
+      const created: Consumable =
+        printType === 'resin'
+          ? { id: crypto.randomUUID(), kind: 'resin', name, pricePerLitre: price, densityGramsPerMl: TYPICAL_RESIN_DENSITY_GRAMS_PER_ML }
+          : { id: crypto.randomUUID(), kind: 'filament', name, pricePerKg: price }
+      library = await this.changeInventory('consumables', identity, (items) => [...items, created])
+      materials.push(created)
+    }
+    return materials
+  }
+
+  /** A print's material estimate per copy in the plate's print type, which a typed plate total is split by. */
+  private platePrintEstimate(
+    request: PrintRequest,
+    printType: PrintType | undefined,
+    printers: PrinterProfile[],
+    settings: MaterialEstimateSettings,
+  ) {
+    const type = printType ?? printers.find(({ id }) => id === request.printerId)?.printType ?? request.requestedPrintType
+    return type
+      ? requestPrintEstimate({ ...request, printType: type, ...automaticEstimateFields(request, type, settings) })?.material
+      : undefined
   }
 
   async createInventoryItem<Kind extends InventoryKind>(kind: Kind, item: InventoryItems[Kind], identity: Identity) {
@@ -1402,20 +1682,42 @@ export class STLQuestService {
   }
 
   private async appendUsage(drafts: UsageDraft[], identity: Identity) {
+    const { transactionId, events } = await this.stampUsage(drafts, identity)
+    await this.repository.appendUsageEvents(events)
+    if (events.length) this.changed('usage.recorded')
+    return { transactionId: events.length ? transactionId : undefined, events }
+  }
+
+  /** A printing step for copies a recorded plate already measured: kept in the log, but replaced by the plate from the start. */
+  private async appendCoveredUsage(drafts: UsageDraft[], supersededBy: string, identity: Identity) {
+    const { events } = await this.stampUsage(drafts, identity)
+    await this.repository.appendUsageEvents(events.map((event) => ({ ...event, undoneAt: event.createdAt, supersededBy })))
+    return { transactionId: undefined, events: [], coveredByPlate: true }
+  }
+
+  /** One action's events under one transaction, priced in today's currency and dated now unless a draft says when. */
+  private async stampUsage(drafts: (UsageDraft & { createdAt?: number })[], identity: Identity) {
     const transactionId = crypto.randomUUID()
-    const createdAt = Date.now()
+    const now = Date.now()
     const { currency } = await this.rates()
     const events: UsageEvent[] = drafts.map((draft) => ({
+      createdAt: now,
       ...draft,
       id: crypto.randomUUID(),
       transactionId,
       userId: identity.id,
-      createdAt,
       ...(draft.unitPrice !== undefined && { currency }),
     }))
-    await this.repository.appendUsageEvents(events)
-    if (events.length) this.changed('usage.recorded')
-    return { transactionId: events.length ? transactionId : undefined, events }
+    return { transactionId, events }
+  }
+
+  private async pastPrintUsage() {
+    return usageBackfill(await this.repository.listRequests(), {
+      rates: await this.rates(),
+      printers: await this.repository.listInventory('printers'),
+      consumables: await this.consumables(),
+      recorded: new Set(await this.repository.usageRequestIds()),
+    })
   }
 
   /** The business rates usage is priced at now. */

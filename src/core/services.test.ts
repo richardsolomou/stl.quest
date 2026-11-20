@@ -14,7 +14,8 @@ import { consumablesOfKind, type Consumable } from './consumables'
 import { MAX_EQUIPMENT, type EquipmentItem } from './equipment'
 import { PRINTERS_SKIPPED_SETTING } from './printers'
 import { summariseSpend } from './spend'
-import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from './priceCalculator'
+import { DEFAULT_PRICE_CALCULATOR_SETTINGS, PRICE_CALCULATOR_SETTING } from './priceCalculator'
+import { requestPrintEstimate } from './printEstimates'
 import type { InventoryItems, InventoryKind } from './inventory'
 import { seesOnlyOwnRequests } from './visibility'
 import { PRINT_TYPE_SETTING } from './printTypes'
@@ -1211,6 +1212,42 @@ describe('STLQuestService crash recovery', () => {
     expect(
       (await service.listRequests(admin, false, { minEstimatedMaterial: 4, maxEstimatedMaterial: 7 })).requests.map(({ id }) => id),
     ).toEqual([first])
+  })
+
+  describe('material estimates', () => {
+    async function modelledResinPrint() {
+      const id = await request()
+      await repository.updateRequest(id, { requestedPrintType: 'resin' })
+      await repository.setModelDimensions(id, { widthMm: 10, depthMm: 10, heightMm: 20 }, 10_000, 3_000)
+      return id
+    }
+
+    async function listed(id: string) {
+      return (await service.listRequests(admin)).requests.find((candidate) => candidate.id === id)!
+    }
+
+    it('adds the default resin allowance to a listed print', async () => {
+      const id = await modelledResinPrint()
+
+      expect((await listed(id)).automaticEstimatedMaterial).toBeCloseTo(17)
+    })
+
+    it('applies a changed allowance to existing prints on the next read', async () => {
+      const id = await modelledResinPrint()
+      await repository.setSetting(PRICE_CALCULATOR_SETTING, {
+        ...DEFAULT_PRICE_CALCULATOR_SETTINGS,
+        supportsAndWastePercent: { resin: 50, filament: 10 },
+      })
+
+      expect((await listed(id)).automaticEstimatedMaterial).toBeCloseTo(16)
+    })
+
+    it('keeps an adjusted material as entered', async () => {
+      const id = await modelledResinPrint()
+      await repository.updateRequest(id, { estimatedMaterialOverride: 12 })
+
+      expect(requestPrintEstimate(await listed(id))?.material).toBe(12)
+    })
   })
 
   it('rejects oversized or malformed updates before persistence', async () => {
@@ -3062,6 +3099,608 @@ describe('STLQuestService crash recovery', () => {
         has_material: false,
         equipment_count: 1,
         outcome: undefined,
+      })
+    })
+
+    async function modelledPrint() {
+      const id = await request()
+      await repository.updateRequest(id, { printerId: slaPrinter.id, estimatedPrintMinutesOverride: 90 })
+      await repository.setModelDimensions(id, { widthMm: 10, depthMm: 10, heightMm: 20 }, 10_000, 3_000)
+      return id
+    }
+
+    async function materialUsed(requestId: string) {
+      return (await service.listUsage({ requestId }, admin)).find((event) => event.consumableId === resin.id)?.amount
+    }
+
+    it('records a printing step at the estimate with its allowance', async () => {
+      const requestId = await modelledPrint()
+
+      await service.recordStepUsage({ requestId, stage: 'printing', copies: 1, printerId: slaPrinter.id, consumableId: resin.id }, admin)
+
+      expect(await materialUsed(requestId)).toBeCloseTo(17)
+    })
+
+    it('records a printing step at an adjusted material without the allowance', async () => {
+      const requestId = await estimatedPrint()
+
+      await service.recordStepUsage({ requestId, stage: 'printing', copies: 1, printerId: slaPrinter.id, consumableId: resin.id }, admin)
+
+      expect(await materialUsed(requestId)).toBe(12)
+    })
+
+    describe('filling in past prints', () => {
+      const readyAt = new Date(2026, 4, 12).getTime()
+
+      async function pastPrint(movedAt = readyAt) {
+        const id = await estimatedPrint()
+        await repository.moveCopies({ id, from: 'todo', to: 'done', count: 1, movedAt })
+        return id
+      }
+
+      it('fills in a print at its estimate with the allowance', async () => {
+        const requestId = await modelledPrint()
+        await repository.moveCopies({ id: requestId, from: 'todo', to: 'done', count: 1, movedAt: readyAt })
+
+        await service.backfillUsage(admin)
+
+        expect(await materialUsed(requestId)).toBeCloseTo(17)
+      })
+
+      it('keeps what it filled in when the allowance changes later', async () => {
+        const requestId = await modelledPrint()
+        await repository.moveCopies({ id: requestId, from: 'todo', to: 'done', count: 1, movedAt: readyAt })
+        await service.backfillUsage(admin)
+
+        await repository.setSetting(PRICE_CALCULATOR_SETTING, {
+          ...DEFAULT_PRICE_CALCULATOR_SETTINGS,
+          supportsAndWastePercent: { resin: 100, filament: 10 },
+        })
+
+        expect(await materialUsed(requestId)).toBeCloseTo(17)
+      })
+
+      it('lets only admins fill them in', async () => {
+        await pastPrint()
+
+        await expect(service.backfillUsage(requester)).rejects.toMatchObject({ status: 403 })
+      })
+
+      it('lets only admins preview them', async () => {
+        await expect(service.usageBackfillPreview(requester)).rejects.toMatchObject({ status: 403 })
+      })
+
+      it('refuses while tracking is off', async () => {
+        await pastPrint()
+        await repository.setSetting(USAGE_TRACKING_SETTING, false)
+
+        await expect(service.backfillUsage(admin)).rejects.toMatchObject({ status: 409 })
+      })
+
+      it('previews the prints and copies it would fill in', async () => {
+        await pastPrint()
+        await pastPrint(readyAt + 1_000)
+
+        expect(await service.usageBackfillPreview(admin)).toEqual({ prints: 2, copies: 2, events: 4, from: readyAt, to: readyAt + 1_000 })
+      })
+
+      it('dates each print when its copies reached Ready', async () => {
+        await pastPrint()
+
+        await service.backfillUsage(admin)
+
+        expect(new Set((await service.listUsage({}, admin)).map((event) => event.createdAt))).toEqual(new Set([readyAt]))
+      })
+
+      it('dates an archived print by when its copies reached Ready, not when it was archived', async () => {
+        const requestId = await pastPrint()
+        await repository.setRequestsArchived([requestId], readyAt + 86_400_000)
+
+        await service.backfillUsage(admin)
+
+        expect(new Set((await service.listUsage({}, admin)).map((event) => event.createdAt))).toEqual(new Set([readyAt]))
+      })
+
+      it('marks what it records as estimated', async () => {
+        await pastPrint()
+
+        await service.backfillUsage(admin)
+
+        expect(new Set((await service.listUsage({}, admin)).map((event) => event.estimated))).toEqual(new Set([true]))
+      })
+
+      it('reports what it filled in', async () => {
+        await pastPrint()
+
+        expect(await service.backfillUsage(admin)).toMatchObject({ prints: 1, copies: 1, events: 2, from: readyAt, to: readyAt })
+      })
+
+      it('finds nothing new the second time', async () => {
+        await pastPrint()
+        await service.backfillUsage(admin)
+
+        expect(await service.backfillUsage(admin)).toEqual({ prints: 0, copies: 0, events: 0 })
+      })
+
+      it('skips a print whose usage was recorded', async () => {
+        const requestId = await pastPrint()
+        await service.recordStepUsage({ requestId, stage: 'finishing', copies: 1, equipmentIds: [wash.id] }, admin)
+
+        expect(await service.usageBackfillPreview(admin)).toMatchObject({ prints: 0 })
+      })
+
+      it('records everything in one transaction that undo takes back whole', async () => {
+        await pastPrint()
+        await pastPrint()
+        const { transactionId } = await service.backfillUsage(admin)
+
+        await service.undoUsage(transactionId!, admin)
+
+        expect(await service.listUsage({}, admin)).toEqual([])
+      })
+
+      it('offers the prints again once undone', async () => {
+        await pastPrint()
+        const { transactionId } = await service.backfillUsage(admin)
+        await service.undoUsage(transactionId!, admin)
+
+        expect(await service.usageBackfillPreview(admin)).toMatchObject({ prints: 1 })
+      })
+
+      it('leaves stock as it was', async () => {
+        await service.recordStockMovement({ consumableId: resin.id, kind: 'restock', amount: 1_000 }, admin)
+        await pastPrint()
+
+        await service.backfillUsage(admin)
+
+        expect((await service.stockLevels(admin)).find((level) => level.consumableId === resin.id)?.onHand).toBe(1_000)
+      })
+
+      it('fills in only its own workspace', async () => {
+        await pastPrint()
+        const other = await repository.scoped((await repository.createWorkspace({ id: admin.id }, 'Second farm')).id)
+        await other.setSetting(USAGE_TRACKING_SETTING, true)
+        const otherService = new STLQuestService(other, assets, staging, eventBus(), telemetry, { remove: removeTusUpload })
+
+        await otherService.backfillUsage(admin)
+
+        expect(await service.usageBackfillPreview(admin)).toMatchObject({ prints: 1 })
+      })
+
+      it('publishes the filled-in usage so other viewers refresh', async () => {
+        const publish = vi.fn()
+        const scopedService = new STLQuestService(repository, assets, staging, { publish }, telemetry, { remove: removeTusUpload })
+        await pastPrint()
+
+        await scopedService.backfillUsage(admin)
+
+        expect(publish).toHaveBeenCalledWith('usage.recorded')
+      })
+
+      it('captures a fill-in with counts only', async () => {
+        await pastPrint()
+        capture.mockClear()
+
+        await service.backfillUsage(admin)
+
+        expect(capture).toHaveBeenCalledWith(admin.id, 'usage_backfilled', { print_count: 1, copy_count: 1, event_count: 2 })
+      })
+    })
+
+    describe('plates', () => {
+      const fdm: PrinterProfile = { id: 'fdm', name: 'X1C', printType: 'filament' }
+
+      beforeEach(async () => {
+        await stock('printers', [fdm])
+      })
+
+      async function filamentPrint() {
+        const id = await request()
+        await repository.updateRequest(id, { printerId: fdm.id, estimatedMaterialOverride: 12, estimatedPrintMinutesOverride: 90 })
+        return id
+      }
+
+      async function plate(...requestIds: string[]) {
+        return await service.createPlate(
+          { printerId: fdm.id, otherStuff: false, items: requestIds.map((requestId) => ({ requestId, copies: 1 })) },
+          admin,
+        )
+      }
+
+      function measured(plateId: string, objects: { requestId?: string; amount: number }[], minutes = 60) {
+        return {
+          plateId,
+          minutes,
+          materials: [{ consumableId: filament.id }],
+          objects: objects.map(({ requestId, amount }) => ({ ...(requestId && { requestId }), amounts: [amount] })),
+          overhead: [0],
+        }
+      }
+
+      async function printing(requestId: string) {
+        return (await service.listUsage({ requestId }, admin)).filter((event) => event.stage === 'printing')
+      }
+
+      it('lets only admins plan a plate', async () => {
+        const requestId = await filamentPrint()
+
+        await expect(service.createPlate({ otherStuff: false, items: [{ requestId, copies: 1 }] }, requester)).rejects.toMatchObject({
+          status: 403,
+        })
+      })
+
+      it('refuses to plan a plate while tracking is off', async () => {
+        const requestId = await filamentPrint()
+        await repository.setSetting(USAGE_TRACKING_SETTING, false)
+
+        await expect(plate(requestId)).rejects.toMatchObject({ status: 409 })
+      })
+
+      it('numbers plates in the order they were planned', async () => {
+        await plate(await filamentPrint())
+
+        expect((await plate(await filamentPrint())).number).toBe(2)
+      })
+
+      it('refuses more copies than the print has', async () => {
+        const requestId = await filamentPrint()
+
+        await expect(
+          service.createPlate({ printerId: fdm.id, otherStuff: false, items: [{ requestId, copies: 2 }] }, admin),
+        ).rejects.toMatchObject({ status: 400 })
+      })
+
+      it('records each print’s material at the amount the slicer measured', async () => {
+        const requestId = await filamentPrint()
+        const { id } = await plate(requestId)
+
+        await service.recordPlate(measured(id, [{ requestId, amount: 30 }]), admin)
+
+        expect((await printing(requestId)).find((event) => event.consumableId === filament.id)?.amount).toBe(30)
+      })
+
+      it('records plate usage as measured rather than estimated', async () => {
+        const requestId = await filamentPrint()
+        const { id } = await plate(requestId)
+
+        await service.recordPlate(measured(id, [{ requestId, amount: 30 }]), admin)
+
+        expect((await printing(requestId)).some((event) => event.estimated)).toBe(false)
+      })
+
+      it('counts the plate against stock, other stuff on it included', async () => {
+        await service.recordStockMovement({ consumableId: filament.id, kind: 'restock', amount: 1_000 }, admin)
+        const requestId = await filamentPrint()
+        const { id } = await plate(requestId)
+
+        await service.recordPlate(measured(id, [{ requestId, amount: 30 }, { amount: 10 }]), admin)
+
+        expect((await service.stockLevels(admin)).find((level) => level.consumableId === filament.id)?.onHand).toBe(960)
+      })
+
+      it('charges no print for objects that are not in STL Quest', async () => {
+        const requestId = await filamentPrint()
+        const { id } = await plate(requestId)
+
+        await service.recordPlate(measured(id, [{ requestId, amount: 30 }, { amount: 10 }]), admin)
+
+        expect((await service.listPlates(admin))[0].recording?.otherAmount).toBe(10)
+      })
+
+      it('replaces the printing step recorded for the copies on the plate', async () => {
+        const requestId = await filamentPrint()
+        await service.recordStepUsage({ requestId, stage: 'printing', copies: 1, printerId: fdm.id, consumableId: filament.id }, admin)
+        const { id } = await plate(requestId)
+
+        const { transactionId } = await service.recordPlate(measured(id, [{ requestId, amount: 30 }]), admin)
+
+        expect(new Set((await printing(requestId)).map((event) => event.transactionId))).toEqual(new Set([transactionId]))
+      })
+
+      it('replaces a filled-in estimate of the print', async () => {
+        const requestId = await filamentPrint()
+        await repository.moveCopies({ id: requestId, from: 'todo', to: 'done', count: 1 })
+        await service.backfillUsage(admin)
+        const { id } = await plate(requestId)
+
+        const { transactionId } = await service.recordPlate(measured(id, [{ requestId, amount: 30 }]), admin)
+
+        expect(new Set((await printing(requestId)).map((event) => event.transactionId))).toEqual(new Set([transactionId]))
+      })
+
+      it('keeps a printing step recorded after the plate out of the count', async () => {
+        const requestId = await filamentPrint()
+        const { id } = await plate(requestId)
+        const { transactionId } = await service.recordPlate(measured(id, [{ requestId, amount: 30 }]), admin)
+
+        await service.recordStepUsage({ requestId, stage: 'printing', copies: 1, printerId: fdm.id, consumableId: filament.id }, admin)
+
+        expect(new Set((await printing(requestId)).map((event) => event.transactionId))).toEqual(new Set([transactionId]))
+      })
+
+      it('says when a printing step was already measured by a plate', async () => {
+        const requestId = await filamentPrint()
+        const { id } = await plate(requestId)
+        await service.recordPlate(measured(id, [{ requestId, amount: 30 }]), admin)
+
+        expect(await service.recordStepUsage({ requestId, stage: 'printing', copies: 1, printerId: fdm.id }, admin)).toMatchObject({
+          coveredByPlate: true,
+        })
+      })
+
+      it('replaces what it recorded before when recorded again', async () => {
+        const requestId = await filamentPrint()
+        const { id } = await plate(requestId)
+        await service.recordPlate(measured(id, [{ requestId, amount: 30 }]), admin)
+
+        const { transactionId } = await service.recordPlate(measured(id, [{ requestId, amount: 25 }]), admin)
+
+        expect(new Set((await printing(requestId)).map((event) => event.transactionId))).toEqual(new Set([transactionId]))
+      })
+
+      it('keeps replacing the earlier step when recorded again', async () => {
+        const requestId = await filamentPrint()
+        await service.recordStepUsage({ requestId, stage: 'printing', copies: 1, printerId: fdm.id, consumableId: filament.id }, admin)
+        const { id } = await plate(requestId)
+        await service.recordPlate(measured(id, [{ requestId, amount: 30 }]), admin)
+
+        const { transactionId } = await service.recordPlate(measured(id, [{ requestId, amount: 25 }]), admin)
+
+        expect(new Set((await printing(requestId)).map((event) => event.transactionId))).toEqual(new Set([transactionId]))
+      })
+
+      it('brings back the step it replaced when its usage is undone', async () => {
+        const requestId = await filamentPrint()
+        const step = await service.recordStepUsage(
+          { requestId, stage: 'printing', copies: 1, printerId: fdm.id, consumableId: filament.id },
+          admin,
+        )
+        const { id } = await plate(requestId)
+        const { transactionId } = await service.recordPlate(measured(id, [{ requestId, amount: 30 }]), admin)
+
+        await service.undoUsage(transactionId, admin)
+
+        expect(new Set((await printing(requestId)).map((event) => event.transactionId))).toEqual(new Set([step.transactionId]))
+      })
+
+      it('goes back to unrecorded when its usage is undone', async () => {
+        const requestId = await filamentPrint()
+        const { id } = await plate(requestId)
+        const { transactionId } = await service.recordPlate(measured(id, [{ requestId, amount: 30 }]), admin)
+
+        await service.undoUsage(transactionId, admin)
+
+        expect((await service.listPlates(admin))[0].recording).toBeUndefined()
+      })
+
+      it('undoes its usage when deleted', async () => {
+        const requestId = await filamentPrint()
+        const { id } = await plate(requestId)
+        await service.recordPlate(measured(id, [{ requestId, amount: 30 }]), admin)
+
+        await service.deletePlate(id, admin)
+
+        expect(await service.listUsage({}, admin)).toEqual([])
+      })
+
+      it('refuses an object put on a print that is not on the plate', async () => {
+        const requestId = await filamentPrint()
+        const { id } = await plate(requestId)
+
+        await expect(service.recordPlate(measured(id, [{ requestId: await filamentPrint(), amount: 30 }]), admin)).rejects.toMatchObject({
+          status: 400,
+        })
+      })
+
+      it('lets only admins record a plate', async () => {
+        const requestId = await filamentPrint()
+        const { id } = await plate(requestId)
+
+        await expect(service.recordPlate(measured(id, [{ requestId, amount: 30 }]), requester)).rejects.toMatchObject({ status: 403 })
+      })
+
+      it('splits a typed total by model volume', async () => {
+        const large = await filamentPrint()
+        const small = await filamentPrint()
+        await repository.setModelDimensions(large, { widthMm: 10, depthMm: 10, heightMm: 30 }, 3_000)
+        await repository.setModelDimensions(small, { widthMm: 10, depthMm: 10, heightMm: 10 }, 1_000)
+        const { id } = await plate(large, small)
+
+        const { plate: recorded } = await service.recordPlate(
+          { plateId: id, minutes: 60, materials: [{ consumableId: filament.id }], total: 40, otherShare: 0 },
+          admin,
+        )
+
+        expect(recorded.items.map(({ requestId, amount }) => ({ requestId, amount }))).toEqual(
+          expect.arrayContaining([
+            { requestId: large, amount: 30 },
+            { requestId: small, amount: 10 },
+          ]),
+        )
+      })
+
+      it('records the slicer’s amount for a print estimated from its model, without the allowance', async () => {
+        const requestId = await request()
+        await repository.updateRequest(requestId, { printerId: fdm.id, estimatedPrintMinutesOverride: 90 })
+        await repository.setModelDimensions(requestId, { widthMm: 10, depthMm: 10, heightMm: 20 }, 10_000, 3_000)
+        const { id } = await plate(requestId)
+
+        await service.recordPlate(measured(id, [{ requestId, amount: 30 }]), admin)
+
+        expect((await printing(requestId)).find((event) => event.consumableId === filament.id)?.amount).toBe(30)
+      })
+
+      it('splits a typed total by estimates that carry the allowance', async () => {
+        const modelled = await request()
+        await repository.updateRequest(modelled, { printerId: slaPrinter.id, estimatedPrintMinutesOverride: 90 })
+        await repository.setModelDimensions(modelled, { widthMm: 10, depthMm: 10, heightMm: 20 }, 10_000, 3_000)
+        const adjusted = await request()
+        await repository.updateRequest(adjusted, {
+          printerId: slaPrinter.id,
+          estimatedMaterialOverride: 34,
+          estimatedPrintMinutesOverride: 90,
+        })
+        const { id } = await service.createPlate(
+          {
+            printerId: slaPrinter.id,
+            otherStuff: false,
+            items: [
+              { requestId: modelled, copies: 1 },
+              { requestId: adjusted, copies: 1 },
+            ],
+          },
+          admin,
+        )
+
+        const { plate: recorded } = await service.recordPlate(
+          { plateId: id, minutes: 60, materials: [{ consumableId: resin.id }], total: 51, otherShare: 0 },
+          admin,
+        )
+
+        expect(recorded.items.find(({ requestId }) => requestId === modelled)?.amount).toBeCloseTo(17)
+      })
+
+      it('adds a material named on the spot to the library without a price', async () => {
+        const requestId = await filamentPrint()
+        const { id } = await plate(requestId)
+
+        await service.recordPlate({ ...measured(id, [{ requestId, amount: 30 }]), materials: [{ name: 'Mystery PLA' }] }, admin)
+
+        expect((await repository.listInventory('consumables')).find(({ name }) => name === 'Mystery PLA')).toMatchObject({
+          kind: 'filament',
+          pricePerKg: 0,
+        })
+      })
+
+      it('keeps plates to their own workspace', async () => {
+        const { id } = await plate(await filamentPrint())
+        const other = await repository.scoped((await repository.createWorkspace({ id: admin.id }, 'Second farm')).id)
+        await other.setSetting(USAGE_TRACKING_SETTING, true)
+        const otherService = new STLQuestService(other, assets, staging, eventBus(), telemetry, { remove: removeTusUpload })
+
+        await expect(otherService.deletePlate(id, admin)).rejects.toMatchObject({ status: 404 })
+      })
+
+      it('refuses slicer amounts for a resin plate, which only takes typed totals', async () => {
+        const requestId = await estimatedPrint()
+        const { id } = await service.createPlate({ printerId: slaPrinter.id, otherStuff: false, items: [{ requestId, copies: 1 }] }, admin)
+
+        await expect(
+          service.recordPlate(
+            { plateId: id, minutes: 60, materials: [{ consumableId: resin.id }], objects: [{ requestId, amounts: [30] }], overhead: [0] },
+            admin,
+          ),
+        ).rejects.toMatchObject({ status: 400 })
+      })
+
+      it('captures a recorded plate with counts and its method only', async () => {
+        const requestId = await filamentPrint()
+        const { id } = await plate(requestId)
+        capture.mockClear()
+
+        await service.recordPlate(measured(id, [{ requestId, amount: 30 }, { amount: 10 }]), admin)
+
+        expect(capture).toHaveBeenCalledWith(admin.id, 'plate_recorded', {
+          source: 'file',
+          method: 'measured',
+          print_count: 1,
+          filament_count: 1,
+          object_count: 2,
+          matched_count: 1,
+          has_other: true,
+          replaced: false,
+        })
+      })
+    })
+
+    describe('what a print was charged', () => {
+      it('records it in the workspace currency', async () => {
+        const requestId = await request()
+
+        await service.setRequestCharge(requestId, 25, admin)
+
+        expect((await repository.getRequest(requestId))?.charged).toEqual({ amount: 25, currency: 'EUR' })
+      })
+
+      it('clears it', async () => {
+        const requestId = await request()
+        await service.setRequestCharge(requestId, 25, admin)
+
+        await service.setRequestCharge(requestId, null, admin)
+
+        expect((await repository.getRequest(requestId))?.charged).toBeUndefined()
+      })
+
+      it('lets only admins record it', async () => {
+        const requestId = await request()
+
+        await expect(service.setRequestCharge(requestId, 25, requester)).rejects.toMatchObject({ status: 403 })
+      })
+
+      it('shows it to admins', async () => {
+        const requestId = await request()
+        await service.setRequestCharge(requestId, 25, admin)
+
+        expect((await service.listRequests(admin)).requests[0].charged).toEqual({ amount: 25, currency: 'EUR' })
+      })
+
+      it('hides it from the person who asked for the print', async () => {
+        const requestId = await request()
+        await service.setRequestCharge(requestId, 25, admin)
+
+        expect((await service.listRequests(requester)).requests[0].charged).toBeUndefined()
+      })
+
+      describe('over the print’s whole life', () => {
+        const october = new Date(2026, 9, 20).getTime()
+        const november = new Date(2026, 10, 12).getTime()
+
+        async function spanningPrint() {
+          const requestId = await request()
+          await service.setRequestCharge(requestId, 20, admin)
+          const used = (createdAt: number) => ({
+            id: crypto.randomUUID(),
+            transactionId: crypto.randomUUID(),
+            stage: 'printing' as const,
+            kind: 'use' as const,
+            requestId,
+            consumableId: ipa.id,
+            amount: 100,
+            unit: 'ml' as const,
+            unitPrice: 0.04,
+            currency: 'EUR' as const,
+            createdAt,
+          })
+          await repository.appendUsageEvents([used(october), used(november)])
+          return requestId
+        }
+
+        it('gives each charged print what it used in every period and when it finished', async () => {
+          const requestId = await spanningPrint()
+
+          expect(await service.chargedPrints(admin)).toEqual([
+            { requestId, charged: { amount: 20, currency: 'EUR' }, cost: expect.closeTo(8), finishedAt: november },
+          ])
+        })
+
+        it('shows them only to admins', async () => {
+          await expect(service.chargedPrints(requester)).rejects.toMatchObject({ status: 403 })
+        })
+
+        it('hides them while tracking is off', async () => {
+          await repository.setSetting(USAGE_TRACKING_SETTING, false)
+
+          await expect(service.chargedPrints(admin)).rejects.toMatchObject({ status: 409 })
+        })
+
+        it('keeps them within their workspace', async () => {
+          await spanningPrint()
+          const other = await repository.scoped((await repository.createWorkspace({ id: admin.id }, 'Second farm')).id)
+          await other.setSetting(USAGE_TRACKING_SETTING, true)
+          const otherService = new STLQuestService(other, assets, staging, eventBus(), telemetry, { remove: removeTusUpload })
+
+          expect(await otherService.chargedPrints(admin)).toEqual([])
+        })
       })
     })
   })

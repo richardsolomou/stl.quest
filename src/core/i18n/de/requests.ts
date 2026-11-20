@@ -110,6 +110,13 @@ export const requests: typeof en = {
     loadingThumbnail: 'Vorschaubild wird geladen',
   },
   downloadModel: 'Modell herunterladen',
+  charge: {
+    label: 'Berechnet',
+    placeholder: 'Nicht erfasst',
+    hint: 'Was du für diesen Druck berechnet hast. Nur Admins sehen es; Ausgaben nutzt es für den Gewinn.',
+    failed: 'Der berechnete Betrag konnte nicht gespeichert werden.',
+  },
+  plates: 'Druckplatten',
   cost: {
     label: 'Geschätzte Kosten',
     suggested: (price, quantity) => (quantity > 1 ? `${price} empfohlen für alle ${quantity} Kopien` : `${price} empfohlen`),

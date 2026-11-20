@@ -4,7 +4,7 @@ import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/clo
 import { useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { SearchX } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -70,7 +70,9 @@ import { BulkMoveDialog } from './BulkMoveDialog'
 import { BulkDeleteDialog } from './BulkDeleteDialog'
 import { useUsageTracking, useWorkspacePrintTypes, useWorkspaceSlug } from '../workspace'
 import { signalProductTourProgress } from '../productTour'
-import { removeRequestFromQueries, restoreRequestQueries } from '../queries'
+import { platesQuery, removeRequestFromQueries, restoreRequestQueries, type PlateView } from '../queries'
+import { PlanPlateDialog } from './plates/PlanPlateDialog'
+import { PlateDialog, type PlateMode } from './plates/PlateDialog'
 import { RepeatRequestDialog } from './RepeatRequestDialog'
 import { TagPickerDialog } from './TagPickerDialog'
 import { StepUsageSheet } from './StepUsageSheet'
@@ -200,6 +202,10 @@ export function Board({
   const priorityStatus = workflow.statuses[0].id
   const completedStatus = workflow.statuses.at(-1)?.id
   const usageTracking = useUsageTracking()
+  const plateTracking = isAdmin && usageTracking
+  const plates = useQuery({ ...platesQuery(workspaceSlug), enabled: plateTracking }).data?.plates
+  const [planningPlate, setPlanningPlate] = useState(false)
+  const [openPlate, setOpenPlate] = useState<{ id: string; mode: PlateMode }>()
 
   const clearSelection = useCallback(() => {
     setSelection(null)
@@ -585,6 +591,7 @@ export function Board({
   const entriesOf = (status: StatusId) => statusEntries.get(status)?.entries ?? []
   const totalOf = (status: StatusId) => statusEntries.get(status)?.total ?? 0
   const stations = boardStations(printers, entriesOf('in_progress'), entriesOf('up_next'))
+  const stationPlates = platesOnStations(plates ?? [], requests, countsOf)
   const idlePrinters = stations.filter((station) => station.printer && station.entries.length === 0).length
   const readyPeople = new Set(entriesOf('done').map(({ request }) => request.requesterId)).size
   const advanceTargets = new Map(
@@ -648,6 +655,8 @@ export function Board({
         empty={emptyZones[status]}
         entries={entriesOf(status)}
         stations={layout === 'stations' || advanceTargets.get(status) === 'in_progress' ? stations : undefined}
+        stationPlates={layout === 'stations' ? stationPlates : undefined}
+        onOpenPlate={plateTracking ? (id, mode) => setOpenPlate({ id, mode }) : undefined}
         total={totalOf(status)}
         onSelectAll={() =>
           setSelection(
@@ -816,10 +825,33 @@ export function Board({
                 }
               : undefined
           }
+          plate={plateTracking ? { onClick: () => setPlanningPlate(true) } : undefined}
           archive={canArchiveSelectedRequests ? { onClick: archiveSelection } : undefined}
           remove={canDeleteSelectedRequests ? { onClick: () => setConfirmDelete(true) } : undefined}
           overLimit={selectedEntries.length > MAX_BULK_CARDS}
           onClear={clearSelection}
+        />
+      )}
+      {planningPlate && selection && selectedEntries.length > 0 && (
+        <PlanPlateDialog
+          prints={selectedCopies.flatMap(({ id, copies }) => {
+            const request = requests.find((candidate) => candidate.id === id)
+            return request ? [{ request, copies }] : []
+          })}
+          printers={printers}
+          onDone={() => {
+            setPlanningPlate(false)
+            clearSelection()
+          }}
+          onCancel={() => setPlanningPlate(false)}
+        />
+      )}
+      {openPlate && (
+        <PlateDialog
+          key={`${openPlate.id}:${openPlate.mode}`}
+          plateId={openPlate.id}
+          mode={openPlate.mode}
+          onClose={() => setOpenPlate(undefined)}
         />
       )}
       {stepMoves.length > 0 && (
@@ -1039,4 +1071,22 @@ export function Board({
       )}
     </section>
   )
+}
+
+/**
+ * The plates a station shows: those not recorded yet, and recorded ones while any of their prints is still printing, so
+ * a plate leaves the station once its run is off the printer.
+ */
+function platesOnStations(
+  plates: PlateView[],
+  requests: PublicPrintRequest[],
+  countsOf: (request: PublicPrintRequest) => Record<string, number>,
+) {
+  const printing = new Set(requests.filter((request) => (countsOf(request).in_progress ?? 0) > 0).map(({ id }) => id))
+  const byPrinter = new Map<string, PlateView[]>()
+  for (const plate of plates) {
+    if (!plate.printerId || (plate.recording && !plate.items.some(({ requestId }) => printing.has(requestId)))) continue
+    byPrinter.set(plate.printerId, [...(byPrinter.get(plate.printerId) ?? []), plate])
+  }
+  return byPrinter
 }

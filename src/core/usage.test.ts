@@ -162,6 +162,10 @@ describe('stockOnHand', () => {
       ),
     ).toBe(820)
   })
+
+  it('leaves estimated use from past prints out of stock', () => {
+    expect(stockOnHand([event({}), event({ kind: 'use', amount: 50, estimated: true })], ipa)).toBe(1_000)
+  })
 })
 
 describe('usagePrefills', () => {
@@ -235,5 +239,11 @@ describe('usagePrefills', () => {
     const prefills = usagePrefills([event({ stage: 'finishing', requestId: 'unknown', equipmentId: wash.id })], [], [wash])
 
     expect(prefills.finishing).toEqual({ resin: [wash.id] })
+  })
+
+  it('prefills nothing from estimates of past prints', () => {
+    const prefills = usagePrefills([event({ printerId: printer.id, estimated: true })], [printer], [])
+
+    expect(prefills.printers).toEqual({})
   })
 })
