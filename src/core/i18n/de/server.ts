@@ -105,6 +105,11 @@ export const server: typeof en = {
     unknownPrinter: 'unbekannter Drucker',
     printerArchived: 'der Drucker ist archiviert',
   },
+  inventory: {
+    notFound: 'dieser Eintrag existiert nicht mehr; laden Sie die Seite neu',
+    exists: 'ein Eintrag mit dieser ID existiert bereits',
+    full: (limit: number) => `ein Arbeitsbereich kann bis zu ${limit} davon gleichzeitig nutzen; archivieren Sie zuerst einen`,
+  },
   usage: {
     unknownConsumable: 'unbekanntes Verbrauchsmaterial',
     unknownEquipment: 'unbekanntes Gerät',

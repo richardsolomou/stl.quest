@@ -4,7 +4,9 @@ import { workflow } from './workflow'
 import { getPrinterPreset, PRINTER_PRESETS } from './printerPresets'
 import type { PrinterPreset } from './printerPresets'
 
-export const PRINTERS_SETTING = 'printers'
+export const MAX_PRINTERS = 500
+/** Set when an admin finishes printer setup without adding one, so setup is not offered again. */
+export const PRINTERS_SKIPPED_SETTING = 'printers-skipped'
 
 /** A catalogue printer takes its print type and build volume from its model; only a custom printer keeps its own. */
 export function normalizePrinterProfile(profile: Partial<PrinterProfile> & Pick<PrinterProfile, 'id' | 'name'>): PrinterProfile {
@@ -22,7 +24,6 @@ export function normalizePrinterProfile(profile: Partial<PrinterProfile> & Pick<
     ...(!preset && positiveNumber(profile.powerWatts) ? { powerWatts: profile.powerWatts } : {}),
     ...(profile.addOnPresetIds?.length ? { addOnPresetIds: profile.addOnPresetIds } : {}),
     ...(profile.archived ? { archived: true } : {}),
-    ...(profile.used ? { used: true } : {}),
   }
 }
 
@@ -60,13 +61,19 @@ export function uniquePrinterName(name: string, profiles: PrinterProfile[]) {
   return `${name} · ${number}`
 }
 
+/** Why `printer` cannot be stored among `profiles`, or '' if it can: an active printer needs a name no other active one has. */
+export function printerValidationError(printer: PrinterProfile, profiles: PrinterProfile[], t: Messages) {
+  if (printer.archived) return ''
+  const name = printer.name.trim().toLowerCase()
+  if (!name) return t.settings.printers.validation.missingName
+  const taken = profiles.some((other) => other.id !== printer.id && !other.archived && other.name.trim().toLowerCase() === name)
+  return taken ? t.settings.printers.validation.duplicateName : ''
+}
+
 export function printerProfilesValidationError(profiles: PrinterProfile[], t: Messages) {
-  const names = new Set<string>()
-  for (const profile of profiles.filter(({ archived }) => !archived)) {
-    const name = profile.name.trim()
-    if (!name) return t.settings.printers.validation.missingName
-    if (names.has(name.toLowerCase())) return t.settings.printers.validation.duplicateName
-    names.add(name.toLowerCase())
+  for (const profile of profiles) {
+    const error = printerValidationError(profile, profiles, t)
+    if (error) return error
   }
   return ''
 }
@@ -133,11 +140,6 @@ export function printerFitsModel(printer: PrinterProfile, model?: ModelDimension
     (model.widthMm <= normalized.widthMm && model.depthMm <= normalized.depthMm) ||
     (model.widthMm <= normalized.depthMm && model.depthMm <= normalized.widthMm)
   return plateFits && (!normalized.heightMm || model.heightMm <= normalized.heightMm)
-}
-
-export async function storedPrinterProfiles(repository: { getSetting<T>(key: string): Promise<T | undefined> }) {
-  const stored = (await repository.getSetting<PrinterProfile[]>(PRINTERS_SETTING)) ?? []
-  return stored.map(normalizePrinterProfile)
 }
 
 function positiveNumber(value?: number) {

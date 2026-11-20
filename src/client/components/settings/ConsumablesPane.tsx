@@ -1,11 +1,11 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useServerFn } from '@tanstack/react-start'
-import { ChevronRight, Plus, Search } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { ChevronRight, Plus, RotateCcw, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu'
+import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
 import {
   consumablePrice,
   consumablesOfKind,
@@ -26,8 +26,9 @@ import { resinFromPreset, type ResinPreset } from '../../../core/resinPresets'
 import { partFromPreset, type PartSuggestion } from '../../../core/stock'
 import { PRINT_TYPES, type PrintType } from '../../../core/types'
 import type { StockLevel } from '../../../core/usage'
-import { saveConsumables } from '../../../server/fns'
 import { useI18n } from '../../i18n'
+import { useInventory } from '../../inventory'
+import { activeItems } from '../../../core/inventory'
 import { createId } from '../../id'
 import { matchesListSearch, showsListSearch } from '../../listSearch'
 import { catalogueQuery, consumablesQuery, priceCalculatorSettingsQuery, printersQuery, stockQuery } from '../../queries'
@@ -92,22 +93,12 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
   const tracking = useUsageTracking()
   const stock = useQuery({ ...stockQuery(workspaceSlug), enabled: tracking }).data?.stock
   const levels = useMemo(() => stock ?? [], [stock])
-  const callSave = useServerFn(saveConsumables)
-  const queryClient = useQueryClient()
-  const queryKey = consumablesQuery(workspaceSlug).queryKey
-  const mutation = useMutation({
-    mutationFn: (consumables: Consumable[]) => callSave({ data: { workspaceSlug, consumables } }),
-    onSuccess: (result) => queryClient.setQueryData(queryKey, result),
-  })
-  // The cache rather than this render's list, so a save never drops a change another admin made meanwhile.
-  const latest = () => queryClient.getQueryData(queryKey)?.consumables ?? saved
-  const persist = (consumables: Consumable[]) => mutation.mutateAsync(consumables)
+  const { mutation, save, setArchived } = useInventory('consumables')
   // A new item scrolls into view once it is stored, so it is found where it landed when its dialog closes.
   const [added, setAdded] = useState<string>()
   const saveItem = async (item: Consumable) => {
-    const list = latest()
-    const isNew = !list.some(({ id }) => id === item.id)
-    await persist(isNew ? [...list, item] : list.map((other) => (other.id === item.id ? item : other)))
+    const isNew = !saved.some(({ id }) => id === item.id)
+    await save(item)
     if (isNew) setAdded(item.id)
     if (isNew && (item.kind === 'resin' || item.kind === 'filament')) signalProductTourProgress('stock')
   }
@@ -118,24 +109,13 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
   const resins = useQuery({ ...catalogueQuery('resins'), enabled: picking?.kind === 'resin' }).data
   const filaments = useQuery({ ...catalogueQuery('filaments'), enabled: picking?.kind === 'filament' }).data
   const partCatalogue = useQuery(catalogueQuery('parts')).data
-  // Removes the item as stored, which its dialog's last save may have changed since it opened.
-  const remove = (removedId: string) => {
+  const failed = () => void toast.error(copy.notSaved)
+  const archive = (item: Consumable) => {
     setEditing(null)
-    const list = latest()
-    const index = list.findIndex(({ id }) => id === removedId)
-    const removed = list[index]
-    if (!removed) return
-    const failed = () => void toast.error(copy.notSaved)
-    persist(list.filter(({ id }) => id !== removed.id)).then(
+    setArchived(item.id, true).then(
       () =>
-        toast(copy.removed(removed.name), {
-          action: {
-            label: copy.undo,
-            onClick: () => {
-              const now = latest()
-              if (!now.some(({ id }) => id === removed.id)) persist([...now.slice(0, index), removed, ...now.slice(index)]).catch(failed)
-            },
-          },
+        toast(copy.archivedItem(item.name), {
+          action: { label: copy.undo, onClick: () => void setArchived(item.id, false).catch(failed) },
         }),
       failed,
     )
@@ -177,7 +157,9 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
     return parts.length || matchesListSearch(search, [group.label]) ? [{ ...group, parts }] : []
   })
   const partCount = consumablesOfKind(saved, 'part').length
-  const noMatches = search.trim() !== '' && !saved.some((item) => item.kind !== 'part' && found(item)) && partGroups.length === 0
+  const active = activeItems(saved)
+  const archived = saved.filter((item) => item.archived)
+  const noMatches = search.trim() !== '' && !active.some((item) => item.kind !== 'part' && found(item)) && partGroups.length === 0
   // A material the workspace neither prints nor stocks folds to one invitation line instead of an empty section.
   const materials = {
     resin: { items: consumablesOfKind(saved, 'resin'), addLabel: copy.resins.add },
@@ -208,6 +190,7 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
       />
     )
   const supplies = consumablesOfKind(saved, 'supply')
+  const kindTitles = { resin: copy.resins.title, filament: copy.filaments.title, supply: copy.supplies.title, part: copy.parts.title }
 
   return (
     <SettingsPage data-saving={mutation.isPending}>
@@ -245,7 +228,7 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
       ) : (
         <UsageTrackingInvite source="consumables" line={t.settings.board.tracking.invite.consumables} />
       )}
-      {showsListSearch(saved.length) && (
+      {showsListSearch(active.length) && (
         <InputGroup className="max-w-sm bg-field">
           <InputGroupAddon>
             <Search aria-hidden="true" />
@@ -306,6 +289,39 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
         </div>
       </SettingsSection>
 
+      {archived.length > 0 && (
+        <SettingsSection layout="stacked" title={copy.archived.title} description={copy.archived.description}>
+          <div className="@container overflow-hidden rounded-lg border">
+            <Table>
+              <TableBody>
+                {archived.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="w-full max-w-0">
+                      <span className="block truncate font-medium" title={item.name}>
+                        {item.name}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">{kindTitles[item.kind]}</span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={mutation.isPending}
+                        onClick={() => void setArchived(item.id, false).catch(failed)}
+                      >
+                        <RotateCcw />
+                        <span className="@max-sm:sr-only">{copy.archived.restore}</span>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </SettingsSection>
+      )}
+
       {picking?.kind === 'resin' && (
         <MaterialPicker
           kind="resin"
@@ -357,7 +373,7 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
           symbol={symbol}
           money={money}
           onSave={saveItem}
-          onRemove={() => remove(editing.id)}
+          onArchive={() => archive(editing)}
           onClose={() => setEditing(null)}
         />
       )}

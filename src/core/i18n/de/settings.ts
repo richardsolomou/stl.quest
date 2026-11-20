@@ -209,8 +209,14 @@ export const settings: typeof en = {
     loading: 'Verbrauchsmaterial wird geladen…',
     loadError: 'Verbrauchsmaterial konnte nicht geladen werden',
     notSaved: 'Verbrauchsmaterial konnte nicht gespeichert werden. Bitte erneut versuchen.',
-    removed: (name: string) => `${name} entfernt`,
+    archive: 'Archivieren',
+    archivedItem: (name: string) => `${name} archiviert`,
     undo: 'Rückgängig',
+    archived: {
+      title: 'Archiviertes Verbrauchsmaterial',
+      description: 'Wird nicht mehr angeboten oder für Angebote verwendet, bleibt aber für Bestand und Ausgaben erhalten, die es nennen.',
+      restore: 'Wiederherstellen',
+    },
     name: 'Name',
     picker: {
       search: 'Nach Marke, Name oder Typ suchen',
@@ -432,12 +438,6 @@ export const settings: typeof en = {
       description:
         'Wird bei Nachbearbeitung und Vorbereitung nicht mehr angeboten, bleibt aber für die Drucke erhalten, die sie genutzt haben.',
       restore: 'Wiederherstellen',
-      remove: 'Entfernen',
-    },
-    remove: {
-      title: (name: string) => `„${name}“ entfernen?`,
-      description: 'Sie wird dauerhaft entfernt. Drucke, die sie genutzt haben, behalten ihre Aufzeichnungen.',
-      action: 'Ausrüstung entfernen',
     },
     picker: {
       title: 'Ausrüstung hinzufügen',

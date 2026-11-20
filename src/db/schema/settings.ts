@@ -51,3 +51,9 @@ export const invites = sqliteTable(
   },
   (table) => [check('invites_role_check', sql`${table.role} IN ('admin', 'requester')`)],
 )
+
+/** Data migrations (src/db/dataMigrations) the deployment has applied; they rewrite every workspace at once. */
+export const dataMigrations = sqliteTable('data_migrations', {
+  id: text().primaryKey(),
+  appliedAt: integer('applied_at').notNull(),
+})

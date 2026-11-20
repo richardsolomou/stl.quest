@@ -25,7 +25,7 @@ import {
 } from '../../../core/equipmentPresets'
 import { printerWear, type PriceCalculatorCurrency } from '../../../core/priceCalculator'
 import { getPrinterPreset, type PrinterPreset } from '../../../core/printerPresets'
-import { normalizePrinterProfile, printerModelName, printerProfilesValidationError } from '../../../core/printers'
+import { normalizePrinterProfile, printerModelName, printerValidationError } from '../../../core/printers'
 import { PRINT_TYPES, type PrinterProfile } from '../../../core/types'
 import { useI18n } from '../../i18n'
 import { useAutosave } from '../../useAutosave'
@@ -77,10 +77,7 @@ export function PrinterDialog({
   const preset = getPrinterPreset(draft.presetId)
   const modelName = preset && printerModelName(preset)
   const resolved = normalizePrinterProfile({ ...draft, name: draft.name.trim() || modelName || '' })
-  const validation = printerProfilesValidationError(
-    isNew ? [...profiles, resolved] : profiles.map((profile) => (profile.id === resolved.id ? resolved : profile)),
-    t,
-  )
+  const validation = printerValidationError(resolved, profiles, t)
   const autosave = useAutosave({ value: resolved, valid: !validation, save: onSave })
   // A new printer starts without a name, which is not worth calling out until the dialog is edited.
   const touched = JSON.stringify(draft) !== JSON.stringify(initial)
@@ -99,7 +96,7 @@ export function PrinterDialog({
         <>
           {!isNew && onRemove && (
             <Button type="button" variant="ghost" className="text-muted-foreground hover:text-destructive sm:mr-auto" onClick={onRemove}>
-              {printer.used ? copy.archive : copy.remove}
+              {stored ? copy.archive : copy.remove}
             </Button>
           )}
           <Button type="button" onClick={() => void close()}>

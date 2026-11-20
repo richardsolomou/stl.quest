@@ -1,7 +1,5 @@
-import { CONSUMABLES_SETTING, consumablesOfKind, type Consumable } from './consumables'
+import { consumablesOfKind, type Consumable } from './consumables'
 import { isPrinterAddOn } from './equipmentPresets'
-import { PRICE_CALCULATOR_SETTING } from './priceCalculator'
-import { PRINTERS_SETTING } from './printers'
 import { PRINT_TYPES, type PrinterProfile, type PrintType } from './types'
 
 /** What v1.51 and v1.52 kept per printer in the calculator settings, and the workspace-wide setup a printer without them used. */
@@ -49,7 +47,7 @@ type CostingSettings = { priceCalculator: Record<string, unknown>; printers: Pri
 /**
  * Moves what v1.51 and v1.52 stored in the calculator settings to where costing lives now: material prices become
  * library resins and filaments, and each printer's wear rate, printing power, and bolt-on modules move onto the printer.
- * Returns undefined once nothing is left to move, so it runs once however often it is called.
+ * Returns undefined once nothing is left to move. Data migration 0001 applies it, so it stays as released.
  */
 export function upgradeLegacyCosting({ priceCalculator, printers, consumables }: CostingSettings): CostingSettings | undefined {
   if (!LEGACY_FIELDS.some((field) => field in priceCalculator)) return undefined
@@ -173,27 +171,4 @@ function upgradePrinter(printer: PrinterProfile, legacy: LegacySettings, costs?:
 
 function positive(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0
-}
-
-/**
- * Upgrades one workspace's stored costing in a single write, touching only the settings it changes, so a workspace
- * that never saved printers or consumables keeps them unsaved. Returns whether anything was upgraded.
- */
-export async function upgradeLegacyCostingSettings(repository: {
-  getSetting<T>(key: string): Promise<T | undefined>
-  setSettings(values: Record<string, unknown>): Promise<void>
-}) {
-  const priceCalculator = await repository.getSetting<Record<string, unknown>>(PRICE_CALCULATOR_SETTING)
-  if (!priceCalculator) return false
-  const printers = await repository.getSetting<PrinterProfile[]>(PRINTERS_SETTING)
-  const consumables = await repository.getSetting<Consumable[]>(CONSUMABLES_SETTING)
-  const upgraded = upgradeLegacyCosting({ priceCalculator, printers: printers ?? [], consumables: consumables ?? [] })
-  if (!upgraded) return false
-  const changed = (stored: unknown, next: unknown[]) => JSON.stringify(stored ?? []) !== JSON.stringify(next)
-  await repository.setSettings({
-    [PRICE_CALCULATOR_SETTING]: upgraded.priceCalculator,
-    ...(changed(printers, upgraded.printers) && { [PRINTERS_SETTING]: upgraded.printers }),
-    ...(changed(consumables, upgraded.consumables) && { [CONSUMABLES_SETTING]: upgraded.consumables }),
-  })
-  return true
 }

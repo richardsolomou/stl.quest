@@ -209,8 +209,14 @@ export const settings: typeof en = {
     loading: 'Chargement des consommables…',
     loadError: 'Impossible de charger les consommables',
     notSaved: 'Impossible d’enregistrer vos consommables. Réessayez.',
-    removed: (name: string) => `${name} supprimé`,
+    archive: 'Archiver',
+    archivedItem: (name: string) => `${name} archivé`,
     undo: 'Annuler',
+    archived: {
+      title: 'Consommables archivés',
+      description: 'Ne sont plus proposés ni utilisés pour chiffrer les devis, mais restent liés au stock et aux dépenses qui les citent.',
+      restore: 'Restaurer',
+    },
     name: 'Nom',
     picker: {
       search: 'Rechercher par marque, nom ou type',
@@ -433,12 +439,6 @@ export const settings: typeof en = {
       title: 'Équipement archivé',
       description: 'N’est plus proposé à la finition ni à la préparation, mais reste lié aux impressions qui l’ont utilisé.',
       restore: 'Restaurer',
-      remove: 'Supprimer',
-    },
-    remove: {
-      title: (name: string) => `Supprimer « ${name} » ?`,
-      description: 'Il est supprimé définitivement. Les impressions qui l’ont utilisé gardent ce qu’elles ont enregistré.',
-      action: 'Supprimer l’équipement',
     },
     picker: {
       title: 'Ajouter un équipement',

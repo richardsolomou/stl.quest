@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { PrinterProfile, Repository } from './types'
 import { PRINT_TYPE_SETTING, printTypeCopy, storedPrintTypeChoice, storedWorkspacePrintTypes, workspacePrintTypes } from './printTypes'
 
 const resin = { printType: 'resin' as const }
@@ -31,8 +32,9 @@ describe('workspace print types', () => {
 })
 
 describe('stored print types', () => {
-  const repository = (settings: Record<string, unknown>) => ({
+  const repository = (settings: Record<string, unknown>, printers: PrinterProfile[] = []) => ({
     getSetting: async <T>(key: string) => settings[key] as T | undefined,
+    listInventory: (async () => printers) as Repository['listInventory'],
   })
 
   it('reads an unknown stored choice as automatic', async () => {
@@ -40,7 +42,7 @@ describe('stored print types', () => {
   })
 
   it('resolves the stored choice against the stored printers', async () => {
-    expect(await storedWorkspacePrintTypes(repository({ printers: [{ id: 'p', name: 'Saturn', printType: 'resin' }] }))).toEqual(['resin'])
+    expect(await storedWorkspacePrintTypes(repository({}, [{ id: 'p', name: 'Saturn', printType: 'resin' }]))).toEqual(['resin'])
   })
 })
 

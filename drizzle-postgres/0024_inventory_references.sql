@@ -1,0 +1,4 @@
+ALTER TABLE "requests" ADD CONSTRAINT "requests_workspace_printer_fk" FOREIGN KEY ("workspace_id","printer_id") REFERENCES "public"."printers"("workspace_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "usage_events" ADD CONSTRAINT "usage_events_workspace_printer_fk" FOREIGN KEY ("workspace_id","printer_id") REFERENCES "public"."printers"("workspace_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "usage_events" ADD CONSTRAINT "usage_events_workspace_equipment_fk" FOREIGN KEY ("workspace_id","equipment_id") REFERENCES "public"."equipment"("workspace_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "usage_events" ADD CONSTRAINT "usage_events_workspace_consumable_fk" FOREIGN KEY ("workspace_id","consumable_id") REFERENCES "public"."consumables"("workspace_id","id") ON DELETE no action ON UPDATE no action;

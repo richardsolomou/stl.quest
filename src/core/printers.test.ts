@@ -9,6 +9,7 @@ import {
   printerProfileChanges,
   printerProfileFromPreset,
   printerProfilesValidationError,
+  printerValidationError,
   uniquePrinterName,
 } from './printers'
 import { PRINTER_PRESETS } from './printerPresets'
@@ -49,6 +50,16 @@ describe('printer profiles', () => {
 
   it('rejects printer names that only differ by case', () => {
     expect(printerProfilesValidationError([small, { ...large, name: 'small' }], messagesFor('en'))).toBe('Printer names must be unique.')
+  })
+
+  it('checks only the printer being stored, so names other printers already share do not block it', () => {
+    const twins = [small, { ...large, name: 'Twin' }, { ...large, id: 'twin-2', name: 'Twin' }]
+
+    expect(printerValidationError({ ...small, name: 'Renamed' }, twins, messagesFor('en'))).toBe('')
+  })
+
+  it('lets an archived printer keep a name an active one now has', () => {
+    expect(printerValidationError({ ...large, name: small.name, archived: true }, [small], messagesFor('en'))).toBe('')
   })
 
   it('summarizes printer configuration changes', () => {

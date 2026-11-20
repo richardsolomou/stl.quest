@@ -1,7 +1,6 @@
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useServerFn } from '@tanstack/react-start'
-import { ChevronRight, RotateCcw, Search, Trash2 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { ChevronRight, RotateCcw, Search } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
@@ -19,13 +18,12 @@ import {
 import { equipmentFromPreset, equipmentPresetName, getEquipmentPreset, type EquipmentPreset } from '../../../core/equipmentPresets'
 import { errorMessage } from '../../../core/error'
 import type { PrintType } from '../../../core/types'
-import { saveEquipment } from '../../../server/fns'
 import { createId } from '../../id'
 import { useI18n } from '../../i18n'
 import { matchesListSearch, showsListSearch } from '../../listSearch'
 import { consumablesQuery, equipmentQuery } from '../../queries'
 import { useWorkspacePrintTypes, useWorkspaceSlug } from '../../workspace'
-import { ConfirmDialog } from '../ConfirmDialog'
+import { useInventory } from '../../inventory'
 import { formatNumber } from '../priceCalculator/format'
 import { QueryState } from '../QueryState'
 import { SettingNotice } from '../SettingNotice'
@@ -66,19 +64,13 @@ export function EquipmentPane() {
   const workspaceSlug = useWorkspaceSlug()
   const query = useQuery(equipmentQuery(workspaceSlug))
   const consumables = useQuery(consumablesQuery(workspaceSlug)).data?.consumables
-  const queryClient = useQueryClient()
-  const callSave = useServerFn(saveEquipment)
+  const { mutation, save, setArchived: storeArchived } = useInventory('equipment')
   const { t } = useI18n()
   const copy = t.settings.equipment
   const printTypes = useWorkspacePrintTypes()
   const [search, setSearch] = useState('')
   // A custom item being added is kept here, not in the list, until its dialog has it named and saves it.
   const [editing, setEditing] = useState<EquipmentItem | null>(null)
-  const [removeId, setRemoveId] = useState<string | null>(null)
-  const mutation = useMutation({
-    mutationFn: (equipment: EquipmentItem[]) => callSave({ data: { workspaceSlug, equipment } }),
-    onSuccess: (result) => queryClient.setQueryData(equipmentQuery(workspaceSlug).queryKey, result),
-  })
 
   if (!query.data) {
     return (
@@ -93,13 +85,7 @@ export function EquipmentPane() {
   }
 
   const items = query.data.equipment
-  const persist = (next: EquipmentItem[]) => mutation.mutateAsync(next)
-  const saveItem = (item: EquipmentItem) =>
-    persist(
-      items.some(({ id }) => id === item.id) ? items.map((candidate) => (candidate.id === item.id ? item : candidate)) : [...items, item],
-    ).then(() => undefined)
-  const setArchived = (id: string, archived: boolean) =>
-    void persist(items.map((item) => (item.id === id ? { ...item, archived: archived || undefined } : item))).catch(() => undefined)
+  const setArchived = (id: string, archived: boolean) => void storeArchived(id, archived).catch(() => undefined)
   const closeEditor = () => {
     setEditing(null)
     // The dialog showed its own failure; the pane's notice is for changes made from the list.
@@ -108,7 +94,7 @@ export function EquipmentPane() {
   // A catalogue item is complete as picked, so it is stored straight away; a custom one waits in its dialog for a name.
   const addPreset = (preset: EquipmentPreset) => {
     const item = equipmentFromPreset(createId(), preset)
-    void persist([...items, item]).then(
+    void save(item).then(
       () => setEditing(item),
       () => undefined,
     )
@@ -122,7 +108,6 @@ export function EquipmentPane() {
     const preset = getEquipmentPreset(item.presetId ?? '')
     return matchesListSearch(search, [item.name, preset && equipmentPresetName(preset), copy.kinds[item.kind]])
   })
-  const removing = items.find((item) => item.id === removeId)
   const failure = mutation.error ? errorMessage(mutation.error, copy.tryAgainFallback) : undefined
 
   return (
@@ -229,17 +214,6 @@ export function EquipmentPane() {
                         <RotateCcw />
                         <span className="@max-sm:sr-only">{copy.archived.restore}</span>
                       </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground hover:text-destructive"
-                        disabled={mutation.isPending}
-                        onClick={() => setRemoveId(item.id)}
-                      >
-                        <Trash2 />
-                        <span className="@max-sm:sr-only">{copy.archived.remove}</span>
-                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -256,7 +230,7 @@ export function EquipmentPane() {
           key={editing.id}
           item={editing}
           isNew={!items.some(({ id }) => id === editing.id)}
-          onSave={saveItem}
+          onSave={save}
           onArchive={() => {
             setArchived(editing.id, true)
             closeEditor()
@@ -264,18 +238,6 @@ export function EquipmentPane() {
           onClose={closeEditor}
         />
       )}
-      <ConfirmDialog
-        open={!!removing}
-        title={copy.remove.title(removing?.name ?? '')}
-        description={copy.remove.description}
-        confirmLabel={copy.remove.action}
-        destructive
-        onCancel={() => setRemoveId(null)}
-        onConfirm={() => {
-          if (removing) void persist(items.filter((item) => item.id !== removing.id)).catch(() => undefined)
-          setRemoveId(null)
-        }}
-      />
     </SettingsPage>
   )
 }

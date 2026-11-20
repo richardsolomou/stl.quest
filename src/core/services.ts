@@ -14,6 +14,7 @@ import type {
   Notifier,
   PendingOperation,
   PrintRequest,
+  PrinterProfile,
   PrintType,
   PublicPrintRequest,
   PublicRequestQueryResult,
@@ -28,7 +29,13 @@ import type {
 import { recordOnboardingTask, type OnboardingTaskId } from './onboarding'
 import { initialStatus, isReadyStatus, requestStarted, statusById } from './workflow'
 import { readyPrintsByRequester, type NotificationKind, type NotificationPreferences } from './notifications'
-import { automaticallyAssignedPrinter, printerFitsModel, storedPrinterProfiles } from './printers'
+import {
+  automaticallyAssignedPrinter,
+  printerFitsModel,
+  printerProfileChanges,
+  PRINTERS_SKIPPED_SETTING,
+  printerValidationError,
+} from './printers'
 import { storedWorkspacePrintTypes } from './printTypes'
 import { storedUsageTracking } from './usageTracking'
 import {
@@ -43,8 +50,9 @@ import {
 } from './request'
 import { modelFormat, sourceImageKey } from './assetKeys'
 import { automaticEstimateFields, requestPrintEstimate } from './printEstimates'
-import { CONSUMABLES_SETTING, type Consumable } from './consumables'
-import { EQUIPMENT_SETTING, type EquipmentItem } from './equipment'
+import { consumablesOfKind, type Consumable } from './consumables'
+import type { EquipmentItem } from './equipment'
+import { activeItems, INVENTORY_LIMITS, type InventoryItems, type InventoryKind } from './inventory'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS, PRICE_CALCULATOR_SETTING, type PriceCalculatorSettings } from './priceCalculator'
 import {
   consumed,
@@ -117,7 +125,7 @@ export class STLQuestService {
       visibleToUserId: !admin && ownRequestsOnly ? identity.id : undefined,
       searchPrivateMetadata: admin,
     })
-    const profiles = await storedPrinterProfiles(this.repository)
+    const profiles = await this.repository.listInventory('printers')
     const printers = new Map(profiles.map(({ id, name, printType }) => [id, { id, name, printType }] as const))
     const allGroups = await this.repository.listGroups()
     const geometryJobs = new Map(
@@ -1164,7 +1172,7 @@ export class STLQuestService {
     await this.requireUsageTracking(identity)
     const request = await this.repository.getRequest(input.requestId)
     if (!request) throw new Response(this.text.access.notFound, { status: 404 })
-    const printers = await storedPrinterProfiles(this.repository)
+    const printers = await this.repository.listInventory('printers')
     const printer = input.printerId ? printers.find(({ id }) => id === input.printerId) : undefined
     if (input.printerId && !printer) throw new Response(this.text.request.unknownPrinter, { status: 400 })
     const consumables = await this.consumables()
@@ -1177,7 +1185,7 @@ export class STLQuestService {
       request.requestedPrintType ??
       (material && isPrintType(material.kind) ? material.kind : undefined)
     if (material && material.kind !== printType) throw new Response(this.text.usage.materialMismatch, { status: 400 })
-    const items = (await this.repository.getSetting<EquipmentItem[]>(EQUIPMENT_SETTING)) ?? []
+    const items = await this.repository.listInventory('equipment')
     const equipment = unique(input.equipmentIds ?? []).map((id) => items.find((item) => item.id === id))
     if (equipment.some((item) => !item)) throw new Response(this.text.usage.unknownEquipment, { status: 400 })
     const drafts = stepUsageDrafts(input, {
@@ -1206,6 +1214,8 @@ export class STLQuestService {
     await this.requireUsageTracking(identity)
     const consumable = (await this.consumables()).find(({ id }) => id === input.consumableId)
     if (!consumable) throw new Response(this.text.usage.unknownConsumable, { status: 400 })
+    if (input.kind === 'replace' && input.printerId && !(await this.printer(input.printerId)))
+      throw new Response(this.text.request.unknownPrinter, { status: 400 })
     const amount =
       input.kind === 'correction' ? input.counted - stockLevels([consumable], await this.repository.stockTotals())[0].onHand : input.amount
     const recorded = await this.appendUsage(
@@ -1242,14 +1252,104 @@ export class STLQuestService {
     await this.requireUsageTracking(identity)
     return usagePrefills(
       await this.repository.listUsage({ limit: MAX_USAGE_LIST }),
-      await storedPrinterProfiles(this.repository),
-      (await this.repository.getSetting<EquipmentItem[]>(EQUIPMENT_SETTING)) ?? [],
+      await this.repository.listInventory('printers'),
+      await this.repository.listInventory('equipment'),
     )
   }
 
   async stockLevels(identity: Identity) {
     await this.requireUsageTracking(identity)
     return stockLevels(await this.consumables(), await this.repository.stockTotals())
+  }
+
+  async createInventoryItem<Kind extends InventoryKind>(kind: Kind, item: InventoryItems[Kind], identity: Identity) {
+    return await this.changeInventory(kind, identity, (items) => {
+      if (items.some(({ id }) => id === item.id)) throw new Response(this.text.inventory.exists, { status: 409 })
+      return [...items, { ...item, archived: undefined }]
+    })
+  }
+
+  /** Stores an edit to one item; archiving has its own action, so the item stays archived or active as it is. */
+  async updateInventoryItem<Kind extends InventoryKind>(kind: Kind, item: InventoryItems[Kind], identity: Identity) {
+    return await this.changeInventory(kind, identity, (items) =>
+      this.replacingItem(items, item.id, (stored) => ({ ...item, archived: stored.archived })),
+    )
+  }
+
+  async setInventoryItemArchived(kind: InventoryKind, id: string, archived: boolean, identity: Identity) {
+    return await this.changeInventory(kind, identity, (items) =>
+      this.replacingItem(items, id, (stored) => ({ ...stored, archived: archived || undefined })),
+    )
+  }
+
+  async skipPrinterSetup(identity: Identity) {
+    this.requireAdmin(identity)
+    await this.repository.setSetting(PRINTERS_SKIPPED_SETTING, true)
+    this.changed('settings.changed')
+  }
+
+  private replacingItem<Item extends { id: string; archived?: boolean }>(items: Item[], id: string, replace: (stored: Item) => Item) {
+    if (!items.some((item) => item.id === id)) throw new Response(this.text.inventory.notFound, { status: 404 })
+    return items.map((item) => (item.id === id ? replace(item) : item))
+  }
+
+  private async changeInventory<Kind extends InventoryKind>(
+    kind: Kind,
+    identity: Identity,
+    change: (items: InventoryItems[Kind][]) => InventoryItems[Kind][],
+  ) {
+    this.requireAdmin(identity)
+    const { previous, items } = await this.repository.changeInventory(kind, (current) => {
+      const next = change(current)
+      this.validateInventory(kind, current, next)
+      return next
+    })
+    this.changed('inventory.changed')
+    this.captureInventory(kind, identity.id, previous, items)
+    return items
+  }
+
+  /** Checks only what the change touched, so an item stored before a rule existed never blocks editing another. */
+  private validateInventory<Kind extends InventoryKind>(kind: Kind, previous: InventoryItems[Kind][], next: InventoryItems[Kind][]) {
+    const active = activeItems(next).length
+    if (active > INVENTORY_LIMITS[kind] && active > activeItems(previous).length)
+      throw new Response(this.text.inventory.full(INVENTORY_LIMITS[kind]), { status: 409 })
+    if (kind !== 'printers') return
+    const stored = new Map(previous.map((item) => [item.id, JSON.stringify(item)]))
+    for (const printer of next as PrinterProfile[]) {
+      if (stored.get(printer.id) === JSON.stringify(printer)) continue
+      const error = printerValidationError(printer, next as PrinterProfile[], this.messages())
+      if (error) throw new Response(error, { status: 400 })
+    }
+  }
+
+  private captureInventory<Kind extends InventoryKind>(
+    kind: Kind,
+    identity: string,
+    previous: InventoryItems[Kind][],
+    items: InventoryItems[Kind][],
+  ) {
+    if (kind === 'printers') {
+      this.capture(identity, 'printer_saved', {
+        printer_count: activeItems(items).length,
+        ...printerProfileChanges(previous as PrinterProfile[], items as PrinterProfile[]),
+      })
+    } else if (kind === 'equipment') {
+      const active = activeItems(items as EquipmentItem[])
+      this.capture(identity, 'equipment_saved', {
+        equipment_count: active.length,
+        catalogue_count: active.filter((item) => item.presetId).length,
+        with_supplies_count: active.filter((item) => item.supplies.length).length,
+      })
+    } else {
+      const library = items as Consumable[]
+      this.capture(identity, 'consumables_saved', {
+        resin_count: consumablesOfKind(library, 'resin').length,
+        filament_count: consumablesOfKind(library, 'filament').length,
+        part_count: consumablesOfKind(library, 'part').length,
+        supply_count: consumablesOfKind(library, 'supply').length,
+      })
+    }
   }
 
   /** Only admins record, read, or undo usage, and only while the workspace tracks it; turning tracking off keeps the log. */
@@ -1259,7 +1359,7 @@ export class STLQuestService {
   }
 
   private async consumables() {
-    return (await this.repository.getSetting<Consumable[]>(CONSUMABLES_SETTING)) ?? []
+    return await this.repository.listInventory('consumables')
   }
 
   private async appendUsage(drafts: UsageDraft[], identity: Identity) {
@@ -1292,7 +1392,7 @@ export class STLQuestService {
   }
 
   private async printer(id: string) {
-    return (await storedPrinterProfiles(this.repository)).find((printer) => printer.id === id)
+    return (await this.repository.listInventory('printers')).find((printer) => printer.id === id)
   }
 
   private async resolveTarget(
@@ -1306,7 +1406,7 @@ export class STLQuestService {
     if (printerId || !requestedPrintType) {
       return { requestedPrintType: undefined, printerId: printerId ?? undefined, automaticPrinterAssignment: false }
     }
-    const profiles = await storedPrinterProfiles(this.repository)
+    const profiles = await this.repository.listInventory('printers')
     const automatic = automaticallyAssignedPrinter(
       profiles,
       await this.repository.listRequests(),

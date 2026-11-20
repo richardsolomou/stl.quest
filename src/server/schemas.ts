@@ -20,6 +20,7 @@ import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
 import { MAX_CONSUMABLES, SUPPLY_UNITS } from '../core/consumables'
 import { isPrinterAddOn } from '../core/equipmentPresets'
 import { EQUIPMENT_KINDS, EQUIPMENT_STAGES, MAX_EQUIPMENT } from '../core/equipment'
+import { INVENTORY_KINDS } from '../core/inventory'
 import { PRINT_TYPE_CHOICES } from '../core/printTypes'
 import { USAGE_TRACKING_SOURCES } from '../core/usageTracking'
 import { PRICE_CALCULATOR_CURRENCIES, PRICE_CALCULATOR_MAXIMUMS } from '../core/priceCalculator'
@@ -81,7 +82,6 @@ export const acceptInviteSchema = z.object({
 
 export const telemetrySettingsSchema = z.object({ enabled: z.boolean() })
 export const selfSignupSettingsSchema = z.object({ enabled: z.boolean() })
-const MAX_PRINTER_PROFILES = 500
 // A stripping object, never strict: settings stored by older releases carry extra fields and must still load.
 export const priceCalculatorSettingsSchema = z.object({
   currency: z.enum(PRICE_CALCULATOR_CURRENCIES),
@@ -97,97 +97,66 @@ const consumableBaseSchema = {
   minimumStock: z.number().positive().max(10_000_000).optional(),
   packSize: z.number().positive().max(10_000_000).optional(),
 }
-export const consumablesSchema = z
+const consumableSchema = z.discriminatedUnion('kind', [
+  z.object({
+    ...consumableBaseSchema,
+    kind: z.literal('resin'),
+    resinPresetId: z.string().trim().min(1).max(200).optional(),
+    pricePerLitre: z.number().positive().max(100_000),
+    densityGramsPerMl: z.number().positive().max(100),
+  }),
+  z.object({
+    ...consumableBaseSchema,
+    kind: z.literal('filament'),
+    filamentPresetId: z.string().trim().min(1).max(200).optional(),
+    colour: z
+      .object({
+        name: z.string().trim().min(1).max(60),
+        hex: z.string().regex(/^#[0-9a-f]{6}$/i),
+      })
+      .optional(),
+    pricePerKg: z.number().positive().max(100_000),
+  }),
+  z.object({
+    ...consumableBaseSchema,
+    kind: z.literal('part'),
+    printType: z.enum(PRINT_TYPES),
+    price: z.number().nonnegative().max(1_000_000),
+    lifespan: z.number().positive().max(10_000_000),
+    lifespanUnit: z.enum(['plates', 'hours']),
+    printerPresetId: z.string().trim().min(1).max(200).optional(),
+    printerId: z.string().trim().min(1).max(200).optional(),
+    partPresetId: z.string().trim().min(1).max(200).optional(),
+  }),
+  z.object({
+    ...consumableBaseSchema,
+    kind: z.literal('supply'),
+    unit: z.enum(SUPPLY_UNITS),
+    price: z.number().nonnegative().max(1_000_000),
+  }),
+])
+const equipmentItemSchema = z
   .object({
-    consumables: z
-      .array(
-        z.discriminatedUnion('kind', [
-          z.object({
-            ...consumableBaseSchema,
-            kind: z.literal('resin'),
-            resinPresetId: z.string().trim().min(1).max(200).optional(),
-            pricePerLitre: z.number().positive().max(100_000),
-            densityGramsPerMl: z.number().positive().max(100),
-          }),
-          z.object({
-            ...consumableBaseSchema,
-            kind: z.literal('filament'),
-            filamentPresetId: z.string().trim().min(1).max(200).optional(),
-            colour: z
-              .object({
-                name: z.string().trim().min(1).max(60),
-                hex: z.string().regex(/^#[0-9a-f]{6}$/i),
-              })
-              .optional(),
-            pricePerKg: z.number().positive().max(100_000),
-          }),
-          z.object({
-            ...consumableBaseSchema,
-            kind: z.literal('part'),
-            printType: z.enum(PRINT_TYPES),
-            price: z.number().nonnegative().max(1_000_000),
-            lifespan: z.number().positive().max(10_000_000),
-            lifespanUnit: z.enum(['plates', 'hours']),
-            printerPresetId: z.string().trim().min(1).max(200).optional(),
-            printerId: z.string().trim().min(1).max(200).optional(),
-            partPresetId: z.string().trim().min(1).max(200).optional(),
-          }),
-          z.object({
-            ...consumableBaseSchema,
-            kind: z.literal('supply'),
-            unit: z.enum(SUPPLY_UNITS),
-            price: z.number().nonnegative().max(1_000_000),
-          }),
-        ]),
-      )
+    id: z.string().trim().min(1).max(200),
+    name: z.string().trim().min(1).max(120),
+    presetId: z.string().trim().min(1).max(200).optional(),
+    kind: z.enum(EQUIPMENT_KINDS),
+    stage: z.enum(EQUIPMENT_STAGES),
+    printType: z.enum(PRINT_TYPES).optional(),
+    powerWatts: z.number().nonnegative().max(100_000),
+    minutesPerUse: z.number().nonnegative().max(10_080),
+    supplies: z
+      .array(z.object({ consumableId: z.string().trim().min(1).max(200), amountPerUse: z.number().positive().max(1_000_000) }))
       .max(MAX_CONSUMABLES),
+    purchasePrice: z.number().nonnegative().max(10_000_000).optional(),
+    lifespanHours: z.number().positive().max(10_000_000).optional(),
   })
-  .superRefine(({ consumables }, context) => {
-    const ids = new Set<string>()
-    for (const [index, consumable] of consumables.entries()) {
-      if (ids.has(consumable.id))
-        context.addIssue({ code: 'custom', path: ['consumables', index, 'id'], message: 'consumable IDs must be unique' })
-      ids.add(consumable.id)
-    }
-  })
-export const equipmentSchema = z
-  .object({
-    equipment: z
-      .array(
-        z.object({
-          id: z.string().trim().min(1).max(200),
-          name: z.string().trim().min(1).max(120),
-          presetId: z.string().trim().min(1).max(200).optional(),
-          kind: z.enum(EQUIPMENT_KINDS),
-          stage: z.enum(EQUIPMENT_STAGES),
-          printType: z.enum(PRINT_TYPES).optional(),
-          powerWatts: z.number().nonnegative().max(100_000),
-          minutesPerUse: z.number().nonnegative().max(10_080),
-          supplies: z
-            .array(z.object({ consumableId: z.string().trim().min(1).max(200), amountPerUse: z.number().positive().max(1_000_000) }))
-            .max(MAX_CONSUMABLES),
-          purchasePrice: z.number().nonnegative().max(10_000_000).optional(),
-          lifespanHours: z.number().positive().max(10_000_000).optional(),
-          archived: z.boolean().optional(),
-        }),
-      )
-      .max(MAX_EQUIPMENT),
-  })
-  .superRefine(({ equipment }, context) => {
-    const ids = new Set<string>()
-    for (const [index, item] of equipment.entries()) {
-      if (ids.has(item.id)) context.addIssue({ code: 'custom', path: ['equipment', index, 'id'], message: 'equipment IDs must be unique' })
-      ids.add(item.id)
-      const supplied = new Set<string>()
-      for (const [supplyIndex, supply] of item.supplies.entries()) {
-        if (supplied.has(supply.consumableId))
-          context.addIssue({
-            code: 'custom',
-            path: ['equipment', index, 'supplies', supplyIndex, 'consumableId'],
-            message: 'each supply is listed once',
-          })
-        supplied.add(supply.consumableId)
-      }
+  .superRefine(({ supplies }, context) => {
+    const supplied = new Set<string>()
+    for (const [index, supply] of supplies.entries()) {
+      if (supplied.has(supply.consumableId))
+        context.addIssue({ code: 'custom', path: ['supplies', index, 'consumableId'], message: 'each supply is listed once' })
+      supplied.add(supply.consumableId)
     }
   })
 export const emailLogoSchema = z.object({
@@ -245,7 +214,7 @@ export const memberRequestVisibilitySchema = z.object({
   visibility: z.enum(['default', 'own', 'all']),
 })
 
-const printerProfileBaseSchema = z.object({
+const printerProfileSchema = z.object({
   id: id,
   presetId: id.optional(),
   widthMm: z.number().positive().max(10_000).optional(),
@@ -261,19 +230,19 @@ const printerProfileBaseSchema = z.object({
     .max(20)
     .refine((ids) => new Set(ids).size === ids.length, 'add-ons must be unique')
     .optional(),
-  archived: z.boolean().optional(),
-  used: z.boolean().optional(),
 })
 
-export const printerProfilesSchema = z
-  .object({ profiles: z.array(printerProfileBaseSchema).max(MAX_PRINTER_PROFILES) })
-  .superRefine(({ profiles }, context) => {
-    const ids = new Set<string>()
-    for (const [index, profile] of profiles.entries()) {
-      if (ids.has(profile.id)) context.addIssue({ code: 'custom', path: ['profiles', index, 'id'], message: 'printer IDs must be unique' })
-      ids.add(profile.id)
-    }
-  })
+/** One printer, piece of equipment, or consumable; whether it is archived is changed only by `inventoryArchiveSchema`. */
+export const inventoryItemSchema = z.discriminatedUnion('inventory', [
+  z.object({ inventory: z.literal('printers'), item: printerProfileSchema }),
+  z.object({ inventory: z.literal('equipment'), item: equipmentItemSchema }),
+  z.object({ inventory: z.literal('consumables'), item: consumableSchema }),
+])
+export const inventoryArchiveSchema = z.object({
+  inventory: z.enum(INVENTORY_KINDS),
+  id: z.string().trim().min(1).max(200),
+  archived: z.boolean(),
+})
 
 export const passwordAuthSettingsSchema = z.object({ enabled: z.boolean() })
 export const setOwnPasswordSchema = z.object({ password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH) })

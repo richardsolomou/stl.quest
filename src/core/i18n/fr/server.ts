@@ -105,6 +105,11 @@ export const server: typeof en = {
     unknownPrinter: 'imprimante inconnue',
     printerArchived: 'l’imprimante est archivée',
   },
+  inventory: {
+    notFound: 'cet élément n’existe plus ; actualisez la page',
+    exists: 'un élément avec cet identifiant existe déjà',
+    full: (limit: number) => `un espace de travail peut en utiliser jusqu’à ${limit} à la fois ; archivez-en un d’abord`,
+  },
   usage: {
     unknownConsumable: 'consommable inconnu',
     unknownEquipment: 'équipement inconnu',

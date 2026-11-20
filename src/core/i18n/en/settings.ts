@@ -202,8 +202,14 @@ export const settings = {
     loading: 'Loading consumables…',
     loadError: 'Could not load consumables',
     notSaved: 'Could not save your consumables. Try again.',
-    removed: (name: string) => `Removed ${name}`,
+    archive: 'Archive',
+    archivedItem: (name: string) => `Archived ${name}`,
     undo: 'Undo',
+    archived: {
+      title: 'Archived consumables',
+      description: 'No longer offered or used to price quotes, but kept for the stock and spend that name them.',
+      restore: 'Restore',
+    },
     name: 'Name',
     picker: {
       search: 'Search by brand, name, or type',
@@ -424,12 +430,6 @@ export const settings = {
       title: 'Archived equipment',
       description: 'No longer offered when a print is finished or prepared, but kept for the prints that used it.',
       restore: 'Restore',
-      remove: 'Remove',
-    },
-    remove: {
-      title: (name: string) => `Remove “${name}”?`,
-      description: 'It is removed permanently. Prints that used it keep what they recorded.',
-      action: 'Remove equipment',
     },
     picker: {
       title: 'Add equipment',

@@ -2,7 +2,6 @@ import { consumableUnit, consumableUnitPrice, partCostPerHour, partCostPerPlate,
 import type { PrintType } from './types'
 import type { UsageUnit } from './usage'
 
-export const EQUIPMENT_SETTING = 'equipment'
 export const MAX_EQUIPMENT = 100
 
 /** Where in the workflow a piece of equipment is used, and so which step asks for it. */

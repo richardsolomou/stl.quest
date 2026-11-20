@@ -3,7 +3,6 @@ import { MAX_EMAIL_TEMPLATE_PLACEHOLDERS } from '../core/email'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from '../core/priceCalculator'
 import { MAX_BULK_CARDS } from '../core/request'
 import {
-  consumablesSchema,
   archiveRequestsSchema,
   deleteRequestsSchema,
   moveCopiesBatchSchema,
@@ -15,11 +14,10 @@ import {
   createInviteSchema,
   emailSenderSchema,
   emailTemplateSchema,
-  equipmentSchema,
   moveCopiesSchema,
   notificationPreferenceSchema,
   priceCalculatorSettingsSchema,
-  printerProfilesSchema,
+  inventoryItemSchema,
   requestFiltersSchema,
   storageSettingsSchema,
   socialProviderSettingsSchema,
@@ -41,6 +39,7 @@ describe('board settings schema', () => {
 })
 
 describe('server input schemas', () => {
+  const printer = (item: unknown) => inventoryItemSchema.safeParse({ inventory: 'printers', item })
   it('rejects unknown notification kinds', () => {
     expect(notificationPreferenceSchema.safeParse({ kind: 'webhook', enabled: true }).success).toBe(false)
   })
@@ -212,15 +211,14 @@ describe('server input schemas', () => {
       materialDensityGPerCm3: 1.24,
     }
 
-    expect(printerProfilesSchema.parse({ profiles: [resin, filament] }).profiles).toMatchObject([
+    expect([printer(resin).data?.item, printer(filament).data?.item]).toMatchObject([
       { id: 'resin', presetId: 'resin-elegoo-mars-2', widthMm: 100, depthMm: 60, heightMm: 150, printType: 'resin' },
       { id: 'filament', widthMm: 220, depthMm: 220, heightMm: 250, printType: 'filament' },
     ])
-    expect(() => printerProfilesSchema.parse({ profiles: [resin, { ...filament, id: 'resin' }] })).toThrow()
   })
 
   it('keeps a printer purchase price, lifespan, and add-on modules', () => {
-    const printer = {
+    const rs = {
       id: 'rs',
       name: 'Reflex RS',
       printType: 'resin',
@@ -228,23 +226,18 @@ describe('server input schemas', () => {
       lifespanHours: 10_000,
       addOnPresetIds: ['accessory-heygears-pulsing-release-module'],
     }
-    expect(printerProfilesSchema.parse({ profiles: [printer] }).profiles[0]).toMatchObject(printer)
+    expect(printer(rs).data?.item).toMatchObject(rs)
   })
 
   it('rejects a wash station as a printer add-on', () => {
     expect(
-      printerProfilesSchema.safeParse({
-        profiles: [{ id: 'rs', name: 'Reflex RS', printType: 'resin', addOnPresetIds: ['postprocess-formlabs-form-wash-v2'] }],
-      }).success,
+      printer({ id: 'rs', name: 'Reflex RS', printType: 'resin', addOnPresetIds: ['postprocess-formlabs-form-wash-v2'] }).success,
     ).toBe(false)
   })
 
   it('rejects the same add-on twice', () => {
     const addOn = 'accessory-heygears-pulsing-release-module'
-    expect(
-      printerProfilesSchema.safeParse({ profiles: [{ id: 'rs', name: 'Reflex RS', printType: 'resin', addOnPresetIds: [addOn, addOn] }] })
-        .success,
-    ).toBe(false)
+    expect(printer({ id: 'rs', name: 'Reflex RS', printType: 'resin', addOnPresetIds: [addOn, addOn] }).success).toBe(false)
   })
 })
 
@@ -311,70 +304,62 @@ describe('OIDC account creation settings', () => {
 })
 
 describe('consumables schema', () => {
+  const consumable = (item: unknown) => inventoryItemSchema.safeParse({ inventory: 'consumables', item })
   const tank = { id: 'tank', kind: 'part', name: 'Resin tank', printType: 'resin', price: 60, lifespan: 200, lifespanUnit: 'plates' }
 
   it('accepts resins, filaments, and wear parts', () => {
     expect(
-      consumablesSchema.safeParse({
-        consumables: [
-          { id: 'grey', kind: 'resin', name: 'Grey', pricePerLitre: 50, densityGramsPerMl: 1.1 },
-          { id: 'pla', kind: 'filament', name: 'PLA', pricePerKg: 20 },
-          tank,
-        ],
-      }).success,
+      [
+        { id: 'grey', kind: 'resin', name: 'Grey', pricePerLitre: 50, densityGramsPerMl: 1.1 },
+        { id: 'pla', kind: 'filament', name: 'PLA', pricePerKg: 20 },
+        tank,
+      ].every((item) => consumable(item).success),
     ).toBe(true)
   })
 
-  it('rejects two consumables with one ID', () => {
-    expect(consumablesSchema.safeParse({ consumables: [tank, tank] }).success).toBe(false)
-  })
-
   it('rejects a wear part that never wears out', () => {
-    expect(consumablesSchema.safeParse({ consumables: [{ ...tank, lifespan: 0 }] }).success).toBe(false)
+    expect(consumable({ ...tank, lifespan: 0 }).success).toBe(false)
   })
 
   it('rejects a consumable without a name', () => {
-    expect(consumablesSchema.safeParse({ consumables: [{ ...tank, name: ' ' }] }).success).toBe(false)
+    expect(consumable({ ...tank, name: ' ' }).success).toBe(false)
   })
 
   it('keeps the printer model a wear part belongs to', () => {
-    expect(consumablesSchema.parse({ consumables: [{ ...tank, printerPresetId: 'resin-formlabs-form-4' }] }).consumables[0]).toMatchObject({
+    expect(consumable({ ...tank, printerPresetId: 'resin-formlabs-form-4' }).data?.item).toMatchObject({
       printerPresetId: 'resin-formlabs-form-4',
     })
   })
 
   it('keeps the custom printer a wear part belongs to', () => {
-    expect(consumablesSchema.parse({ consumables: [{ ...tank, printerId: 'printer-1' }] }).consumables[0]).toMatchObject({
+    expect(consumable({ ...tank, printerId: 'printer-1' }).data?.item).toMatchObject({
       printerId: 'printer-1',
     })
   })
 
   it('accepts a supply priced by the litre', () => {
-    expect(consumablesSchema.safeParse({ consumables: [{ id: 'ipa', kind: 'supply', name: 'IPA', unit: 'ml', price: 8 }] }).success).toBe(
-      true,
-    )
+    expect(consumable({ id: 'ipa', kind: 'supply', name: 'IPA', unit: 'ml', price: 8 }).success).toBe(true)
   })
 
   it('rejects a supply without a unit', () => {
-    expect(consumablesSchema.safeParse({ consumables: [{ id: 'ipa', kind: 'supply', name: 'IPA', price: 8 }] }).success).toBe(false)
+    expect(consumable({ id: 'ipa', kind: 'supply', name: 'IPA', price: 8 }).success).toBe(false)
   })
 
   it('keeps a minimum stock', () => {
-    expect(consumablesSchema.parse({ consumables: [{ ...tank, minimumStock: 2 }] }).consumables[0]).toMatchObject({ minimumStock: 2 })
+    expect(consumable({ ...tank, minimumStock: 2 }).data?.item).toMatchObject({ minimumStock: 2 })
   })
 
   it('rejects a negative minimum stock', () => {
-    expect(consumablesSchema.safeParse({ consumables: [{ ...tank, minimumStock: -1 }] }).success).toBe(false)
+    expect(consumable({ ...tank, minimumStock: -1 }).success).toBe(false)
   })
 
   it('drops a stored list of printer models from a wear part', () => {
-    expect(
-      consumablesSchema.parse({ consumables: [{ ...tank, printerPresetIds: ['resin-formlabs-form-4'] }] }).consumables[0],
-    ).not.toHaveProperty('printerPresetIds')
+    expect(consumable({ ...tank, printerPresetIds: ['resin-formlabs-form-4'] }).data?.item).not.toHaveProperty('printerPresetIds')
   })
 })
 
 describe('equipment schema', () => {
+  const equipment = (item: unknown) => inventoryItemSchema.safeParse({ inventory: 'equipment', item })
   const wash = {
     id: 'wash',
     name: 'Form Wash',
@@ -387,33 +372,27 @@ describe('equipment schema', () => {
   }
 
   it('accepts a wash station with a supply', () => {
-    expect(equipmentSchema.safeParse({ equipment: [wash] }).success).toBe(true)
+    expect(equipment(wash).success).toBe(true)
   })
 
   it('keeps a supply whose consumable it cannot check', () => {
-    expect(equipmentSchema.parse({ equipment: [wash] }).equipment[0].supplies).toEqual([{ consumableId: 'ipa', amountPerUse: 1 }])
-  })
-
-  it('rejects equipment listed twice', () => {
-    expect(equipmentSchema.safeParse({ equipment: [wash, wash] }).success).toBe(false)
+    expect(equipment(wash).data?.item).toMatchObject({ supplies: [{ consumableId: 'ipa', amountPerUse: 1 }] })
   })
 
   it('rejects the same supply listed twice', () => {
-    expect(equipmentSchema.safeParse({ equipment: [{ ...wash, supplies: [...wash.supplies, ...wash.supplies] }] }).success).toBe(false)
+    expect(equipment({ ...wash, supplies: [...wash.supplies, ...wash.supplies] }).success).toBe(false)
   })
 
   it('rejects a supply used up in no amount', () => {
-    expect(equipmentSchema.safeParse({ equipment: [{ ...wash, supplies: [{ consumableId: 'ipa', amountPerUse: 0 }] }] }).success).toBe(
-      false,
-    )
+    expect(equipment({ ...wash, supplies: [{ consumableId: 'ipa', amountPerUse: 0 }] }).success).toBe(false)
   })
 
   it('rejects an unknown workflow stage', () => {
-    expect(equipmentSchema.safeParse({ equipment: [{ ...wash, stage: 'printing' }] }).success).toBe(false)
+    expect(equipment({ ...wash, stage: 'printing' }).success).toBe(false)
   })
 
   it('rejects equipment without a name', () => {
-    expect(equipmentSchema.safeParse({ equipment: [{ ...wash, name: ' ' }] }).success).toBe(false)
+    expect(equipment({ ...wash, name: ' ' }).success).toBe(false)
   })
 })
 

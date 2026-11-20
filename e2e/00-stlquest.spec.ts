@@ -1459,8 +1459,8 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('dialog', { name: printerName }).getByRole('button', { name: 'Archive', exact: true }).click()
   const archivePrinterDialog = page.getByRole('alertdialog', { name: `Archive “${printerName}”?` })
   await expect(archivePrinterDialog.getByText('completed prints will continue to show it')).toBeVisible()
+  // Archiving stores one printer, which can finish before a saving state is ever seen, so only the outcome is checked.
   await archivePrinterDialog.getByRole('button', { name: 'Archive printer' }).click()
-  await expect(page.locator('[data-slot="settings-page"]')).toHaveAttribute('data-saving', 'true')
   await expect(page.getByText('Archived printers', { exact: true })).toBeVisible()
   await expect(page.locator('[data-slot="settings-page"]')).toHaveAttribute('data-saving', 'false')
   await expect(page.getByText(printerName)).toBeVisible()
@@ -1473,7 +1473,6 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   }
   await page.setViewportSize({ width: 1280, height: 720 })
   await page.getByRole('button', { name: 'Restore printer' }).click()
-  await expect(page.locator('[data-slot="settings-page"]')).toHaveAttribute('data-saving', 'true')
   await expect(page.getByText('Archived printers', { exact: true })).toHaveCount(0)
   await expect(page.locator('[data-slot="settings-page"]')).toHaveAttribute('data-saving', 'false')
   // Rows only open the printer, so narrow screens keep each one a single tap target and edit in the dialog.

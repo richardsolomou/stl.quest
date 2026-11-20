@@ -64,9 +64,12 @@ export async function seedPreview() {
       existingWorkspace ??
       (await repository.createWorkspace({ id: owner.id }, 'Preview workspace', {
         storage: managed ? { adapter: 'managed' } : { adapter: 'local', root: path.resolve(process.env.PRINTS_DIR ?? '/prints') },
-        printers: previewPrinters(),
       }))
     const scoped = await repository.scoped(workspace.id)
+    await scoped.changeInventory('printers', (stored) => [
+      ...stored,
+      ...previewPrinters().filter(({ id }) => !stored.some((printer) => printer.id === id)),
+    ])
     let assets: AssetStore | undefined
     if (managed) {
       await scoped.claimManagedStorage(owner.id, HOSTED_OWNED_WORKSPACE_LIMIT)

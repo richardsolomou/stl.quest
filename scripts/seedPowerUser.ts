@@ -6,7 +6,6 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { eq } from 'drizzle-orm'
 import {
-  CONSUMABLES_SETTING,
   consumableUnit,
   type Consumable,
   type FilamentConsumable,
@@ -14,7 +13,7 @@ import {
   type ResinConsumable,
   type SupplyConsumable,
 } from '../src/core/consumables'
-import { EQUIPMENT_SETTING, type EquipmentItem } from '../src/core/equipment'
+import type { EquipmentItem } from '../src/core/equipment'
 import { equipmentFromPreset, getEquipmentPreset } from '../src/core/equipmentPresets'
 import electricityCatalog from '../catalogs/electricity/catalog.generated.json'
 import filamentCatalog from '../catalogs/filaments/catalog.generated.json'
@@ -483,14 +482,12 @@ const requesterNames = [
 ] as const
 const requesters = [owner, ...(await Promise.all(requesterNames.map(([email, name]) => account(email, name))))]
 
-const workspace = await repo.createWorkspace({ id: owner.id }, NAME, {
-  storage: { adapter: 'local', root: printsDir },
-  printers,
-})
+const workspace = await repo.createWorkspace({ id: owner.id }, NAME, { storage: { adapter: 'local', root: printsDir } })
 const scoped = await repo.scoped(workspace.id)
 for (const requester of requesters.slice(1)) await scoped.addWorkspaceMember(requester.id, 'member')
-await scoped.setSetting(CONSUMABLES_SETTING, library)
-await scoped.setSetting(EQUIPMENT_SETTING, equipment)
+await scoped.changeInventory('printers', () => printers)
+await scoped.changeInventory('consumables', () => library)
+await scoped.changeInventory('equipment', () => equipment)
 await scoped.setSetting(PRICE_CALCULATOR_SETTING, calculator)
 
 // Usage is recorded as the step sheets record it, through the same drafting and pricing the service uses, but dated

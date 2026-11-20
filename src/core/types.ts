@@ -4,6 +4,7 @@ import type { NotificationKind, NotificationPreferences } from './notifications'
 import type { OnboardingProgress } from './onboarding'
 import type { Locale } from './i18n/locales'
 import type { StockTotal, UsageEvent, UsageFilters } from './usage'
+import type { InventoryItems, InventoryKind } from './inventory'
 
 export type Role = 'admin' | 'requester'
 export type AccountRole = 'super_admin' | 'requester'
@@ -71,7 +72,6 @@ export type PrinterProfile = PrinterSummary & {
   /** Catalogue equipment bolted onto this printer, such as a pulsing release module, whose printing power adds to its own. */
   addOnPresetIds?: string[]
   archived?: boolean
-  used?: boolean
 }
 
 export type Invite = {
@@ -500,7 +500,6 @@ interface RepositoryShape {
   setSettings(values: Record<string, unknown>, deleteKeys?: string[]): void
   setSettingsAndReleaseManagedStorage(values: Record<string, unknown>, deleteKeys?: string[]): void
   deleteSetting(key: string): void
-  replacePrinterProfiles(profiles: PrinterProfile[]): void
   /** Appends every event in one transaction. */
   appendUsageEvents(events: UsageEvent[]): void
   listUsage(filters: UsageFilters): UsageEvent[]
@@ -550,6 +549,17 @@ type AsyncRepositoryShape = {
 
 export type Repository = Omit<AsyncRepositoryShape, 'getSetting'> & {
   getSetting<T>(key: string): Promise<T | undefined>
+  /** Every item of `kind`, archived ones included, in the order they were added. */
+  listInventory<Kind extends InventoryKind>(kind: Kind): Promise<InventoryItems[Kind][]>
+  /**
+   * Stores what `change` makes of the items of `kind` while no other change to them can interleave, so edits to
+   * different items never undo each other: new items join the end, changed ones are updated in place, and none may go
+   * missing, since items are archived instead. `change` may throw a `Response` to refuse.
+   */
+  changeInventory<Kind extends InventoryKind>(
+    kind: Kind,
+    change: (items: InventoryItems[Kind][]) => InventoryItems[Kind][],
+  ): Promise<{ previous: InventoryItems[Kind][]; items: InventoryItems[Kind][] }>
 }
 
 // Final print-file storage. Keys are '/'-separated paths from core/assetKeys;
@@ -669,6 +679,7 @@ export type AppEvent =
   | 'workspace.deleted'
   | 'usage.recorded'
   | 'usage.undone'
+  | 'inventory.changed'
 
 export interface EventBus {
   publish(event: AppEvent): void

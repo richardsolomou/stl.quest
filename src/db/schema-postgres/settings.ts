@@ -51,3 +51,9 @@ export const invites = pgTable(
   },
   (table) => [check('invites_role_check', sql`${table.role} IN ('admin', 'requester')`)],
 )
+
+/** Data migrations (src/db/dataMigrations) the deployment has applied; they rewrite every workspace at once. */
+export const dataMigrations = pgTable('data_migrations', {
+  id: text().primaryKey(),
+  appliedAt: bigint('applied_at', { mode: 'number' }).notNull(),
+})

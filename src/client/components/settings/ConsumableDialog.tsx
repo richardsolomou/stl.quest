@@ -60,7 +60,7 @@ export function ConsumableDialog({
   symbol,
   money,
   onSave,
-  onRemove,
+  onArchive,
   onClose,
 }: {
   consumable: Consumable
@@ -71,7 +71,7 @@ export function ConsumableDialog({
   symbol: string
   money: (value: number) => string
   onSave: (consumable: Consumable) => Promise<void>
-  onRemove: () => void
+  onArchive: () => void
   onClose: () => void
 }) {
   const { t, locale } = useI18n()
@@ -83,8 +83,8 @@ export function ConsumableDialog({
   const close = async () => {
     if (await autosave.flush()) onClose()
   }
-  const remove = async () => {
-    if (await autosave.flush()) onRemove()
+  const archive = async () => {
+    if (await autosave.flush()) onArchive()
   }
   const resins = useQuery({ ...catalogueQuery('resins'), enabled: draft.kind === 'resin' }).data
   const filaments = useQuery({ ...catalogueQuery('filaments'), enabled: draft.kind === 'filament' }).data
@@ -126,9 +126,9 @@ export function ConsumableDialog({
               type="button"
               variant="ghost"
               className="text-muted-foreground hover:text-destructive sm:mr-auto"
-              onClick={() => void remove()}
+              onClick={() => void archive()}
             >
-              {t.common.remove}
+              {copy.archive}
             </Button>
           )}
           <Button type="button" onClick={() => void close()}>

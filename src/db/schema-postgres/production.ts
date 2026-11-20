@@ -14,6 +14,7 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/pg-core'
 import { organization, user } from './auth'
+import { consumables, equipment, printers } from './inventory'
 
 export const requests = pgTable(
   'requests',
@@ -63,6 +64,11 @@ export const requests = pgTable(
     index('requests_print_type').on(table.printType),
     index('requests_printer_id').on(table.printerId),
     index('requests_owner_user_id').on(table.ownerUserId),
+    foreignKey({
+      columns: [table.workspaceId, table.printerId],
+      foreignColumns: [printers.workspaceId, printers.id],
+      name: 'requests_workspace_printer_fk',
+    }),
   ],
 )
 
@@ -224,9 +230,9 @@ export const managedStorageEntitlements = pgTable(
 )
 
 /**
- * The append-only usage log (see core/usage). Request, printer, equipment, consumable, and user IDs are plain text:
- * printers, equipment, and consumables live in settings JSON, and deleting a print or an account must not erase the
- * stock and spend it recorded.
+ * The append-only usage log (see core/usage). Printers, equipment, and consumables are archived rather than deleted, so
+ * their foreign keys always resolve; request and user IDs are plain text, as deleting a print or an account must not
+ * erase the stock and spend it recorded.
  */
 export const usageEvents = pgTable(
   'usage_events',
@@ -262,5 +268,20 @@ export const usageEvents = pgTable(
     index('usage_events_consumable').on(table.workspaceId, table.consumableId),
     index('usage_events_transaction').on(table.workspaceId, table.transactionId),
     index('usage_events_created').on(table.workspaceId, table.createdAt),
+    foreignKey({
+      columns: [table.workspaceId, table.printerId],
+      foreignColumns: [printers.workspaceId, printers.id],
+      name: 'usage_events_workspace_printer_fk',
+    }),
+    foreignKey({
+      columns: [table.workspaceId, table.equipmentId],
+      foreignColumns: [equipment.workspaceId, equipment.id],
+      name: 'usage_events_workspace_equipment_fk',
+    }),
+    foreignKey({
+      columns: [table.workspaceId, table.consumableId],
+      foreignColumns: [consumables.workspaceId, consumables.id],
+      name: 'usage_events_workspace_consumable_fk',
+    }),
   ],
 )

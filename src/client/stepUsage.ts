@@ -122,7 +122,7 @@ export function prefillMaterial(printType: PrintType, printerId: string | undefi
 }
 
 export function materialsFor(printType: PrintType, consumables: Consumable[]) {
-  return consumables.filter((consumable): consumable is JobMaterial => consumable.kind === printType)
+  return consumables.filter((consumable): consumable is JobMaterial => consumable.kind === printType && !consumable.archived)
 }
 
 /**

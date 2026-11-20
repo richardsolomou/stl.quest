@@ -291,7 +291,7 @@ function SupplyFields({
   // Equipment mostly uses supplies such as IPA, so the library is offered in that order.
   const kindOrder = Object.keys(kindLabels)
   const options = (consumables ?? [])
-    .filter((consumable) => !listed.has(consumable.id))
+    .filter((consumable) => !consumable.archived && !listed.has(consumable.id))
     .sort((a, b) => kindOrder.indexOf(a.kind) - kindOrder.indexOf(b.kind))
     .map((consumable) => ({ value: consumable.id, label: consumable.name, kind: kindLabels[consumable.kind] }))
   const consumablesLink = (
@@ -325,7 +325,7 @@ function SupplyFields({
           })}
         </ul>
       )}
-      {consumables && consumables.length === 0 ? (
+      {consumables && consumables.every(({ archived }) => archived) ? (
         <p className="text-sm text-muted-foreground">
           {copy.noConsumables} {consumablesLink}.
         </p>

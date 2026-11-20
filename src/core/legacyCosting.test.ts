@@ -1,12 +1,6 @@
-import postgres from 'postgres'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { PostgreSQLBackend } from '../db/backends/postgres'
-import { createDatabase } from '../db/connection'
-import { DrizzleRepository } from '../db/repository'
-import { CONSUMABLES_SETTING, type Consumable } from './consumables'
-import { upgradeLegacyCosting, upgradeLegacyCostingSettings } from './legacyCosting'
-import { PRICE_CALCULATOR_SETTING } from './priceCalculator'
-import { PRINTERS_SETTING } from './printers'
+import { describe, expect, it } from 'vitest'
+import type { Consumable } from './consumables'
+import { upgradeLegacyCosting } from './legacyCosting'
 import type { PrinterProfile } from './types'
 
 /** A calculator setup as v1.52 stored it, with the defaults it saved alongside whatever the workspace changed. */
@@ -199,78 +193,5 @@ describe('upgrading v1.52 costing settings', () => {
     const first = upgrade(v152Settings({ resinPricePerLitre: 32, equipmentCostPerHour: 2 }), [saturn])!
 
     expect(upgrade(first.priceCalculator, first.printers, first.consumables)).toBeUndefined()
-  })
-})
-
-const backends = process.env.POSTGRES_TEST_URL ? (['sqlite', 'postgres'] as const) : (['sqlite'] as const)
-
-describe.each(backends)('upgrading a stored v1.52 workspace (%s)', (backend) => {
-  let repository: DrizzleRepository
-
-  async function resetPostgreSQL() {
-    const url = process.env.POSTGRES_TEST_URL!
-    if (!new URL(url).pathname.endsWith('_test')) throw new Error('POSTGRES_TEST_URL must name a database ending in _test')
-    const client = postgres(url, { max: 1, onnotice: () => undefined })
-    await client`DROP SCHEMA public CASCADE`
-    await client`DROP SCHEMA IF EXISTS drizzle CASCADE`
-    await client`CREATE SCHEMA public`
-    await client.end()
-  }
-
-  beforeAll(async () => {
-    if (backend === 'postgres') await resetPostgreSQL()
-  })
-  beforeEach(async () => {
-    repository =
-      backend === 'postgres'
-        ? await DrizzleRepository.create(PostgreSQLBackend.open(process.env.POSTGRES_TEST_URL!))
-        : await DrizzleRepository.create(createDatabase(':memory:'))
-  })
-  afterEach(async () => {
-    await repository.setSettings({}, [PRICE_CALCULATOR_SETTING, PRINTERS_SETTING, CONSUMABLES_SETTING])
-    await repository.close()
-  })
-  afterAll(async () => {
-    if (backend === 'postgres') await resetPostgreSQL()
-  })
-
-  it('moves the prices onto consumables and printers in one write', async () => {
-    await repository.setSettings({
-      [PRICE_CALCULATOR_SETTING]: v152Settings({ resinPricePerLitre: 32, printerCosts: { saturn: { equipmentCostPerHour: 0.4 } } }),
-      [PRINTERS_SETTING]: [saturn],
-    })
-
-    await upgradeLegacyCostingSettings(repository)
-
-    expect({
-      priceCalculator: await repository.getSetting(PRICE_CALCULATOR_SETTING),
-      printers: await repository.getSetting(PRINTERS_SETTING),
-      consumables: await repository.getSetting(CONSUMABLES_SETTING),
-    }).toEqual({
-      priceCalculator: {
-        currency: 'GBP',
-        electricityPricePerKwh: 0.3,
-        labourCostPerHour: 18,
-        failureAllowancePercent: 12,
-        standardMarginPercent: 30,
-      },
-      printers: [{ ...saturn, purchasePrice: 400, lifespanHours: 1_000 }],
-      consumables: [{ id: 'legacy-resin', kind: 'resin', name: 'Resin', pricePerLitre: 32, densityGramsPerMl: 1.1 }],
-    })
-  })
-
-  it('leaves printers unsaved in a workspace that never saved them', async () => {
-    await repository.setSetting(PRICE_CALCULATOR_SETTING, v152Settings())
-
-    await upgradeLegacyCostingSettings(repository)
-
-    expect(await repository.getSetting(PRINTERS_SETTING)).toBeUndefined()
-  })
-
-  it('changes nothing the second time', async () => {
-    await repository.setSettings({ [PRICE_CALCULATOR_SETTING]: v152Settings({ filamentPricePerKg: 19 }), [PRINTERS_SETTING]: [mk4] })
-    await upgradeLegacyCostingSettings(repository)
-
-    expect(await upgradeLegacyCostingSettings(repository)).toBe(false)
   })
 })

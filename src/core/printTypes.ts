@@ -1,5 +1,4 @@
-import { storedPrinterProfiles } from './printers'
-import { PRINT_TYPES, type PrintType } from './types'
+import { PRINT_TYPES, type PrintType, type Repository } from './types'
 
 export const PRINT_TYPE_SETTING = 'print-types'
 export const PRINT_TYPE_CHOICES = ['automatic', 'resin', 'filament', 'both'] as const
@@ -26,6 +25,6 @@ export async function storedPrintTypeChoice(repository: { getSetting<T>(key: str
   return isPrintTypeChoice(stored) ? stored : 'automatic'
 }
 
-export async function storedWorkspacePrintTypes(repository: { getSetting<T>(key: string): Promise<T | undefined> }) {
-  return workspacePrintTypes(await storedPrintTypeChoice(repository), await storedPrinterProfiles(repository))
+export async function storedWorkspacePrintTypes(repository: Pick<Repository, 'getSetting' | 'listInventory'>) {
+  return workspacePrintTypes(await storedPrintTypeChoice(repository), await repository.listInventory('printers'))
 }

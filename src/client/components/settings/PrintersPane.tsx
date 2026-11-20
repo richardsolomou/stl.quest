@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { ArrowLeft, ChevronRight, Printer, RotateCcw, Search } from 'lucide-react'
@@ -18,11 +18,12 @@ import {
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from '../../../core/priceCalculator'
 import { getPrinterPreset, PRINTER_PRESETS, type PrinterPreset } from '../../../core/printerPresets'
 import { PRINT_TYPES, type PrinterProfile } from '../../../core/types'
-import { savePrinterProfiles } from '../../../server/fns'
+import { skipPrinterSetup } from '../../../server/fns'
 import { createId } from '../../id'
 import { errorMessage } from '../../../core/error'
 import { priceCalculatorSettingsQuery, printersQuery } from '../../queries'
 import { invalidateQueries } from '../../queryState'
+import { useInventory } from '../../inventory'
 import { useWorkspacePrintTypes, useWorkspaceSlug } from '../../workspace'
 import { signalProductTourProgress } from '../../productTour'
 import { ConfirmDialog } from '../ConfirmDialog'
@@ -46,8 +47,9 @@ export function PrintersPane({
   const workspaceSlug = useWorkspaceSlug()
   const query = useQuery(printersQuery(workspaceSlug))
   const data = query.data
-  const [profiles, setProfiles] = useState<PrinterProfile[]>([])
-  const [savedProfiles, setSavedProfiles] = useState<PrinterProfile[]>([])
+  // Onboarding keeps the printers it adds here until "Save and continue"; settings store each change straight away.
+  const [drafts, setDrafts] = useState<PrinterProfile[]>([])
+  const profiles = useMemo(() => (onboarding ? drafts : (data?.profiles ?? [])), [onboarding, drafts, data])
   const [removeId, setRemoveId] = useState<string | null>(null)
   // A custom printer being added is kept here, not in the list, until its dialog has it named and saves it.
   const [editing, setEditing] = useState<PrinterProfile | null>(null)
@@ -55,50 +57,40 @@ export function PrintersPane({
     useQuery({ ...priceCalculatorSettingsQuery(workspaceSlug), enabled: !onboarding }).data?.settings.currency ??
     DEFAULT_PRICE_CALCULATOR_SETTINGS.currency
   const [search, setSearch] = useState('')
-  const dirty = JSON.stringify(profiles) !== JSON.stringify(savedProfiles)
-  const dirtyRef = useRef(dirty)
-  dirtyRef.current = dirty
-  const callSave = useServerFn(savePrinterProfiles)
   const queryClient = useQueryClient()
   const { t } = useI18n()
   const copy = t.settings.printers
   const printTypes = useWorkspacePrintTypes()
-  const mutation = useMutation({
-    mutationFn: (next: PrinterProfile[]) => callSave({ data: { workspaceSlug, profiles: next } }),
-    onSuccess: async (result) => {
-      const next = result.profiles.map(normalizePrinterProfile)
-      setProfiles(next)
-      setSavedProfiles(next)
-      const active = next.filter(({ archived }) => !archived)
-      if (active.length) signalProductTourProgress('printers')
-      if (onboarding) onSaved?.()
-      await invalidateQueries(queryClient, 'printers', 'session', 'requests')
+  const { mutation, save, setArchived } = useInventory('printers')
+  const callSkip = useServerFn(skipPrinterSetup)
+  // Finishing onboarding creates each printer it collected, or records that setup was skipped when there are none.
+  const finishSetup = useMutation({
+    mutationFn: async () => {
+      for (const profile of drafts) await save(normalizePrinterProfile(profile))
+      if (!drafts.length) await callSkip({ data: { workspaceSlug } })
     },
+    onSuccess: () => onSaved?.(),
   })
-
-  useEffect(() => {
-    if (!data || dirtyRef.current) return
-    const next = data.profiles.map(normalizePrinterProfile)
-    setProfiles(next)
-    setSavedProfiles(next)
-  }, [data])
+  const pending = mutation.isPending || finishSetup.isPending
 
   const error = useMemo(() => printerProfilesValidationError(profiles, t), [profiles, t])
 
-  // Onboarding keeps every change local until "Save and continue"; settings store each one straight away.
-  const persist = async (next: PrinterProfile[]) => {
-    const normalized = next.map(normalizePrinterProfile)
-    setProfiles(normalized)
-    if (!onboarding) await mutation.mutateAsync(normalized)
-  }
+  // The session and board show printers too, so they refresh at once rather than when the workspace channel says so.
+  const refreshFleet = () => invalidateQueries(queryClient, 'session', 'requests')
   const saveProfile = async (profile: PrinterProfile) => {
-    const next = profiles.some(({ id }) => id === profile.id)
-      ? profiles.map((candidate) => (candidate.id === profile.id ? profile : candidate))
-      : [...profiles, profile]
-    const normalized = next.map(normalizePrinterProfile)
-    if (!onboarding) await mutation.mutateAsync(normalized)
-    setProfiles(normalized)
+    const normalized = normalizePrinterProfile(profile)
+    if (!onboarding) {
+      await save(normalized)
+      signalProductTourProgress('printers')
+      return await refreshFleet()
+    }
+    setDrafts((current) =>
+      current.some(({ id }) => id === normalized.id)
+        ? current.map((candidate) => (candidate.id === normalized.id ? normalized : candidate))
+        : [...current, normalized],
+    )
   }
+  const archive = (id: string, archived: boolean) => void setArchived(id, archived).then(refreshFleet, () => undefined)
   const closeEditor = () => {
     setEditing(null)
     // The dialog showed its own failure; the pane's notice is for changes made from the list.
@@ -113,7 +105,7 @@ export function PrintersPane({
     setEditing(newPrinterProfile(createId(), printType))
   const addPresetPrinter = (preset: PrinterPreset) => {
     const added = printerProfileFromPreset(createId(), preset)
-    void persist([...profiles, { ...added, name: uniquePrinterName(added.name, profiles) }]).catch(() => undefined)
+    void saveProfile({ ...added, name: uniquePrinterName(added.name, profiles) }).catch(() => undefined)
   }
 
   if (!data) {
@@ -173,7 +165,8 @@ export function PrintersPane({
       ))}
     </div>
   )
-  const failure = mutation.error ? errorMessage(mutation.error, copy.tryAgainFallback) : undefined
+  const failed = mutation.error ?? finishSetup.error
+  const failure = failed ? errorMessage(failed, copy.tryAgainFallback) : undefined
 
   const content = onboarding ? (
     <div className="flex flex-col gap-5">
@@ -189,12 +182,7 @@ export function PrintersPane({
       {profiles.length > 0 ? (
         <div className="flex flex-col gap-3">
           <div>
-            <PrinterPresetPicker
-              added={addedPresetIds}
-              disabled={mutation.isPending}
-              onSelect={addPresetPrinter}
-              onCustom={addCustomPrinter}
-            />
+            <PrinterPresetPicker added={addedPresetIds} disabled={pending} onSelect={addPresetPrinter} onCustom={addCustomPrinter} />
           </div>
           {printerList}
         </div>
@@ -213,7 +201,7 @@ export function PrintersPane({
               <PrinterPresetPicker
                 variant="default"
                 added={addedPresetIds}
-                disabled={mutation.isPending}
+                disabled={pending}
                 onSelect={addPresetPrinter}
                 onCustom={() => addCustomPrinter()}
               />
@@ -227,15 +215,11 @@ export function PrintersPane({
       />
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            disabled={!profiles.length || !!error || mutation.isPending}
-            onClick={() => mutation.mutate(profiles.map(normalizePrinterProfile))}
-          >
-            {mutation.isPending ? t.common.saving : copy.onboarding.save}
+          <Button type="button" disabled={!profiles.length || !!error || pending} onClick={() => finishSetup.mutate()}>
+            {pending ? t.common.saving : copy.onboarding.save}
           </Button>
           {!profiles.length && (
-            <Button type="button" variant="ghost" size="sm" disabled={mutation.isPending} onClick={() => mutation.mutate([])}>
+            <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => finishSetup.mutate()}>
               {copy.onboarding.skip}
             </Button>
           )}
@@ -253,7 +237,7 @@ export function PrintersPane({
           <PrinterPresetPicker
             variant="default"
             added={addedPresetIds}
-            disabled={mutation.isPending}
+            disabled={pending}
             onSelect={addPresetPrinter}
             onCustom={() => addCustomPrinter()}
           />
@@ -279,7 +263,7 @@ export function PrintersPane({
                   label={copy.addOfType[printType]}
                   printType={printType}
                   added={addedPresetIds}
-                  disabled={mutation.isPending}
+                  disabled={pending}
                   onSelect={addPresetPrinter}
                   onCustom={() => addCustomPrinter(printType)}
                 />
@@ -300,7 +284,7 @@ export function PrintersPane({
               label={copy.addOfType[printType]}
               printType={printType}
               added={addedPresetIds}
-              disabled={mutation.isPending}
+              disabled={pending}
               onSelect={addPresetPrinter}
               onCustom={() => addCustomPrinter(printType)}
             />
@@ -323,17 +307,7 @@ export function PrintersPane({
                     </TableCell>
                     <TableCell className="text-muted-foreground @max-sm:hidden">{copy.printTypes[profile.printType]}</TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        disabled={mutation.isPending}
-                        onClick={() =>
-                          void persist(
-                            profiles.map((candidate) => (candidate.id === profile.id ? { ...candidate, archived: undefined } : candidate)),
-                          ).catch(() => undefined)
-                        }
-                      >
+                      <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => archive(profile.id, false)}>
                         <RotateCcw />
                         <span className="@max-sm:sr-only">{copy.archived.restore}</span>
                       </Button>
@@ -347,13 +321,9 @@ export function PrintersPane({
       )}
 
       <SettingNotice notice={failure ? { tone: 'error', title: copy.notSaved, hint: copy.notSavedHint, detail: failure } : undefined} />
-      {failure ? (
+      {failure && mutation.variables ? (
         <SettingsActions>
-          <Button
-            type="button"
-            disabled={!!error || mutation.isPending}
-            onClick={() => mutation.mutate(profiles.map(normalizePrinterProfile))}
-          >
+          <Button type="button" disabled={pending} onClick={() => mutation.mutate(mutation.variables)}>
             {t.common.retry}
           </Button>
         </SettingsActions>
@@ -366,20 +336,17 @@ export function PrintersPane({
       open={!!removeProfile}
       title={
         removeProfile
-          ? (removeProfile.used ? copy.remove.archiveTitle : copy.remove.removeTitle)(removeProfile.name || copy.remove.thisPrinter)
+          ? (onboarding ? copy.remove.removeTitle : copy.remove.archiveTitle)(removeProfile.name || copy.remove.thisPrinter)
           : copy.remove.fallbackTitle
       }
-      description={removeProfile?.used ? copy.remove.archiveDescription : copy.remove.removeDescription}
-      confirmLabel={removeProfile?.used ? copy.remove.archiveAction : copy.remove.removeAction}
+      description={onboarding ? copy.remove.removeDescription : copy.remove.archiveDescription}
+      confirmLabel={onboarding ? copy.remove.removeAction : copy.remove.archiveAction}
       destructive
       onCancel={() => setRemoveId(null)}
       onConfirm={() => {
         if (!removeProfile) return
-        void persist(
-          removeProfile.used
-            ? profiles.map((profile) => (profile.id === removeProfile.id ? { ...profile, archived: true } : profile))
-            : profiles.filter((profile) => profile.id !== removeProfile.id),
-        ).catch(() => undefined)
+        if (onboarding) setDrafts((current) => current.filter((profile) => profile.id !== removeProfile.id))
+        else archive(removeProfile.id, true)
         setRemoveId(null)
         closeEditor()
       }}
@@ -408,7 +375,7 @@ export function PrintersPane({
       </>
     )
   return (
-    <SettingsPage data-saving={dirty || mutation.isPending}>
+    <SettingsPage data-saving={pending}>
       {content}
       {editor}
       {removalDialog}

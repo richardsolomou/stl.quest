@@ -44,7 +44,7 @@ export function SupplyNeeds({
   const stock = consumables.stock
   const runningOut = levels.flatMap((level) => {
     const consumable = library.find(({ id }) => id === level.consumableId)
-    return consumable && (level.low || level.missing) ? [{ consumable, level }] : []
+    return consumable && !consumable.archived && (level.low || level.missing) ? [{ consumable, level }] : []
   })
   const materials = missingMaterials(library, printers).filter(({ printType }) => printTypes.includes(printType))
   const catalogue = useQuery(catalogueQuery('parts')).data ?? []

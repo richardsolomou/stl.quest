@@ -1,18 +1,19 @@
 import { PRINT_TYPES, type PrinterProfile, type PrintType } from './types'
 import type { UsageUnit } from './usage'
 
-export const CONSUMABLES_SETTING = 'consumables'
 export const MAX_CONSUMABLES = 200
 
-/** Amounts in the consumable's own unit (see `consumableUnit`). */
-type MinimumStock = {
+/** What every consumable carries; amounts are in the consumable's own unit (see `consumableUnit`). */
+type LibraryFields = {
+  /** Kept so usage that names it still resolves, but left out of pickers, pricing, and stock needs. */
+  archived?: boolean
   /** Below this much on hand it counts as running low. */
   minimumStock?: number
   /** How much one bottle, spool, box, or pack holds, so restocking can count what was bought. */
   packSize?: number
 }
 
-export type ResinConsumable = MinimumStock & {
+export type ResinConsumable = LibraryFields & {
   id: string
   kind: 'resin'
   name: string
@@ -24,7 +25,7 @@ export type ResinConsumable = MinimumStock & {
 export type FilamentColour = { name: string; hex: string }
 
 /** A catalogued filament takes its name from the preset and colour; `name` is typed only for one the catalogue lacks. */
-export type FilamentConsumable = MinimumStock & {
+export type FilamentConsumable = LibraryFields & {
   id: string
   kind: 'filament'
   name: string
@@ -34,7 +35,7 @@ export type FilamentConsumable = MinimumStock & {
 }
 
 /** A part that wears out, such as a resin tank or build plate, costed across the plates or print hours it lasts. */
-export type PartConsumable = MinimumStock & {
+export type PartConsumable = LibraryFields & {
   id: string
   kind: 'part'
   name: string
@@ -57,7 +58,7 @@ export type SupplyUnit = (typeof SUPPLY_UNITS)[number]
  * Something used up around printing, such as IPA or gloves, measured in the unit equipment uses it in. `price` is per
  * litre for `ml`, per kilogram for `g`, and per item for `item`, which is how supplies are bought.
  */
-export type SupplyConsumable = MinimumStock & {
+export type SupplyConsumable = LibraryFields & {
   id: string
   kind: 'supply'
   name: string
@@ -69,8 +70,11 @@ export type Consumable = ResinConsumable | FilamentConsumable | PartConsumable |
 
 export const CONSUMABLE_KINDS = ['resin', 'filament', 'part', 'supply'] as const satisfies Consumable['kind'][]
 
+/** The consumables of a kind still in use, in library order, so the first is the one a quote uses when none is picked. */
 export function consumablesOfKind<Kind extends Consumable['kind']>(consumables: Consumable[], kind: Kind) {
-  return consumables.filter((consumable): consumable is Extract<Consumable, { kind: Kind }> => consumable.kind === kind)
+  return consumables.filter(
+    (consumable): consumable is Extract<Consumable, { kind: Kind }> => consumable.kind === kind && !consumable.archived,
+  )
 }
 
 /** Whether a part belongs to every printer of its print type rather than to a model or a printer of its own. */

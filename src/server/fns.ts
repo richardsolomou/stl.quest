@@ -46,8 +46,7 @@ import { managedStorageAvailable } from './managedStorage'
 import { storagePlans } from '../core/plans'
 import { billingAvailable } from './billing'
 import { workflow } from '../core/workflow'
-import { CONSUMABLES_SETTING, consumablesOfKind, type Consumable } from '../core/consumables'
-import { EQUIPMENT_SETTING, type EquipmentItem } from '../core/equipment'
+import { activeItems } from '../core/inventory'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS, PRICE_CALCULATOR_SETTING } from '../core/priceCalculator'
 import {
   cloudStorageProviderName,
@@ -59,8 +58,8 @@ import {
   socialProviderCredentialsChanged,
   socialProviderNeedsRetest,
 } from '../core/auth'
-import type { BoardConfig, PrinterProfile, Repository, Role, StorageMigration, Telemetry } from '../core/types'
-import { printerProfileChanges, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
+import type { BoardConfig, Repository, Role, StorageMigration, Telemetry } from '../core/types'
+import { PRINTERS_SKIPPED_SETTING } from '../core/printers'
 import { PRINT_TYPE_SETTING, storedPrintTypeChoice, workspacePrintTypes } from '../core/printTypes'
 import { storedUsageTracking, USAGE_TRACKING_SETTING } from '../core/usageTracking'
 import { applyOnboardingProgressOperation, recordOnboardingTask } from '../core/onboarding'
@@ -110,9 +109,8 @@ import {
   updatePrintGroupSchema,
   updatePrintCopyTagsSchema,
   reorderPrintGroupItemSchema,
-  printerProfilesSchema,
-  consumablesSchema,
-  equipmentSchema,
+  inventoryArchiveSchema,
+  inventoryItemSchema,
   reorderRequestSchema,
   requestFiltersSchema,
   repeatRequestSchema,
@@ -203,9 +201,9 @@ async function resolvedOnboardingProgress(
 ) {
   let progress = await repository.getUserOnboarding(userId, workspaceId)
   if (!isAdmin) return progress
-  if ((await storedPrinterProfiles(workspaceRepository)).some(({ archived }) => !archived))
+  if (activeItems(await workspaceRepository.listInventory('printers')).length)
     progress = applyOnboardingProgressOperation(progress, { operation: 'complete', task: 'printers' })
-  const consumables = (await workspaceRepository.getSetting<Consumable[]>(CONSUMABLES_SETTING)) ?? []
+  const consumables = activeItems(await workspaceRepository.listInventory('consumables'))
   if (consumables.some(({ kind }) => kind === 'resin' || kind === 'filament'))
     progress = applyOnboardingProgressOperation(progress, { operation: 'complete', task: 'stock' })
   if (await storedUsageTracking(workspaceRepository))
@@ -311,8 +309,10 @@ export const sessionInfo = createServerFn({ method: 'GET' })
       const authenticated = identity ? await instance.requireIdentity(getRequestHeaders()) : undefined
       const workspaces = authenticated ? await instance.listWorkspaces(authenticated.id) : []
       const context = authenticated ? await instance.workspace(getRequestHeaders(), data.workspaceSlug) : undefined
-      const printers = context ? (await storedPrinterProfiles(context.repository)).filter(({ archived }) => !archived) : []
-      const printersConfigured = context ? (await context.repository.getSetting<PrinterProfile[]>(PRINTERS_SETTING)) !== undefined : false
+      const fleet = context ? await context.repository.listInventory('printers') : []
+      const printers = activeItems(fleet)
+      const printersConfigured =
+        fleet.length > 0 || (context ? (await context.repository.getSetting<boolean>(PRINTERS_SKIPPED_SETTING)) === true : false)
       const printTypeChoice = context ? await storedPrintTypeChoice(context.repository) : 'automatic'
       const workspaceOwnerId = context ? await context.repository.workspaceOwnerId() : undefined
       const managedStorageEligible =
@@ -408,29 +408,47 @@ export const getPrinters = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      return { profiles: await storedPrinterProfiles(context.repository) }
+      return { profiles: await context.repository.listInventory('printers') }
     }),
   )
 
-export const savePrinterProfiles = createServerFn({ method: 'POST' })
-  .validator(inWorkspace(printerProfilesSchema))
-  .handler(async ({ data }) =>
-    mutationRpc(async () => {
-      const instance = await app()
-      const context = await workspaceAdmin(instance, data.workspaceSlug)
-      const previous = await storedPrinterProfiles(context.repository)
-      await context.repository.replacePrinterProfiles(data.profiles)
-      const activeProfiles = data.profiles.filter(({ archived }) => !archived)
-      if (activeProfiles.length)
-        await recordOnboardingTask(instance.repository, context.identity.id, 'printers', context.workspace.id).catch(() => undefined)
-      context.events.publish('settings.changed')
-      instance.telemetry.capture(context.identity.id, 'printer_saved', {
-        printer_count: activeProfiles.length,
-        ...printerProfileChanges(previous, data.profiles),
-      })
-      return { saved: true, profiles: await storedPrinterProfiles(context.repository) }
+export const createInventoryItem = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(inventoryItemSchema))
+  .handler(async ({ data: { workspaceSlug, inventory, item } }) =>
+    workspaceMutation(workspaceSlug, async (context) => {
+      const items = await context.service.createInventoryItem(inventory, item, context.identity)
+      if (inventory === 'printers') await recordPrinterSetup(context)
+      return { items }
     }),
   )
+
+export const updateInventoryItem = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(inventoryItemSchema))
+  .handler(async ({ data: { workspaceSlug, inventory, item } }) =>
+    workspaceMutation(workspaceSlug, async (context) => ({
+      items: await context.service.updateInventoryItem(inventory, item, context.identity),
+    })),
+  )
+
+export const setInventoryItemArchived = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(inventoryArchiveSchema))
+  .handler(async ({ data: { workspaceSlug, inventory, id, archived } }) =>
+    workspaceMutation(workspaceSlug, async (context) => {
+      const items = await context.service.setInventoryItemArchived(inventory, id, archived, context.identity)
+      if (inventory === 'printers' && !archived) await recordPrinterSetup(context)
+      return { items }
+    }),
+  )
+
+/** Finishes printer setup without a printer, so it is not offered again; adding one later works as usual. */
+export const skipPrinterSetup = createServerFn({ method: 'POST' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) => workspaceMutation(data.workspaceSlug, (context) => context.service.skipPrinterSetup(context.identity)))
+
+async function recordPrinterSetup(context: { identity: { id: string }; workspace: { id: string } }) {
+  const instance = await app()
+  await recordOnboardingTask(instance.repository, context.identity.id, 'printers', context.workspace.id).catch(() => undefined)
+}
 
 /**
  * Everything the plan page shows about the signed-in account's subscription. Stripe syncs the
@@ -1137,25 +1155,7 @@ export const getConsumables = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      return { consumables: (await context.repository.getSetting<Consumable[]>(CONSUMABLES_SETTING)) ?? [] }
-    }),
-  )
-
-export const saveConsumables = createServerFn({ method: 'POST' })
-  .validator(inWorkspace(consumablesSchema))
-  .handler(async ({ data }) =>
-    mutationRpc(async () => {
-      const instance = await app()
-      const context = await workspaceAdmin(instance, data.workspaceSlug)
-      await context.repository.setSetting(CONSUMABLES_SETTING, data.consumables)
-      context.events.publish('settings.changed')
-      instance.telemetry.capture(context.identity.id, 'consumables_saved', {
-        resin_count: consumablesOfKind(data.consumables, 'resin').length,
-        filament_count: consumablesOfKind(data.consumables, 'filament').length,
-        part_count: consumablesOfKind(data.consumables, 'part').length,
-        supply_count: consumablesOfKind(data.consumables, 'supply').length,
-      })
-      return { consumables: data.consumables }
+      return { consumables: await context.repository.listInventory('consumables') }
     }),
   )
 
@@ -1166,24 +1166,7 @@ export const getEquipment = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      return { equipment: (await context.repository.getSetting<EquipmentItem[]>(EQUIPMENT_SETTING)) ?? [] }
-    }),
-  )
-
-export const saveEquipment = createServerFn({ method: 'POST' })
-  .validator(inWorkspace(equipmentSchema))
-  .handler(async ({ data }) =>
-    mutationRpc(async () => {
-      const instance = await app()
-      const context = await workspaceAdmin(instance, data.workspaceSlug)
-      await context.repository.setSetting(EQUIPMENT_SETTING, data.equipment)
-      context.events.publish('settings.changed')
-      instance.telemetry.capture(context.identity.id, 'equipment_saved', {
-        equipment_count: data.equipment.filter((item) => !item.archived).length,
-        catalogue_count: data.equipment.filter((item) => !item.archived && item.presetId).length,
-        with_supplies_count: data.equipment.filter((item) => !item.archived && item.supplies.length).length,
-      })
-      return { equipment: data.equipment }
+      return { equipment: await context.repository.listInventory('equipment') }
     }),
   )
 
