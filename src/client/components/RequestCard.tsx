@@ -343,7 +343,10 @@ export function RequestCard({
               >
                 {request.name}
               </span>
-              {avatar}
+              <span className={cn('relative shrink-0', variant === 'lead' ? 'size-14' : 'size-10')}>
+                <RequestThumb request={request} />
+                {avatar && <span className="absolute -right-1.5 -bottom-1.5 flex rounded-[5px] ring-2 ring-ticket">{avatar}</span>}
+              </span>
             </span>
             <span className="-order-1 flex items-center gap-2 font-mono text-[11px] leading-none text-ticket-muted uppercase">
               {position !== undefined && <span>#{String(position).padStart(2, '0')}</span>}
