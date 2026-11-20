@@ -18,3 +18,6 @@ deploy/*.local.*
 playwright-report/
 test-results/
 .capture/
+
+# Design review screenshots from the impeccable skill
+.impeccable/review/

@@ -1,4 +1,7 @@
 import type { OnboardingSectionId, OnboardingTaskId } from '../../onboarding'
+import type { PrintType } from '../../types'
+
+type QuestCopy = { title: string; description: string }
 
 export const shell = {
   notFound: { title: 'Page not found', back: 'Back to the board' },
@@ -22,6 +25,8 @@ export const shell = {
     label: 'Settings sections',
     choose: 'Choose a settings section',
     workspace: 'Workspace',
+    production: 'Production',
+    connections: 'Connections',
     you: 'You',
     server: 'Server',
     product: 'STL Quest',
@@ -51,7 +56,9 @@ export const shell = {
       `${resolved} of ${total} quests resolved · ${points} of ${totalPoints} XP earned`,
     summary: (completed: number, skipped: number) => `${completed} completed · ${skipped} skipped`,
     reviewQuests: 'Review quests',
-    rowComplete: 'Complete · Review',
+    rowComplete: 'Done',
+    showResolved: (count: number) => `Show ${count} resolved`,
+    hideResolved: 'Hide resolved',
     rowSkipped: 'Skipped',
     rowPoints: (points: number, isNew: boolean) => `${isNew ? 'New · ' : ''}${points} XP`,
     restore: (title: string) => `Restore ${title}`,
@@ -64,37 +71,44 @@ export const shell = {
   onboarding: {
     sections: {
       'getting-started': 'Getting started',
-      'managing-queue': 'Managing the queue',
-      'workspace-setup': 'Configuring your workspace',
+      optional: 'Optional',
     } satisfies Record<OnboardingSectionId, string>,
     quests: {
+      printers: {
+        title: 'Add your printers',
+        description: 'Add each printer you run, so prints are matched to one that fits and quotes use what it costs to run.',
+      },
+      stock: {
+        resin: {
+          title: 'Add the resins you stock',
+          description: 'Optional. Add the resins you print with and what you pay, so quotes use your prices.',
+        },
+        filament: {
+          title: 'Add the filaments you stock',
+          description: 'Optional. Add the filaments you print with and what you pay, so quotes use your prices.',
+        },
+        both: {
+          title: 'Add the materials you stock',
+          description: 'Optional. Add the resins and filaments you print with and what you pay, so quotes use your prices.',
+        },
+      },
       upload: {
         title: 'Add your first print',
-        description: 'Upload a model or save a source link when you are ready to put work into the queue.',
+        description: 'Upload a model or save a link to put work in the queue.',
       },
-      move: { title: 'Move work through the queue', description: 'Drag a print card between columns to update its stage.' },
+      move: {
+        title: 'Get a print to Ready',
+        description: 'Drag a print card from the queue through Printing and Finishing to Ready.',
+      },
       inspect: { title: 'Inspect a print', description: 'Open a print card to review its model, notes, copies, and assignment.' },
       download: { title: 'Download a model', description: 'Download an STL from a print card or its detail view.' },
-      actions: { title: 'Discover print actions', description: 'Use a print card action to select, group, move, or delete work.' },
-      sort: { title: 'Choose your queue view', description: 'Sort by requester priority, submission time, name, or recent activity.' },
-      filter: {
-        title: 'Find work with filters',
-        description: 'Apply a filter to focus the queue by print type, requester, dates, files, or another useful field.',
+      invite: { title: 'Invite your team', description: 'Create a single-use invite for a requester or another admin.' },
+      tracking: {
+        title: 'Track usage and stock',
+        description:
+          'Optional. Answer what each print used as it moves, and stock levels, reorders, part wear, and spend count themselves. Turn it on here.',
       },
-      printers: {
-        title: 'Assemble your printer fleet',
-        description: 'Add and save a printer profile to help match requests to compatible machines.',
-      },
-      storage: {
-        title: 'Inspect model storage',
-        description: 'Review the active storage provider and the options for moving models later.',
-      },
-      visibility: {
-        title: 'Choose request visibility',
-        description: 'Choose whether requesters see the shared queue or only their own work.',
-      },
-      invite: { title: 'Invite a teammate', description: 'Create a single-use invite for a requester or another admin.' },
-    } satisfies Record<OnboardingTaskId, { title: string; description: string }>,
+    } satisfies Record<Exclude<OnboardingTaskId, 'stock'>, QuestCopy> & { stock: Record<PrintType | 'both', QuestCopy> },
   },
   confirm: {
     noDetail: 'No further detail was returned.',

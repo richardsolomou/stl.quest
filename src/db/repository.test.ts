@@ -11,6 +11,9 @@ import { databasePath } from './paths'
 import { createDatabase, rawDatabase } from './connection'
 import type { AccountRole, PrinterProfile, WorkspaceRole } from '../core/types'
 import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
+import type { UsageEvent } from '../core/usage'
+import type { Consumable } from '../core/consumables'
+import type { InventoryItems, InventoryKind } from '../core/inventory'
 import {
   account,
   assetGenerationJobs,
@@ -34,6 +37,14 @@ async function insertUser(
     .values({ ...values, role: values.accountRole ?? 'requester', emailVerified: true, createdAt: now, updatedAt: now })
     .run()
   await repository.addWorkspaceMember(values.id, values.workspaceRole ?? 'member')
+}
+
+async function stock<Kind extends InventoryKind>(
+  repository: Pick<DrizzleRepository, 'changeInventory'>,
+  kind: Kind,
+  items: InventoryItems[Kind][],
+) {
+  await repository.changeInventory(kind, (current) => [...current, ...items])
 }
 
 const contractBackends = process.env.POSTGRES_TEST_URL ? (['sqlite', 'postgres'] as const) : (['sqlite'] as const)
@@ -90,6 +101,10 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
   })
 
   it('persists requests and tracks copy quantities transactionally', async () => {
+    await stock(repository, 'printers', [
+      { id: 'printer-id', name: 'Saturn', printType: 'resin' },
+      { id: 'next-printer', name: 'Mars', printType: 'resin' },
+    ])
     const id = await repository.createRequest({
       name: 'Bracket',
       fileName: 'bracket.stl',
@@ -387,6 +402,25 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
   })
 
   it('filters mixed requests by print type and printer assignment', async () => {
+    await stock(repository, 'printers', [
+      {
+        id: 'resin-printer',
+        name: 'Resin printer',
+        printType: 'resin',
+        widthMm: 100,
+        depthMm: 60,
+        heightMm: 150,
+      },
+      {
+        id: 'filament-printer',
+        name: 'Filament printer',
+        printType: 'filament',
+        widthMm: 220,
+        depthMm: 220,
+        heightMm: 250,
+      },
+    ])
+
     const resin = await repository.createRequest({
       name: 'Resin model',
       fileName: 'resin.stl',
@@ -411,34 +445,6 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       ownerUserId: 'maker',
       requestedPrintType: 'filament',
     })
-
-    await repository.setSetting('printers', [
-      {
-        id: 'resin-printer',
-        name: 'Resin printer',
-        printType: 'resin',
-        widthMm: 100,
-        depthMm: 60,
-        heightMm: 150,
-        spacingMm: 2,
-        supportMarginMm: 2,
-        adhesionMarginMm: 1,
-        heightAllowanceMm: 4,
-        maxHeightDifferenceMm: 20,
-      },
-      {
-        id: 'filament-printer',
-        name: 'Filament printer',
-        printType: 'filament',
-        widthMm: 220,
-        depthMm: 220,
-        heightMm: 250,
-        spacingMm: 3,
-        brimMarginMm: 2,
-        filamentDiameterMm: 1.75,
-        materialDensityGPerCm3: 1.24,
-      },
-    ])
 
     expect((await repository.queryRequests({ filters: { printType: 'filament' } })).requests.map(({ id }) => id).sort()).toEqual(
       [unassigned, filament].sort(),
@@ -562,14 +568,14 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
 
   it('persists onboarding progress per user', async () => {
     await repository.saveUserOnboarding('maker', {
-      completedTasks: ['upload', 'filter'],
-      skippedTasks: ['sort'],
+      completedTasks: ['upload', 'inspect'],
+      skippedTasks: ['download'],
       celebratedTasks: ['upload'],
     })
 
     await expect(repository.getUserOnboarding('maker')).resolves.toEqual({
-      completedTasks: ['upload', 'filter'],
-      skippedTasks: ['sort'],
+      completedTasks: ['upload', 'inspect'],
+      skippedTasks: ['download'],
       celebratedTasks: ['upload'],
     })
   })
@@ -579,13 +585,13 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const secondWorkspace = await repository.createWorkspace({ id: 'maker' }, 'Second workspace')
     await repository.saveUserOnboarding(
       'maker',
-      { completedTasks: ['upload', 'printers'], skippedTasks: ['storage'], celebratedTasks: ['upload', 'printers'] },
+      { completedTasks: ['upload', 'printers'], skippedTasks: ['stock'], celebratedTasks: ['upload', 'printers'] },
       firstWorkspace.id,
     )
 
     await expect(repository.getUserOnboarding('maker', firstWorkspace.id)).resolves.toEqual({
       completedTasks: ['upload', 'printers'],
-      skippedTasks: ['storage'],
+      skippedTasks: ['stock'],
       celebratedTasks: ['upload', 'printers'],
     })
     await expect(repository.getUserOnboarding('maker', secondWorkspace.id)).resolves.toEqual({
@@ -620,6 +626,83 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       undefined,
       { enabled: false },
     ])
+  })
+
+  const ipa: Consumable = { id: 'ipa', kind: 'supply', name: 'IPA', unit: 'ml', price: 8 }
+
+  function usageEvent(overrides: Partial<UsageEvent> = {}): UsageEvent {
+    return {
+      id: crypto.randomUUID(),
+      transactionId: 'transaction',
+      stage: 'stock',
+      kind: 'restock',
+      consumableId: 'ipa',
+      amount: 1_000,
+      unit: 'ml',
+      createdAt: 1_000,
+      ...overrides,
+    }
+  }
+
+  it('lists usage newest first with only the requested filters', async () => {
+    await stock(repository, 'consumables', [ipa])
+    await repository.appendUsageEvents([
+      usageEvent({ id: 'old', requestId: 'print', createdAt: 1_000 }),
+      usageEvent({ id: 'new', requestId: 'print', createdAt: 2_000 }),
+      usageEvent({ id: 'other', requestId: 'other-print', createdAt: 3_000 }),
+    ])
+
+    expect((await repository.listUsage({ requestId: 'print' })).map((event) => event.id)).toEqual(['new', 'old'])
+  })
+
+  it('lists usage within a time range', async () => {
+    await stock(repository, 'consumables', [ipa])
+    await repository.appendUsageEvents([
+      usageEvent({ id: 'before', createdAt: 999 }),
+      usageEvent({ id: 'inside', createdAt: 1_000 }),
+      usageEvent({ id: 'after', createdAt: 2_000 }),
+    ])
+
+    expect((await repository.listUsage({ from: 1_000, to: 2_000 })).map((event) => event.id)).toEqual(['inside'])
+  })
+
+  it('sums live stock per consumable, kind, and unit', async () => {
+    await stock(repository, 'consumables', [ipa])
+    await repository.appendUsageEvents([
+      usageEvent({ id: 'first', transactionId: 'first' }),
+      usageEvent({ id: 'second', transactionId: 'second', amount: 500 }),
+      usageEvent({ id: 'used', transactionId: 'used', kind: 'use', amount: 40 }),
+    ])
+    await repository.undoUsageTransaction('second', 2_000)
+
+    expect(await repository.stockTotals()).toEqual(
+      expect.arrayContaining([
+        { consumableId: 'ipa', kind: 'restock', unit: 'ml', amount: 1_000 },
+        { consumableId: 'ipa', kind: 'use', unit: 'ml', amount: 40 },
+      ]),
+    )
+  })
+
+  it('undoes every live event of a transaction once', async () => {
+    await stock(repository, 'consumables', [ipa])
+    await repository.appendUsageEvents([usageEvent({ id: 'printer' }), usageEvent({ id: 'material' })])
+
+    expect([
+      await repository.undoUsageTransaction('transaction', 2_000),
+      await repository.undoUsageTransaction('transaction', 3_000),
+    ]).toEqual([2, 0])
+  })
+
+  it('keeps usage within its workspace', async () => {
+    await stock(repository, 'consumables', [ipa])
+    const secondary = await repository.scoped((await repository.createWorkspace({ id: 'owner' }, 'Second farm')).id)
+    await repository.appendUsageEvents([usageEvent()])
+
+    expect([
+      await secondary.listUsage({}),
+      await secondary.stockTotals(),
+      await secondary.undoUsageTransaction('transaction', 2_000),
+    ]).toEqual([[], [], 0])
   })
 
   it('journals asset migrations per workspace', async () => {
@@ -796,10 +879,10 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       ownerUserId: 'owner',
     })
     await workspace.setSetting('storageEncrypted', { encrypted: true })
-    await workspace.setSetting('printers', [
+    await stock(workspace, 'printers', [
       { id: 'active', name: 'Active', printType: 'resin' },
       { id: 'archived', name: 'Archived', printType: 'filament', archived: true },
-    ] satisfies PrinterProfile[])
+    ])
     await repository.database
       .update(assetGenerationJobs)
       .set({ status: 'failed', error: 'preview failed' })
@@ -895,8 +978,8 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     })
     await primary.setSetting('board', { privateRequests: true })
     await secondary.setSetting('board', { privateRequests: false })
-    await primary.setSetting('printers', [{ id: 'primary-printer', name: 'Primary printer', printType: 'resin' }])
-    await secondary.setSetting('printers', [{ id: 'secondary-printer', name: 'Secondary printer', printType: 'filament' }])
+    await stock(primary, 'printers', [{ id: 'primary-printer', name: 'Primary printer', printType: 'resin' }])
+    await stock(secondary, 'printers', [{ id: 'secondary-printer', name: 'Secondary printer', printType: 'filament' }])
     await primary.createInvite({ id: 'primary-invite', tokenHash: 'primary-token', role: 'admin', expiresAt: Date.now() + 60_000 })
     await secondary.createInvite({
       id: 'secondary-invite',
@@ -920,8 +1003,10 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect(await primary.getRequest(primaryRequest)).toMatchObject({ archivedAt: expect.any(Number) })
     expect(await primary.getSetting('board')).toEqual({ privateRequests: true })
     expect(await secondary.getSetting('board')).toEqual({ privateRequests: false })
-    expect(await primary.getSetting('printers')).toEqual([{ id: 'primary-printer', name: 'Primary printer', printType: 'resin' }])
-    expect(await secondary.getSetting('printers')).toEqual([{ id: 'secondary-printer', name: 'Secondary printer', printType: 'filament' }])
+    expect(await primary.listInventory('printers')).toEqual([{ id: 'primary-printer', name: 'Primary printer', printType: 'resin' }])
+    expect(await secondary.listInventory('printers')).toEqual([
+      { id: 'secondary-printer', name: 'Secondary printer', printType: 'filament' },
+    ])
     expect((await primary.listAssetGenerationJobs()).every((job) => job.requestId === primaryRequest)).toBe(true)
     expect((await secondary.listAssetGenerationJobs()).every((job) => job.requestId === secondaryRequest)).toBe(true)
     expect(await primary.listInvites()).toEqual([expect.objectContaining({ id: 'primary-invite' })])
@@ -1589,54 +1674,49 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 35 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 38 })
     await migrated.close()
   })
 
-  it('archives a used printer without changing its request history', async () => {
-    const printer: PrinterProfile = {
-      id: 'retired-filament',
-      name: 'Retired filament printer',
-      printType: 'filament',
-    }
-    await repository.setSetting('printers', [printer])
-    const request = await repository.createRequest({
-      name: 'Assigned model',
-      fileName: 'assigned.stl',
-      filePath: 'todo/assigned.stl',
-      quantity: 1,
-      ownerUserId: 'maker',
-      printerId: printer.id,
-    })
+  it('lists inventory in the order it was added, archived items included', async () => {
+    await stock(repository, 'consumables', [
+      { id: 'grey', kind: 'resin', name: 'Grey', pricePerLitre: 30, densityGramsPerMl: 1.1 },
+      { id: 'black', kind: 'resin', name: 'Black', pricePerLitre: 32, densityGramsPerMl: 1.1, archived: true },
+    ])
+    await stock(repository, 'consumables', [{ id: 'clear', kind: 'resin', name: 'Clear', pricePerLitre: 35, densityGramsPerMl: 1.1 }])
 
-    await repository.replacePrinterProfiles([])
-
-    expect(await repository.getRequest(request)).toMatchObject({ printerId: printer.id, requestedPrintType: undefined })
-    expect(await repository.getSetting<PrinterProfile[]>('printers')).toEqual([{ ...printer, archived: true, used: true }])
-  })
-
-  it('removes a printer that has never been assigned', async () => {
-    await repository.setSetting('printers', [{ id: 'unused', name: 'Unused', printType: 'resin' }])
-
-    await repository.replacePrinterProfiles([])
-
-    expect(await repository.getSetting<PrinterProfile[]>('printers')).toEqual([])
-  })
-
-  it('restores an archived printer without losing its usage history', async () => {
-    const printer: PrinterProfile = { id: 'archived', name: 'Archived', printType: 'resin', archived: true, used: true }
-    await repository.setSetting('printers', [printer])
-
-    await repository.replacePrinterProfiles([{ ...printer, archived: undefined }])
-
-    expect(await repository.getSetting<PrinterProfile[]>('printers')).toEqual([
-      { id: printer.id, name: printer.name, printType: printer.printType, used: true },
+    expect((await repository.listInventory('consumables')).map(({ id, archived }) => ({ id, archived }))).toEqual([
+      { id: 'grey', archived: undefined },
+      { id: 'black', archived: true },
+      { id: 'clear', archived: undefined },
     ])
   })
 
-  it('remembers printer usage after its request is unassigned', async () => {
-    const printer: PrinterProfile = { id: 'used', name: 'Used', printType: 'resin' }
-    await repository.setSetting('printers', [printer])
+  it('keeps edits to different items made at the same time', async () => {
+    await stock(repository, 'printers', [
+      { id: 'saturn', name: 'Saturn', printType: 'resin' },
+      { id: 'mk4', name: 'MK4', printType: 'filament' },
+    ])
+    const rename = (id: string, name: string) =>
+      repository.changeInventory('printers', (items) => items.map((item) => (item.id === id ? { ...item, name } : item)))
+
+    await Promise.all([rename('saturn', 'Saturn bay 1'), rename('mk4', 'MK4 bay 2')])
+
+    expect((await repository.listInventory('printers')).map(({ name }) => name)).toEqual(['Saturn bay 1', 'MK4 bay 2'])
+  })
+
+  it('refuses a change that drops an item rather than archiving it', async () => {
+    await stock(repository, 'equipment', [
+      { id: 'wash', name: 'Wash', kind: 'wash', stage: 'finishing', powerWatts: 50, minutesPerUse: 10, supplies: [] },
+    ])
+
+    await expect(repository.changeInventory('equipment', () => [])).rejects.toThrow('archived, never removed')
+    expect(await repository.listInventory('equipment')).toHaveLength(1)
+  })
+
+  it('archives a printer without changing its request history', async () => {
+    const printer: PrinterProfile = { id: 'retired-filament', name: 'Retired filament printer', printType: 'filament' }
+    await stock(repository, 'printers', [printer])
     const request = await repository.createRequest({
       name: 'Assigned model',
       fileName: 'assigned.stl',
@@ -1645,11 +1725,52 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       ownerUserId: 'maker',
       printerId: printer.id,
     })
-    await repository.updateRequest(request, { printerId: null })
 
-    await repository.replacePrinterProfiles([])
+    await repository.changeInventory('printers', (items) => items.map((item) => ({ ...item, archived: true })))
 
-    expect(await repository.getSetting<PrinterProfile[]>('printers')).toEqual([{ ...printer, archived: true, used: true }])
+    expect(await repository.getRequest(request)).toMatchObject({ printerId: printer.id, requestedPrintType: undefined })
+    expect(await repository.listInventory('printers')).toEqual([{ ...printer, archived: true }])
+  })
+
+  it('restores an archived printer', async () => {
+    const printer: PrinterProfile = { id: 'archived', name: 'Archived', printType: 'resin', archived: true }
+    await stock(repository, 'printers', [printer])
+
+    await repository.changeInventory('printers', (items) => items.map((item) => ({ ...item, archived: undefined })))
+
+    expect(await repository.listInventory('printers')).toEqual([{ id: printer.id, name: printer.name, printType: printer.printType }])
+  })
+
+  it('rejects a print assigned to a printer the workspace does not have', async () => {
+    await expect(
+      repository.createRequest({
+        name: 'Misassigned model',
+        fileName: 'misassigned.stl',
+        filePath: 'todo/misassigned.stl',
+        quantity: 1,
+        ownerUserId: 'maker',
+        printerId: 'missing',
+      }),
+    ).rejects.toThrow()
+  })
+
+  it('rejects usage of a consumable the workspace does not have', async () => {
+    await expect(
+      repository.appendUsageEvents([
+        { id: 'use', transactionId: 'use', stage: 'stock', kind: 'restock', consumableId: 'missing', amount: 1, unit: 'ml', createdAt: 0 },
+      ]),
+    ).rejects.toThrow()
+  })
+
+  it('lets two workspaces keep items with the same ID', async () => {
+    const second = await repository.scoped((await repository.createWorkspace({ id: 'maker' }, 'Second farm')).id)
+    await stock(repository, 'printers', [{ id: 'bay-1', name: 'Saturn', printType: 'resin' }])
+    await stock(second, 'printers', [{ id: 'bay-1', name: 'MK4', printType: 'filament' }])
+
+    expect([(await repository.listInventory('printers'))[0].name, (await second.listInventory('printers'))[0].name]).toEqual([
+      'Saturn',
+      'MK4',
+    ])
   })
 
   it('does not assign existing pooled requests when a printer is added', async () => {
@@ -1662,26 +1783,15 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       requestedPrintType: 'resin',
     })
 
-    await repository.replacePrinterProfiles([{ id: 'small', name: 'Small', printType: 'resin', widthMm: 100, depthMm: 100 }])
+    await stock(repository, 'printers', [{ id: 'small', name: 'Small', printType: 'resin', widthMm: 100, depthMm: 100 }])
 
     expect(await repository.getRequest(request)).toMatchObject({ printerId: undefined, requestedPrintType: 'resin' })
   })
 
-  it('persists predefined printer matches by name when the repository starts', async () => {
-    await repository.setSetting('printers', [
-      {
-        id: 'mars-2',
-        name: 'Elegoo Mars 2',
-        printType: 'resin',
-        widthMm: 100,
-        depthMm: 100,
-      },
-    ])
+  it('stores the catalogue model a printer is named after', async () => {
+    await stock(repository, 'printers', [{ id: 'mars-2', name: 'Elegoo Mars 2', printType: 'resin', widthMm: 100, depthMm: 100 }])
 
-    const reopened = await reopenRepository()
-
-    expect((await repository.getSetting<PrinterProfile[]>('printers'))?.[0]?.presetId).toBe('resin-elegoo-mars-2')
-    await reopened.close()
+    expect((await repository.listInventory('printers'))[0]?.presetId).toBe('resin-elegoo-mars-2')
   })
 
   it('does not assign measured pooled requests when printers are added', async () => {
@@ -1695,7 +1805,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     })
     await repository.setModelDimensions(request, { widthMm: 150, depthMm: 80, heightMm: 120 })
 
-    await repository.replacePrinterProfiles([
+    await stock(repository, 'printers', [
       { id: 'small', name: 'Small', printType: 'resin', widthMm: 100, depthMm: 100, heightMm: 100 },
       { id: 'large', name: 'Large', printType: 'resin', widthMm: 200, depthMm: 200, heightMm: 200 },
     ])
@@ -1718,7 +1828,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
   })
 
   it('backfills existing pooled requests when the repository starts', async () => {
-    await repository.setSetting('printers', [
+    await stock(repository, 'printers', [
       { id: 'small', name: 'Small', printType: 'resin', widthMm: 100, depthMm: 100 },
       { id: 'large', name: 'Large', printType: 'resin', widthMm: 200, depthMm: 200 },
     ])
@@ -1748,7 +1858,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
   })
 
   it('does not rewrite unchanged automatic printer assignments when the repository reopens', async () => {
-    await repository.setSetting('printers', [{ id: 'small', name: 'Small', printType: 'resin' }])
+    await stock(repository, 'printers', [{ id: 'small', name: 'Small', printType: 'resin' }])
     const request = await repository.createRequest({
       name: 'Already assigned model',
       fileName: 'already-assigned.stl',
@@ -1767,7 +1877,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
   })
 
   it('repairs stale automatic printer assignments when the repository reopens', async () => {
-    await repository.setSetting('printers', [
+    await stock(repository, 'printers', [
       { id: 'small', name: 'Small', printType: 'resin' },
       { id: 'large', name: 'Large', printType: 'resin' },
     ])

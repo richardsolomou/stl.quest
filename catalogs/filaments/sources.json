@@ -1,0 +1,15 @@
+{
+  "sources": [
+    {
+      "id": "spoolmandb",
+      "repository": "https://github.com/Donkie/SpoolmanDB.git",
+      "webRepository": "https://github.com/Donkie/SpoolmanDB",
+      "branch": "main",
+      "revision": "8e391c16be4bfde29dfc184e2f0b9a8d154ab550",
+      "catalogPath": "filaments",
+      "license": "MIT",
+      "licensePath": "LICENSE",
+      "licenseOutput": "LICENSES/SpoolmanDB-MIT.txt"
+    }
+  ]
+}

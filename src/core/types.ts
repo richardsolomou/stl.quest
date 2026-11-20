@@ -3,6 +3,8 @@ import type { StoragePlan } from './plans'
 import type { NotificationKind, NotificationPreferences } from './notifications'
 import type { OnboardingProgress } from './onboarding'
 import type { Locale } from './i18n/locales'
+import type { StockTotal, UsageEvent, UsageFilters } from './usage'
+import type { InventoryItems, InventoryKind } from './inventory'
 
 export type Role = 'admin' | 'requester'
 export type AccountRole = 'super_admin' | 'requester'
@@ -62,8 +64,14 @@ export type PrinterProfile = PrinterSummary & {
   widthMm?: number
   depthMm?: number
   heightMm?: number
+  /** For wear: what the printer cost and how many print hours it lasts. */
+  purchasePrice?: number
+  lifespanHours?: number
+  /** What a printer without a catalogue model draws while printing; a catalogue model's own power is used otherwise. */
+  powerWatts?: number
+  /** Catalogue equipment bolted onto this printer, such as a pulsing release module, whose printing power adds to its own. */
+  addOnPresetIds?: string[]
   archived?: boolean
-  used?: boolean
 }
 
 export type Invite = {
@@ -492,7 +500,13 @@ interface RepositoryShape {
   setSettings(values: Record<string, unknown>, deleteKeys?: string[]): void
   setSettingsAndReleaseManagedStorage(values: Record<string, unknown>, deleteKeys?: string[]): void
   deleteSetting(key: string): void
-  replacePrinterProfiles(profiles: PrinterProfile[]): void
+  /** Appends every event in one transaction. */
+  appendUsageEvents(events: UsageEvent[]): void
+  listUsage(filters: UsageFilters): UsageEvent[]
+  /** Live events summed per consumable, kind, and unit. */
+  stockTotals(): StockTotal[]
+  /** Marks the transaction's live events undone and returns how many it marked. */
+  undoUsageTransaction(transactionId: string, undoneAt: number): number
   countUsers(): number
   /** Undefined clears the preference so the browser's languages decide. */
   setUserLocale(userId: string, locale: Locale | undefined): void
@@ -535,6 +549,17 @@ type AsyncRepositoryShape = {
 
 export type Repository = Omit<AsyncRepositoryShape, 'getSetting'> & {
   getSetting<T>(key: string): Promise<T | undefined>
+  /** Every item of `kind`, archived ones included, in the order they were added. */
+  listInventory<Kind extends InventoryKind>(kind: Kind): Promise<InventoryItems[Kind][]>
+  /**
+   * Stores what `change` makes of the items of `kind` while no other change to them can interleave, so edits to
+   * different items never undo each other: new items join the end, changed ones are updated in place, and none may go
+   * missing, since items are archived instead. `change` may throw a `Response` to refuse.
+   */
+  changeInventory<Kind extends InventoryKind>(
+    kind: Kind,
+    change: (items: InventoryItems[Kind][]) => InventoryItems[Kind][],
+  ): Promise<{ previous: InventoryItems[Kind][]; items: InventoryItems[Kind][] }>
 }
 
 // Final print-file storage. Keys are '/'-separated paths from core/assetKeys;
@@ -652,6 +677,9 @@ export type AppEvent =
   | 'storage.changed'
   | 'settings.changed'
   | 'workspace.deleted'
+  | 'usage.recorded'
+  | 'usage.undone'
+  | 'inventory.changed'
 
 export interface EventBus {
   publish(event: AppEvent): void

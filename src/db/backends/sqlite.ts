@@ -5,10 +5,13 @@ import type { DatabaseBackend } from '../backend'
 import { backupDatabase } from '../backup'
 import { closeDatabase, databaseFile, openDatabase, rawDatabase, type STLQuestDatabase } from '../connection'
 import { errorHasCode } from '../errors'
+import { runMigrations } from '../dataMigrations'
+import type { MigrationLog } from '../dataMigrations/types'
 import { migrateDatabase } from '../migrations'
 
 export class SQLiteBackend implements DatabaseBackend<STLQuestDatabase> {
   private lastIntegrity = { integrity: 'unknown', checkedAt: 0 }
+  private backedUp = false
 
   constructor(
     readonly database: STLQuestDatabase,
@@ -24,14 +27,27 @@ export class SQLiteBackend implements DatabaseBackend<STLQuestDatabase> {
     return new SQLiteBackend(this.database, false)
   }
 
-  async initialize() {
+  async initialize(log: MigrationLog) {
     const database = rawDatabase(this.database)
     database.run(sql`PRAGMA journal_mode = WAL`)
     database.run(sql`PRAGMA synchronous = FULL`)
     database.run(sql`PRAGMA busy_timeout = 5000`)
     database.run(sql`PRAGMA foreign_keys = ON`)
-    migrateDatabase(database, () => this.backupBeforeMigration(database))
+    await runMigrations(this, this.database, log)
     await this.maintain()
+  }
+
+  async migrateSchema(through?: string) {
+    const database = rawDatabase(this.database)
+    migrateDatabase(
+      database,
+      () => {
+        // Data migrations run between schema migrations, so one backup from before the first covers them all.
+        if (!this.backedUp) this.backupBeforeMigration(database)
+        this.backedUp = true
+      },
+      through,
+    )
   }
 
   close() {

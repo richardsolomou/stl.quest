@@ -121,7 +121,7 @@ function AuthenticatedHome() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const {
-    data: { identity, workflow, ownRequestsOnly, printers, printersConfigured, storageConfigured, storageReady },
+    data: { identity, workflow, ownRequestsOnly, printers, printersConfigured, printTypes, storageConfigured, storageReady },
   } = useSuspenseQuery(sessionQuery(workspaceSlug))
   const isAdmin = identity?.role === 'admin'
   const isWorkspaceOwner = identity?.workspaceRole === 'owner'
@@ -136,7 +136,8 @@ function AuthenticatedHome() {
   const tags = result?.groups ?? []
   const selectedTagIds = search.tag ? printGroupBranchIds(tags, search.tag) : undefined
   const visibleRequests = selectedTagIds ? requests.filter((request) => request.groups.some((tag) => selectedTagIds.has(tag.id))) : requests
-  const showPrintTypes = true
+  // A workspace that prints one type would stamp it on every card, so cards name the type only when there is a choice.
+  const showPrintTypes = printTypes.length > 1
   const facets = result?.facets ?? { requesters: [], total: 0, available: 0 }
   const posthog = usePostHog()
   const [uploadOpen, setUploadOpen] = useState(false)
@@ -239,13 +240,18 @@ function AuthenticatedHome() {
       {result ? (
         <>
           <BoardFilters
+            className="pb-3"
             search={effectiveSearch}
             facets={facets}
             tags={tags}
             onManageTags={isAdmin ? () => setManageTags(true) : undefined}
             prioritySortLabel={isAdmin ? undefined : t.board.sort.myPriority}
             showRoundRobin={isWorkspaceOwner}
-            presence={<BoardPresence workspaceSlug={workspaceSlug} visible={!hideRequester} />}
+            presence={
+              <span className="contents max-sm:hidden">
+                <BoardPresence workspaceSlug={workspaceSlug} visible={!hideRequester} />
+              </span>
+            }
             action={
               <>
                 <MyRequests workspaceSlug={workspaceSlug} userId={me.id} workflow={workflow} onOpenRequest={openRequest} />
@@ -276,7 +282,13 @@ function AuthenticatedHome() {
             selectedTagIds={selectedTagIds}
             filtered={search.tag !== undefined || Object.entries(filters).some(([key, value]) => key !== 'sort' && value !== undefined)}
             sort={effectiveSearch.sort ?? 'fair'}
+            printers={printers}
             onOpenRequest={openRequest}
+            onAddPrint={() => {
+              posthog.capture('add_print_opened', { source: 'empty_queue' })
+              setAddMode('upload')
+              setUploadOpen(true)
+            }}
           />
           {manageTags && (
             <ManageTagsDialog
@@ -347,7 +359,6 @@ function AuthenticatedHome() {
         <UploadForm
           initialFiles={droppedFiles}
           initialMode={addMode}
-          printers={printers}
           uploadsEnabled={storageReady}
           onClose={() => {
             setUploadOpen(false)

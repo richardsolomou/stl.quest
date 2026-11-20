@@ -25,12 +25,7 @@ function ThumbImage({ request, className }: { request: ThumbRequest; className?:
   const retryTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   useEffect(() => () => clearTimeout(retryTimer.current), [])
   return (
-    <div
-      className={cn(
-        'thumb relative grid size-16 shrink-0 place-items-center overflow-hidden rounded-md border bg-background [background-image:var(--grid)] [background-size:12px_12px]',
-        className,
-      )}
-    >
+    <div className={cn('thumb relative grid size-16 shrink-0 place-items-center overflow-hidden rounded-md border bg-thumb', className)}>
       {failed ? (
         <ModelFormatLabel format={request.modelFormat} />
       ) : (

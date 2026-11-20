@@ -14,6 +14,7 @@ import {
   workspaceOnboarding,
 } from './auth'
 import { assetGenerationJobs } from './analysis'
+import { consumables, equipment, printers } from './inventory'
 import {
   managedStorageAccounts,
   managedStorageEntitlements,
@@ -24,11 +25,13 @@ import {
   requests,
   requestStatuses,
   uploadSessions,
+  usageEvents,
 } from './production'
-import { assetMigrations, deploymentSettings, invites, settings } from './settings'
+import { assetMigrations, dataMigrations, deploymentSettings, invites, settings } from './settings'
 
 export * from './analysis'
 export * from './auth'
+export * from './inventory'
 export * from './production'
 export * from './settings'
 
@@ -36,7 +39,10 @@ export const schema = {
   account,
   assetGenerationJobs,
   assetMigrations,
+  consumables,
+  dataMigrations,
   deploymentSettings,
+  equipment,
   invites,
   invitation,
   member,
@@ -47,6 +53,7 @@ export const schema = {
   operations,
   printGroupItems,
   printGroups,
+  printers,
   organization,
   rateLimit,
   requests,
@@ -56,6 +63,7 @@ export const schema = {
   subscription,
   twoFactor,
   uploadSessions,
+  usageEvents,
   user,
   userOnboarding,
   verification,

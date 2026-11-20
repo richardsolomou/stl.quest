@@ -26,7 +26,7 @@ export function SegmentedControl<T extends string>({
   return (
     <fieldset
       data-slot="segmented-control"
-      className={cn('m-0 flex min-w-0 rounded-lg border border-input bg-background', size === 'xs' ? 'p-0.5' : 'p-1', className)}
+      className={cn('mx-0 mt-0 flex min-w-0 rounded-lg border border-input bg-foreground/5', size === 'xs' ? 'p-0.5' : 'p-1', className)}
     >
       <legend className="sr-only">{legend}</legend>
       {options.map((option) => (
@@ -35,8 +35,12 @@ export function SegmentedControl<T extends string>({
           id={option.id}
           type="button"
           size={size === 'xs' ? 'xs' : 'default'}
-          variant={value === option.value ? 'secondary' : 'ghost'}
-          className={cn('min-w-0', size === 'default' && 'flex-1')}
+          variant="ghost"
+          className={cn(
+            'min-w-0',
+            size === 'default' && 'flex-1',
+            value === option.value && 'bg-field text-foreground shadow-sm ring-1 ring-input hover:bg-field',
+          )}
           aria-pressed={value === option.value}
           disabled={option.disabled}
           title={option.title}

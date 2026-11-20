@@ -21,6 +21,14 @@ dev:
     trap cleanup EXIT INT TERM
     DATA_DIR=./data-dev PRINTS_DIR=./prints-dev BETTER_AUTH_URL=http://localhost:3000 pnpm dev
 
+# A print farm's printers, equipment, priced consumables, requesters, prints, and usage in the dev database; sign in as power@stl.quest.
+seed-power *args:
+    DATA_DIR=./data-dev PRINTS_DIR=./prints-dev pnpm exec tsx scripts/seedPowerUser.ts {{ args }}
+
+# Deletes the seeded print farm workspace and seeds it again from scratch.
+seed-power-reset:
+    just seed-power --reset
+
 realtime *args:
     pnpm realtime {{ args }}
 

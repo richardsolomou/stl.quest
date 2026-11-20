@@ -1,7 +1,9 @@
 import path from 'node:path'
 import { sql } from 'drizzle-orm'
-import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import type { DatabaseBackend } from '../backend'
+import { runMigrations } from '../dataMigrations'
+import type { MigrationLog } from '../dataMigrations/types'
+import { applySchemaMigrations, schemaMigrations } from '../migrations/files'
 import type { STLQuestDatabase } from '../connection'
 import { errorHasCode } from '../errors'
 import { openPostgreSQL } from '../postgresConnection'
@@ -31,9 +33,13 @@ export class PostgreSQLBackend implements DatabaseBackend<STLQuestDatabase> {
     return new PostgreSQLBackend(this.database, this.url, this.connection, false)
   }
 
-  async initialize() {
-    await migrate(this.connection.drizzle, { migrationsFolder })
+  async initialize(log: MigrationLog) {
+    await runMigrations(this, this.database, log)
     await this.maintain()
+  }
+
+  async migrateSchema(through?: string) {
+    await applySchemaMigrations<Promise<void>>(this.connection.drizzle, schemaMigrations(migrationsFolder, through), migrationsFolder)
   }
 
   async close() {

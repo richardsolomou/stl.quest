@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { MODEL_FORMATS } from '@/core/assetKeys'
 import { workflow } from '@/core/workflow'
 import { llmsText } from './llms'
+import { OUTSIDE_THE_PRODUCT } from './site'
 
 describe('llmsText', () => {
   it('names every workflow stage in order', () => {
@@ -26,5 +27,13 @@ describe('llmsText', () => {
 
   it('does not claim self-hosted installs are unlimited', () => {
     expect(llmsText()).not.toMatch(/no limits/i)
+  })
+
+  it('names everything the page says it leaves to other tools', () => {
+    expect(OUTSIDE_THE_PRODUCT.every(({ clause }) => llmsText().includes(clause))).toBe(true)
+  })
+
+  it('says usage and stock tracking is off until turned on', () => {
+    expect(llmsText()).toContain('Usage and stock, off until an admin turns it on')
   })
 })

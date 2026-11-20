@@ -2,7 +2,6 @@ import { createFileRoute } from '@tanstack/react-router'
 import { app } from '../../server/app'
 import { withRequestContext } from '../../server/requestContext'
 import { authorizedRequestAsset } from '../../server/requestAssetAccess'
-import { storedPrinterProfiles } from '../../core/printers'
 import { assetContentType } from '../../core/assetKeys'
 import { attachmentDisposition, gzipAssetStream } from '../../server/assetDownloads'
 
@@ -36,7 +35,7 @@ export const Route = createFileRoute('/api/files/$requestId')({
           if (url.searchParams.get('inline') !== '1') {
             headers.set('Content-Disposition', attachmentDisposition(printRequest.fileName))
             const assignedPrinter = printRequest.printerId
-              ? (await storedPrinterProfiles(context.repository)).find(({ id }) => id === printRequest.printerId)
+              ? (await context.repository.listInventory('printers')).find(({ id }) => id === printRequest.printerId)
               : undefined
             instance.telemetry.capture(context.identity.id, 'stl_download_served', {
               print_type: assignedPrinter?.printType ?? printRequest.requestedPrintType,

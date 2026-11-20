@@ -1,0 +1,235 @@
+{
+  "images": [
+    {
+      "presetId": "accessory-bambu-lab-ams-2-pro",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/ams-2-pro",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/43d7967a0e88481083c77e7ad38412c5/ams-2_d2a1a01a-42ac-494a-a469-c89c74b797c8.jpg",
+      "src": "/equipment-presets/accessory-bambu-lab-ams-2-pro.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "accessory-bambu-lab-ams-ht",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/ams-ht",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/2e1f75ddac9043eca10fa292fed7b7bc/ams-2_9d653846-9428-4619-9aff-3931504a62db.jpg",
+      "src": "/equipment-presets/accessory-bambu-lab-ams-ht.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "accessory-bambu-lab-ams-lite",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/ams-lite",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/17f308c500be45cca01c9e92fed7006b/20231215-121309.jpg",
+      "src": "/equipment-presets/accessory-bambu-lab-ams-lite.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "accessory-creality-space-pi-dryer",
+      "sourcePageUrl": "https://store.creality.com/uk/products/creality-space-pi-filament-dryer",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0684/9943/9806/files/Space_Pi_Filament_Dryer_1.png?v=1737007451",
+      "src": "/equipment-presets/accessory-creality-space-pi-dryer.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "accessory-creality-spacepi-x4-dryer",
+      "sourcePageUrl": "https://store.creality.com/ca/products/creality-spacepi-x4-dryer",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0911/3233/0284/files/1600px1.png?v=1747705759",
+      "src": "/equipment-presets/accessory-creality-spacepi-x4-dryer.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "accessory-eibos-cyclopes",
+      "sourcePageUrl": "https://shop.eibos3d.com/products/filament-dryer",
+      "sourceUrl": "https://shop.eibos3d.com/cdn/shop/files/22fe6d1a4d2f3b13627bae3c12a23fde_36d604d3-1596-456d-83e3-5d92c9ab0e7d.png?v=1733823139",
+      "src": "/equipment-presets/accessory-eibos-cyclopes.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "accessory-elegoo-mars-mate",
+      "sourcePageUrl": "https://www.elegoo.com/products/elegoo-mars-mate-large-air-purifier",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0296/9026/5648/files/elegooMarsMateAirPurifier_1.jpg?v=1698050179",
+      "src": "/equipment-presets/accessory-elegoo-mars-mate.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "accessory-elegoo-mini-heater",
+      "sourcePageUrl": "https://www.elegoo.com/products/mini-heater",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0296/9026/5648/files/mini-heater.jpg?v=1712827789",
+      "src": "/equipment-presets/accessory-elegoo-mini-heater.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "accessory-heygears-pulsing-release-module",
+      "sourcePageUrl": "https://store.heygears.com/products/reflex-rs-pulsing-release-module-kit",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/202509_-38_1e74d116-ee1f-4edf-8a33-ae4469e20012.webp?v=1775114161",
+      "src": "/equipment-presets/accessory-heygears-pulsing-release-module.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "accessory-polymaker-polydryer",
+      "sourcePageUrl": "https://us.polymaker.com/products/filament-dryer",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0548/7299/7945/files/PolyDryer_ISO_Right_with_Spool_Rendering.png?v=1751884754",
+      "src": "/equipment-presets/accessory-polymaker-polydryer.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "accessory-sunlu-filadryer-s4",
+      "sourcePageUrl": "https://store.sunlu.com/products/sunlu-filadryer-s4",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0152/6507/1190/files/S4_0fe3657d-b1c8-421d-85ab-e3db82662e8f.jpg?v=1794021596",
+      "src": "/equipment-presets/accessory-sunlu-filadryer-s4.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-anycubic-wash-cure",
+      "sourcePageUrl": "https://store.anycubic.com/products/anycubic-washing-curing-machine",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0245/5519/2380/products/03_008023cb-990b-42e9-87a9-17e64a389730.jpg?v=1770001032",
+      "src": "/equipment-presets/postprocess-anycubic-wash-cure.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-anycubic-wash-cure-3",
+      "sourcePageUrl": "https://store.anycubic.com/products/wash-cure-3",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0245/5519/2380/files/Wash_Cure3_1.jpg?v=1753857788",
+      "src": "/equipment-presets/postprocess-anycubic-wash-cure-3.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-anycubic-wash-cure-3-max",
+      "sourcePageUrl": "https://store.anycubic.com/products/wash-cure-3-max",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0245/5519/2380/files/Wash_Cure3Max_5.jpg?v=1753841607",
+      "src": "/equipment-presets/postprocess-anycubic-wash-cure-3-max.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-anycubic-wash-cure-3-plus",
+      "sourcePageUrl": "https://store.anycubic.com/products/wash-cure-3-plus",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0245/5519/2380/files/Wash_Cure3Plus_1_36df3ba5-36cd-458e-b9bc-e93574bb83c3.jpg?v=1753857534",
+      "src": "/equipment-presets/postprocess-anycubic-wash-cure-3-plus.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-creality-uw-03",
+      "sourcePageUrl": "https://store.creality.com/au/products/uw-03-washing-curing-machine",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0627/2480/0600/files/uw-03_.145.png?v=1739001520",
+      "src": "/equipment-presets/postprocess-creality-uw-03.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-elegoo-mercury-plus-v1",
+      "sourcePageUrl": "https://www.elegoo.com/products/elegoo-mercury-plus-washing-and-curing-machine",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0296/9026/5648/files/MercuryPlusV1.0_1.jpg?v=1705052161",
+      "src": "/equipment-presets/postprocess-elegoo-mercury-plus-v1.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-elegoo-mercury-plus-v2",
+      "sourcePageUrl": "https://www.elegoo.com/products/washing-and-curing-station-v2-0",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0296/9026/5648/files/MercuryPlusV2.0_1.jpg?v=1705052079",
+      "src": "/equipment-presets/postprocess-elegoo-mercury-plus-v2.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-elegoo-mercury-plus-v3",
+      "sourcePageUrl": "https://www.elegoo.com/products/elegoo-wash-and-cure-station-3-0-for-resin-3d-printers",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0296/9026/5648/files/MERCURYPLUSV3.0_1.jpg?v=1729760272",
+      "src": "/equipment-presets/postprocess-elegoo-mercury-plus-v3.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-elegoo-mercury-x-wash",
+      "sourcePageUrl": "https://www.elegoo.com/products/elegoo-mercury-xs-bundle-washing-and-curing-machine",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0296/9026/5648/files/4_a814b2a4-8b6e-41a6-8210-2780e6535748.jpg?v=1770953735",
+      "src": "/equipment-presets/postprocess-elegoo-mercury-x-wash.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-elegoo-mercury-xs-cure",
+      "sourcePageUrl": "https://www.elegoo.com/products/elegoo-mercury-xs-bundle-washing-and-curing-machine",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0296/9026/5648/files/2_72d38b26-111a-4e1f-9f47-cc4c8f06dd94.jpg?v=1770953735",
+      "src": "/equipment-presets/postprocess-elegoo-mercury-xs-cure.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-formlabs-form-cure-l-v2",
+      "sourcePageUrl": "https://formlabs.com/global/products/form-cure-l/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/dc/f3/dcf3b769-48b8-4520-8a58-1e3f22571a88/form_cure_l_v2_light_background_002_store_3.png",
+      "src": "/equipment-presets/postprocess-formlabs-form-cure-l-v2.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-formlabs-form-cure-v2",
+      "sourcePageUrl": "https://formlabs.com/global/products/form-cure/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/b6/a8/b6a895b9-e9fe-42d4-8502-252c63b6cf47/02172025_form_cure_2nd_gen_002_shadow_store.png",
+      "src": "/equipment-presets/postprocess-formlabs-form-cure-v2.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-formlabs-form-studio-wash-cure",
+      "sourcePageUrl": "https://formlabs.com/global/products/form-studio-wash-cure/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/6a/64/6a6477de-eca5-4940-90ea-fc716a92a905/combo_white_00000_store.jpg",
+      "src": "/equipment-presets/postprocess-formlabs-form-studio-wash-cure.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-formlabs-form-wash-l-v2",
+      "sourcePageUrl": "https://formlabs.com/global/products/form-wash-l-2nd-generation/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/60/2b/602bdc43-4b0c-496b-877d-3b850779c5d7/09272021_wash_cure_l_435_base_copy.png",
+      "src": "/equipment-presets/postprocess-formlabs-form-wash-l-v2.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-formlabs-form-wash-v2",
+      "sourcePageUrl": "https://formlabs.com/global/products/form-wash/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/c4/0a/c40aac4f-0fa4-4013-b8a5-3fa57972948d/formlabs_wash_plus_front_ik_240314_store.png",
+      "src": "/equipment-presets/postprocess-formlabs-form-wash-v2.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-heygears-ultracraft-cure",
+      "sourcePageUrl": "https://store.heygears.com/products/ultracraft-cure",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/cure-for-3d-printer-heygears_28ac3edb-086f-4cc4-b77b-d93472ccad5b.webp?v=1773133272",
+      "src": "/equipment-presets/postprocess-heygears-ultracraft-cure.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-heygears-ultracraft-wash",
+      "sourcePageUrl": "https://store.heygears.com/products/ultracraft-wash",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/UltraCraft-Wash-for-3d-printer-heygears02.webp?v=1775113584",
+      "src": "/equipment-presets/postprocess-heygears-ultracraft-wash.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-phrozen-cure-station",
+      "sourcePageUrl": "https://us.phrozen3d.com/products/wash-cure-kit",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0758/4337/1286/products/Wash_Cure_1400x1600_08_a5e3897e-d763-4cbe-96b0-efd1b5e11e29.png?v=1698392271",
+      "src": "/equipment-presets/postprocess-phrozen-cure-station.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-phrozen-wash-station",
+      "sourcePageUrl": "https://us.phrozen3d.com/products/wash-cure-kit",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0758/4337/1286/files/W_C_1400x1600_03.png?v=1732253344",
+      "src": "/equipment-presets/postprocess-phrozen-wash-station.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-prusa-cw1s",
+      "sourcePageUrl": "https://www.prusa3d.com/product/original-prusa-curing-and-washing-machine-cw1s/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/3085.jpg",
+      "src": "/equipment-presets/postprocess-prusa-cw1s.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-uniformation-cure3-ultra",
+      "sourcePageUrl": "https://uniformation3d.com/products/uniformation-cure3-ultra-curing-machine-for-gk3-ultra",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0644/1949/6153/files/1_a3396bbc-6e7c-45d4-af53-ec3c98ad98c8.png?v=1775033336",
+      "src": "/equipment-presets/postprocess-uniformation-cure3-ultra.webp",
+      "checkedAt": "2026-11-20"
+    },
+    {
+      "presetId": "postprocess-uniformation-w230",
+      "sourcePageUrl": "https://uniformation3d.com/products/uniformation-resin-wash-machine-w230",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0644/1949/6153/files/3_621c009b-c28a-495f-97a1-285f88da3aa9.jpg?v=1785814520",
+      "src": "/equipment-presets/postprocess-uniformation-w230.webp",
+      "checkedAt": "2026-11-20"
+    }
+  ]
+}

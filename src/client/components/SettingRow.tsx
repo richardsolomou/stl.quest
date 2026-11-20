@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 type SettingRowStatus = { label: string; tone: 'on' | 'ready' | 'off' }
 
 // One shape for every "thing you can turn on or set up" list: identity on the left, true state in the badge, actions on the right.
+// Rows sit directly in a settings panel and rule themselves off from the row above.
 export function SettingRow({
   icon,
   name,
@@ -24,13 +25,13 @@ export function SettingRow({
   success?: string
 }) {
   return (
-    <section aria-label={name} className="rounded-lg border bg-card p-3">
+    <section aria-label={name} className="not-first:border-t not-first:border-border not-first:pt-4">
       <div className="flex items-start gap-3">
         <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-muted [&>svg]:size-5">{icon}</span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium">{name}</span>
-            <Badge variant={status.tone === 'on' ? 'default' : status.tone === 'ready' ? 'outline' : 'secondary'}>{status.label}</Badge>
+            <Badge variant={status.tone === 'on' ? 'success' : status.tone === 'ready' ? 'outline' : 'secondary'}>{status.label}</Badge>
           </div>
           <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">{detail}</p>
         </div>
@@ -39,7 +40,7 @@ export function SettingRow({
       <div className="mt-3 flex flex-wrap items-center gap-2 sm:hidden">{actions}</div>
       {success && !problem && (
         <output className="mt-3 flex items-start gap-2 rounded-lg border px-2.5 py-2 text-sm">
-          <CircleCheck className="mt-0.5 size-4 shrink-0 text-primary" />
+          <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" />
           <span>{success}</span>
         </output>
       )}

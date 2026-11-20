@@ -12,7 +12,7 @@ export function LazyStlViewer(viewerProps: Props) {
   return (
     <Suspense
       fallback={
-        <Skeleton className="viewer relative mb-3.5 aspect-4/3 w-full overflow-hidden rounded-lg border [background-image:var(--grid)]">
+        <Skeleton className="viewer relative mb-3.5 aspect-4/3 w-full overflow-hidden rounded-lg border">
           <div className="absolute inset-0 grid place-items-center font-mono text-xs text-muted-foreground">
             {t.requests.viewer.loadingViewer}
           </div>

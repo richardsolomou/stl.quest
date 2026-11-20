@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
+import { cn } from '@/lib/utils'
 import type { PrintType } from '../../core/types'
 import { MAX_REQUEST_NAME_LENGTH, MAX_REQUEST_QUANTITY, MAX_REQUEST_SOURCE_URL_LENGTH, MIN_REQUEST_QUANTITY } from '../../core/request'
 import type { LinkedRequestValues } from '../linkedRequest'
@@ -55,26 +56,29 @@ export function LinkedRequestForm({
         />
         <p className="text-xs text-muted-foreground">{t.requests.linked.linkHint}</p>
       </Field>
-      <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-3">
-        <Field>
-          <FieldLabel htmlFor="linked-request-print-type">{t.requests.fields.printType}</FieldLabel>
-          <Select
-            items={printTypes.map((printType) => ({ value: printType, label: printTypeLabel(t, printType) }))}
-            value={values.printType}
-            onValueChange={(printType) => onChange({ printType: printType ?? '' })}
-          >
-            <SelectTrigger id="linked-request-print-type" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {printTypes.map((printType) => (
-                <SelectItem key={printType} value={printType}>
-                  {printTypeLabel(t, printType)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
+      {/* A workspace that prints one type has nothing to choose, so the field gives the row to the copies. */}
+      <div className={cn('grid gap-3', printTypes.length > 1 ? 'grid-cols-[minmax(0,1fr)_5.5rem]' : 'grid-cols-[5.5rem]')}>
+        {printTypes.length > 1 && (
+          <Field>
+            <FieldLabel htmlFor="linked-request-print-type">{t.requests.fields.printType}</FieldLabel>
+            <Select
+              items={printTypes.map((printType) => ({ value: printType, label: printTypeLabel(t, printType) }))}
+              value={values.printType}
+              onValueChange={(printType) => onChange({ printType: printType ?? '' })}
+            >
+              <SelectTrigger id="linked-request-print-type" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {printTypes.map((printType) => (
+                  <SelectItem key={printType} value={printType}>
+                    {printTypeLabel(t, printType)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        )}
         <Field>
           <FieldLabel htmlFor="linked-request-quantity">{t.requests.fields.copies}</FieldLabel>
           <Input

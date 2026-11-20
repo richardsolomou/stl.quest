@@ -1,10 +1,16 @@
 import type { ElectricityPricePreset } from '../../../core/electricityPresets'
-import { printerPowerProfile, type EquipmentPreset } from '../../../core/equipmentPresets'
 import { DEFAULT_LOCALE, type Locale, type Messages } from '../../../core/i18n'
 import type { PriceCalculatorCurrency } from '../../../core/priceCalculator'
 
 export function formatMoney(value: number, currency: PriceCalculatorCurrency, locale: Locale = DEFAULT_LOCALE) {
   return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(value)
+}
+
+/** A per-unit rate: amounts under one currency unit keep one more digit, so €0.149/mL does not round to €0.15. */
+export function formatRate(value: number, currency: PriceCalculatorCurrency, locale: Locale = DEFAULT_LOCALE) {
+  const digits = new Intl.NumberFormat(locale, { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2
+  const extra = value > 0 && value < 1 ? 1 : 0
+  return new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: digits + extra }).format(value)
 }
 
 export function currencySymbol(currency: PriceCalculatorCurrency, locale: Locale) {
@@ -40,15 +46,4 @@ export function countryName(preset: ElectricityPricePreset, locale: Locale) {
 
 export function electricitySourceLabel(preset: ElectricityPricePreset, t: Messages['calculator']) {
   return preset.source.id === 'iea-end-use-prices' ? t.electricity.ieaSource(preset.period) : t.electricity.eurostatSource(preset.period)
-}
-
-export function formatPowerProfiles(preset: EquipmentPreset, t: Messages['calculator']) {
-  return preset.powerProfiles
-    .map((profile) => (profile.watts ? `${t.equipment.phaseNames[profile.phase]} ${profile.watts} W` : t.equipment.includedInPrinter))
-    .join(' · ')
-}
-
-export function formatPrinterPower(printerPresetId: string, locale: Locale) {
-  const profile = printerPowerProfile(printerPresetId)
-  return profile ? `${formatNumber(profile.watts, locale)} W` : ''
 }

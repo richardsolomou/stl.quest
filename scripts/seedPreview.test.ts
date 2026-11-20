@@ -30,7 +30,7 @@ it('creates an idempotent populated preview snapshot', async () => {
   const scoped = await repository.scoped(workspace.id)
   const requests = await scoped.listRequests()
   // Every seeded request needs a printer that can take it, or the board reports it as unprintable.
-  const printers = await scoped.getSetting<{ id: string; printType: string }[]>('printers')
+  const printers = await scoped.listInventory('printers')
   expect(printers?.map(({ printType }) => printType).sort()).toEqual(['filament', 'resin'])
   const printTypeById = new Map(printers?.map(({ id, printType }) => [id, printType]))
 

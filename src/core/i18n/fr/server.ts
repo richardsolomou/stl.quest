@@ -101,7 +101,20 @@ export const server: typeof en = {
     invalidArchive: 'archivage invalide',
     sourceModelNotFound: 'STL source introuvable',
     printerOrPrintType: 'choisissez une imprimante ou un type d’impression, pas les deux',
+    printTypeNotOffered: 'cet espace de travail n’imprime pas ce type',
     unknownPrinter: 'imprimante inconnue',
     printerArchived: 'l’imprimante est archivée',
+  },
+  inventory: {
+    notFound: 'cet élément n’existe plus ; actualisez la page',
+    exists: 'un élément avec cet identifiant existe déjà',
+    full: (limit: number) => `un espace de travail peut en utiliser jusqu’à ${limit} à la fois ; archivez-en un d’abord`,
+  },
+  usage: {
+    unknownConsumable: 'consommable inconnu',
+    unknownEquipment: 'équipement inconnu',
+    materialMismatch: 'ce matériau ne convient pas à ce type d’impression',
+    nothingToUndo: 'rien à annuler',
+    trackingOff: 'le suivi de la consommation et du stock est désactivé pour cet espace de travail',
   },
 }

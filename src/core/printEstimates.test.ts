@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { messagesFor } from './i18n'
-import { automaticPrintEstimate, estimatePending, formatEstimateMaterial, formatEstimateTime } from './printEstimates'
+import {
+  automaticEstimateFields,
+  automaticPrintEstimate,
+  estimatePending,
+  formatEstimateMaterial,
+  formatEstimateTime,
+  requestPrintEstimate,
+} from './printEstimates'
 
 describe('print estimates', () => {
   it('combines a dense shell with 15% internal infill', () => {
@@ -75,5 +82,17 @@ describe('print estimates', () => {
 
   it('drops trailing zeros from a small material estimate', () => {
     expect(formatEstimateMaterial(1.5)).toBe('1.5')
+  })
+
+  it('prefers the adjusted material over the automatic estimate', () => {
+    expect(requestPrintEstimate({ printType: 'resin', automaticEstimatedMaterial: 10, estimatedMaterialOverride: 12 })?.material).toBe(12)
+  })
+
+  it('has no estimate without a print type', () => {
+    expect(requestPrintEstimate({ automaticEstimatedMaterial: 10 })).toBeUndefined()
+  })
+
+  it('names the automatic estimate as a listed print carries it', () => {
+    expect(automaticEstimateFields({ modelVolumeMm3: 10_000 }, 'resin').estimatedMaterialUnit).toBe('ml')
   })
 })

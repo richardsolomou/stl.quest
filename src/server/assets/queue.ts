@@ -5,7 +5,6 @@ import { fileURLToPath } from 'node:url'
 import PQueue from 'p-queue'
 import { errorMessage } from '../../core/error'
 import type { AssetGenerationFailureKind, AssetGenerationStage, AssetStore, EventBus, Repository, Telemetry } from '../../core/types'
-import { storedPrinterProfiles } from '../../core/printers'
 import { InvalidMeshError } from '../../core/mesh/stl'
 import { thumbnailKey } from '../../core/assetKeys'
 import { ASSET_GENERATION_MEMORY_BUDGET, ASSET_GENERATION_MEMORY_MULTIPLIER } from '../../core/uploadLimits'
@@ -278,7 +277,7 @@ export class AssetGenerationQueue {
     if (!request?.filePath) return
     const filePath = request.filePath
     const printType = request.printerId
-      ? (await storedPrinterProfiles(this.repository)).find((printer) => printer.id === request.printerId)?.printType
+      ? (await this.repository.listInventory('printers')).find((printer) => printer.id === request.printerId)?.printType
       : request.requestedPrintType
     const jobs = await this.repository.assetGenerationJobs(requestId)
     const wants = {

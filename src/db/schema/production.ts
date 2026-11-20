@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
 import { check, foreignKey, index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { organization, user } from './auth'
+import { consumables, equipment, printers } from './inventory'
 
 export const requests = sqliteTable(
   'requests',
@@ -50,6 +51,11 @@ export const requests = sqliteTable(
     index('requests_print_type').on(table.printType),
     index('requests_printer_id').on(table.printerId),
     index('requests_owner_user_id').on(table.ownerUserId),
+    foreignKey({
+      columns: [table.workspaceId, table.printerId],
+      foreignColumns: [printers.workspaceId, printers.id],
+      name: 'requests_workspace_printer_fk',
+    }),
   ],
 )
 
@@ -208,4 +214,61 @@ export const managedStorageEntitlements = sqliteTable(
       .references(() => managedStorageAccounts.ownerId, { onDelete: 'cascade' }),
   },
   (table) => [index('managed_storage_entitlements_owner').on(table.ownerId)],
+)
+
+/**
+ * The append-only usage log (see core/usage). Printers, equipment, and consumables are archived rather than deleted, so
+ * their foreign keys always resolve; request and user IDs are plain text, as deleting a print or an account must not
+ * erase the stock and spend it recorded.
+ */
+export const usageEvents = sqliteTable(
+  'usage_events',
+  {
+    id: text().primaryKey(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    transactionId: text('transaction_id').notNull(),
+    stage: text({ enum: ['printing', 'finishing', 'stock'] }).notNull(),
+    kind: text({ enum: ['use', 'restock', 'correction', 'waste', 'replace'] }).notNull(),
+    requestId: text('request_id'),
+    printerId: text('printer_id'),
+    equipmentId: text('equipment_id'),
+    consumableId: text('consumable_id'),
+    amount: real().notNull(),
+    unit: text({ enum: ['ml', 'g', 'item', 'minute', 'plate'] }).notNull(),
+    copies: integer(),
+    outcome: text({ enum: ['completed', 'failed'] }),
+    unitPrice: real('unit_price'),
+    currency: text(),
+    userId: text('user_id'),
+    createdAt: integer('created_at').notNull(),
+    undoneAt: integer('undone_at'),
+  },
+  (table) => [
+    check('usage_events_stage_check', sql`${table.stage} IN ('printing', 'finishing', 'stock')`),
+    check('usage_events_kind_check', sql`${table.kind} IN ('use', 'restock', 'correction', 'waste', 'replace')`),
+    check('usage_events_unit_check', sql`${table.unit} IN ('ml', 'g', 'item', 'minute', 'plate')`),
+    check('usage_events_outcome_check', sql`${table.outcome} IN ('completed', 'failed') OR ${table.outcome} IS NULL`),
+    check('usage_events_copies_check', sql`${table.copies} > 0 OR ${table.copies} IS NULL`),
+    index('usage_events_request').on(table.workspaceId, table.requestId),
+    index('usage_events_consumable').on(table.workspaceId, table.consumableId),
+    index('usage_events_transaction').on(table.workspaceId, table.transactionId),
+    index('usage_events_created').on(table.workspaceId, table.createdAt),
+    foreignKey({
+      columns: [table.workspaceId, table.printerId],
+      foreignColumns: [printers.workspaceId, printers.id],
+      name: 'usage_events_workspace_printer_fk',
+    }),
+    foreignKey({
+      columns: [table.workspaceId, table.equipmentId],
+      foreignColumns: [equipment.workspaceId, equipment.id],
+      name: 'usage_events_workspace_equipment_fk',
+    }),
+    foreignKey({
+      columns: [table.workspaceId, table.consumableId],
+      foreignColumns: [consumables.workspaceId, consumables.id],
+      name: 'usage_events_workspace_consumable_fk',
+    }),
+  ],
 )

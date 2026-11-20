@@ -29,7 +29,7 @@ Supporting, not headline: dimension-aware auto-assignment across mixed resin and
 
 ## Operating Context
 
-- **The board is the product's center of gravity.** Five status columns, drag-and-drop, filtering, search, multi-select, board presence showing who else is looking, and realtime updates with no extra service to install.
+- **The board is the product's center of gravity.** Laid out as an expo pass: the queue as a backlog list, up-next prints as tickets on a rail in firing order, printing grouped by printer with idle printers flagged, and finishing and ready as a pickup shelf. Drag-and-drop, one-click advance to the next stage, filtering, search, multi-select, board presence showing who else is looking, and realtime updates with no extra service to install.
 - **Workspaces are the tenancy boundary.** Each has its own board, printers, members, settings, and storage. Users can belong to several by invitation. Roles are owner / admin / member.
 - **Intake is two-track:** uploaded model files, or saved source links. Links to MakerWorld, Printables, MyMiniFactory, Cults3D, and Thingiverse resolve a cover preview.
 - **Models are viewed in-app** through interactive STL previews and generated thumbnails; geometry, thumbnail, and preview assets are generated asynchronously per request.
@@ -74,6 +74,7 @@ Supporting, not headline: dimension-aware auto-assignment across mixed resin and
 3. **Say what it does not do.** The boundary — no slicing, no printer control, no marketplace — is a feature, stated plainly rather than left implied.
 4. **The operator owns their data.** Nothing may quietly depend on a hosted service, and self-hosted installs must never be shown hosted-only configuration.
 5. **Workspaces do not leak.** Tenancy is absolute in the data layer and must remain legible in the interface — the user should always know which workspace they are in.
+6. **One printer to a print farm.** Every surface must work for a hobbyist with one printer and a handful of requests and for a farm with dozens of printers and hundreds of copies. Design and check both extremes: a single item should not look empty or redundant, and a large fleet or queue must not flood the screen. Show what the operator acts on individually, summarise the rest, and cap what grows to a fixed footprint.
 
 ## Accessibility & Inclusion
 

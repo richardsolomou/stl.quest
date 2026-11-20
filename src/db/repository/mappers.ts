@@ -1,5 +1,7 @@
+import type { PriceCalculatorCurrency } from '../../core/priceCalculator'
 import type { AssetGenerationJob, Invite, OperationPayload, PrintRequest } from '../../core/types'
-import { assetGenerationJobs, invites, requests, requestStatuses, user } from '../schema'
+import type { UsageEvent } from '../../core/usage'
+import { assetGenerationJobs, invites, requests, requestStatuses, usageEvents, user } from '../schema'
 
 export type RequestRow = typeof requests.$inferSelect & {
   ownerEmail: string
@@ -30,6 +32,28 @@ export function mapInvite(row: typeof invites.$inferSelect): Invite {
     createdAt: row.createdAt,
     expiresAt: row.expiresAt,
     usedAt: row.usedAt ?? undefined,
+  }
+}
+
+export function mapUsageEvent(row: typeof usageEvents.$inferSelect): UsageEvent {
+  return {
+    id: row.id,
+    transactionId: row.transactionId,
+    stage: row.stage,
+    kind: row.kind,
+    requestId: row.requestId ?? undefined,
+    printerId: row.printerId ?? undefined,
+    equipmentId: row.equipmentId ?? undefined,
+    consumableId: row.consumableId ?? undefined,
+    amount: row.amount,
+    unit: row.unit,
+    copies: row.copies ?? undefined,
+    outcome: row.outcome ?? undefined,
+    unitPrice: row.unitPrice ?? undefined,
+    currency: (row.currency as PriceCalculatorCurrency | null) ?? undefined,
+    userId: row.userId ?? undefined,
+    createdAt: row.createdAt,
+    undoneAt: row.undoneAt ?? undefined,
   }
 }
 

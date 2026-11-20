@@ -1,35 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { SegmentedControl } from '@/components/ui/segmented-control'
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { useI18n } from '../../i18n'
 
 export type SetupMode = 'preset' | 'custom'
-
-export function SetupGroup({
-  title,
-  description,
-  action,
-  children,
-}: {
-  title: string
-  description?: ReactNode
-  action?: ReactNode
-  children: ReactNode
-}) {
-  return (
-    <section className="grid gap-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="grid gap-1">
-          <h3 className="font-heading text-base font-semibold tracking-tight">{title}</h3>
-          {description && <p className="text-xs leading-relaxed text-muted-foreground">{description}</p>}
-        </div>
-        {action}
-      </div>
-      {children}
-    </section>
-  )
-}
 
 export function ModeSelector({ legend, value, onChange }: { legend: string; value: SetupMode; onChange: (value: SetupMode) => void }) {
   const { t } = useI18n()
@@ -62,12 +37,31 @@ export function NumberSetting({
   description?: ReactNode
   onChange: (value: number) => void
 }) {
+  const { t, locale } = useI18n()
   const id = settingId(label)
+  const outOfRange = value < min || (max !== undefined && value > max)
   return (
-    <Field>
+    <Field data-invalid={outOfRange || undefined}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <NumberInput id={id} value={value} min={min} max={max} step="any" required onChange={onChange} />
-      {description && <FieldDescription>{description}</FieldDescription>}
+      <NumberInput
+        id={id}
+        value={value}
+        min={min}
+        max={max}
+        step="any"
+        required
+        aria-invalid={outOfRange || undefined}
+        onChange={onChange}
+      />
+      {outOfRange ? (
+        <FieldError>
+          {max === undefined
+            ? t.common.atLeast(min.toLocaleString(locale))
+            : t.common.between(min.toLocaleString(locale), max.toLocaleString(locale))}
+        </FieldError>
+      ) : (
+        description && <FieldDescription>{description}</FieldDescription>
+      )}
     </Field>
   )
 }

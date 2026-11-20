@@ -3,7 +3,16 @@ import { MODEL_FORMATS } from '@/core/assetKeys'
 import { formatBytes } from '@/core/format'
 import { storagePlans } from '@/core/plans'
 import { workflow } from '@/core/workflow'
-import { NAS_CATALOGUES, PAGES, SELF_HOSTING_GUIDE_URL, SIGN_UP_PATH, SITE_ORIGIN, LOCAL_STORAGE, STORAGE_PROVIDERS } from './site'
+import {
+  LOCAL_STORAGE,
+  NAS_CATALOGUES,
+  OUTSIDE_THE_PRODUCT,
+  PAGES,
+  SELF_HOSTING_GUIDE_URL,
+  SIGN_UP_PATH,
+  SITE_ORIGIN,
+  STORAGE_PROVIDERS,
+} from './site'
 
 const list = (items: readonly string[], type: Intl.ListFormatType = 'conjunction') => new Intl.ListFormat('en', { type }).format(items)
 
@@ -18,6 +27,13 @@ export function llmsText() {
 
 STL Quest replaces spreadsheets and chat threads for hobbyists printing for friends, print farms, and small print businesses. Each copy of a request moves through production on its own, so a request for six copies is six units of work, not one card.
 
+## What it does
+
+- The board: the queue as a backlog, tickets hanging in firing order, printing grouped by printer with idle printers flagged, and finished prints grouped by who is collecting them. It works on phones as well as desktops.
+- Catalogues: printers, resins, filaments (from SpoolmanDB, with every colour), equipment, and wear parts for each printer model ship with the app, so operators pick products instead of typing specifications and enter only their own prices.
+- Quotes: a calculator turns the slicer's material and print time into a suggested price from printer, material, wear-part, electricity, and labour costs, and prices a batch of prints selected on the board.
+- Usage and stock, off until an admin turns it on: the board asks what each print used as it moves into printing and finishing, and counts stock against reorder levels, wear-part maintenance, and spend.
+
 ## Ways to run it
 
 - [Self-hosting guide](${SELF_HOSTING_GUIDE_URL}): one Docker container, \`ghcr.io/richardsolomou/stl.quest:latest\`, SQLite by default or PostgreSQL through \`DATABASE_URL\`
@@ -31,7 +47,7 @@ STL Quest replaces spreadsheets and chat threads for hobbyists printing for frie
 - Is STL Quest free? Yes. The software is free and open source under AGPL-3.0, and self-hosted installs have no storage plans: files live wherever the operator puts them. Hosted accounts include ${formatBytes(storagePlans.free.quotaBytes)} of storage on the ${storagePlans.free.name} plan, with optional paid plans for larger libraries, or can connect storage they manage: [storage guide](${LATEST_DOCUMENTATION_URL}/storage.md).
 - Where are model files stored? In a folder on the server, in ${list(remoteStorage, 'disjunction')} storage the operator connects, or in included hosted storage. Settings → Storage migrates existing files when switching providers.
 - Which file formats does it preview? ${list(MODEL_FORMATS.map((format) => format.toUpperCase()))}, with interactive previews and generated thumbnails. Links to MakerWorld, Printables, MyMiniFactory, Cults3D, and Thingiverse get a cover preview.
-- Does it work with both resin and filament printers? Yes. Mixed fleets are supported, and auto-assignment matches each job to a printer by build volume and print type.
+- Does it work with both resin and filament printers? Yes. Mixed fleets are supported, and each job is matched to a printer by build volume and print type.
 - How is the queue ordered? Round robin between requesters, oldest first, requester priority, or manual ordering.
 - Can several groups share one install? Yes. Each workspace has its own board, printers, members, and storage, and users can join several workspaces by invitation or be added directly by a super admin.
 - How do people sign in? Email and password, social login, OpenID Connect single sign-on, and two-factor authentication.
@@ -39,7 +55,10 @@ STL Quest replaces spreadsheets and chat threads for hobbyists printing for frie
 
 ## What it does not do
 
-STL Quest does not slice models, control printers, take payments for prints, handle shipping, or host a public gallery or marketplace. The operator's slicer remains the source of truth for orientation, arrangement, supports, infill, and material use.
+STL Quest does not ${list(
+    OUTSIDE_THE_PRODUCT.map(({ clause }) => clause),
+    'disjunction',
+  )}. The operator's slicer remains the source of truth for orientation, arrangement, supports, infill, and material use, and quotes are figures for the operator, not payments.
 
 ## Links
 

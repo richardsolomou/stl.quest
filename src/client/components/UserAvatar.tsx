@@ -8,17 +8,13 @@ export function UserAvatar({ name, image, size = 'default' }: { name: string; im
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join('')
-  // The person's own ink rather than the accent: a board full of amber initials would outshout the
-  // one amber that means "act here", and this keeps the avatar and the detail chip the same colour.
+  // The person's own ink plate rather than the accent, so the avatar and the detail chip agree on who someone is.
   const ink = requesterInk(name)
 
   return (
-    <Avatar size={size} className="ph-no-capture" aria-hidden="true">
-      {image && <AvatarImage src={image} alt="" />}
-      <AvatarFallback
-        className="font-heading font-semibold"
-        style={{ backgroundColor: `color-mix(in srgb, ${ink} 15%, transparent)`, color: ink }}
-      >
+    <Avatar size={size} className="ph-no-capture rounded-[4px] after:rounded-[4px]" aria-hidden="true">
+      {image && <AvatarImage src={image} alt="" className="rounded-[4px]" />}
+      <AvatarFallback className="rounded-[4px] font-heading font-extrabold tracking-[0.02em] text-white" style={{ backgroundColor: ink }}>
         {initials || '?'}
       </AvatarFallback>
     </Avatar>

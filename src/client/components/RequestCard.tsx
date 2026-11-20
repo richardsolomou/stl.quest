@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react'
+import { useEffect, useRef, useState, type ComponentProps, type MouseEvent } from 'react'
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/adapter/element-adapter'
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/utils/combine'
 import { attachClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge/attach-closest-edge'
 import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge/extract-closest-edge'
 import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/types'
 import { Button } from '@/components/ui/button'
-import { Archive, Check, Copy, Download, Layers3, Move, RotateCcw, Trash2 } from 'lucide-react'
+import { Archive, ArrowRight, Check, ChevronDown, Copy, Download, Layers3, Move, RotateCcw, Trash2 } from 'lucide-react'
+import { Menu, MenuContent, MenuGroup, MenuGroupLabel, MenuItem, MenuTrigger } from '@/components/ui/menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { cn } from '@/lib/utils'
@@ -20,10 +21,32 @@ import { TagDotCluster } from './TagBadge'
 import { UserAvatar } from './UserAvatar'
 import { PrintEstimateBadges } from './PrintEstimate'
 import { RequestThumb } from './RequestThumb'
+import { CopyCells } from './CopyCells'
+import { AgeStamp } from './AgeStamp'
+import { useNow } from '../useNow'
+import { isAgeHot } from '../../core/requestAge'
 import { useI18n } from '../i18n'
+
+/**
+ * How a card presents in its zone of the board: `row` in the queue's backlog list, `ticket` hanging on the up-next rail
+ * (`lead` for the one that fires next), `job` on a printer station, and `slip` on the finishing and ready shelf.
+ */
+export type RequestCardVariant = 'row' | 'ticket' | 'lead' | 'job' | 'slip'
+
+/** One destination the advance action offers, with a short mono state beside its name. */
+export type AdvanceChoice = { id: string; label: string; detail: string; onChoose: () => void }
+
+/** Moves a card's copies on to the next stage in one action, or offers a choice of where (such as which printer). */
+export type CardAdvance = { label: string; onAdvance: () => void } | { label: string; menuLabel: string; choices: AdvanceChoice[] }
 
 export function RequestCard({
   request,
+  variant = 'row',
+  counts,
+  position,
+  since,
+  sinceLabel,
+  advance,
   reorderableRequestIds,
   status,
   count,
@@ -36,7 +59,6 @@ export function RequestCard({
   showRequester = false,
   tagPaths,
   tagCopyCounts,
-  annotation,
   selected = false,
   selectionMode = false,
   selectedRequestIds,
@@ -53,6 +75,15 @@ export function RequestCard({
   onManageTags,
 }: {
   request: PublicPrintRequest
+  variant?: RequestCardVariant
+  /** The request's live copy counts across every stage, which the copy cells draw. */
+  counts?: Record<string, number>
+  /** The card's place on the up-next rail, counted from one. */
+  position?: number
+  /** When the copies on this card started waiting, for the age stamp. */
+  since?: number
+  sinceLabel?: (age: string) => string
+  advance?: CardAdvance
   reorderableRequestIds: Set<string>
   status: StatusId
   count: number
@@ -66,7 +97,6 @@ export function RequestCard({
   /** Full paths keyed by tag id. Supplying it is what makes the card show its tags. */
   tagPaths?: Map<string, string>
   tagCopyCounts?: Map<string, number>
-  annotation?: string
   selected?: boolean
   selectionMode?: boolean
   selectedRequestIds?: string[]
@@ -94,6 +124,7 @@ export function RequestCard({
     .filter((group) => group.status === status)
     .map((group) => group.id)
     .join(',')
+  const printType = request.printType ?? request.printer?.printType
   const tagSummaries = tags.map((tag) => ({
     id: tag.id,
     color: tag.color,
@@ -125,6 +156,7 @@ export function RequestCard({
           return {
             requestId: request.id,
             requesterId: request.requesterId,
+            printType,
             from: status,
             count,
             groupId,
@@ -149,7 +181,7 @@ export function RequestCard({
         getData: ({ input, element: el }) =>
           attachClosestEdge(
             { type: 'card', requestId: request.id, requesterId: request.requesterId, status, groupId },
-            { input, element: el, allowedEdges: ['top', 'bottom'] },
+            { input, element: el, allowedEdges: variant === 'ticket' || variant === 'lead' ? ['left', 'right'] : ['top', 'bottom'] },
           ),
         getDropEffect: ({ input }) => boardDropEffect(input),
         onDrag: ({ self, source }) => {
@@ -183,12 +215,14 @@ export function RequestCard({
     cardTagIds,
     selected,
     count,
+    printType,
     reorderableRequestIds,
     reorderEnabled,
     request.id,
     request.requesterId,
     selectedRequestIds,
     status,
+    variant,
   ])
 
   const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
@@ -205,18 +239,61 @@ export function RequestCard({
     onOpen()
   }
 
+  const ticket = variant === 'ticket' || variant === 'lead'
+  const requester = requesterLabel(request, t.requests.requesterFallback)
+  const meta = [
+    showPrintType && request.printType ? printTypeLabel(t, request.printType) : undefined,
+    showPrinter && variant !== 'job' ? request.printer?.name : undefined,
+  ].filter(Boolean)
+  const countLabel = count === request.quantity ? `×${count}` : t.requests.card.partialCount(count, request.quantity)
+  const age = since !== undefined && sinceLabel && <AgeStamp since={since} label={sinceLabel} />
+  const avatar = showRequester && (
+    <Tooltip>
+      <TooltipTrigger render={<span className="ph-no-capture shrink-0" aria-label={t.requests.card.requestedBy(requester)} />}>
+        <UserAvatar name={requester} image={request.requesterImage} size="sm" />
+      </TooltipTrigger>
+      <TooltipContent className="ph-no-capture">{t.requests.card.requestedBy(requester)}</TooltipContent>
+    </Tooltip>
+  )
+  const notes = request.notes && (
+    <p
+      className={cn(
+        'mt-1.5 line-clamp-2 font-medium break-words whitespace-pre-wrap text-note',
+        variant === 'lead' ? 'text-sm' : 'text-xs',
+      )}
+    >
+      {request.notes}
+    </p>
+  )
+  const cells = counts && <CopyCells counts={counts} status={status} stamp={settling} className="mt-1.5" />
+  const now = useNow()
+  // An overdue ticket carries the heat on its own header, not only in its age stamp.
+  const hot = since !== undefined && now !== undefined && isAgeHot(now - since)
+
   const card = (
     <Button
       ref={ref}
       type="button"
       variant="outline"
+      data-stage={status}
       className={cn(
-        'card relative block h-auto w-full whitespace-normal rounded-lg border-2 border-transparent bg-ticket p-2.5 text-left text-ticket-foreground shadow-[0_1px_2px_rgb(0_0_0/0.25)] transition-[border-color,transform,opacity,box-shadow] duration-200 hover:bg-ticket hover:text-ticket-foreground',
-        canDrag && 'cursor-grab touch-manipulation',
+        'card relative block h-auto w-full rounded-md border-2 border-transparent text-left whitespace-normal transition-[border-color,transform,opacity,box-shadow,background-color] duration-200',
+        variant === 'row' && 'bg-transparent px-2 py-2 text-foreground shadow-none hover:bg-foreground/[0.05] hover:text-foreground',
+        // The row's advance arrow appears on hover over its right edge, so that edge stays clear of the age and count.
+        variant === 'row' && advance && 'pr-10',
+        variant !== 'row' &&
+          '[--note:var(--ticket-note)] bg-ticket text-ticket-foreground shadow-[0_1px_0_rgb(0_0_0/0.08),0_10px_18px_-12px_rgb(0_0_0/0.5)] hover:bg-ticket hover:text-ticket-foreground',
+        ticket && 'rounded-[3px] px-3 pt-4 pb-3',
+        variant === 'job' && 'p-2.5',
+        variant === 'slip' && 'rounded-[3px] px-2.5 py-2',
         tagSummaries.length > 0 && 'pb-5',
+        // The lead's button sits above its tag dots, so the lead keeps room for both.
+        advance && variant === 'lead' && (tagSummaries.length > 0 ? 'pb-17' : 'pb-14'),
+        advance && (variant === 'job' || variant === 'slip') && 'pr-12',
+        canDrag && 'cursor-grab touch-manipulation',
         dragging && 'dragging scale-[0.985] opacity-40',
-        settling && 'animate-[card-settle_240ms_ease-out]',
-        selected && 'border-primary bg-primary/15 ring-4 ring-primary/25 hover:bg-primary/15 hover:text-ticket-foreground',
+        settling && 'animate-[card-settle_320ms_cubic-bezier(0.16,1,0.3,1)]',
+        selected && 'border-primary bg-primary/10 ring-4 ring-primary/20 hover:bg-primary/10',
       )}
       aria-pressed={selectionMode ? selected : undefined}
       data-draggable={canDrag}
@@ -238,75 +315,123 @@ export function RequestCard({
           aria-hidden="true"
           data-drop-indicator
           className={cn(
-            'pointer-events-none absolute right-0 left-0 z-10 h-0.5 rounded-full bg-blueprint',
-            closestEdge === 'top' ? 'bottom-full -translate-y-[3px]' : 'top-full translate-y-[3px]',
+            'pointer-events-none absolute z-10 rounded-full bg-(--stage)',
+            closestEdge === 'top' && 'right-0 bottom-full left-0 h-1 -translate-y-[3px]',
+            closestEdge === 'bottom' && 'top-full right-0 left-0 h-1 translate-y-[3px]',
+            closestEdge === 'left' && 'top-0 right-full bottom-0 w-1 -translate-x-[5px]',
+            closestEdge === 'right' && 'top-0 bottom-0 left-full w-1 translate-x-[5px]',
           )}
         />
       )}
-      <div className="flex items-stretch gap-2.5">
-        {/* Stretches to the text block so short cards leave no gap above or below it, capped at square. */}
-        <div className="relative max-h-14 min-h-10 w-14 shrink-0 max-[620px]:max-h-11 max-[620px]:w-11">
-          <RequestThumb request={request} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <div className="line-clamp-2 min-w-0 flex-1 font-serif text-base font-semibold leading-snug max-[620px]:line-clamp-3">
-              {request.name}
-            </div>
-            <FitAlertIcon request={request} />
-            {showRequester && (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <span
-                      className="ph-no-capture rounded-full max-[620px]:hidden"
-                      aria-label={t.requests.card.requestedBy(requesterLabel(request, t.requests.requesterFallback))}
-                    />
-                  }
-                >
-                  <UserAvatar name={requesterLabel(request, t.requests.requesterFallback)} image={request.requesterImage} size="sm" />
-                </TooltipTrigger>
-                <TooltipContent className="ph-no-capture">
-                  {t.requests.card.requestedBy(requesterLabel(request, t.requests.requesterFallback))}
-                </TooltipContent>
-              </Tooltip>
+      {ticket ? (
+        <>
+          <span
+            aria-hidden="true"
+            className={cn('absolute inset-x-0 top-0 rounded-t-[3px]', hot ? 'h-2.5 bg-note' : 'h-1.5 bg-(--stage)')}
+          />
+          <span
+            aria-hidden="true"
+            className="absolute -top-3 left-1/2 hidden h-4 w-8 -translate-x-1/2 rounded-[3px] border border-foreground/25 bg-rail @min-[960px]:block"
+          />
+          <span className="flex flex-col">
+            <span className="mt-2 flex items-start gap-2">
+              <span
+                className={cn(
+                  'line-clamp-4 min-w-0 flex-1 font-heading font-bold uppercase',
+                  variant === 'lead' ? 'text-[1.85rem]/[1]' : 'text-lg/[1.05]',
+                )}
+              >
+                {request.name}
+              </span>
+              {avatar}
+            </span>
+            <span className="-order-1 flex items-center gap-2 font-mono text-[11px] leading-none text-ticket-muted uppercase">
+              {position !== undefined && <span>#{String(position).padStart(2, '0')}</span>}
+              {variant === 'lead' && <span className="font-bold text-ticket-foreground">{t.board.pass.firesNext}</span>}
+              <span className="ml-auto flex items-center gap-1.5">
+                <FitAlertIcon request={request} />
+                {age}
+              </span>
+            </span>
+          </span>
+          {notes}
+          {cells}
+          <span className="mt-2 flex items-start gap-2 border-t border-dashed border-ticket-foreground/20 pt-2 font-mono text-[11px] leading-tight text-ticket-muted uppercase">
+            <span className="min-w-0 flex-1 break-words" title={showPrinter ? request.printer?.name : undefined}>
+              {meta.join(' · ')}
+            </span>
+            <span className="shrink-0 text-ticket-foreground">{countLabel}</span>
+          </span>
+          {variant === 'lead' && <PrintEstimateBadges request={request} />}
+        </>
+      ) : (
+        <span className={cn('flex items-start', variant === 'slip' || !avatar ? 'gap-2.5' : 'gap-4')}>
+          <span
+            className={cn(
+              'relative shrink-0',
+              variant === 'row' && 'size-10',
+              variant === 'job' && 'size-12 max-[620px]:size-10',
+              variant === 'slip' && 'size-8',
             )}
-          </div>
-          <div className="mt-0.5 flex min-w-0 flex-wrap items-baseline gap-x-2 text-xs text-ticket-muted">
-            {(showPrintType || showPrinter) && request.printType && (
-              <span className="min-w-0 flex-1 truncate" title={showPrinter ? request.printer?.name : undefined}>
-                {printTypeLabel(t, request.printType)}
-                {showPrinter && request.printer && ` · ${request.printer.name}`}
+          >
+            <RequestThumb request={request} />
+            {variant !== 'slip' && avatar && (
+              <span
+                className={cn(
+                  'absolute -right-2 -bottom-2 flex rounded-[5px] ring-2',
+                  variant === 'row' ? 'ring-background' : 'ring-ticket',
+                )}
+              >
+                {avatar}
               </span>
             )}
-            <span className="ml-auto shrink-0 font-mono">
-              {count === request.quantity ? `×${count}` : t.requests.card.partialCount(count, request.quantity)}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="flex min-w-0 items-start gap-1.5">
+              <span
+                className={cn(
+                  'line-clamp-2 min-w-0 flex-1 font-serif leading-tight max-[620px]:line-clamp-3',
+                  variant === 'job' ? 'text-base font-bold' : 'text-[0.9rem] font-semibold',
+                )}
+              >
+                {request.name}
+              </span>
+              <FitAlertIcon request={request} />
+              {age}
             </span>
-          </div>
-          <PrintEstimateBadges request={request} />
-          {annotation && <div className="mt-0.5 text-xs font-medium text-primary">{annotation}</div>}
-        </div>
-      </div>
-      {request.notes && (
-        <p className="mt-2 line-clamp-2 whitespace-pre-wrap break-words text-xs leading-relaxed text-ticket-muted">{request.notes}</p>
+            {variant !== 'slip' && (
+              <span
+                className={cn(
+                  'mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 text-xs leading-4',
+                  variant === 'row' ? 'text-muted-foreground' : 'text-ticket-muted',
+                )}
+              >
+                {meta.length > 0 && (
+                  <span className="min-w-0 flex-1 truncate" title={showPrinter ? request.printer?.name : undefined}>
+                    {meta.join(' · ')}
+                  </span>
+                )}
+                <span className="ml-auto shrink-0 font-mono">{countLabel}</span>
+              </span>
+            )}
+            {variant === 'slip' && <span className="mt-0.5 block font-mono text-[11px] leading-none text-ticket-muted">{countLabel}</span>}
+            {variant !== 'slip' && notes}
+            {variant !== 'slip' && cells}
+          </span>
+        </span>
       )}
       <TagDotCluster tags={tagSummaries} draggable={canDragTags} activeTagId={draggingTagId} />
     </Button>
   )
 
   return (
-    <div className="relative">
+    <div className="group/card relative">
       {onSelect || onMove || onDownload || onRepeat || onDelete || onArchive || onManageTags ? (
         <ContextMenu>
           <ContextMenuTrigger className="block">{card}</ContextMenuTrigger>
           <ContextMenuContent>
             {onSelect && (
-              <ContextMenuItem
-                onClick={() => {
-                  onSelect({ range: false, toggle: true })
-                  signalProductTourProgress('actions')
-                }}
-              >
+              <ContextMenuItem onClick={() => onSelect({ range: false, toggle: true })}>
                 <Check />
                 {selectionMode
                   ? selected
@@ -370,6 +495,56 @@ export function RequestCard({
       ) : (
         card
       )}
+      {advance && (
+        <AdvanceButton
+          advance={advance}
+          size={variant === 'lead' ? 'sm' : 'icon-sm'}
+          variant={variant === 'lead' ? 'default' : 'outline'}
+          className={cn(
+            'absolute z-1',
+            // The lead grows its button to fit the printer it names, and truncates only past the ticket's width.
+            variant === 'lead' && 'right-3 max-w-[calc(100%-1.5rem)]',
+            variant === 'lead' && (tagSummaries.length > 0 ? 'bottom-6' : 'bottom-3'),
+            (variant === 'job' || variant === 'slip') &&
+              'top-1/2 right-2 -translate-y-1/2 border-ticket-foreground/25 bg-ticket text-ticket-foreground hover:bg-ticket-foreground/10 hover:text-ticket-foreground',
+            variant === 'ticket' &&
+              'right-2 bottom-2 border-ticket-foreground/25 bg-ticket text-ticket-foreground opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100 hover:bg-ticket-foreground/10 hover:text-ticket-foreground',
+            variant === 'row' && 'top-1/2 right-1.5 -translate-y-1/2 opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100',
+            'data-popup-open:opacity-100',
+          )}
+          aria-label={variant === 'lead' ? undefined : `${advance.label}: ${request.name}`}
+          title={advance.label}
+        >
+          {variant === 'lead' && <span className="truncate">{advance.label}</span>}
+          {'choices' in advance ? <ChevronDown /> : <ArrowRight />}
+        </AdvanceButton>
+      )}
     </div>
+  )
+}
+
+/** The advance action as one button, or, when it offers a choice, as the trigger of a menu of destinations. */
+function AdvanceButton({ advance, children, ...props }: Omit<ComponentProps<typeof Button>, 'onClick'> & { advance: CardAdvance }) {
+  if (!('choices' in advance))
+    return (
+      <Button type="button" {...props} onClick={advance.onAdvance}>
+        {children}
+      </Button>
+    )
+  return (
+    <Menu>
+      <MenuTrigger render={<Button type="button" {...props} />}>{children}</MenuTrigger>
+      <MenuContent align="end" className="w-64">
+        <MenuGroup>
+          <MenuGroupLabel>{advance.menuLabel}</MenuGroupLabel>
+          {advance.choices.map((choice) => (
+            <MenuItem key={choice.id} onClick={choice.onChoose}>
+              <span className="min-w-0 truncate font-semibold">{choice.label}</span>
+              <span className="ml-auto shrink-0 font-mono text-[11px] text-muted-foreground uppercase">{choice.detail}</span>
+            </MenuItem>
+          ))}
+        </MenuGroup>
+      </MenuContent>
+    </Menu>
   )
 }

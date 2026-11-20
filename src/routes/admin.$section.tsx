@@ -1,7 +1,8 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
-import { isSuperAdminSection, SuperAdminPanes } from '../client/components/SuperAdminPanes'
+import { SuperAdminPanes } from '../client/components/SuperAdminPanes'
+import { isSuperAdminSection } from '../client/settingsSections'
 import { SettingsShell } from '../client/components/settings/SettingsShell'
 import { sessionQuery } from '../client/queries'
 

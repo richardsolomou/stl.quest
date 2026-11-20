@@ -1,38 +1,43 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { Archive, ArrowLeft, Printer, RotateCcw, Trash2 } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Printer, RotateCcw, Search } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Field, FieldError, FieldLabel } from '@/components/ui/field'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { FieldError } from '@/components/ui/field'
+import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
 import {
   newPrinterProfile,
   nextPrinterPrintType,
   normalizePrinterProfile,
+  printerModelName,
   printerProfileFromPreset,
   printerProfilesValidationError,
+  uniquePrinterName,
 } from '../../../core/printers'
+import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from '../../../core/priceCalculator'
 import { getPrinterPreset, PRINTER_PRESETS, type PrinterPreset } from '../../../core/printerPresets'
-import { PRINT_TYPES, type PrinterProfile, type PrintType } from '../../../core/types'
-import { savePrinterProfiles } from '../../../server/fns'
+import { PRINT_TYPES, type PrinterProfile } from '../../../core/types'
+import { skipPrinterSetup } from '../../../server/fns'
 import { createId } from '../../id'
 import { errorMessage } from '../../../core/error'
-import { printersQuery } from '../../queries'
+import { priceCalculatorSettingsQuery, printersQuery } from '../../queries'
 import { invalidateQueries } from '../../queryState'
-import { useWorkspaceSlug } from '../../workspace'
+import { useInventory } from '../../inventory'
+import { useWorkspacePrintTypes, useWorkspaceSlug } from '../../workspace'
 import { signalProductTourProgress } from '../../productTour'
 import { ConfirmDialog } from '../ConfirmDialog'
+import { AlsoPrints } from './AlsoPrints'
 import { QueryState } from '../QueryState'
 import { SettingNotice } from '../SettingNotice'
+import { PrinterDialog } from './PrinterDialog'
 import { PrinterPresetImage } from './PrinterPresetImage'
 import { PrinterPresetPicker } from './PrinterPresetPicker'
+import { VirtualList } from './VirtualList'
 import { SettingsActions, PageHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { useI18n } from '../../i18n'
-
-const printTypeOptions = (labels: Record<PrintType, string>) => PRINT_TYPES.map((value) => ({ value, label: labels[value] }))
+import { matchesListSearch, showsListSearch } from '../../listSearch'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 
 export function PrintersPane({
   onboarding = false,
@@ -42,65 +47,66 @@ export function PrintersPane({
   const workspaceSlug = useWorkspaceSlug()
   const query = useQuery(printersQuery(workspaceSlug))
   const data = query.data
-  const [profiles, setProfiles] = useState<PrinterProfile[]>([])
-  const [savedProfiles, setSavedProfiles] = useState<PrinterProfile[]>([])
+  // Onboarding keeps the printers it adds here until "Save and continue"; settings store each change straight away.
+  const [drafts, setDrafts] = useState<PrinterProfile[]>([])
+  const profiles = useMemo(() => (onboarding ? drafts : (data?.profiles ?? [])), [onboarding, drafts, data])
   const [removeId, setRemoveId] = useState<string | null>(null)
-  const failedProfiles = useRef<string | undefined>(undefined)
-  const dirty = JSON.stringify(profiles) !== JSON.stringify(savedProfiles)
-  const dirtyRef = useRef(dirty)
-  dirtyRef.current = dirty
-  const callSave = useServerFn(savePrinterProfiles)
+  // A custom printer being added is kept here, not in the list, until its dialog has it named and saves it.
+  const [editing, setEditing] = useState<PrinterProfile | null>(null)
+  const currency =
+    useQuery({ ...priceCalculatorSettingsQuery(workspaceSlug), enabled: !onboarding }).data?.settings.currency ??
+    DEFAULT_PRICE_CALCULATOR_SETTINGS.currency
+  const [search, setSearch] = useState('')
   const queryClient = useQueryClient()
   const { t } = useI18n()
   const copy = t.settings.printers
-  const mutation = useMutation({
-    mutationFn: (next: PrinterProfile[]) => callSave({ data: { workspaceSlug, profiles: next } }),
-    onMutate: () => {
-      failedProfiles.current = undefined
+  const printTypes = useWorkspacePrintTypes()
+  const { mutation, save, setArchived } = useInventory('printers')
+  const callSkip = useServerFn(skipPrinterSetup)
+  // Finishing onboarding creates each printer it collected, or records that setup was skipped when there are none.
+  const finishSetup = useMutation({
+    mutationFn: async () => {
+      for (const profile of drafts) await save(normalizePrinterProfile(profile))
+      if (!drafts.length) await callSkip({ data: { workspaceSlug } })
     },
-    onError: (_error, next) => {
-      failedProfiles.current = JSON.stringify(next)
-    },
-    onSuccess: async (result) => {
-      const next = result.profiles.map(normalizePrinterProfile)
-      setProfiles(next)
-      setSavedProfiles(next)
-      const active = next.filter(({ archived }) => !archived)
-      if (active.length) signalProductTourProgress('printers')
-      if (onboarding) onSaved?.()
-      await invalidateQueries(queryClient, 'printers', 'session', 'requests')
-    },
+    onSuccess: () => onSaved?.(),
   })
-  const mutate = mutation.mutate
-
-  useEffect(() => {
-    if (!data || dirtyRef.current) return
-    const next = data.profiles.map(normalizePrinterProfile)
-    setProfiles(next)
-    setSavedProfiles(next)
-  }, [data])
+  const pending = mutation.isPending || finishSetup.isPending
 
   const error = useMemo(() => printerProfilesValidationError(profiles, t), [profiles, t])
-  useEffect(() => {
-    if (onboarding || !dirty || error || mutation.isPending) return
-    const next = profiles.map(normalizePrinterProfile)
-    if (failedProfiles.current === JSON.stringify(next)) return
-    const timeout = window.setTimeout(() => mutate(next), 600)
-    return () => window.clearTimeout(timeout)
-  }, [dirty, error, mutate, mutation.isPending, onboarding, profiles])
 
-  const persist = (next: PrinterProfile[]) => {
-    const normalized = next.map(normalizePrinterProfile)
-    setProfiles(normalized)
-    mutation.mutate(normalized)
+  // The session and board show printers too, so they refresh at once rather than when the workspace channel says so.
+  const refreshFleet = () => invalidateQueries(queryClient, 'session', 'requests')
+  const saveProfile = async (profile: PrinterProfile) => {
+    const normalized = normalizePrinterProfile(profile)
+    if (!onboarding) {
+      await save(normalized)
+      signalProductTourProgress('printers')
+      return await refreshFleet()
+    }
+    setDrafts((current) =>
+      current.some(({ id }) => id === normalized.id)
+        ? current.map((candidate) => (candidate.id === normalized.id ? normalized : candidate))
+        : [...current, normalized],
+    )
+  }
+  const archive = (id: string, archived: boolean) => void setArchived(id, archived).then(refreshFleet, () => undefined)
+  const closeEditor = () => {
+    setEditing(null)
+    // The dialog showed its own failure; the pane's notice is for changes made from the list.
+    if (mutation.isError) mutation.reset()
   }
 
   const removeProfile = profiles.find((profile) => profile.id === removeId)
   const activeProfiles = profiles.filter(({ archived }) => !archived)
   const archivedProfiles = profiles.filter(({ archived }) => archived)
   const addedPresetIds = new Set(activeProfiles.map((profile) => profile.presetId).filter((id): id is string => !!id))
-  const addCustomPrinter = () => setProfiles((current) => [...current, newPrinterProfile(createId(), nextPrinterPrintType(current))])
-  const addPresetPrinter = (preset: PrinterPreset) => setProfiles((current) => [...current, printerProfileFromPreset(createId(), preset)])
+  const addCustomPrinter = (printType = printTypes.length === 1 ? printTypes[0] : nextPrinterPrintType(activeProfiles)) =>
+    setEditing(newPrinterProfile(createId(), printType))
+  const addPresetPrinter = (preset: PrinterPreset) => {
+    const added = printerProfileFromPreset(createId(), preset)
+    void saveProfile({ ...added, name: uniquePrinterName(added.name, profiles) }).catch(() => undefined)
+  }
 
   if (!data) {
     return (
@@ -114,38 +120,53 @@ export function PrintersPane({
     )
   }
 
-  // Narrow containers stack each row into a card so every field keeps its full width and a visible label.
-  const printerTable = activeProfiles.length > 0 && (
-    <div className="@container overflow-hidden rounded-lg border">
-      <Table className="@max-lg:block">
-        <TableHeader className="@max-lg:hidden">
-          <TableRow className="hover:bg-transparent">
-            <TableHead className="w-14">
-              <span className="sr-only">{copy.table.image}</span>
-            </TableHead>
-            <TableHead>{copy.table.printer}</TableHead>
-            <TableHead>{copy.table.printType}</TableHead>
-            <TableHead className="w-10">
-              <span className="sr-only">{t.common.remove}</span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody className="@max-lg:block">
-          {activeProfiles.map((profile, index) => (
-            <PrinterRow
-              key={profile.id}
-              profile={profile}
-              index={index}
-              disabled={mutation.isPending}
-              onChange={(next) => setProfiles((current) => current.map((item) => (item.id === next.id ? next : item)))}
-              onRemove={() => setRemoveId(profile.id)}
-            />
-          ))}
-        </TableBody>
-      </Table>
+  const searchable = showsListSearch(activeProfiles.length)
+  const found = activeProfiles.filter((profile) => {
+    const preset = getPrinterPreset(profile.presetId)
+    return matchesListSearch(search, [profile.name, preset?.brand, preset?.model, copy.printTypes[profile.printType]])
+  })
+  // A mixed fleet reads as its resin and filament machines; a single-type fleet needs no grouping heading.
+  const groups = PRINT_TYPES.map((printType) => ({
+    printType,
+    profiles: found.filter((profile) => profile.printType === printType),
+  })).filter(({ profiles: grouped }) => grouped.length > 0)
+  const grouped = new Set(activeProfiles.map((profile) => profile.printType)).size > 1
+  // Each type the workspace prints or owns a printer of gets a section; any other folds to one invitation line.
+  const sectionTypes = activeProfiles.length
+    ? PRINT_TYPES.filter((printType) => printTypes.includes(printType) || activeProfiles.some((profile) => profile.printType === printType))
+    : []
+  const searchField = (
+    <InputGroup className="max-w-sm bg-field">
+      <InputGroupAddon>
+        <Search aria-hidden="true" />
+      </InputGroupAddon>
+      <InputGroupInput
+        aria-label={copy.search}
+        placeholder={copy.search}
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+      />
+    </InputGroup>
+  )
+  // Onboarding keeps its short list in one place, headed by print type only when the fleet mixes them.
+  const printerList = activeProfiles.length > 0 && (
+    <div className="flex flex-col gap-3">
+      {searchable && searchField}
+      {found.length === 0 && <p className="text-sm text-muted-foreground">{copy.noMatches(search.trim())}</p>}
+      {groups.map(({ printType, profiles: groupProfiles }) => (
+        <section key={printType} className="flex flex-col gap-1.5" aria-label={grouped ? copy.printTypes[printType] : undefined}>
+          {grouped && (
+            <h3 className="px-1 font-heading text-sm font-extrabold tracking-[0.015em] uppercase">
+              {copy.printTypes[printType]} · {groupProfiles.length}
+            </h3>
+          )}
+          <PrinterList profiles={groupProfiles} all={activeProfiles} onOpen={setEditing} />
+        </section>
+      ))}
     </div>
   )
-  const failure = mutation.error ? errorMessage(mutation.error, copy.tryAgainFallback) : undefined
+  const failed = mutation.error ?? finishSetup.error
+  const failure = failed ? errorMessage(failed, copy.tryAgainFallback) : undefined
 
   const content = onboarding ? (
     <div className="flex flex-col gap-5">
@@ -160,32 +181,29 @@ export function PrintersPane({
       </div>
       {profiles.length > 0 ? (
         <div className="flex flex-col gap-3">
-          {printerTable}
-          <PrinterPresetPicker
-            added={addedPresetIds}
-            disabled={mutation.isPending}
-            onSelect={addPresetPrinter}
-            onCustom={addCustomPrinter}
-          />
+          <div>
+            <PrinterPresetPicker added={addedPresetIds} disabled={pending} onSelect={addPresetPrinter} onCustom={addCustomPrinter} />
+          </div>
+          {printerList}
         </div>
       ) : (
-        <div className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/5 p-3 max-sm:flex-col max-sm:items-stretch sm:p-4">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <div className="flex items-start gap-3 rounded-lg border border-border bg-card p-3 max-sm:flex-col max-sm:items-stretch sm:p-4">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">
             <Printer className="size-5" aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium">{copy.onboarding.presetsTitle}</span>
-              <Badge>{copy.onboarding.presetCount(PRINTER_PRESETS.length)}</Badge>
+              <Badge variant="secondary">{copy.onboarding.presetCount(PRINTER_PRESETS.length)}</Badge>
             </div>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{copy.onboarding.presetsDescription}</p>
             <div className="mt-3">
               <PrinterPresetPicker
                 variant="default"
                 added={addedPresetIds}
-                disabled={mutation.isPending}
+                disabled={pending}
                 onSelect={addPresetPrinter}
-                onCustom={addCustomPrinter}
+                onCustom={() => addCustomPrinter()}
               />
             </div>
           </div>
@@ -197,15 +215,11 @@ export function PrintersPane({
       />
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            disabled={!profiles.length || !!error || mutation.isPending}
-            onClick={() => mutation.mutate(profiles.map(normalizePrinterProfile))}
-          >
-            {mutation.isPending ? t.common.saving : copy.onboarding.save}
+          <Button type="button" disabled={!profiles.length || !!error || pending} onClick={() => finishSetup.mutate()}>
+            {pending ? t.common.saving : copy.onboarding.save}
           </Button>
           {!profiles.length && (
-            <Button type="button" variant="ghost" size="sm" disabled={mutation.isPending} onClick={() => mutation.mutate([])}>
+            <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => finishSetup.mutate()}>
               {copy.onboarding.skip}
             </Button>
           )}
@@ -215,26 +229,71 @@ export function PrintersPane({
     </div>
   ) : (
     <>
-      <PageHeader title={copy.title} description={copy.description} />
-
-      <SettingsSection
-        title={copy.active.title}
-        description={activeProfiles.length ? copy.active.count(activeProfiles.length) : copy.active.empty}
-      >
-        <div className="flex flex-col gap-3" data-onboarding="printers">
-          {printerTable}
+      {/* In the header so a farm's long list never pushes adding a printer out of reach. */}
+      <PageHeader
+        title={copy.title}
+        description={copy.description}
+        actions={
           <PrinterPresetPicker
+            variant="default"
             added={addedPresetIds}
-            disabled={mutation.isPending}
+            disabled={pending}
             onSelect={addPresetPrinter}
-            onCustom={addCustomPrinter}
+            onCustom={() => addCustomPrinter()}
           />
-        </div>
-        <FieldError>{error}</FieldError>
-      </SettingsSection>
+        }
+      />
+
+      {searchable && searchField}
+      {search.trim() !== '' && found.length === 0 && <p className="text-sm text-muted-foreground">{copy.noMatches(search.trim())}</p>}
+      {/* One section per print type, as Consumables lists each kind; a single-type fleet shows just its own. */}
+      {sectionTypes.length ? (
+        sectionTypes.map((printType, index) => {
+          const shown = found.filter((profile) => profile.printType === printType)
+          const count = activeProfiles.filter((profile) => profile.printType === printType).length
+          return (
+            <SettingsSection
+              key={printType}
+              layout="stacked"
+              data-onboarding={index === 0 ? 'printers' : undefined}
+              title={count ? `${copy.sections[printType]} · ${count}` : copy.sections[printType]}
+              action={
+                <PrinterPresetPicker
+                  size="sm"
+                  label={copy.addOfType[printType]}
+                  printType={printType}
+                  added={addedPresetIds}
+                  disabled={pending}
+                  onSelect={addPresetPrinter}
+                  onCustom={() => addCustomPrinter(printType)}
+                />
+              }
+            >
+              {shown.length > 0 && <PrinterList profiles={shown} all={activeProfiles} onOpen={setEditing} />}
+            </SettingsSection>
+          )
+        })
+      ) : (
+        <SettingsSection layout="stacked" data-onboarding="printers" title={copy.active.title} description={copy.active.empty} />
+      )}
+      {sectionTypes.length > 0 &&
+        PRINT_TYPES.filter((printType) => !sectionTypes.includes(printType)).map((printType) => (
+          <AlsoPrints key={printType} printType={printType}>
+            <PrinterPresetPicker
+              variant="link"
+              label={copy.addOfType[printType]}
+              printType={printType}
+              added={addedPresetIds}
+              disabled={pending}
+              onSelect={addPresetPrinter}
+              onCustom={() => addCustomPrinter(printType)}
+            />
+          </AlsoPrints>
+        ))}
+      <FieldError>{error}</FieldError>
 
       {archivedProfiles.length > 0 && (
-        <SettingsSection title={copy.archived.title} description={copy.archived.description}>
+        <SettingsSection layout="stacked" title={copy.archived.title} description={copy.archived.description}>
           <div className="@container overflow-hidden rounded-lg border">
             <Table>
               <TableBody>
@@ -248,17 +307,7 @@ export function PrintersPane({
                     </TableCell>
                     <TableCell className="text-muted-foreground @max-sm:hidden">{copy.printTypes[profile.printType]}</TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        disabled={mutation.isPending}
-                        onClick={() =>
-                          persist(
-                            profiles.map((candidate) => (candidate.id === profile.id ? { ...candidate, archived: undefined } : candidate)),
-                          )
-                        }
-                      >
+                      <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => archive(profile.id, false)}>
                         <RotateCcw />
                         <span className="@max-sm:sr-only">{copy.archived.restore}</span>
                       </Button>
@@ -272,13 +321,9 @@ export function PrintersPane({
       )}
 
       <SettingNotice notice={failure ? { tone: 'error', title: copy.notSaved, hint: copy.notSavedHint, detail: failure } : undefined} />
-      {failure ? (
+      {failure && mutation.variables ? (
         <SettingsActions>
-          <Button
-            type="button"
-            disabled={!!error || mutation.isPending}
-            onClick={() => mutation.mutate(profiles.map(normalizePrinterProfile))}
-          >
+          <Button type="button" disabled={pending} onClick={() => mutation.mutate(mutation.variables)}>
             {t.common.retry}
           </Button>
         </SettingsActions>
@@ -291,22 +336,33 @@ export function PrintersPane({
       open={!!removeProfile}
       title={
         removeProfile
-          ? (removeProfile.used ? copy.remove.archiveTitle : copy.remove.removeTitle)(removeProfile.name || copy.remove.thisPrinter)
+          ? (onboarding ? copy.remove.removeTitle : copy.remove.archiveTitle)(removeProfile.name || copy.remove.thisPrinter)
           : copy.remove.fallbackTitle
       }
-      description={removeProfile?.used ? copy.remove.archiveDescription : copy.remove.removeDescription}
-      confirmLabel={removeProfile?.used ? copy.remove.archiveAction : copy.remove.removeAction}
+      description={onboarding ? copy.remove.removeDescription : copy.remove.archiveDescription}
+      confirmLabel={onboarding ? copy.remove.removeAction : copy.remove.archiveAction}
       destructive
       onCancel={() => setRemoveId(null)}
       onConfirm={() => {
         if (!removeProfile) return
-        persist(
-          removeProfile.used
-            ? profiles.map((profile) => (profile.id === removeProfile.id ? { ...profile, archived: true } : profile))
-            : profiles.filter((profile) => profile.id !== removeProfile.id),
-        )
+        if (onboarding) setDrafts((current) => current.filter((profile) => profile.id !== removeProfile.id))
+        else archive(removeProfile.id, true)
         setRemoveId(null)
+        closeEditor()
       }}
+    />
+  )
+  const editor = editing && (
+    <PrinterDialog
+      key={editing.id}
+      printer={editing}
+      isNew={!profiles.some(({ id }) => id === editing.id)}
+      profiles={profiles}
+      currency={currency}
+      stored={!onboarding}
+      onSave={saveProfile}
+      onRemove={() => setRemoveId(editing.id)}
+      onClose={closeEditor}
     />
   )
 
@@ -314,98 +370,60 @@ export function PrintersPane({
     return (
       <>
         {content}
+        {editor}
         {removalDialog}
       </>
     )
   return (
-    <SettingsPage data-saving={dirty || mutation.isPending}>
+    <SettingsPage data-saving={pending}>
       {content}
+      {editor}
       {removalDialog}
     </SettingsPage>
   )
 }
 
-function PrinterRow({
-  profile,
-  index,
-  disabled,
-  onChange,
-  onRemove,
+function PrinterList({
+  profiles,
+  all,
+  onOpen,
 }: {
-  profile: PrinterProfile
-  index: number
-  disabled: boolean
-  onChange: (profile: PrinterProfile) => void
-  onRemove: () => void
+  profiles: PrinterProfile[]
+  /** Every active printer, which numbers an unnamed one. */
+  all: PrinterProfile[]
+  onOpen: (profile: PrinterProfile) => void
 }) {
+  return (
+    <VirtualList
+      items={profiles}
+      getKey={({ id }) => id}
+      renderItem={(profile) => <PrinterRow profile={profile} index={all.indexOf(profile)} onOpen={() => onOpen(profile)} />}
+    />
+  )
+}
+
+function PrinterRow({ profile, index, onOpen }: { profile: PrinterProfile; index: number; onOpen: () => void }) {
   const preset = getPrinterPreset(profile.presetId)
   const { t } = useI18n()
   const copy = t.settings.printers
-  const printTypes = printTypeOptions(copy.printTypes)
   const displayName = profile.name || copy.row.fallbackName(index + 1)
+  // Bay names such as "X1C · A" hide the machine, so the catalogue model shows beneath unless the name already says it.
+  const catalogueName = preset && printerModelName(preset)
+  const model = catalogueName && catalogueName.toLocaleLowerCase() !== profile.name.trim().toLocaleLowerCase() ? catalogueName : undefined
 
   return (
-    <TableRow
-      aria-label={copy.row.label(index + 1)}
-      className="@max-lg:grid @max-lg:grid-cols-[minmax(0,1fr)_auto] @max-lg:gap-x-3 @max-lg:gap-y-3 @max-lg:p-3"
+    <button
+      type="button"
+      aria-label={copy.row.open(displayName)}
+      className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none focus-visible:ring-inset"
+      onClick={onOpen}
     >
-      <TableCell className="@max-lg:p-0">
-        <PrinterPresetImage printer={preset ?? profile} className="size-10 shrink-0 rounded-md border bg-muted/40" />
-      </TableCell>
-      <TableCell className="w-full min-w-40 whitespace-normal @max-lg:col-span-2 @max-lg:row-start-2 @max-lg:min-w-0 @max-lg:p-0">
-        <Field>
-          <FieldLabel htmlFor={`${profile.id}-name`} className="@lg:sr-only">
-            {copy.row.name}
-          </FieldLabel>
-          <Input
-            id={`${profile.id}-name`}
-            value={profile.name}
-            placeholder={copy.row.placeholder[profile.printType]}
-            maxLength={100}
-            disabled={disabled}
-            onChange={(event) => onChange({ ...profile, name: event.target.value })}
-          />
-        </Field>
-      </TableCell>
-      <TableCell className="min-w-36 @max-lg:col-span-2 @max-lg:row-start-3 @max-lg:min-w-0 @max-lg:p-0">
-        <Field>
-          <FieldLabel htmlFor={`${profile.id}-print-type`} className="@lg:sr-only">
-            {copy.table.printType}
-          </FieldLabel>
-          <Select
-            items={printTypes}
-            value={profile.printType}
-            disabled={disabled}
-            onValueChange={(printType) =>
-              printType && onChange({ ...profile, printType, presetId: printType === profile.printType ? profile.presetId : undefined })
-            }
-          >
-            <SelectTrigger id={`${profile.id}-print-type`} className="w-full" aria-label={copy.row.printTypeLabel(displayName)}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {printTypes.map((printType) => (
-                <SelectItem key={printType.value} value={printType.value}>
-                  {printType.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-      </TableCell>
-      <TableCell className="@max-lg:col-start-2 @max-lg:row-start-1 @max-lg:p-0">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="shrink-0 text-muted-foreground hover:text-destructive"
-          aria-label={(profile.used ? copy.row.archiveLabel : copy.row.removeLabel)(displayName)}
-          disabled={disabled}
-          onClick={onRemove}
-        >
-          {profile.used ? <Archive /> : <Trash2 />}
-        </Button>
-      </TableCell>
-    </TableRow>
+      <PrinterPresetImage printer={preset ?? profile} className="size-10 rounded-md border bg-muted/40" />
+      <span className="min-w-0 flex-1">
+        <span className="block font-medium @max-sm:line-clamp-2 @sm:truncate">{displayName}</span>
+        {model && <span className="block truncate text-xs text-muted-foreground">{model}</span>}
+      </span>
+      <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+    </button>
   )
 }

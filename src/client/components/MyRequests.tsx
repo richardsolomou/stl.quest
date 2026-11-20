@@ -12,6 +12,7 @@ import { printEstimateSummary } from './PrintEstimate'
 import { QueryState } from './QueryState'
 import { RequestThumb } from './RequestThumb'
 import { StatusDot } from './StatusDot'
+import { CopyCells } from './CopyCells'
 import { useI18n } from '../i18n'
 import { statusText } from '../../core/i18n'
 
@@ -52,8 +53,8 @@ export function MyRequests({
         sideOffset={8}
         className="max-h-[min(32rem,var(--available-height))] w-[min(420px,calc(100vw-24px))] gap-0 p-0"
       >
-        <PopoverHeader className="gap-2 border-b-2 border-dashed border-blueprint/25 p-3">
-          <PopoverTitle className="font-heading text-xs font-semibold tracking-[0.08em] uppercase">
+        <PopoverHeader className="gap-2 border-b border-border p-3">
+          <PopoverTitle className="font-heading text-xs font-semibold tracking-[0.015em] uppercase">
             {t.requests.myRequests.title}
           </PopoverTitle>
           {loaded && totals.length > 0 ? (
@@ -91,7 +92,7 @@ export function MyRequests({
                   <li key={request.id}>
                     <button
                       type="button"
-                      className="flex w-full items-center gap-2.5 rounded-lg border-2 border-transparent bg-ticket p-2 text-left text-ticket-foreground shadow-[0_1px_2px_rgb(0_0_0/0.25)] transition-colors hover:border-blueprint/40 focus-visible:border-ring focus-visible:outline-none"
+                      className="flex w-full items-center gap-2.5 rounded-lg border-2 border-transparent bg-ticket p-2 text-left text-ticket-foreground shadow-[0_1px_2px_rgb(0_0_0/0.25)] transition-colors hover:border-foreground/30 focus-visible:border-ring focus-visible:outline-none"
                       onClick={() => {
                         setOpen(false)
                         onOpenRequest(request.id)
@@ -127,6 +128,7 @@ export function MyRequests({
                             )
                           })}
                         </span>
+                        <CopyCells counts={request.counts} className="mt-0.5" />
                         {estimate && <span className="font-mono text-xs text-ticket-muted">{t.requests.myRequests.perCopy(estimate)}</span>}
                       </span>
                     </button>

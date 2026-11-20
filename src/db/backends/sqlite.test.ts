@@ -7,12 +7,12 @@ describe('SQLiteBackend', () => {
   it('initializes SQLite connection settings and migrations', async () => {
     const backend = new SQLiteBackend(createDatabase(':memory:'))
 
-    await backend.initialize()
+    await backend.initialize({ info: () => undefined, warn: () => undefined })
 
     expect({
       foreignKeys: (await backend.database.get<{ foreign_keys: number }>(sql`PRAGMA foreign_keys`))?.foreign_keys,
       migrations: (await backend.database.get<{ count: number }>(sql`SELECT count(*) count FROM __drizzle_migrations`))?.count,
-    }).toEqual({ foreignKeys: 1, migrations: 35 })
+    }).toEqual({ foreignKeys: 1, migrations: 38 })
     backend.close()
   })
 

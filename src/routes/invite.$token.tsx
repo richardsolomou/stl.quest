@@ -6,12 +6,13 @@ import { useServerFn } from '@tanstack/react-start'
 import { CircleAlert } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { CardContent } from '@/components/ui/card'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, passwordLengthError } from '../core/security'
 import { acceptInvite, acceptWorkspaceInvite, beginProviderInvite, inviteInfo, switchWorkspace } from '../server/fns'
+import { AuthTicket } from '../client/components/AuthTicket'
 import { AuthBrand } from '../client/components/Brand'
 import { AuthMethodIcon } from '../client/components/AuthMethodIcon'
 import { PasswordAuthDivider } from '../client/components/PasswordAuthDivider'
@@ -95,17 +96,14 @@ function InvitePage() {
   })
 
   return (
-    <main className="grid min-h-dvh place-items-center p-6 [background-image:var(--grid)] [background-size:24px_24px]">
+    <main className="grid min-h-dvh place-items-center p-6">
       <div className="flex w-full max-w-[440px] flex-col gap-8">
         <AuthBrand />
         {valid ? (
-          <Card className="w-full shadow-xl shadow-black/10">
-            <CardHeader>
-              <CardTitle>{copy.title}</CardTitle>
-              <CardDescription>
-                {signedIn ? copy.signedInDescription : signingIn ? copy.signInDescription : copy.createDescription}
-              </CardDescription>
-            </CardHeader>
+          <AuthTicket
+            title={copy.title}
+            description={signedIn ? copy.signedInDescription : signingIn ? copy.signInDescription : copy.createDescription}
+          >
             <CardContent className="flex flex-col gap-4">
               {signedIn && (
                 <Button
@@ -228,14 +226,9 @@ function InvitePage() {
                 </Alert>
               )}
             </CardContent>
-          </Card>
+          </AuthTicket>
         ) : (
-          <Card className="w-full shadow-xl shadow-black/10">
-            <CardHeader>
-              <CardTitle>{copy.invalidTitle}</CardTitle>
-              <CardDescription>{copy.invalidDescription}</CardDescription>
-            </CardHeader>
-          </Card>
+          <AuthTicket title={copy.invalidTitle} description={copy.invalidDescription} />
         )}
       </div>
     </main>

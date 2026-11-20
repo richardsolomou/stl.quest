@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { MAX_EMAIL_TEMPLATE_PLACEHOLDERS } from '../core/email'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from '../core/priceCalculator'
+import { MAX_BULK_CARDS } from '../core/request'
 import {
-  consumablesSchema,
+  archiveRequestsSchema,
+  deleteRequestsSchema,
+  moveCopiesBatchSchema,
+  updatePrintCopyTagsSchema,
   acceptInviteSchema,
   boardSettingsSchema,
   createLinkedRequestSchema,
@@ -13,7 +17,7 @@ import {
   moveCopiesSchema,
   notificationPreferenceSchema,
   priceCalculatorSettingsSchema,
-  printerProfilesSchema,
+  inventoryItemSchema,
   requestFiltersSchema,
   storageSettingsSchema,
   socialProviderSettingsSchema,
@@ -35,6 +39,7 @@ describe('board settings schema', () => {
 })
 
 describe('server input schemas', () => {
+  const printer = (item: unknown) => inventoryItemSchema.safeParse({ inventory: 'printers', item })
   it('rejects unknown notification kinds', () => {
     expect(notificationPreferenceSchema.safeParse({ kind: 'webhook', enabled: true }).success).toBe(false)
   })
@@ -131,44 +136,24 @@ describe('server input schemas', () => {
     ).toThrow()
   })
 
-  it('validates calculator settings', () => {
-    const settings = {
-      currency: 'EUR',
-      printType: 'resin',
-      resinPresetId: 'resin-heygears-pap10',
-      resinPricePerLitre: 70,
-      resinDensityGramsPerMl: 1.25,
-      filamentPricePerKg: 25,
-      electricityCountryCode: 'CY',
-      electricityPricePerKwh: 0.3,
-      resinEquipment: {
-        mode: 'preset',
-        presetIds: ['resin-heygears-reflex-rs-turbo', 'accessory-heygears-pulsing-release-module', 'postprocess-elegoo-mercury-plus-v3'],
-        printPowerWatts: 205,
-        washPowerWatts: 60,
-        washMinutesPerPlate: 5,
-        dryPowerWatts: 0,
-        dryMinutesPerPlate: 0,
-        curePowerWatts: 60,
-        cureMinutesPerPlate: 15,
-      },
-      filamentEquipment: DEFAULT_PRICE_CALCULATOR_SETTINGS.filamentEquipment,
-      equipmentCostPerHour: 1.15,
-      consumablesCostPerPlate: 0.5,
-      labourCostPerHour: 15,
-      failureAllowancePercent: 10,
-      standardMarginPercent: 25,
-    }
-
-    expect(priceCalculatorSettingsSchema.parse(settings)).toMatchObject({
-      resinPresetId: 'resin-heygears-pap10',
+  it('accepts the business rates', () => {
+    expect(priceCalculatorSettingsSchema.parse({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, electricityCountryCode: 'CY' })).toMatchObject({
       electricityCountryCode: 'CY',
     })
-    expect(priceCalculatorSettingsSchema.parse(DEFAULT_PRICE_CALCULATOR_SETTINGS)).toEqual(DEFAULT_PRICE_CALCULATOR_SETTINGS)
-    expect(() => priceCalculatorSettingsSchema.parse({ ...settings, resinPricePerLitre: 0 })).toThrow()
-    expect(() => priceCalculatorSettingsSchema.parse({ ...settings, standardMarginPercent: 100 })).toThrow()
-    expect(priceCalculatorSettingsSchema.parse({ ...settings, currency: 'CAD' })).toMatchObject({ currency: 'CAD' })
-    expect(() => priceCalculatorSettingsSchema.parse({ ...settings, currency: 'XYZ' })).toThrow()
+  })
+
+  it('rejects a margin that leaves nothing to cost', () => {
+    expect(() => priceCalculatorSettingsSchema.parse({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, standardMarginPercent: 100 })).toThrow()
+  })
+
+  it('rejects an unknown currency', () => {
+    expect(() => priceCalculatorSettingsSchema.parse({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, currency: 'XYZ' })).toThrow()
+  })
+
+  it('drops the material and equipment costs older settings stored', () => {
+    expect(priceCalculatorSettingsSchema.parse({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, resinPricePerLitre: 70, printerCosts: {} })).toEqual(
+      DEFAULT_PRICE_CALCULATOR_SETTINGS,
+    )
   })
 
   it('validates board filters and cross-field ranges', () => {
@@ -226,11 +211,33 @@ describe('server input schemas', () => {
       materialDensityGPerCm3: 1.24,
     }
 
-    expect(printerProfilesSchema.parse({ profiles: [resin, filament] }).profiles).toMatchObject([
+    expect([printer(resin).data?.item, printer(filament).data?.item]).toMatchObject([
       { id: 'resin', presetId: 'resin-elegoo-mars-2', widthMm: 100, depthMm: 60, heightMm: 150, printType: 'resin' },
       { id: 'filament', widthMm: 220, depthMm: 220, heightMm: 250, printType: 'filament' },
     ])
-    expect(() => printerProfilesSchema.parse({ profiles: [resin, { ...filament, id: 'resin' }] })).toThrow()
+  })
+
+  it('keeps a printer purchase price, lifespan, and add-on modules', () => {
+    const rs = {
+      id: 'rs',
+      name: 'Reflex RS',
+      printType: 'resin',
+      purchasePrice: 2500,
+      lifespanHours: 10_000,
+      addOnPresetIds: ['accessory-heygears-pulsing-release-module'],
+    }
+    expect(printer(rs).data?.item).toMatchObject(rs)
+  })
+
+  it('rejects a wash station as a printer add-on', () => {
+    expect(
+      printer({ id: 'rs', name: 'Reflex RS', printType: 'resin', addOnPresetIds: ['postprocess-formlabs-form-wash-v2'] }).success,
+    ).toBe(false)
+  })
+
+  it('rejects the same add-on twice', () => {
+    const addOn = 'accessory-heygears-pulsing-release-module'
+    expect(printer({ id: 'rs', name: 'Reflex RS', printType: 'resin', addOnPresetIds: [addOn, addOn] }).success).toBe(false)
   })
 })
 
@@ -297,29 +304,118 @@ describe('OIDC account creation settings', () => {
 })
 
 describe('consumables schema', () => {
+  const consumable = (item: unknown) => inventoryItemSchema.safeParse({ inventory: 'consumables', item })
   const tank = { id: 'tank', kind: 'part', name: 'Resin tank', printType: 'resin', price: 60, lifespan: 200, lifespanUnit: 'plates' }
 
   it('accepts resins, filaments, and wear parts', () => {
     expect(
-      consumablesSchema.safeParse({
-        consumables: [
-          { id: 'grey', kind: 'resin', name: 'Grey', pricePerLitre: 50, densityGramsPerMl: 1.1 },
-          { id: 'pla', kind: 'filament', name: 'PLA', pricePerKg: 20 },
-          tank,
-        ],
-      }).success,
+      [
+        { id: 'grey', kind: 'resin', name: 'Grey', pricePerLitre: 50, densityGramsPerMl: 1.1 },
+        { id: 'pla', kind: 'filament', name: 'PLA', pricePerKg: 20 },
+        tank,
+      ].every((item) => consumable(item).success),
     ).toBe(true)
   })
 
-  it('rejects two consumables with one ID', () => {
-    expect(consumablesSchema.safeParse({ consumables: [tank, tank] }).success).toBe(false)
-  })
-
   it('rejects a wear part that never wears out', () => {
-    expect(consumablesSchema.safeParse({ consumables: [{ ...tank, lifespan: 0 }] }).success).toBe(false)
+    expect(consumable({ ...tank, lifespan: 0 }).success).toBe(false)
   })
 
   it('rejects a consumable without a name', () => {
-    expect(consumablesSchema.safeParse({ consumables: [{ ...tank, name: ' ' }] }).success).toBe(false)
+    expect(consumable({ ...tank, name: ' ' }).success).toBe(false)
+  })
+
+  it('keeps the printer model a wear part belongs to', () => {
+    expect(consumable({ ...tank, printerPresetId: 'resin-formlabs-form-4' }).data?.item).toMatchObject({
+      printerPresetId: 'resin-formlabs-form-4',
+    })
+  })
+
+  it('keeps the custom printer a wear part belongs to', () => {
+    expect(consumable({ ...tank, printerId: 'printer-1' }).data?.item).toMatchObject({
+      printerId: 'printer-1',
+    })
+  })
+
+  it('accepts a supply priced by the litre', () => {
+    expect(consumable({ id: 'ipa', kind: 'supply', name: 'IPA', unit: 'ml', price: 8 }).success).toBe(true)
+  })
+
+  it('rejects a supply without a unit', () => {
+    expect(consumable({ id: 'ipa', kind: 'supply', name: 'IPA', price: 8 }).success).toBe(false)
+  })
+
+  it('keeps a minimum stock', () => {
+    expect(consumable({ ...tank, minimumStock: 2 }).data?.item).toMatchObject({ minimumStock: 2 })
+  })
+
+  it('rejects a negative minimum stock', () => {
+    expect(consumable({ ...tank, minimumStock: -1 }).success).toBe(false)
+  })
+
+  it('drops a stored list of printer models from a wear part', () => {
+    expect(consumable({ ...tank, printerPresetIds: ['resin-formlabs-form-4'] }).data?.item).not.toHaveProperty('printerPresetIds')
+  })
+})
+
+describe('equipment schema', () => {
+  const equipment = (item: unknown) => inventoryItemSchema.safeParse({ inventory: 'equipment', item })
+  const wash = {
+    id: 'wash',
+    name: 'Form Wash',
+    kind: 'wash',
+    stage: 'finishing',
+    printType: 'resin',
+    powerWatts: 50,
+    minutesPerUse: 10,
+    supplies: [{ consumableId: 'ipa', amountPerUse: 1 }],
+  }
+
+  it('accepts a wash station with a supply', () => {
+    expect(equipment(wash).success).toBe(true)
+  })
+
+  it('keeps a supply whose consumable it cannot check', () => {
+    expect(equipment(wash).data?.item).toMatchObject({ supplies: [{ consumableId: 'ipa', amountPerUse: 1 }] })
+  })
+
+  it('rejects the same supply listed twice', () => {
+    expect(equipment({ ...wash, supplies: [...wash.supplies, ...wash.supplies] }).success).toBe(false)
+  })
+
+  it('rejects a supply used up in no amount', () => {
+    expect(equipment({ ...wash, supplies: [{ consumableId: 'ipa', amountPerUse: 0 }] }).success).toBe(false)
+  })
+
+  it('rejects an unknown workflow stage', () => {
+    expect(equipment({ ...wash, stage: 'printing' }).success).toBe(false)
+  })
+
+  it('rejects equipment without a name', () => {
+    expect(equipment({ ...wash, name: ' ' }).success).toBe(false)
+  })
+})
+
+describe('bulk board actions', () => {
+  const cards = (count: number) => Array.from({ length: count }, (_, index) => ({ id: `request-${index}`, status: 'queue', count: 1 }))
+  const bulk = {
+    archive: (count: number) => archiveRequestsSchema.safeParse({ ids: cards(count).map(({ id }) => id) }),
+    delete: (count: number) => deleteRequestsSchema.safeParse({ deletions: cards(count) }),
+    move: (count: number) =>
+      moveCopiesBatchSchema.safeParse({ moves: cards(count).map(({ id }) => ({ id, from: 'queue', to: 'printing', count: 1 })) }),
+    tag: (count: number) =>
+      updatePrintCopyTagsSchema.safeParse({
+        addTagIds: [],
+        removeTagIds: [],
+        items: cards(count).map(({ id }) => ({ requestId: id, status: 'queue', count: 1 })),
+      }),
+  }
+
+  it.each(Object.entries(bulk))('takes a whole selection up to the limit to %s', (_, parse) => {
+    expect(parse(MAX_BULK_CARDS).success).toBe(true)
+  })
+
+  it.each(Object.entries(bulk))('refuses more than the limit to %s', (_, parse) => {
+    expect(parse(MAX_BULK_CARDS + 1).success).toBe(false)
   })
 })

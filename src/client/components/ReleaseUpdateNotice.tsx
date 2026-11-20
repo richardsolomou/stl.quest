@@ -14,7 +14,7 @@ export function ReleaseUpdateNotice({ hosted }: { hosted: boolean }) {
   if (!update) return null
 
   return (
-    <aside className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 text-sm">
+    <aside className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border bg-card px-4 py-3 text-sm">
       <span className="font-medium">{t.shell.release.available(update.latestVersion)}</span>
       <ButtonLink size="sm" variant="outline" className="ml-auto" href={update.releaseUrl} target="_blank" rel="noreferrer">
         {hosted ? t.shell.release.viewWhatsNew : t.shell.release.viewRelease}

@@ -14,7 +14,7 @@ export function OnboardingProgress({ step }: { step: number }) {
       </div>
       <div className="flex gap-1.5" aria-hidden="true">
         {STEPS.map((id, index) => (
-          <span key={id} className={cn('h-1 flex-1 rounded-full', index < step ? 'bg-primary' : 'bg-muted')} />
+          <span key={id} className={cn('h-1 flex-1 rounded-full', index < step ? 'bg-foreground' : 'bg-muted')} />
         ))}
       </div>
     </div>

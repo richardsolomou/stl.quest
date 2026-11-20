@@ -74,7 +74,7 @@ export function DiagnosticsPane() {
               const jobs = backgroundJobs.filter((job) => job.kind === kind)
               const complete = jobs.filter((job) => job.status === 'ready' || job.status === 'skipped').length
               return (
-                <Progress key={kind} value={jobs.length ? (complete / jobs.length) * 100 : 100}>
+                <Progress key={kind} completeTone="success" value={jobs.length ? (complete / jobs.length) * 100 : 100}>
                   <ProgressLabel>{copy.jobs.kind[kind]}</ProgressLabel>
                   <ProgressValue>{() => (jobs.length ? `${complete}/${jobs.length}` : copy.jobs.none)}</ProgressValue>
                 </Progress>
@@ -115,7 +115,7 @@ export function DiagnosticsPane() {
 function JobStatus({ status }: { status: 'pending' | 'running' | 'ready' | 'skipped' | 'failed' }) {
   const copy = useI18n().t.settings.diagnostics.jobs.status
   if (status === 'failed') return <Badge variant="destructive">{copy.failed}</Badge>
-  if (status === 'running') return <Badge>{copy.running}</Badge>
+  if (status === 'running') return <Badge variant="outline">{copy.running}</Badge>
   if (status === 'pending') return <Badge variant="secondary">{copy.pending}</Badge>
   if (status === 'skipped') return <Badge variant="outline">{copy.skipped}</Badge>
   return <Badge variant="outline">{copy.ready}</Badge>

@@ -23,7 +23,6 @@ import {
   updateStorageSettings,
 } from '../../../server/fns'
 import { cloudConnectionsQuery, integrationsQuery, sessionQuery, storageMigrationQuery, storageQuery } from '../../queries'
-import { signalProductTourProgress } from '../../productTour'
 import { invalidateQueries, retryQueries } from '../../queryState'
 import { CLOUD_PROVIDERS, storageLabel, storageRecoveryHint, type StorageMessages } from '../../storageProviders'
 import { rootForStorageAdapter, storageConfigFromForm, storageFormValues, useStorageConfigForm } from '../../storageForm'
@@ -323,7 +322,6 @@ function StorageForm({
   const migrationInProgress = !!startingMigration || migration?.state === 'running'
 
   const chooseStorage = (adapter: StorageConfig['adapter']) => {
-    if (!onboarding) signalProductTourProgress('storage')
     setNotice(undefined)
     setStorageChoice(adapter)
     form.setFieldValue('adapter', adapter)
@@ -451,7 +449,6 @@ function StorageForm({
 
   const formContent = (
     <form
-      data-onboarding="storage"
       onSubmit={(event) => {
         event.preventDefault()
         void form.handleSubmit()

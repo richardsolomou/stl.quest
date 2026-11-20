@@ -172,7 +172,7 @@ describe('asset generation queue', () => {
   })
 
   it('reassigns automatically assigned models after measuring their dimensions', async () => {
-    await repository.replacePrinterProfiles([
+    await repository.changeInventory('printers', () => [
       { id: 'small', name: 'Small', printType: 'resin', widthMm: 100, depthMm: 100, heightMm: 100 },
       { id: 'large', name: 'Large', printType: 'resin', widthMm: 200, depthMm: 200, heightMm: 200 },
     ])

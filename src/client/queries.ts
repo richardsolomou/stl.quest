@@ -3,6 +3,7 @@ import {
   getBoardSettings,
   getPriceCalculatorSettings,
   getConsumables,
+  getEquipment,
   getAuthCapabilities,
   getAccountMethods,
   getAdminAccount,
@@ -27,9 +28,17 @@ import {
   getOnboardingProgress,
   getNotificationPreferences,
   sessionInfo,
+  listUsage,
+  getStockLevels,
+  getUsagePrefills,
 } from '../server/fns'
+import type { ElectricityPricePreset } from '../core/electricityPresets'
+import type { FilamentPreset } from '../core/filamentPresets'
+import type { PartPreset } from '../core/partPresets'
 import { estimatePending } from '../core/printEstimates'
+import type { ResinPreset } from '../core/resinPresets'
 import type { PublicRequestQueryResult, RequestFilters } from '../core/types'
+import { MAX_USAGE_LIST, type UsageEvent, type UsageFilters } from '../core/usage'
 
 export type RequestQuerySnapshot = [readonly unknown[], PublicRequestQueryResult | undefined]
 
@@ -119,6 +128,31 @@ export const boardQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['board-settings', workspaceSlug], queryFn: () => getBoardSettings({ data: { workspaceSlug } }) })
 export const consumablesQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['consumables', workspaceSlug], queryFn: () => getConsumables({ data: { workspaceSlug } }) })
+export const equipmentQuery = (workspaceSlug: string) =>
+  queryOptions({ queryKey: ['equipment', workspaceSlug], queryFn: () => getEquipment({ data: { workspaceSlug } }) })
+export const usageQuery = (workspaceSlug: string, filters: UsageFilters = {}) =>
+  queryOptions({ queryKey: ['usage', workspaceSlug, filters], queryFn: () => listUsage({ data: { ...filters, workspaceSlug } }) })
+/** Every live event in a period, read a page at a time because one list is capped; a page overlaps the last by its oldest moment. */
+export const usagePeriodQuery = (workspaceSlug: string, period: { from: number; to: number }) =>
+  queryOptions({
+    queryKey: ['usage', workspaceSlug, 'period', period],
+    queryFn: async () => {
+      const events = new Map<string, UsageEvent>()
+      for (let to = period.to; ;) {
+        const page = (await listUsage({ data: { workspaceSlug, from: period.from, to } })).events
+        const before = events.size
+        for (const event of page) events.set(event.id, event)
+        const oldest = page.at(-1)
+        if (page.length < MAX_USAGE_LIST || !oldest || events.size === before) return { events: [...events.values()] }
+        to = oldest.createdAt + 1
+      }
+    },
+    placeholderData: (previousData, previousQuery) => (previousQuery?.queryKey[1] === workspaceSlug ? previousData : undefined),
+  })
+export const stockQuery = (workspaceSlug: string) =>
+  queryOptions({ queryKey: ['stock', workspaceSlug], queryFn: () => getStockLevels({ data: { workspaceSlug } }) })
+export const usagePrefillsQuery = (workspaceSlug: string) =>
+  queryOptions({ queryKey: ['usage-prefills', workspaceSlug], queryFn: () => getUsagePrefills({ data: { workspaceSlug } }) })
 
 export const priceCalculatorSettingsQuery = (workspaceSlug: string) =>
   queryOptions({
@@ -137,5 +171,16 @@ export const diagnosticsQuery = (workspaceSlug: string) =>
 export const systemDiagnosticsQuery = () =>
   queryOptions({ queryKey: ['system-diagnostics'], queryFn: () => getSystemDiagnostics(), refetchInterval: 30_000 })
 export const integrationsQuery = () => queryOptions({ queryKey: ['integrations'], queryFn: () => getIntegrationSettings() })
+type Catalogues = { electricity: ElectricityPricePreset[]; filaments: FilamentPreset[]; parts: PartPreset[]; resins: ResinPreset[] }
+// Each catalogue is its own chunk, fetched the first time something shows it, so pages that never do stay small.
+const catalogues: { [Name in keyof Catalogues]: () => Promise<Catalogues[Name]> } = {
+  electricity: () => import('../../catalogs/electricity/catalog.generated.json').then(({ default: catalogue }) => catalogue.presets),
+  filaments: () =>
+    import('../../catalogs/filaments/catalog.generated.json').then(({ default: catalogue }) => catalogue.presets as FilamentPreset[]),
+  parts: () => import('../../catalogs/parts/catalog.json').then(({ default: catalogue }) => catalogue.presets as PartPreset[]),
+  resins: () => import('../../catalogs/resins/catalog.generated.json').then(({ default: catalogue }) => catalogue.presets as ResinPreset[]),
+}
+export const catalogueQuery = <Name extends keyof Catalogues>(name: Name) =>
+  queryOptions({ queryKey: ['catalogue', name], queryFn: (): Promise<Catalogues[Name]> => catalogues[name](), staleTime: Infinity })
 export const printersQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['printers', workspaceSlug], queryFn: () => getPrinters({ data: { workspaceSlug } }) })

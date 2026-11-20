@@ -1,8 +1,9 @@
 import { Boxes, Printer, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { CardContent } from '@/components/ui/card'
 import { useI18n } from '../i18n'
 import { SOURCE_CODE_URL } from '../sourceCode'
+import { AuthTicket } from './AuthTicket'
 import { AuthBrand } from './Brand'
 
 export function AuthIntroduction({
@@ -17,14 +18,10 @@ export function AuthIntroduction({
   const { t } = useI18n()
   const copy = t.auth.introduction
   return (
-    <main className="grid min-h-dvh place-items-center p-6 [background-image:var(--grid)] [background-size:24px_24px]">
+    <main className="grid min-h-dvh place-items-center p-6">
       <div className="flex w-full max-w-[720px] flex-col gap-5">
         <AuthBrand />
-        <Card className="shadow-xl shadow-black/10">
-          <CardHeader>
-            <CardTitle>{copy.title}</CardTitle>
-            <CardDescription>{copy.description}</CardDescription>
-          </CardHeader>
+        <AuthTicket title={copy.title} description={copy.description}>
           <CardContent className="flex flex-col gap-4">
             <div className="grid gap-3 sm:grid-cols-3">
               <IntroductionItem icon={ShieldCheck} title={copy.privateTitle}>
@@ -45,7 +42,7 @@ export function AuthIntroduction({
               {copy.setUp}
             </Button>
           </CardContent>
-        </Card>
+        </AuthTicket>
         <AuthSourceOffer />
       </div>
     </main>
@@ -68,8 +65,8 @@ export function AuthSourceOffer() {
 
 function IntroductionItem({ icon: Icon, title, children }: { icon: typeof Printer; title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-sm border-2 border-dashed border-blueprint/25 bg-card p-3.5">
-      <Icon className="mb-2 size-5 text-primary" />
+    <div className="rounded-[3px] border border-ticket-foreground/15 p-3.5">
+      <Icon className="mb-2 size-5 text-ticket-foreground" />
       <h3 className="font-heading font-semibold">{title}</h3>
       <p className="mt-1 text-sm text-muted-foreground">{children}</p>
     </div>

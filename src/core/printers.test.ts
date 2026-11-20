@@ -9,6 +9,8 @@ import {
   printerProfileChanges,
   printerProfileFromPreset,
   printerProfilesValidationError,
+  printerValidationError,
+  uniquePrinterName,
 } from './printers'
 import { PRINTER_PRESETS } from './printerPresets'
 
@@ -34,8 +36,30 @@ describe('printer profiles', () => {
     expect(printerProfileFromPreset('printer', PRINTER_PRESETS[0])).toMatchObject({ id: 'printer', presetId: PRINTER_PRESETS[0].id })
   })
 
+  it('keeps a printer name no active printer has', () => {
+    expect(uniquePrinterName('Medium', [small, large])).toBe('Medium')
+  })
+
+  it('numbers a printer name an active printer already has', () => {
+    expect(uniquePrinterName('Small', [small, { ...large, name: 'small · 2' }])).toBe('Small · 3')
+  })
+
+  it('reuses the name of an archived printer', () => {
+    expect(uniquePrinterName('Small', [{ ...small, archived: true }])).toBe('Small')
+  })
+
   it('rejects printer names that only differ by case', () => {
     expect(printerProfilesValidationError([small, { ...large, name: 'small' }], messagesFor('en'))).toBe('Printer names must be unique.')
+  })
+
+  it('checks only the printer being stored, so names other printers already share do not block it', () => {
+    const twins = [small, { ...large, name: 'Twin' }, { ...large, id: 'twin-2', name: 'Twin' }]
+
+    expect(printerValidationError({ ...small, name: 'Renamed' }, twins, messagesFor('en'))).toBe('')
+  })
+
+  it('lets an archived printer keep a name an active one now has', () => {
+    expect(printerValidationError({ ...large, name: small.name, archived: true }, [small], messagesFor('en'))).toBe('')
   })
 
   it('summarizes printer configuration changes', () => {
@@ -69,6 +93,19 @@ describe('printer profiles', () => {
     expect(normalizePrinterProfile({ ...large }).widthMm).toBe(200)
   })
 
+  it("takes a catalogue printer's build volume from its model over stored dimensions", () => {
+    expect(
+      normalizePrinterProfile({ id: 'mars-2', presetId: 'resin-elegoo-mars-2', name: 'Mars', widthMm: 300, depthMm: 300, heightMm: 300 })
+        .widthMm,
+    ).toBe(82.62)
+  })
+
+  it("takes a catalogue printer's print type from its model over a stored one", () => {
+    expect(normalizePrinterProfile({ id: 'anker-m5', presetId: 'filament-anker-m5', name: 'M5', printType: 'resin' }).printType).toBe(
+      'filament',
+    )
+  })
+
   it('recovers missing dimensions from a saved preset', () => {
     expect(normalizePrinterProfile({ id: 'mars-2', presetId: 'resin-elegoo-mars-2', name: 'Elegoo Mars 2' }).widthMm).toBe(82.62)
   })
@@ -91,6 +128,25 @@ describe('printer profiles', () => {
 
   it('recovers a missing print type from a name-inferred filament preset', () => {
     expect(normalizePrinterProfile({ id: 'anker-m5', name: 'Anker M5' }).printType).toBe('filament')
+  })
+
+  it('keeps what a printer cost, how long it lasts, and its add-ons', () => {
+    const wear = { purchasePrice: 2500, lifespanHours: 10_000, addOnPresetIds: ['accessory-heygears-pulsing-release-module'] }
+    expect(normalizePrinterProfile({ ...small, ...wear })).toMatchObject(wear)
+  })
+
+  it('keeps the printing power of a printer without a catalogue model', () => {
+    expect(normalizePrinterProfile({ id: 'own', name: 'Workshop rig', printType: 'filament', powerWatts: 320 }).powerWatts).toBe(320)
+  })
+
+  it('drops printing power from a catalogue printer, whose model sets it', () => {
+    expect(normalizePrinterProfile({ id: 'mars-2', presetId: 'resin-elegoo-mars-2', name: 'Mars', powerWatts: 320 })).not.toHaveProperty(
+      'powerWatts',
+    )
+  })
+
+  it('drops an empty add-on list', () => {
+    expect(normalizePrinterProfile({ ...small, addOnPresetIds: [] })).not.toHaveProperty('addOnPresetIds')
   })
 
   it('assigns a model only to printers whose build volume can contain it', () => {

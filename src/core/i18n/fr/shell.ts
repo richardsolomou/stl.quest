@@ -24,6 +24,8 @@ export const shell: typeof en = {
     label: 'Sections des paramètres',
     choose: 'Choisir une section des paramètres',
     workspace: 'Espace de travail',
+    production: 'Production',
+    connections: 'Connexions',
     you: 'Vous',
     server: 'Serveur',
     product: 'STL Quest',
@@ -54,7 +56,9 @@ export const shell: typeof en = {
     summary: (completed, skipped) =>
       `${completed} ${completed <= 1 ? 'terminée' : 'terminées'} · ${skipped} ${skipped <= 1 ? 'ignorée' : 'ignorées'}`,
     reviewQuests: 'Revoir les quêtes',
-    rowComplete: 'Terminée · Revoir',
+    rowComplete: 'Terminée',
+    showResolved: (count: number) => `Afficher ${count} terminées`,
+    hideResolved: 'Masquer les terminées',
     rowSkipped: 'Ignorée',
     rowPoints: (points, isNew) => `${isNew ? 'Nouvelle · ' : ''}${points} XP`,
     restore: (title) => `Restaurer ${title}`,
@@ -67,51 +71,50 @@ export const shell: typeof en = {
   onboarding: {
     sections: {
       'getting-started': 'Premiers pas',
-      'managing-queue': 'Gérer la file d’attente',
-      'workspace-setup': 'Configurer votre espace de travail',
+      optional: 'Facultatif',
     },
     quests: {
+      printers: {
+        title: 'Ajouter vos imprimantes',
+        description:
+          'Ajoutez chaque imprimante, pour que les impressions aillent à une machine adaptée et que les devis utilisent son coût de fonctionnement.',
+      },
+      stock: {
+        resin: {
+          title: 'Ajouter vos résines',
+          description: 'Facultatif. Ajoutez les résines que vous utilisez et leur prix, pour que les devis utilisent vos prix.',
+        },
+        filament: {
+          title: 'Ajouter vos filaments',
+          description: 'Facultatif. Ajoutez les filaments que vous utilisez et leur prix, pour que les devis utilisent vos prix.',
+        },
+        both: {
+          title: 'Ajouter vos matériaux',
+          description:
+            'Facultatif. Ajoutez les résines et filaments que vous utilisez et leur prix, pour que les devis utilisent vos prix.',
+        },
+      },
       upload: {
         title: 'Ajouter votre première impression',
-        description: 'Téléversez un modèle ou enregistrez un lien source quand vous êtes prêt à alimenter la file d’attente.',
+        description: 'Téléversez un modèle ou enregistrez un lien pour alimenter la file d’attente.',
       },
       move: {
-        title: 'Faire avancer le travail dans la file d’attente',
-        description: 'Faites glisser une carte d’impression d’une colonne à l’autre pour changer son étape.',
+        title: 'Amener une impression à Prêt',
+        description: 'Faites glisser une carte d’impression de la file d’attente vers Impression, Finition, puis Prêt.',
       },
       inspect: {
         title: 'Examiner une impression',
         description: 'Ouvrez une carte d’impression pour consulter son modèle, ses notes, ses copies et son attribution.',
       },
       download: { title: 'Télécharger un modèle', description: 'Téléchargez un STL depuis une carte d’impression ou sa vue détaillée.' },
-      actions: {
-        title: 'Découvrir les actions d’impression',
-        description: 'Utilisez une action de carte d’impression pour sélectionner, regrouper, déplacer ou supprimer du travail.',
-      },
-      sort: {
-        title: 'Choisir la vue de la file d’attente',
-        description: 'Triez par priorité du demandeur, date d’envoi, nom ou activité récente.',
-      },
-      filter: {
-        title: 'Trouver du travail avec les filtres',
-        description:
-          'Appliquez un filtre pour cibler la file d’attente par type d’impression, demandeur, dates, fichiers ou tout autre champ utile.',
-      },
-      printers: {
-        title: 'Constituer votre parc d’imprimantes',
-        description: 'Ajoutez et enregistrez un profil d’imprimante pour associer les demandes aux machines compatibles.',
-      },
-      storage: {
-        title: 'Examiner le stockage des modèles',
-        description: 'Consultez le fournisseur de stockage actif et les options pour déplacer les modèles plus tard.',
-      },
-      visibility: {
-        title: 'Choisir la visibilité des demandes',
-        description: 'Choisissez si les demandeurs voient la file d’attente partagée ou seulement leurs propres demandes.',
-      },
       invite: {
-        title: 'Inviter un coéquipier',
+        title: 'Inviter votre équipe',
         description: 'Créez une invitation à usage unique pour un demandeur ou un autre administrateur.',
+      },
+      tracking: {
+        title: 'Suivre la consommation et le stock',
+        description:
+          'Facultatif. Indiquez ce que chaque impression a utilisé, et les stocks, les commandes, l’usure et les dépenses se comptent seuls. Activez-le ici.',
       },
     },
   },

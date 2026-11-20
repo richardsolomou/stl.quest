@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { Field, FieldContent, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Activity } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { updateTelemetrySettings } from '../../../server/fns'
 import { telemetryQuery } from '../../queries'
+import { LATEST_DOCUMENTATION_URL } from '../../sourceCode'
 import { QueryState } from '../QueryState'
+import { SettingRow } from '../SettingRow'
 import { SettingNotice, errorNotice } from '../SettingNotice'
 import { PageHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { useI18n } from '../../i18n'
@@ -38,19 +40,36 @@ export function TelemetryPane() {
   return (
     <SettingsPage>
       <PageHeader title={copy.title} description={copy.description} />
-      <SettingsSection>
-        <Field orientation="horizontal">
-          <FieldContent>
-            <FieldLabel htmlFor="telemetry-enabled">{copy.label}</FieldLabel>
-            <FieldDescription>{copy.hint}</FieldDescription>
-          </FieldContent>
-          <Switch
-            id="telemetry-enabled"
-            checked={current.enabled}
-            disabled={mutation.isPending}
-            onCheckedChange={(enabled) => mutation.mutate({ data: { enabled } })}
-          />
-        </Field>
+      <SettingsSection
+        title={copy.usage.title}
+        description={
+          <>
+            {copy.usage.description}{' '}
+            <a
+              className="font-medium text-foreground underline underline-offset-2"
+              href={`${LATEST_DOCUMENTATION_URL}/telemetry.md`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {copy.usage.docs}
+            </a>
+          </>
+        }
+      >
+        <SettingRow
+          icon={<Activity />}
+          name={copy.label}
+          status={{ label: current.enabled ? copy.on : copy.off, tone: current.enabled ? 'on' : 'off' }}
+          detail={copy.hint}
+          actions={
+            <Switch
+              aria-label={copy.label}
+              checked={current.enabled}
+              disabled={mutation.isPending}
+              onCheckedChange={(enabled) => mutation.mutate({ data: { enabled } })}
+            />
+          }
+        />
         {mutation.error && <SettingNotice notice={errorNotice(copy.notSaved, copy.notSavedHint, mutation.error)} />}
       </SettingsSection>
     </SettingsPage>

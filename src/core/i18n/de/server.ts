@@ -101,7 +101,20 @@ export const server: typeof en = {
     invalidArchive: 'ungültige Archivierung',
     sourceModelNotFound: 'Quell-STL nicht gefunden',
     printerOrPrintType: 'wählen Sie einen Drucker oder eine Druckart, nicht beides',
+    printTypeNotOffered: 'dieser Arbeitsbereich druckt diese Druckart nicht',
     unknownPrinter: 'unbekannter Drucker',
     printerArchived: 'der Drucker ist archiviert',
+  },
+  inventory: {
+    notFound: 'dieser Eintrag existiert nicht mehr; laden Sie die Seite neu',
+    exists: 'ein Eintrag mit dieser ID existiert bereits',
+    full: (limit: number) => `ein Arbeitsbereich kann bis zu ${limit} davon gleichzeitig nutzen; archivieren Sie zuerst einen`,
+  },
+  usage: {
+    unknownConsumable: 'unbekanntes Verbrauchsmaterial',
+    unknownEquipment: 'unbekanntes Gerät',
+    materialMismatch: 'dieses Material passt nicht zur Druckart',
+    nothingToUndo: 'nichts rückgängig zu machen',
+    trackingOff: 'Verbrauchs- und Bestandserfassung ist für diesen Arbeitsbereich aus',
   },
 }

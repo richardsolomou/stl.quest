@@ -137,7 +137,7 @@ function DestinationChoice({
       aria-pressed={selected}
       className={cn(
         'flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none',
-        selected && !destructive && 'border-primary/50 bg-primary/5',
+        selected && !destructive && 'border-foreground/40 bg-muted/50',
         selected && destructive && 'border-destructive/50 bg-destructive/5',
         !selected && 'hover:bg-muted/60',
       )}
@@ -146,7 +146,7 @@ function DestinationChoice({
       <span
         className={cn(
           'mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border',
-          selected && (destructive ? 'border-destructive bg-destructive text-white' : 'border-primary bg-primary text-primary-foreground'),
+          selected && (destructive ? 'border-destructive bg-destructive text-white' : 'border-foreground bg-foreground text-background'),
         )}
       >
         {selected && <Check className="size-3" aria-hidden="true" />}

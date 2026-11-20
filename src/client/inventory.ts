@@ -1,0 +1,42 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useServerFn } from '@tanstack/react-start'
+import type { InventoryItems, InventoryKind } from '../core/inventory'
+import { createInventoryItem, setInventoryItemArchived, updateInventoryItem } from '../server/fns'
+import { consumablesQuery, equipmentQuery, printersQuery } from './queries'
+import { useWorkspaceSlug } from './workspace'
+
+const queries = { printers: printersQuery, equipment: equipmentQuery, consumables: consumablesQuery }
+/** Where each kind's list sits in what its query returns. */
+const listField = { printers: 'profiles', equipment: 'equipment', consumables: 'consumables' } as const
+
+type Change<Kind extends InventoryKind> = { item: InventoryItems[Kind] } | { id: string; archived: boolean }
+
+/**
+ * Saves one printer, piece of equipment, or consumable at a time, so admins editing different items never undo each
+ * other: `save` creates an item the list does not have yet and updates one it does, and `setArchived` archives or
+ * restores one. Each result replaces the cached list straight away; the workspace channel refreshes everyone else.
+ */
+export function useInventory<Kind extends InventoryKind>(kind: Kind) {
+  const workspaceSlug = useWorkspaceSlug()
+  const queryClient = useQueryClient()
+  const create = useServerFn(createInventoryItem)
+  const update = useServerFn(updateInventoryItem)
+  const archive = useServerFn(setInventoryItemArchived)
+  const { queryKey } = queries[kind](workspaceSlug)
+  const stored = (): InventoryItems[Kind][] =>
+    queryClient.getQueryData<Record<string, InventoryItems[Kind][]>>(queryKey)?.[listField[kind]] ?? []
+  const mutation = useMutation({
+    mutationFn: async (change: Change<Kind>) => {
+      if ('id' in change) return await archive({ data: { workspaceSlug, inventory: kind, ...change } })
+      const known = stored().some(({ id }) => id === change.item.id)
+      const data = { workspaceSlug, inventory: kind, item: change.item } as Parameters<typeof create>[0]['data']
+      return await (known ? update({ data }) : create({ data }))
+    },
+    onSuccess: ({ items }) => queryClient.setQueryData(queryKey, { [listField[kind]]: items } as never),
+  })
+  return {
+    mutation,
+    save: async (item: InventoryItems[Kind]) => void (await mutation.mutateAsync({ item })),
+    setArchived: async (id: string, archived: boolean) => void (await mutation.mutateAsync({ id, archived })),
+  }
+}

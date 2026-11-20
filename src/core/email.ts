@@ -4,6 +4,7 @@ export const EMAIL_LOGO_TYPES = ['image/png', 'image/jpeg', 'image/gif'] as cons
 export const MAX_EMAIL_LOGO_BYTES = 256 * 1024
 export const EMAIL_SENDER_SETTING = 'email-sender'
 export const MAX_EMAIL_SENDER_NAME_LENGTH = 64
+export const MAX_EMAIL_ADDRESS_LENGTH = 254
 export const WORKSPACE_SMTP_SETTING = 'emailSmtpEncrypted'
 /** Submission ports a hosted workspace's own mail server may use; anything else is not a mail submission service. */
 export const HOSTED_SMTP_PORTS = [465, 587, 2525] as const
@@ -153,4 +154,16 @@ function emailHtml(content: EmailContent) {
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => `&#${character.charCodeAt(0)};`)
+}
+
+/** A reply-to address that can be stored: empty, or shaped like an address. The server checks it fully on save. */
+export function plausibleReplyTo(value: string) {
+  const address = value.trim()
+  return address === '' || (address.length <= MAX_EMAIL_ADDRESS_LENGTH && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address))
+}
+
+/** A sender name that can be stored: one line, within the length a From header allows here. */
+export function validSenderName(value: string) {
+  const name = value.trim()
+  return name.length <= MAX_EMAIL_SENDER_NAME_LENGTH && !/[\r\n]/.test(name)
 }

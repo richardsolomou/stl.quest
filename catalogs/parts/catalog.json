@@ -1,0 +1,1005 @@
+{
+  "layersPerPlate": {
+    "value": 1000,
+    "note": "Converts a manufacturer's layer or release count into plates: a 50 mm plate at 50 µm, the usual MSLA default. Formlabs' own example print is shorter (39 mm at 100 µm, about 390 layers), so this errs towards fewer plates."
+  },
+  "sources": [
+    {
+      "id": "formlabs-store",
+      "repository": "https://formlabs.com/store/",
+      "revision": "2026-11-20",
+      "license": "manufacturer product data"
+    },
+    {
+      "id": "elegoo-store",
+      "repository": "https://us.elegoo.com/",
+      "revision": "2026-11-20",
+      "license": "manufacturer product data"
+    },
+    {
+      "id": "anycubic-store",
+      "repository": "https://store.anycubic.com/",
+      "revision": "2026-11-20",
+      "license": "manufacturer product data"
+    },
+    {
+      "id": "phrozen-store",
+      "repository": "https://us.phrozen3d.com/",
+      "revision": "2026-11-20",
+      "license": "manufacturer product data"
+    },
+    {
+      "id": "prusa-store",
+      "repository": "https://www.prusa3d.com/",
+      "revision": "2026-11-20",
+      "license": "manufacturer product data"
+    },
+    {
+      "id": "bambu-lab-store",
+      "repository": "https://eu.store.bambulab.com/",
+      "revision": "2026-11-20",
+      "license": "manufacturer product data"
+    },
+    {
+      "id": "creality-store",
+      "repository": "https://store.creality.com/",
+      "revision": "2026-11-20",
+      "license": "manufacturer product data"
+    },
+    {
+      "id": "formlabs-support",
+      "repository": "https://formlabs.com/support/",
+      "revision": "2026-11-20",
+      "license": "manufacturer documentation"
+    }
+  ],
+  "presets": [
+    {
+      "id": "part-formlabs-form-4-resin-tank",
+      "brand": "Formlabs",
+      "name": "Form 4 Resin Tank",
+      "category": "resin-tank",
+      "printType": "resin",
+      "fits": ["resin-formlabs-form-4", "resin-formlabs-form-4b"],
+      "lifespan": 190,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "stated",
+        "url": "https://formlabs.com/support/Resin-tank-lifetime-and-monitoring-Form-4-generation/",
+        "note": "Formlabs rates the tank for 75,000 layers with any material and gives approximately 190 prints of a 39 mm model at 100 µm. It notes artifacts can appear after 20,000–30,000 layers with BioMed Clear, Tough 1500, and High Temp."
+      },
+      "listPrice": {
+        "amount": 119,
+        "currency": "USD",
+        "url": "https://formlabs.com/store/accessories/form-4-resin-tank/",
+        "checked": "2026-11-20",
+        "note": "Excluding sales tax."
+      },
+      "source": {
+        "id": "formlabs-store",
+        "url": "https://formlabs.com/store/accessories/form-4-resin-tank/"
+      }
+    },
+    {
+      "id": "part-formlabs-form-4l-resin-tank",
+      "brand": "Formlabs",
+      "name": "Form 4L Resin Tank",
+      "category": "resin-tank",
+      "printType": "resin",
+      "fits": ["resin-formlabs-form-4l", "resin-formlabs-form-4bl"],
+      "lifespan": 190,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "stated",
+        "url": "https://formlabs.com/support/Resin-tank-lifetime-and-monitoring-Form-4-generation/",
+        "note": "The same Form 4 generation article rates Form 4L tanks for 75,000 layers and gives approximately 190 prints of a 39 mm model at 100 µm."
+      },
+      "listPrice": {
+        "amount": 299,
+        "currency": "USD",
+        "url": "https://formlabs.com/store/accessories/form-4l-resin-tank/",
+        "checked": "2026-11-20",
+        "note": "Excluding sales tax."
+      },
+      "source": {
+        "id": "formlabs-store",
+        "url": "https://formlabs.com/store/accessories/form-4l-resin-tank/"
+      }
+    },
+    {
+      "id": "part-formlabs-form-3-resin-tank-v2-1",
+      "brand": "Formlabs",
+      "name": "Form 3 Resin Tank V2.1",
+      "category": "resin-tank",
+      "printType": "resin",
+      "fits": ["resin-formlabs-form-3", "resin-formlabs-form-3b", "resin-formlabs-form-3-plus", "resin-formlabs-form-3b-plus"],
+      "lifespan": 600,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "stated",
+        "url": "https://formlabs.com/support/Resin-tank-lifetime-Form-3-Form-3B/",
+        "note": "Lower end of Formlabs' 600–800 printing-hour estimate for most resins. Aggressive resins such as Tough 2000, Rigid 4000, and Grey Pro cap the tank at 250 hours or 75 days in resin."
+      },
+      "listPrice": {
+        "amount": 149,
+        "currency": "USD",
+        "url": "https://formlabs.com/store/form-3-resin-tank",
+        "checked": "2026-11-20",
+        "note": "Excluding sales tax. The store page lists Form 3 and Form 3B; Formlabs' tank-types article also covers the Form 3+ and 3B+."
+      },
+      "source": {
+        "id": "formlabs-store",
+        "url": "https://formlabs.com/store/form-3-resin-tank"
+      }
+    },
+    {
+      "id": "part-formlabs-form-3l-resin-tank-v3",
+      "brand": "Formlabs",
+      "name": "Form 3L Resin Tank V3",
+      "category": "resin-tank",
+      "printType": "resin",
+      "fits": ["resin-formlabs-form-3l", "resin-formlabs-form-3bl"],
+      "lifespan": 600,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "stated",
+        "url": "https://formlabs.com/support/Resin-tank-lifetime-Form-3L-Form-3BL/",
+        "note": "Lower end of Formlabs' 600–800 printing-hour estimate for most resins. Aggressive resins cap the tank at 250 hours or 75 days in resin."
+      },
+      "listPrice": {
+        "amount": 299,
+        "currency": "USD",
+        "url": "https://formlabs.com/store/accessories/form-3l-resin-tank/",
+        "checked": "2026-11-20",
+        "note": "Excluding sales tax."
+      },
+      "source": {
+        "id": "formlabs-store",
+        "url": "https://formlabs.com/store/accessories/form-3l-resin-tank/"
+      }
+    },
+    {
+      "id": "part-elegoo-pfa-film-saturn",
+      "brand": "Elegoo",
+      "name": "PFA Film for Saturn 2/8K/3/4/4 Ultra/4 Ultra 16K",
+      "category": "release-film",
+      "printType": "resin",
+      "fits": [
+        "resin-elegoo-saturn-2",
+        "resin-elegoo-saturn-8k",
+        "resin-elegoo-saturn-3",
+        "resin-elegoo-saturn-4",
+        "resin-elegoo-saturn-4-ultra",
+        "resin-elegoo-saturn-4-ultra-12k",
+        "resin-elegoo-saturn-4-ultra-16k"
+      ],
+      "lifespan": 60,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "derived",
+        "statedLayers": 60000,
+        "url": "https://us.elegoo.com/products/elegoo-pfa-release-liner-for-saturn-2-3d-printer",
+        "note": "Elegoo states up to 60,000 releases, one per layer."
+      },
+      "listPrice": {
+        "amount": 30,
+        "currency": "USD",
+        "packSize": 5,
+        "url": "https://us.elegoo.com/products/elegoo-pfa-release-liner-for-saturn-2-3d-printer",
+        "checked": "2026-11-20"
+      },
+      "source": {
+        "id": "elegoo-store",
+        "url": "https://us.elegoo.com/products/elegoo-pfa-release-liner-for-saturn-2-3d-printer"
+      }
+    },
+    {
+      "id": "part-elegoo-fep-film-mars-4-5",
+      "brand": "Elegoo",
+      "name": "FEP Film for Mars 4/5/5 Ultra",
+      "category": "release-film",
+      "printType": "resin",
+      "fits": ["resin-elegoo-mars-4", "resin-elegoo-mars-5", "resin-elegoo-mars-5-ultra"],
+      "lifespan": 60,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "derived",
+        "statedLayers": 60000,
+        "url": "https://us.elegoo.com/products/fep-film-for-mars-4-5-pcs",
+        "note": "Elegoo states the film withstands 60,000+ releases, one per layer."
+      },
+      "listPrice": {
+        "amount": 24.99,
+        "currency": "USD",
+        "packSize": 5,
+        "url": "https://us.elegoo.com/products/fep-film-for-mars-4-5-pcs",
+        "checked": "2026-11-20"
+      },
+      "source": {
+        "id": "elegoo-store",
+        "url": "https://us.elegoo.com/products/fep-film-for-mars-4-5-pcs"
+      }
+    },
+    {
+      "id": "part-elegoo-lcd-saturn-3",
+      "brand": "Elegoo",
+      "name": "LCD Screen for Saturn 3 & Saturn 3 Ultra",
+      "category": "lcd-screen",
+      "printType": "resin",
+      "fits": ["resin-elegoo-saturn-3", "resin-elegoo-saturn-3-ultra"],
+      "lifespan": 2000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "stated",
+        "url": "https://us.elegoo.com/products/lcd-screen-for-saturn-3-saturn-3-ultra",
+        "note": "Elegoo states a service life of about 2,000 hours. The warranty is three months."
+      },
+      "listPrice": {
+        "amount": 129.99,
+        "currency": "USD",
+        "url": "https://us.elegoo.com/products/lcd-screen-for-saturn-3-saturn-3-ultra",
+        "checked": "2026-11-20"
+      },
+      "source": {
+        "id": "elegoo-store",
+        "url": "https://us.elegoo.com/products/lcd-screen-for-saturn-3-saturn-3-ultra"
+      }
+    },
+    {
+      "id": "part-elegoo-lcd-saturn-4",
+      "brand": "Elegoo",
+      "name": "LCD Screen for Saturn 4 & Saturn 4 Ultra",
+      "category": "lcd-screen",
+      "printType": "resin",
+      "fits": ["resin-elegoo-saturn-4", "resin-elegoo-saturn-4-ultra", "resin-elegoo-saturn-4-ultra-12k"],
+      "lifespan": 2000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://us.elegoo.com/products/lcd-screen-for-saturn-3-saturn-3-ultra",
+        "note": "This product page states no lifespan; Elegoo states about 2,000 hours for its other monochrome LCDs."
+      },
+      "listPrice": {
+        "amount": 114.99,
+        "currency": "USD",
+        "url": "https://us.elegoo.com/products/lcd-screen-for-saturn-4-saturn-4-ultra",
+        "checked": "2026-11-20"
+      },
+      "source": {
+        "id": "elegoo-store",
+        "url": "https://us.elegoo.com/products/lcd-screen-for-saturn-4-saturn-4-ultra"
+      }
+    },
+    {
+      "id": "part-elegoo-lcd-saturn-4-ultra-16k",
+      "brand": "Elegoo",
+      "name": "LCD Screen for Saturn 4 Ultra 16K",
+      "category": "lcd-screen",
+      "printType": "resin",
+      "fits": ["resin-elegoo-saturn-4-ultra-16k"],
+      "lifespan": 2000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://us.elegoo.com/products/lcd-screen-for-saturn-3-saturn-3-ultra",
+        "note": "This product page states no lifespan; Elegoo states about 2,000 hours for its other monochrome LCDs."
+      },
+      "listPrice": {
+        "amount": 129.99,
+        "currency": "USD",
+        "url": "https://us.elegoo.com/products/lcd-screen-for-saturn-4-ultra-16k",
+        "checked": "2026-11-20"
+      },
+      "source": {
+        "id": "elegoo-store",
+        "url": "https://us.elegoo.com/products/lcd-screen-for-saturn-4-ultra-16k"
+      }
+    },
+    {
+      "id": "part-elegoo-lcd-mars-4",
+      "brand": "Elegoo",
+      "name": "LCD Screen for Mars 4",
+      "category": "lcd-screen",
+      "printType": "resin",
+      "fits": ["resin-elegoo-mars-4"],
+      "lifespan": 2000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://us.elegoo.com/products/lcd-screen-for-saturn-3-saturn-3-ultra",
+        "note": "The US product page states no lifespan; Elegoo states about 2,000 hours for its other monochrome LCDs."
+      },
+      "listPrice": {
+        "amount": 84.99,
+        "currency": "USD",
+        "url": "https://us.elegoo.com/products/lcd-screen-for-mars-4",
+        "checked": "2026-11-20"
+      },
+      "source": {
+        "id": "elegoo-store",
+        "url": "https://us.elegoo.com/products/lcd-screen-for-mars-4"
+      }
+    },
+    {
+      "id": "part-elegoo-lcd-mars-5",
+      "brand": "Elegoo",
+      "name": "LCD Screen for Mars 5",
+      "category": "lcd-screen",
+      "printType": "resin",
+      "fits": ["resin-elegoo-mars-5"],
+      "lifespan": 2000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://us.elegoo.com/products/lcd-screen-for-saturn-3-saturn-3-ultra",
+        "note": "This product page states no lifespan; Elegoo states about 2,000 hours for its other monochrome LCDs."
+      },
+      "listPrice": {
+        "amount": 39.99,
+        "currency": "USD",
+        "url": "https://us.elegoo.com/products/lcd-screen-for-mars-5",
+        "checked": "2026-11-20"
+      },
+      "source": {
+        "id": "elegoo-store",
+        "url": "https://us.elegoo.com/products/lcd-screen-for-mars-5"
+      }
+    },
+    {
+      "id": "part-elegoo-lcd-mars-5-ultra",
+      "brand": "Elegoo",
+      "name": "LCD Screen for Mars 5 Ultra",
+      "category": "lcd-screen",
+      "printType": "resin",
+      "fits": ["resin-elegoo-mars-5-ultra"],
+      "lifespan": 2000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://us.elegoo.com/products/lcd-screen-for-saturn-3-saturn-3-ultra",
+        "note": "This product page states no lifespan; Elegoo states about 2,000 hours for its other monochrome LCDs."
+      },
+      "listPrice": {
+        "amount": 84.99,
+        "currency": "USD",
+        "url": "https://us.elegoo.com/products/lcd-screen-for-mars-5-ultra",
+        "checked": "2026-11-20"
+      },
+      "source": {
+        "id": "elegoo-store",
+        "url": "https://us.elegoo.com/products/lcd-screen-for-mars-5-ultra"
+      }
+    },
+    {
+      "id": "part-anycubic-fep-film-photon-mono-4",
+      "brand": "Anycubic",
+      "name": "FEP Film for Photon Mono 4/4 Ultra/2",
+      "category": "release-film",
+      "printType": "resin",
+      "fits": ["resin-anycubic-photon-mono-4", "resin-anycubic-photon-mono-4-ultra", "resin-anycubic-photon-mono-2"],
+      "lifespan": 30,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "derived",
+        "statedLayers": 30000,
+        "url": "https://store.anycubic.com/blogs/3d-printing-guides/how-to-replace-fep-film",
+        "note": "Anycubic gives the FEP film a usage life of about 30,000 layers and says an undamaged film can stay in use after the printer flags it."
+      },
+      "listPrice": {
+        "amount": 24.99,
+        "currency": "USD",
+        "packSize": 5,
+        "url": "https://store.anycubic.com/products/fep-film",
+        "checked": "2026-11-20"
+      },
+      "source": {
+        "id": "anycubic-store",
+        "url": "https://store.anycubic.com/products/fep-film"
+      }
+    },
+    {
+      "id": "part-anycubic-fep-film-photon-m3-plus",
+      "brand": "Anycubic",
+      "name": "FEP Film for Photon M3 Plus",
+      "category": "release-film",
+      "printType": "resin",
+      "fits": ["resin-anycubic-photon-m3-plus"],
+      "lifespan": 30,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "derived",
+        "statedLayers": 30000,
+        "url": "https://store.anycubic.com/blogs/3d-printing-guides/how-to-replace-fep-film",
+        "note": "Anycubic gives the FEP film a usage life of about 30,000 layers."
+      },
+      "listPrice": {
+        "amount": 27,
+        "currency": "USD",
+        "packSize": 5,
+        "url": "https://store.anycubic.com/products/fep-film",
+        "checked": "2026-11-20"
+      },
+      "source": {
+        "id": "anycubic-store",
+        "url": "https://store.anycubic.com/products/fep-film"
+      }
+    },
+    {
+      "id": "part-anycubic-nfep-film-photon-mono-m7",
+      "brand": "Anycubic",
+      "name": "NFEP Film for Photon Mono M7/M5 series",
+      "category": "release-film",
+      "printType": "resin",
+      "fits": [
+        "resin-anycubic-photon-mono-m7",
+        "resin-anycubic-photon-mono-m5s-pro",
+        "resin-anycubic-photon-mono-m5s",
+        "resin-anycubic-photon-mono-m5"
+      ],
+      "lifespan": 30,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "statedLayers": 30000,
+        "url": "https://store.anycubic.com/blogs/3d-printing-guides/how-to-replace-fep-film",
+        "note": "Anycubic states no figure for NFEP; this applies its 30,000-layer FEP figure."
+      },
+      "listPrice": {
+        "amount": 29.99,
+        "currency": "USD",
+        "packSize": 5,
+        "url": "https://store.anycubic.com/products/nfep-film-for-photon-series",
+        "checked": "2026-11-20"
+      },
+      "source": {
+        "id": "anycubic-store",
+        "url": "https://store.anycubic.com/products/nfep-film-for-photon-series"
+      }
+    },
+    {
+      "id": "part-anycubic-nfep-film-photon-mono-m7-pro",
+      "brand": "Anycubic",
+      "name": "NFEP Film for Photon Mono M7 Pro",
+      "category": "release-film",
+      "printType": "resin",
+      "fits": ["resin-anycubic-photon-mono-m7-pro"],
+      "lifespan": 30,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "statedLayers": 30000,
+        "url": "https://store.anycubic.com/blogs/3d-printing-guides/how-to-replace-fep-film",
+        "note": "Anycubic states no figure for NFEP; this applies its 30,000-layer FEP figure."
+      },
+      "listPrice": {
+        "amount": 30,
+        "currency": "USD",
+        "packSize": 5,
+        "url": "https://store.anycubic.com/products/nfep-film-for-photon-series",
+        "checked": "2026-11-20"
+      },
+      "source": {
+        "id": "anycubic-store",
+        "url": "https://store.anycubic.com/products/nfep-film-for-photon-series"
+      }
+    },
+    {
+      "id": "part-phrozen-pfa-film-mighty",
+      "brand": "Phrozen",
+      "name": "PFA (nFEP) Film, Mighty Series 310 × 220 mm",
+      "category": "release-film",
+      "printType": "resin",
+      "fits": [
+        "resin-phrozen-sonic-mighty-8k",
+        "resin-phrozen-sonic-mighty-12k",
+        "resin-phrozen-sonic-mighty-revo",
+        "resin-phrozen-sonic-mighty-revo-16k"
+      ],
+      "lifespan": 30,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "statedLayers": 30000,
+        "url": "https://store.anycubic.com/blogs/3d-printing-guides/how-to-replace-fep-film",
+        "note": "Phrozen states no figure; this applies Anycubic's 30,000-layer FEP figure, the lower of the two manufacturer film figures found."
+      },
+      "listPrice": {
+        "amount": 16,
+        "currency": "USD",
+        "url": "https://us.phrozen3d.com/products/nfep-film-mighty",
+        "checked": "2026-11-20",
+        "note": "Fits follow Phrozen's shared Mighty 8K/12K/Revo 14K/Revo 16K resin vat."
+      },
+      "source": {
+        "id": "phrozen-store",
+        "url": "https://us.phrozen3d.com/products/nfep-film-mighty"
+      }
+    },
+    {
+      "id": "part-phrozen-pfa-film-mighty-revo-16k-max-heated",
+      "brand": "Phrozen",
+      "name": "PFA (nFEP) Film for Mighty Revo 16K MAX Heated Resin Vat",
+      "category": "release-film",
+      "printType": "resin",
+      "fits": ["resin-phrozen-sonic-mighty-revo-16k-max"],
+      "lifespan": 30,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "statedLayers": 30000,
+        "url": "https://store.anycubic.com/blogs/3d-printing-guides/how-to-replace-fep-film",
+        "note": "Phrozen states no figure; this applies Anycubic's 30,000-layer FEP figure."
+      },
+      "listPrice": {
+        "amount": 68,
+        "currency": "USD",
+        "packSize": 3,
+        "url": "https://us.phrozen3d.com/products/revomax-heated-tank-pfa-release-film",
+        "checked": "2026-11-20",
+        "note": "The quick-release vat takes a different film at the same price."
+      },
+      "source": {
+        "id": "phrozen-store",
+        "url": "https://us.phrozen3d.com/products/revomax-heated-tank-pfa-release-film"
+      }
+    },
+    {
+      "id": "part-phrozen-lcd-mighty-revo-16k-max",
+      "brand": "Phrozen",
+      "name": "LCD Screen for Mighty Revo 16K MAX",
+      "category": "lcd-screen",
+      "printType": "resin",
+      "fits": ["resin-phrozen-sonic-mighty-revo-16k-max"],
+      "lifespan": 2000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "stated",
+        "url": "https://us.phrozen3d.com/products/revomax-lcd-panel-assembly",
+        "note": "Phrozen states an expected lifespan of 2,000 hours."
+      },
+      "listPrice": {
+        "amount": 297,
+        "currency": "USD",
+        "url": "https://us.phrozen3d.com/products/revomax-lcd-panel-assembly",
+        "checked": "2026-11-20"
+      },
+      "source": {
+        "id": "phrozen-store",
+        "url": "https://us.phrozen3d.com/products/revomax-lcd-panel-assembly"
+      }
+    },
+    {
+      "id": "part-phrozen-lcd-mighty-revo",
+      "brand": "Phrozen",
+      "name": "LCD Replacement for Sonic Mighty Revo (10.1\" 14K)",
+      "category": "lcd-screen",
+      "printType": "resin",
+      "fits": ["resin-phrozen-sonic-mighty-revo"],
+      "lifespan": 2000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://us.phrozen3d.com/products/revomax-lcd-panel-assembly",
+        "note": "This product page states no lifespan; Phrozen states 2,000 hours for its Mighty Revo 16K MAX LCD."
+      },
+      "listPrice": {
+        "amount": 135,
+        "currency": "USD",
+        "url": "https://us.phrozen3d.com/products/lcd-sonic-mighty-revo",
+        "checked": "2026-11-20"
+      },
+      "source": {
+        "id": "phrozen-store",
+        "url": "https://us.phrozen3d.com/products/lcd-sonic-mighty-revo"
+      }
+    },
+    {
+      "id": "part-phrozen-lcd-mighty-8k",
+      "brand": "Phrozen",
+      "name": "LCD Replacement for Sonic Mighty 8K (10.1\" 8K)",
+      "category": "lcd-screen",
+      "printType": "resin",
+      "fits": ["resin-phrozen-sonic-mighty-8k"],
+      "lifespan": 2000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://us.phrozen3d.com/products/revomax-lcd-panel-assembly",
+        "note": "This product page states no lifespan; Phrozen states 2,000 hours for its Mighty Revo 16K MAX LCD."
+      },
+      "listPrice": {
+        "amount": 126,
+        "currency": "USD",
+        "url": "https://us.phrozen3d.com/products/lcd-sonic-mighty-8k",
+        "checked": "2026-11-20"
+      },
+      "source": {
+        "id": "phrozen-store",
+        "url": "https://us.phrozen3d.com/products/lcd-sonic-mighty-8k"
+      }
+    },
+    {
+      "id": "part-phrozen-lcd-mini-8k-s",
+      "brand": "Phrozen",
+      "name": "LCD Replacement for Sonic Mini 8K S (7.1\" 8K)",
+      "category": "lcd-screen",
+      "printType": "resin",
+      "fits": ["resin-phrozen-sonic-mini-8k-s"],
+      "lifespan": 2000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://us.phrozen3d.com/products/revomax-lcd-panel-assembly",
+        "note": "This product page states no lifespan; Phrozen states 2,000 hours for its Mighty Revo 16K MAX LCD."
+      },
+      "listPrice": {
+        "amount": 90,
+        "currency": "USD",
+        "url": "https://us.phrozen3d.com/products/lcd-sonic-mini-8k-s",
+        "checked": "2026-11-20"
+      },
+      "source": {
+        "id": "phrozen-store",
+        "url": "https://us.phrozen3d.com/products/lcd-sonic-mini-8k-s"
+      }
+    },
+    {
+      "id": "part-prusa-fep-film-sl1s",
+      "brand": "Prusa",
+      "name": "FEP film - SL1S",
+      "category": "release-film",
+      "printType": "resin",
+      "fits": ["resin-prusa-uvtools-prusa-sl1s-speed"],
+      "lifespan": 30,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "statedLayers": 30000,
+        "url": "https://store.anycubic.com/blogs/3d-printing-guides/how-to-replace-fep-film",
+        "note": "Prusa calls the film a consumable but states no figure; this applies Anycubic's 30,000-layer FEP figure."
+      },
+      "listPrice": {
+        "amount": 15.99,
+        "currency": "EUR",
+        "packSize": 3,
+        "url": "https://www.prusa3d.com/product/fep-film-3-pcs-sl1s/",
+        "checked": "2026-11-20",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "prusa-store",
+        "url": "https://www.prusa3d.com/product/fep-film-3-pcs-sl1s/"
+      }
+    },
+    {
+      "id": "part-prusa-fep-film-sl1",
+      "brand": "Prusa",
+      "name": "FEP film - SL1",
+      "category": "release-film",
+      "printType": "resin",
+      "fits": ["resin-prusa-uvtools-prusa-sl1"],
+      "lifespan": 30,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "statedLayers": 30000,
+        "url": "https://store.anycubic.com/blogs/3d-printing-guides/how-to-replace-fep-film",
+        "note": "Prusa calls the film a consumable but states no figure; this applies Anycubic's 30,000-layer FEP figure."
+      },
+      "listPrice": {
+        "amount": 27.9,
+        "currency": "EUR",
+        "packSize": 3,
+        "url": "https://www.prusa3d.com/product/fep-film-3-pcs-sl1/",
+        "checked": "2026-11-20",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "prusa-store",
+        "url": "https://www.prusa3d.com/product/fep-film-3-pcs-sl1/"
+      }
+    },
+    {
+      "id": "part-prusa-nozzle-brass-0-4",
+      "brand": "Prusa",
+      "name": "Prusa Nozzle brass - 0.4 mm",
+      "category": "nozzle",
+      "printType": "filament",
+      "fits": [
+        "filament-prusa-mk4",
+        "filament-prusa-mk4-mmu3",
+        "filament-prusa-mk4s",
+        "filament-prusa-core-one",
+        "filament-prusa-core-one-mmu3",
+        "filament-prusa-core-one-l",
+        "filament-prusa-xl",
+        "filament-prusa-xl-5t"
+      ],
+      "lifespan": 500,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Prusa states no lifespan. 500 print hours is a common rule of thumb for brass nozzles with unfilled filament; abrasive filaments wear brass far sooner."
+      },
+      "listPrice": {
+        "amount": 21.99,
+        "currency": "EUR",
+        "url": "https://www.prusa3d.com/product/prusa-nozzle-brass-0-4-mm/",
+        "checked": "2026-11-20",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "prusa-store",
+        "url": "https://www.prusa3d.com/product/prusa-nozzle-brass-0-4-mm/"
+      }
+    },
+    {
+      "id": "part-prusa-smooth-pei-sheet",
+      "brand": "Prusa",
+      "name": "Smooth PEI Print Sheet",
+      "category": "build-sheet",
+      "printType": "filament",
+      "fits": [
+        "filament-prusa-mk3s",
+        "filament-prusa-mk3-5",
+        "filament-prusa-mk4",
+        "filament-prusa-mk4-mmu3",
+        "filament-prusa-mk4-mmu3-hf",
+        "filament-prusa-mk4s",
+        "filament-prusa-mk4s-hf",
+        "filament-prusa-core-one",
+        "filament-prusa-core-one-hf",
+        "filament-prusa-core-one-mmu3"
+      ],
+      "lifespan": 500,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://www.prusa3d.com/product/smooth-pei-steel-sheet/",
+        "note": "Prusa states only that the coating is designed to diminish over time. 500 plates is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 29.74,
+        "currency": "EUR",
+        "url": "https://www.prusa3d.com/product/smooth-pei-steel-sheet/",
+        "checked": "2026-11-20",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "prusa-store",
+        "url": "https://www.prusa3d.com/product/smooth-pei-steel-sheet/"
+      }
+    },
+    {
+      "id": "part-prusa-satin-sheet",
+      "brand": "Prusa",
+      "name": "Satin Powder-coated Print Sheet",
+      "category": "build-sheet",
+      "printType": "filament",
+      "fits": [
+        "filament-prusa-mk3s",
+        "filament-prusa-mk3-5",
+        "filament-prusa-mk4",
+        "filament-prusa-mk4-mmu3",
+        "filament-prusa-mk4-mmu3-hf",
+        "filament-prusa-mk4s",
+        "filament-prusa-mk4s-hf",
+        "filament-prusa-core-one",
+        "filament-prusa-core-one-hf",
+        "filament-prusa-core-one-mmu3"
+      ],
+      "lifespan": 500,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://www.prusa3d.com/product/satin-powder-coated-steel-sheet/",
+        "note": "Prusa states only that the coating is designed to diminish over time. 500 plates is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 42.42,
+        "currency": "EUR",
+        "url": "https://www.prusa3d.com/product/satin-powder-coated-steel-sheet/",
+        "checked": "2026-11-20",
+        "note": "Including VAT. Discounted from €49.90."
+      },
+      "source": {
+        "id": "prusa-store",
+        "url": "https://www.prusa3d.com/product/satin-powder-coated-steel-sheet/"
+      }
+    },
+    {
+      "id": "part-bambu-lab-hotend-x1c-0-4-hardened",
+      "brand": "Bambu Lab",
+      "name": "Bambu Hotend - X1C, 0.4 mm Hardened Steel",
+      "category": "nozzle",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-x1", "filament-bambu-lab-x1-carbon"],
+      "lifespan": 500,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://wiki.bambulab.com/en/x1/maintenance/replace-hotend",
+        "note": "Bambu Lab treats the hotend as condition-based maintenance and states no lifespan. 500 print hours is the common brass-nozzle rule of thumb, conservative for hardened steel."
+      },
+      "listPrice": {
+        "amount": 15.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/bambu-hotend-x1c",
+        "checked": "2026-11-20",
+        "note": "Hotend with nozzle, not the complete hotend assembly (€35.99)."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/bambu-hotend-x1c"
+      }
+    },
+    {
+      "id": "part-bambu-lab-hotend-p1-0-4-hardened",
+      "brand": "Bambu Lab",
+      "name": "Bambu Hotend - P1 Series, 0.4 mm Hardened Steel",
+      "category": "nozzle",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-p1p", "filament-bambu-lab-p1s"],
+      "lifespan": 500,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://wiki.bambulab.com/en/p1/maintenance/p1p-maintenance",
+        "note": "Bambu Lab treats nozzle care as condition-based maintenance and states no lifespan. 500 print hours is the common brass-nozzle rule of thumb, conservative for hardened steel."
+      },
+      "listPrice": {
+        "amount": 15.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/bambu-hotend-p1-series",
+        "checked": "2026-11-20",
+        "note": "Hotend with nozzle, not the complete hotend assembly (€35.99)."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/bambu-hotend-p1-series"
+      }
+    },
+    {
+      "id": "part-bambu-lab-hotend-a1-0-4-stainless",
+      "brand": "Bambu Lab",
+      "name": "Bambu Hotend - A1, 0.4 mm Stainless Steel",
+      "category": "nozzle",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-a1"],
+      "lifespan": 500,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://wiki.bambulab.com/en/a1/maintenance/replace-hotend",
+        "note": "Bambu Lab states no lifespan. 500 print hours is the common nozzle rule of thumb with unfilled filament; abrasive filaments wear stainless steel sooner."
+      },
+      "listPrice": {
+        "amount": 9.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/bambu-hotend-a1-a2",
+        "checked": "2026-11-20"
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/bambu-hotend-a1-a2"
+      }
+    },
+    {
+      "id": "part-bambu-lab-hotend-a1-mini-0-4-stainless",
+      "brand": "Bambu Lab",
+      "name": "Bambu Hotend - A1 mini, 0.4 mm Stainless Steel",
+      "category": "nozzle",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-a1-mini"],
+      "lifespan": 500,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://wiki.bambulab.com/en/a1/maintenance/replace-hotend",
+        "note": "Bambu Lab states no lifespan. 500 print hours is the common nozzle rule of thumb with unfilled filament; abrasive filaments wear stainless steel sooner."
+      },
+      "listPrice": {
+        "amount": 9.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/bambu-hotend-a1-a2",
+        "checked": "2026-11-20"
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/bambu-hotend-a1-a2"
+      }
+    },
+    {
+      "id": "part-bambu-lab-textured-pei-plate",
+      "brand": "Bambu Lab",
+      "name": "Bambu Textured PEI Plate, 256 mm",
+      "category": "build-sheet",
+      "printType": "filament",
+      "fits": [
+        "filament-bambu-lab-x1",
+        "filament-bambu-lab-x1-carbon",
+        "filament-bambu-lab-x1e",
+        "filament-bambu-lab-p1p",
+        "filament-bambu-lab-p1s",
+        "filament-bambu-lab-a1"
+      ],
+      "lifespan": 500,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://eu.store.bambulab.com/products/bambu-textured-pei-plate",
+        "note": "Bambu Lab calls the plate a consumable that degrades over time but states no figure. 500 plates is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 35.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/bambu-textured-pei-plate",
+        "checked": "2026-11-20",
+        "note": "X1 Series, P1 Series, and A1 variants share this price."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/bambu-textured-pei-plate"
+      }
+    },
+    {
+      "id": "part-bambu-lab-textured-pei-plate-a1-mini",
+      "brand": "Bambu Lab",
+      "name": "Bambu Textured PEI Plate, A1 mini",
+      "category": "build-sheet",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-a1-mini"],
+      "lifespan": 500,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://eu.store.bambulab.com/products/bambu-textured-pei-plate",
+        "note": "Bambu Lab calls the plate a consumable that degrades over time but states no figure. 500 plates is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 19.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/bambu-textured-pei-plate",
+        "checked": "2026-11-20"
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/bambu-textured-pei-plate"
+      }
+    },
+    {
+      "id": "part-creality-smooth-pei-plate-235",
+      "brand": "Creality",
+      "name": "Smooth PEI Build Plate 235 × 235 mm",
+      "category": "build-sheet",
+      "printType": "filament",
+      "fits": [
+        "filament-creality-ender-3-s1",
+        "filament-creality-ender-3-s1-pro",
+        "filament-creality-ender-5-s1",
+        "filament-creality-k1",
+        "filament-creality-ender-3-v3-se",
+        "filament-creality-ender-3-v3-ke",
+        "filament-creality-cr-10-se",
+        "filament-creality-ender-3-v3"
+      ],
+      "lifespan": 500,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Creality states no lifespan. 500 plates is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 17.99,
+        "currency": "USD",
+        "url": "https://store.creality.com/products/smooth-pei-build-plate-235-235mm",
+        "checked": "2026-11-20",
+        "note": "Sale price; the store's compare-at price was $45.99."
+      },
+      "source": {
+        "id": "creality-store",
+        "url": "https://store.creality.com/products/smooth-pei-build-plate-235-235mm"
+      }
+    }
+  ]
+}

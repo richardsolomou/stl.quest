@@ -96,7 +96,7 @@ test('manages profile details through the protected account surface', async ({ p
   await page.getByRole('combobox', { name: 'Theme' }).click()
   await page.getByRole('option', { name: 'Light' }).click()
   await expect(html).toHaveAttribute('data-theme', 'light')
-  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(243, 241, 234)')
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(220, 223, 221)')
   if (captureScreenshots) await page.screenshot({ path: path.join(screenshots, 'account-light-theme.png'), fullPage: true })
   await page.reload()
   await expect(html).toHaveAttribute('data-theme', 'light')

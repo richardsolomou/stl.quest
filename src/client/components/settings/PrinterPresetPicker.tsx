@@ -1,67 +1,96 @@
-import { useVirtualizer } from '@tanstack/react-virtual'
-import { Check, ChevronDown, ChevronRight, Plus, Search, Settings2 } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { Plus, Replace, Search } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { filterPrinterPresets, PRINTER_PRESETS, type PrinterPreset } from '../../../core/printerPresets'
+import { cn } from '@/lib/utils'
+import type { PrintType } from '../../../core/types'
 import { DialogShell } from '../DialogShell'
 import { PrinterPresetImage } from './PrinterPresetImage'
 import { useI18n } from '../../i18n'
+import { CardAffordance, CardMark, catalogueCard, CustomCard } from './CatalogueCards'
+import { CatalogueScopeLine, useCatalogueScope } from './CatalogueScope'
+import { VirtualCatalogue } from './VirtualCatalogue'
 
+/**
+ * Adds a printer from the catalogue, or in `change` mode chooses the catalogue model of an existing one. A `printType`
+ * keeps the catalogue to that kind of printer, for the add in a print type's own section; otherwise it opens on what
+ * the workspace prints.
+ */
 export function PrinterPresetPicker({
   disabled,
   variant = 'outline',
+  size,
+  label,
+  printType,
+  mode = 'add',
   added,
+  current,
   onSelect,
   onCustom,
 }: {
   disabled?: boolean
-  variant?: 'default' | 'outline'
+  variant?: 'default' | 'outline' | 'link'
+  size?: 'sm'
+  label?: string
+  printType?: PrintType
+  mode?: 'add' | 'change'
   added?: ReadonlySet<string>
+  /** The model the printer being changed has now; without one it is already custom, so that choice is not offered. */
+  current?: string
   onSelect: (preset: PrinterPreset) => void
   onCustom: () => void
 }) {
   const [open, setOpen] = useState(false)
   const { t } = useI18n()
   const copy = t.settings.printerPicker
+  const changing = mode === 'change'
+  const marked = (preset: PrinterPreset) =>
+    changing ? (preset.id === current ? copy.current : undefined) : added?.has(preset.id) ? copy.added : undefined
   const [search, setSearch] = useState('')
-  const [expandedBrand, setExpandedBrand] = useState<string | null>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const { presets: results, closest } = useMemo(() => filterPrinterPresets(search), [search])
-  const resultRows = useMemo(() => pairPresets(results), [results])
-  const groups = useMemo(() => groupPresets(PRINTER_PRESETS), [])
-  const searching = !!search.trim()
-  const virtualizer = useVirtualizer({
-    count: searching ? resultRows.length : 0,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => 88,
-    overscan: 8,
-  })
-  const choose = (action: () => void) => {
-    action()
+  const query = search.trim()
+  const scope = useCatalogueScope(printType)
+  const { lists } = scope
+  const catalogue = useMemo(() => PRINTER_PRESETS.filter((preset) => lists(preset.printType)), [lists])
+  const { presets: results, closest } = useMemo(() => filterPrinterPresets(query, catalogue), [query, catalogue])
+  const groups = useMemo(() => groupPresets(results), [results])
+  const close = () => {
     setOpen(false)
     setSearch('')
-    setExpandedBrand(null)
+    scope.setShowAll(false)
+  }
+  const choose = (action: () => void) => {
+    action()
+    close()
   }
 
   return (
     <>
-      <Button type="button" variant={variant} className="justify-self-start" onClick={() => setOpen(true)} disabled={disabled}>
-        <Plus /> {copy.add}
-      </Button>
+      {changing ? (
+        <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)} disabled={disabled}>
+          <Replace /> {current ? t.settings.printers.dialog.changeModel : t.settings.printers.dialog.chooseModel}
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          variant={variant}
+          size={size}
+          className="justify-self-start"
+          onClick={() => setOpen(true)}
+          disabled={disabled}
+        >
+          {variant !== 'link' && <Plus />} <span className={cn(size === 'sm' && 'max-sm:sr-only')}>{label ?? copy.add}</span>
+        </Button>
+      )}
       {open && (
         <DialogShell
-          title={copy.title}
-          description={copy.description}
-          className="sm:max-h-[min(44rem,calc(100dvh-2.5rem))] sm:max-w-2xl"
+          title={changing ? copy.changeTitle : (label ?? copy.title)}
+          description={changing ? copy.changeDescription : copy.description}
+          className="sm:h-[min(44rem,calc(100dvh-2.5rem))] sm:max-w-2xl"
           // The result list owns the scrolling here, so the shell must not scroll as well.
           contentClassName="flex min-h-0 flex-col gap-3 overflow-y-hidden"
-          onClose={() => {
-            setOpen(false)
-            setSearch('')
-            setExpandedBrand(null)
-          }}
+          onClose={close}
         >
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -73,92 +102,38 @@ export function PrinterPresetPicker({
               onChange={(event) => setSearch(event.target.value)}
             />
           </div>
-          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto pr-1">
-            {searching ? (
-              results.length ? (
-                <>
-                  {closest && <p className="pb-2 text-sm text-muted-foreground">{copy.closestMatches(search.trim())}</p>}
-                  <div className="relative" style={{ height: virtualizer.getTotalSize() }}>
-                    {virtualizer.getVirtualItems().map((row) => {
-                      const presets = resultRows[row.index]
-                      return (
-                        <div
-                          key={presets.map((preset) => preset.id).join(':')}
-                          ref={virtualizer.measureElement}
-                          data-index={row.index}
-                          className="absolute top-0 left-0 w-full py-1"
-                          style={{ transform: `translateY(${row.start}px)` }}
-                        >
-                          <div className="grid min-h-20 grid-cols-1 gap-2 sm:grid-cols-2">
-                            {presets.map((preset) => (
-                              <PresetButton
-                                key={preset.id}
-                                preset={preset}
-                                added={added?.has(preset.id)}
-                                onClick={() => choose(() => onSelect(preset))}
-                                showBrand
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </>
-              ) : (
-                <p className="py-10 text-center text-sm text-muted-foreground">{copy.noMatch(search.trim())}</p>
-              )
-            ) : (
-              <div className="grid gap-3 pb-1">
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-muted/60 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-                  onClick={() => choose(onCustom)}
-                >
-                  <span className="flex size-14 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                    <Settings2 className="size-6" />
-                  </span>
-                  <span>
-                    <span className="block font-medium">{copy.custom}</span>
-                    <span className="block text-sm text-muted-foreground">{copy.customDescription}</span>
-                  </span>
-                </button>
-                <div className="grid gap-2">
-                  {groups.map(([brand, presets]) => {
-                    const expanded = expandedBrand === brand
-                    return (
-                      <section key={brand} className="overflow-hidden rounded-lg border">
-                        <button
-                          type="button"
-                          className="flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-                          aria-expanded={expanded}
-                          onClick={() => setExpandedBrand(expanded ? null : brand)}
-                        >
-                          {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-                          <span className="font-medium">{brand}</span>
-                          <Badge variant="secondary" className="ml-auto">
-                            {presets.length}
-                          </Badge>
-                        </button>
-                        {expanded && (
-                          <div className="grid gap-2 border-t bg-muted/15 p-2 sm:grid-cols-2">
-                            {presets.map((preset) => (
-                              <PresetButton
-                                key={preset.id}
-                                preset={preset}
-                                added={added?.has(preset.id)}
-                                onClick={() => choose(() => onSelect(preset))}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </section>
-                    )
-                  })}
-                </div>
-              </div>
+          <CatalogueScopeLine scope={scope} />
+          <VirtualCatalogue
+            query={query}
+            groups={groups}
+            getKey={(preset) => preset.id}
+            renderItem={(preset) => (
+              <PresetButton
+                key={preset.id}
+                preset={preset}
+                mark={marked(preset)}
+                changing={changing}
+                onClick={() => choose(() => onSelect(preset))}
+              />
             )}
-          </div>
+            before={
+              query ? (
+                groups.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-muted-foreground">{copy.noMatch(query)}</p>
+                ) : (
+                  closest && <p className="text-sm text-muted-foreground">{copy.closestMatches(query)}</p>
+                )
+              ) : (
+                (!changing || current) && (
+                  <CustomCard
+                    title={changing ? copy.customChange : copy.custom}
+                    description={changing ? copy.customChangeDescription : copy.customDescription}
+                    onClick={() => choose(onCustom)}
+                  />
+                )
+              )
+            }
+          />
         </DialogShell>
       )}
     </>
@@ -167,49 +142,46 @@ export function PrinterPresetPicker({
 
 function PresetButton({
   preset,
-  added = false,
+  mark,
+  changing,
   onClick,
-  showBrand = false,
 }: {
   preset: PrinterPreset
-  added?: boolean
+  mark?: string
+  changing: boolean
   onClick: () => void
-  showBrand?: boolean
 }) {
   const { t } = useI18n()
   const copy = t.settings.printerPicker
   return (
     <button
       type="button"
-      className="flex h-full w-full min-w-0 items-center gap-3 rounded-lg border bg-background p-2.5 text-left transition-colors hover:bg-muted/60 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-      aria-label={copy.addPreset(`${preset.brand} ${preset.model}`)}
+      className={cn(catalogueCard, 'h-full')}
+      aria-label={(changing ? copy.choosePreset : copy.addPreset)(`${preset.brand} ${preset.model}`)}
       onClick={onClick}
     >
       <PrinterPresetImage printer={preset} />
-      <span className="min-w-0">
+      <span className="min-w-0 flex-1">
         <span className="flex min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap">
-          <span className="min-w-0 font-medium sm:truncate">{showBrand ? `${preset.brand} ${preset.model}` : preset.model}</span>
+          <span className="min-w-0 font-medium sm:truncate">{preset.model}</span>
           <Badge variant="outline" className="shrink-0 text-[0.65rem]">
             {t.settings.printers.printTypes[preset.printType]}
           </Badge>
-          {added && (
-            <Badge variant="secondary" className="shrink-0 text-[0.65rem]">
-              <Check /> {copy.added}
-            </Badge>
-          )}
+          {mark && <CardMark>{mark}</CardMark>}
         </span>
-        <span className="mt-1 block text-xs text-muted-foreground">{copy.presetHint}</span>
+        <span className="mt-1 block text-xs text-muted-foreground">{changing ? copy.chooseHint : copy.presetHint}</span>
       </span>
+      <CardAffordance changing={changing} />
     </button>
   )
 }
 
 function groupPresets(presets: readonly PrinterPreset[]) {
   const groups = new Map<string, PrinterPreset[]>()
-  for (const preset of presets) groups.set(preset.brand, [...(groups.get(preset.brand) ?? []), preset])
-  return [...groups.entries()]
-}
-
-function pairPresets(presets: readonly PrinterPreset[]) {
-  return Array.from({ length: Math.ceil(presets.length / 2) }, (_, index) => presets.slice(index * 2, index * 2 + 2))
+  for (const preset of presets) {
+    const group = groups.get(preset.brand)
+    if (group) group.push(preset)
+    else groups.set(preset.brand, [preset])
+  }
+  return [...groups].map(([title, items]) => ({ title, items }))
 }

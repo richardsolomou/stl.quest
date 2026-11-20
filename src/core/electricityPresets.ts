@@ -1,9 +1,11 @@
-import catalog from '../../catalogs/electricity/catalog.generated.json'
+export type ElectricityPricePreset = {
+  countryCode: string
+  countryName: string
+  eurPerKwh: number
+  period: string
+  source: { id: string; url: string }
+}
 
-export type ElectricityPricePreset = (typeof catalog.presets)[number]
-
-export const ELECTRICITY_PRICE_PRESETS = catalog.presets
-
-export function getElectricityPricePreset(countryCode?: string) {
-  return countryCode ? ELECTRICITY_PRICE_PRESETS.find((preset) => preset.countryCode === countryCode) : undefined
+export function getElectricityPricePreset(presets: readonly ElectricityPricePreset[] | undefined, countryCode?: string) {
+  return countryCode ? presets?.find((preset) => preset.countryCode === countryCode) : undefined
 }

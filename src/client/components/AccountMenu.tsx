@@ -79,7 +79,7 @@ export function AccountMenu({ side = 'top', align = 'start' }: { side?: 'top' | 
             </div>
           </div>
           <Separator />
-          <div className="px-2 pt-1 font-heading text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
+          <div className="px-2 pt-1 font-heading text-[11px] font-semibold tracking-[0.015em] text-muted-foreground uppercase">
             {copy.workspaces}
           </div>
           <div className="flex flex-col gap-0.5">
@@ -90,7 +90,7 @@ export function AccountMenu({ side = 'top', align = 'start' }: { side?: 'top' | 
                   key={workspace.id}
                   type="button"
                   variant="ghost"
-                  className={cn('w-full justify-start', active && 'bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary')}
+                  className={cn('w-full justify-start', active && 'bg-foreground/10 font-semibold text-foreground hover:bg-foreground/10')}
                   disabled={switchMutation.isPending}
                   aria-current={active ? 'true' : undefined}
                   onClick={() => !active && switchMutation.mutate(workspace.id)}

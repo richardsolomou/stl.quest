@@ -48,14 +48,6 @@ export function PlanPane() {
     }
   }
 
-  if (!data.available) {
-    return (
-      <SettingsPage>
-        <PageHeader title={copy.title} description={copy.unavailable} />
-      </SettingsPage>
-    )
-  }
-
   return (
     <SettingsPage>
       <PageHeader title={copy.title} description={copy.description} />
@@ -76,10 +68,13 @@ export function PlanPane() {
             const current = candidate === plan
             const upgrade = details.monthlyPrice > storagePlans[plan].monthlyPrice
             return (
-              <div key={candidate} className={cn('flex flex-col gap-4 rounded-lg border p-4', current && 'border-primary/50 bg-primary/5')}>
+              <div
+                key={candidate}
+                className={cn('flex flex-col gap-4 rounded-lg border p-4', current && 'border-foreground/40 bg-muted/50')}
+              >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-heading text-xs font-semibold tracking-[0.08em] uppercase">{name}</span>
-                  {current && <span className="text-xs font-medium text-primary">{copy.change.current}</span>}
+                  <span className="font-heading text-xs font-semibold tracking-[0.015em] uppercase">{name}</span>
+                  {current && <span className="text-xs font-medium text-foreground">{copy.change.current}</span>}
                 </div>
                 <div>
                   <p className="font-heading text-2xl leading-none">{formatBytes(details.quotaBytes, locale)}</p>
@@ -113,7 +108,7 @@ export function PlanPane() {
  * the workspaces drawing on it with a matching key underneath. Three colours is enough: an account
  * can own at most three workspaces.
  */
-const segmentColours = ['bg-primary', 'bg-blueprint', 'bg-secondary-foreground']
+const segmentColours = ['bg-foreground', 'bg-muted-foreground', 'bg-rail']
 
 function AllowanceBreakdown({
   quotaBytes,

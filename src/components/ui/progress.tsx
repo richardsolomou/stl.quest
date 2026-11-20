@@ -2,12 +2,13 @@ import { Progress as ProgressPrimitive } from '@base-ui/react/progress'
 
 import { cn } from '@/lib/utils'
 
-function Progress({ className, children, value, ...props }: ProgressPrimitive.Root.Props) {
+/** Ink while running; `completeTone="success"` turns a finished bar green where finishing is the good outcome (not a usage meter). */
+function Progress({ className, children, value, completeTone, ...props }: ProgressPrimitive.Root.Props & { completeTone?: 'success' }) {
   return (
     <ProgressPrimitive.Root value={value} data-slot="progress" className={cn('flex flex-wrap gap-3', className)} {...props}>
       {children}
       <ProgressTrack>
-        <ProgressIndicator />
+        <ProgressIndicator className={completeTone === 'success' ? 'data-complete:bg-success' : undefined} />
       </ProgressTrack>
     </ProgressPrimitive.Root>
   )
@@ -25,7 +26,11 @@ function ProgressTrack({ className, ...props }: ProgressPrimitive.Track.Props) {
 
 function ProgressIndicator({ className, ...props }: ProgressPrimitive.Indicator.Props) {
   return (
-    <ProgressPrimitive.Indicator data-slot="progress-indicator" className={cn('h-full bg-primary transition-all', className)} {...props} />
+    <ProgressPrimitive.Indicator
+      data-slot="progress-indicator"
+      className={cn('h-full bg-foreground transition-all', className)}
+      {...props}
+    />
   )
 }
 

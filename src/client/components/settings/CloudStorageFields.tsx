@@ -77,7 +77,7 @@ export function CloudStorageFields({
             <p className="flex flex-wrap items-center gap-2 font-medium text-foreground">
               {connection.connected ? label : t.cloud.connectProvider(label)}
               {connection.connected && (
-                <Badge>
+                <Badge variant="success">
                   <CheckCircle2 /> {t.cloud.connected}
                 </Badge>
               )}

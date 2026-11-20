@@ -14,6 +14,15 @@ just dev
 
 Open `http://localhost:3000`. The first account created becomes the super admin.
 
+To see the app as a print farm uses it, run `just seed-power` with the dev server stopped or running. It adds the Northside Print Works workspace, built only from the catalogues so every printer, part, and material is a real product:
+
+- 27 printers: Form 4, Saturn 4 Ultra 16K, Mars 5 Ultra, Mighty Revo, Photon Mono M7 Pro, and a Reflex RS Turbo with its pulsing release module for resin; X1 Carbon, P1S, H2D, CORE One, XL, K1C, Voron 2.4, and QIDI Plus4 for filament, named by bay (`X1C · A`).
+- Equipment: Form Wash and Form Cure, two Mercury Plus stations, an ultrasonic cleaner, a filament dryer, and an archived wash and cure station, with the IPA and gloves each uses.
+- Consumables: resins, filaments in catalogue colours, IPA, gloves, desiccant, and wear parts in their printer model groups, each with a pack size, minimum stock, and stock that is healthy for most, low for some, and used up for two. One fleet part is left out so the missing-parts list has something to suggest.
+- Business rates in euros with the Netherlands electricity preset, eight requesters, about 300 prints across every stage, and six weeks of recorded printing and finishing with failed runs, waste, restocks, and replaced parts.
+
+Sign in as `power@stl.quest` with `PREVIEW_PASSWORD` from `scripts/seedPreview.ts`. Running `just seed-power` again leaves an existing workspace alone; `just seed-power-reset` deletes that workspace with its prints, files, settings, and usage, then seeds it again. Other workspaces and the accounts are never touched. Purchase and list prices, with the store page and date each was read, live in `scripts/seedPowerUserPrices.json`; update that file rather than the script when prices change.
+
 To start again with an empty installation, delete `data-dev/` and `prints-dev/`. To test with real data, point `DATA_DIR` at a disposable copy of a production snapshot. The ignored `/local/` directory is the usual place for it. Startup may migrate the database, so never use the original snapshot.
 
 `just dev` runs the pinned realtime service with its memory engine and development-only signing key alongside Vite, and stops both together. Vite proxies the realtime WebSocket to it. Production bundles the same service version in the STL Quest image. Use `just realtime` only when debugging the realtime service separately.

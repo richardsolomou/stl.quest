@@ -29,7 +29,7 @@ export function UploadRow({
   const { t } = useI18n()
   return (
     <Item variant="muted" className={cn('items-start max-sm:flex-col', entry.state === 'error' && 'ring-1 ring-destructive')}>
-      <ItemMedia className="grid size-12 place-items-center overflow-hidden rounded-md border bg-background [background-image:var(--grid)] [background-size:12px_12px] max-sm:size-16">
+      <ItemMedia className="grid size-12 place-items-center overflow-hidden rounded-md border bg-thumb max-sm:size-16">
         {entry.thumbnail ? (
           <img className="size-full object-contain" src={entry.thumbnail} alt="" />
         ) : (

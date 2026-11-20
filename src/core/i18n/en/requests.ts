@@ -10,6 +10,7 @@ export const requests = {
     downloadAllCopies: 'Download all copies',
     downloadCopies: (count: number) => `Download ${count} copies`,
     printAgain: 'Print again…',
+    estimate: 'Estimate price',
     move: 'Move',
     archive: 'Archive',
   },
@@ -72,6 +73,8 @@ export const requests = {
   details: {
     anyCompatiblePrinter: 'Any compatible printer',
     decideLater: 'Decide later',
+    submittedAgo: (age: string) => `Submitted ${age} ago`,
+    copyCount: (count: number) => `${count} ${count === 1 ? 'copy' : 'copies'}`,
     openSourceLink: 'Open source link',
     linkOnly: 'Link only — no model file is stored.',
   },
@@ -95,10 +98,10 @@ export const requests = {
   cost: {
     label: 'Estimated cost',
     suggested: (price: string, quantity: number) => (quantity > 1 ? `${price} suggested for all ${quantity} copies` : `${price} suggested`),
-    hint: 'From your saved calculator setup, assuming one plate per copy and no hands-on time.',
+    hint: 'From your pricing rates and the assigned printer, with typical material and finishing, one plate per copy, and no hands-on time.',
     openCalculator: 'Open in calculator',
     onPrinter: (printer: string) => `on ${printer}`,
-    onEachPrinter: 'On each printer',
+    compare: (count: number, range: string) => `${range} across ${count} printers`,
   },
   repeat: {
     title: 'Print again',
@@ -221,9 +224,15 @@ export const requests = {
     filtersLabel: 'Archive filters',
     filtersDescription: 'Combine any fields to narrow the archive.',
     noMatchesTitle: 'No matches',
-    emptyTitle: 'The archive is empty',
+    emptyTitle: 'Nothing archived yet',
     noMatches: 'No archived prints match these filters.',
-    empty: 'Nothing is archived yet. Right-click a print on the board and choose Archive.',
+    empty:
+      'Collected prints you archive wait here, off the board, until you need them again. Right-click a print on the board and choose Archive.',
+    autoArchive: {
+      before: 'Or let ',
+      link: 'auto-archive in General settings',
+      after: ' clear prints a set number of days after they reach Ready.',
+    },
     loading: 'Loading archive…',
     loadFailed: 'Could not load the archive',
     restoring: 'Moving back to the board…',

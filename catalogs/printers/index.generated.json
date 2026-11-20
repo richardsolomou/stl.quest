@@ -1,0 +1,6107 @@
+{
+  "presets": [
+    {
+      "id": "filament-afinia-h-1-hs",
+      "brand": "Afinia",
+      "model": "H+1(HS)",
+      "printType": "filament",
+      "widthMm": 207,
+      "depthMm": 255,
+      "heightMm": 230,
+      "image": "/printer-presets/orcaslicer/filament-afinia-h-1-hs.webp"
+    },
+    {
+      "id": "resin-anet-n4",
+      "brand": "Anet",
+      "model": "N4",
+      "printType": "resin",
+      "widthMm": 68.04,
+      "depthMm": 120.96,
+      "heightMm": 135
+    },
+    {
+      "id": "resin-anet-n7",
+      "brand": "Anet",
+      "model": "N7",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 300
+    },
+    {
+      "id": "filament-anker-m5",
+      "brand": "Anker",
+      "model": "M5",
+      "printType": "filament",
+      "widthMm": 235,
+      "depthMm": 235,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-anker-m5.webp"
+    },
+    {
+      "id": "filament-anker-m5-all-metal-hot-end",
+      "brand": "Anker",
+      "model": "M5 All-Metal Hot End",
+      "printType": "filament",
+      "widthMm": 235,
+      "depthMm": 235,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-anker-m5-all-metal-hot-end.webp"
+    },
+    {
+      "id": "filament-anker-m5c",
+      "brand": "Anker",
+      "model": "M5C",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-anker-m5c.webp"
+    },
+    {
+      "id": "filament-anycubic-4max-pro",
+      "brand": "Anycubic",
+      "model": "4Max Pro",
+      "printType": "filament",
+      "widthMm": 270,
+      "depthMm": 205,
+      "heightMm": 200,
+      "image": "/printer-presets/orcaslicer/filament-anycubic-4max-pro.webp"
+    },
+    {
+      "id": "filament-anycubic-4max-pro-2",
+      "brand": "Anycubic",
+      "model": "4Max Pro 2",
+      "printType": "filament",
+      "widthMm": 270,
+      "depthMm": 210,
+      "heightMm": 190,
+      "image": "/printer-presets/orcaslicer/filament-anycubic-4max-pro-2.webp"
+    },
+    {
+      "id": "filament-anycubic-chiron",
+      "brand": "Anycubic",
+      "model": "Chiron",
+      "printType": "filament",
+      "widthMm": 400,
+      "depthMm": 400,
+      "heightMm": 450,
+      "image": "/printer-presets/orcaslicer/filament-anycubic-chiron.webp"
+    },
+    {
+      "id": "filament-anycubic-i3-mega-s",
+      "brand": "Anycubic",
+      "model": "i3 Mega S",
+      "printType": "filament",
+      "widthMm": 210,
+      "depthMm": 210,
+      "heightMm": 205,
+      "image": "/printer-presets/orcaslicer/filament-anycubic-i3-mega-s.webp"
+    },
+    {
+      "id": "filament-anycubic-kobra",
+      "brand": "Anycubic",
+      "model": "Kobra",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-anycubic-kobra.webp"
+    },
+    {
+      "id": "filament-anycubic-kobra-2",
+      "brand": "Anycubic",
+      "model": "Kobra 2",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-anycubic-kobra-2.webp"
+    },
+    {
+      "id": "filament-anycubic-kobra-2-max",
+      "brand": "Anycubic",
+      "model": "Kobra 2 Max",
+      "printType": "filament",
+      "widthMm": 420,
+      "depthMm": 420,
+      "heightMm": 500,
+      "image": "/printer-presets/orcaslicer/filament-anycubic-kobra-2-max.webp"
+    },
+    {
+      "id": "filament-anycubic-kobra-2-neo",
+      "brand": "Anycubic",
+      "model": "Kobra 2 Neo",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-anycubic-kobra-2-neo.webp"
+    },
+    {
+      "id": "filament-anycubic-kobra-2-plus",
+      "brand": "Anycubic",
+      "model": "Kobra 2 Plus",
+      "printType": "filament",
+      "widthMm": 320,
+      "depthMm": 320,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-anycubic-kobra-2-plus.webp"
+    },
+    {
+      "id": "filament-anycubic-kobra-2-pro",
+      "brand": "Anycubic",
+      "model": "Kobra 2 Pro",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-anycubic-kobra-2-pro.webp"
+    },
+    {
+      "id": "filament-anycubic-kobra-3",
+      "brand": "Anycubic",
+      "model": "Kobra 3",
+      "printType": "filament",
+      "widthMm": 255,
+      "depthMm": 255,
+      "heightMm": 260,
+      "image": "/printer-presets/orcaslicer/filament-anycubic-kobra-3.webp"
+    },
+    {
+      "id": "filament-anycubic-kobra-3-max",
+      "brand": "Anycubic",
+      "model": "Kobra 3 Max",
+      "printType": "filament",
+      "widthMm": 426,
+      "depthMm": 420,
+      "heightMm": 501,
+      "image": "/printer-presets/orcaslicer/filament-anycubic-kobra-3-max.webp"
+    },
+    {
+      "id": "filament-anycubic-kobra-3-v2",
+      "brand": "Anycubic",
+      "model": "Kobra 3 V2",
+      "printType": "filament",
+      "widthMm": 255,
+      "depthMm": 255,
+      "heightMm": 260,
+      "image": "/printer-presets/orcaslicer/filament-anycubic-kobra-3-v2.webp"
+    },
+    {
+      "id": "filament-anycubic-kobra-max",
+      "brand": "Anycubic",
+      "model": "Kobra Max",
+      "printType": "filament",
+      "widthMm": 400,
+      "depthMm": 400,
+      "heightMm": 450,
+      "image": "/printer-presets/orcaslicer/filament-anycubic-kobra-max.webp"
+    },
+    {
+      "id": "filament-anycubic-kobra-neo",
+      "brand": "Anycubic",
+      "model": "Kobra Neo",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-anycubic-kobra-neo.webp"
+    },
+    {
+      "id": "filament-anycubic-kobra-plus",
+      "brand": "Anycubic",
+      "model": "Kobra Plus",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 350,
+      "image": "/printer-presets/orcaslicer/filament-anycubic-kobra-plus.webp"
+    },
+    {
+      "id": "filament-anycubic-kobra-s1",
+      "brand": "Anycubic",
+      "model": "Kobra S1",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 250,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-anycubic-kobra-s1.webp"
+    },
+    {
+      "id": "filament-anycubic-kobra-s1-max",
+      "brand": "Anycubic",
+      "model": "Kobra S1 Max",
+      "printType": "filament",
+      "widthMm": 350,
+      "depthMm": 350,
+      "heightMm": 350,
+      "image": "/printer-presets/orcaslicer/filament-anycubic-kobra-s1-max.webp"
+    },
+    {
+      "id": "filament-anycubic-kobra-x",
+      "brand": "Anycubic",
+      "model": "Kobra X",
+      "printType": "filament",
+      "widthMm": 260,
+      "depthMm": 260,
+      "heightMm": 260,
+      "image": "/printer-presets/orcaslicer/filament-anycubic-kobra-x.webp"
+    },
+    {
+      "id": "resin-anycubic-photon",
+      "brand": "Anycubic",
+      "model": "Photon",
+      "printType": "resin",
+      "widthMm": 68.04,
+      "depthMm": 120.96,
+      "heightMm": 155,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-d2",
+      "brand": "Anycubic",
+      "model": "Photon D2",
+      "printType": "resin",
+      "widthMm": 130.56,
+      "depthMm": 73.44,
+      "heightMm": 165,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-d2.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-m3",
+      "brand": "Anycubic",
+      "model": "Photon M3",
+      "printType": "resin",
+      "widthMm": 163.84,
+      "depthMm": 102.4,
+      "heightMm": 180,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-m3.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-m3-max",
+      "brand": "Anycubic",
+      "model": "Photon M3 Max",
+      "printType": "resin",
+      "widthMm": 298.08,
+      "depthMm": 165.6,
+      "heightMm": 300,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-m3-max.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-m3-plus",
+      "brand": "Anycubic",
+      "model": "Photon M3 Plus",
+      "printType": "resin",
+      "widthMm": 198.15,
+      "depthMm": 123.84,
+      "heightMm": 245
+    },
+    {
+      "id": "resin-anycubic-photon-m3-premium",
+      "brand": "Anycubic",
+      "model": "Photon M3 Premium",
+      "printType": "resin",
+      "widthMm": 218.88,
+      "depthMm": 123.12,
+      "heightMm": 250,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-m3-premium.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-mono",
+      "brand": "Anycubic",
+      "model": "Photon Mono",
+      "printType": "resin",
+      "widthMm": 82.62,
+      "depthMm": 130.56,
+      "heightMm": 165,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-mono.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-mono-2",
+      "brand": "Anycubic",
+      "model": "Photon Mono 2",
+      "printType": "resin",
+      "widthMm": 143.36,
+      "depthMm": 89.6,
+      "heightMm": 165,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-mono-2.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-mono-4",
+      "brand": "Anycubic",
+      "model": "Photon Mono 4",
+      "printType": "resin",
+      "widthMm": 153.408,
+      "depthMm": 87.04,
+      "heightMm": 165,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-mono-4.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-mono-4-ultra",
+      "brand": "Anycubic",
+      "model": "Photon Mono 4 Ultra",
+      "printType": "resin",
+      "widthMm": 153.408,
+      "depthMm": 87.04,
+      "heightMm": 165,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-mono-4-ultra.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-mono-4k",
+      "brand": "Anycubic",
+      "model": "Photon Mono 4K",
+      "printType": "resin",
+      "widthMm": 134.4,
+      "depthMm": 84,
+      "heightMm": 165,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-mono-4k.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-mono-m5",
+      "brand": "Anycubic",
+      "model": "Photon Mono M5",
+      "printType": "resin",
+      "widthMm": 218.88,
+      "depthMm": 122.88,
+      "heightMm": 200,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-mono-m5.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-mono-m5s",
+      "brand": "Anycubic",
+      "model": "Photon Mono M5s",
+      "printType": "resin",
+      "widthMm": 218.88,
+      "depthMm": 122.88,
+      "heightMm": 200,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-mono-m5s.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-mono-m5s-pro",
+      "brand": "Anycubic",
+      "model": "Photon Mono M5s Pro",
+      "printType": "resin",
+      "widthMm": 223.642,
+      "depthMm": 126.976,
+      "heightMm": 200,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-mono-m5s-pro.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-mono-m7",
+      "brand": "Anycubic",
+      "model": "Photon Mono M7",
+      "printType": "resin",
+      "widthMm": 223.642,
+      "depthMm": 126.976,
+      "heightMm": 230,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-mono-m7.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-mono-m7-max",
+      "brand": "Anycubic",
+      "model": "Photon Mono M7 Max",
+      "printType": "resin",
+      "widthMm": 298.08,
+      "depthMm": 165.6,
+      "heightMm": 300,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-mono-m7-max.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-mono-m7-pro",
+      "brand": "Anycubic",
+      "model": "Photon Mono M7 Pro",
+      "printType": "resin",
+      "widthMm": 223.642,
+      "depthMm": 126.976,
+      "heightMm": 230,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-mono-m7-pro.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-mono-se",
+      "brand": "Anycubic",
+      "model": "Photon Mono SE",
+      "printType": "resin",
+      "widthMm": 82.62,
+      "depthMm": 130.56,
+      "heightMm": 160,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-mono-se.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-mono-sq",
+      "brand": "Anycubic",
+      "model": "Photon Mono SQ",
+      "printType": "resin",
+      "widthMm": 120,
+      "depthMm": 128,
+      "heightMm": 200,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-mono-sq.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-mono-x",
+      "brand": "Anycubic",
+      "model": "Photon Mono X",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 245,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-mono-x.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-mono-x-6k",
+      "brand": "Anycubic",
+      "model": "Photon Mono X 6K",
+      "printType": "resin",
+      "widthMm": 198.15,
+      "depthMm": 123.84,
+      "heightMm": 245,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-mono-x-6k.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-mono-x-6ks",
+      "brand": "Anycubic",
+      "model": "Photon Mono X 6Ks",
+      "printType": "resin",
+      "widthMm": 195.84,
+      "depthMm": 122.4,
+      "heightMm": 200,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-mono-x-6ks.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-mono-x2",
+      "brand": "Anycubic",
+      "model": "Photon Mono X2",
+      "printType": "resin",
+      "widthMm": 196.61,
+      "depthMm": 122.88,
+      "heightMm": 200,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-mono-x2.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-p1",
+      "brand": "Anycubic",
+      "model": "Photon P1",
+      "printType": "resin",
+      "widthMm": 223.642,
+      "depthMm": 126.976,
+      "heightMm": 230,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-p1.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-p1-max",
+      "brand": "Anycubic",
+      "model": "Photon P1 Max",
+      "printType": "resin",
+      "widthMm": 285.696,
+      "depthMm": 214.272,
+      "heightMm": 300,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-p1-max.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-s",
+      "brand": "Anycubic",
+      "model": "Photon S",
+      "printType": "resin",
+      "widthMm": 68.04,
+      "depthMm": 120.96,
+      "heightMm": 165,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-s.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-ultra",
+      "brand": "Anycubic",
+      "model": "Photon Ultra",
+      "printType": "resin",
+      "widthMm": 102.4,
+      "depthMm": 57.6,
+      "heightMm": 165,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-ultra.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-x",
+      "brand": "Anycubic",
+      "model": "Photon X",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 245,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-x.webp"
+    },
+    {
+      "id": "resin-anycubic-photon-zero",
+      "brand": "Anycubic",
+      "model": "Photon Zero",
+      "printType": "resin",
+      "widthMm": 55.4,
+      "depthMm": 98.63,
+      "heightMm": 150,
+      "image": "/printer-presets/manufacturer/resin-anycubic-photon-zero.webp"
+    },
+    {
+      "id": "filament-anycubic-predator",
+      "brand": "Anycubic",
+      "model": "Predator",
+      "printType": "filament",
+      "widthMm": 370,
+      "depthMm": 370,
+      "heightMm": 455,
+      "image": "/printer-presets/orcaslicer/filament-anycubic-predator.webp"
+    },
+    {
+      "id": "filament-anycubic-vyper",
+      "brand": "Anycubic",
+      "model": "Vyper",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 255,
+      "heightMm": 265,
+      "image": "/printer-presets/orcaslicer/filament-anycubic-vyper.webp"
+    },
+    {
+      "id": "filament-artillery-genius",
+      "brand": "Artillery",
+      "model": "Genius",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-artillery-genius.webp"
+    },
+    {
+      "id": "filament-artillery-genius-pro",
+      "brand": "Artillery",
+      "model": "Genius Pro",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-artillery-genius-pro.webp"
+    },
+    {
+      "id": "filament-artillery-hornet",
+      "brand": "Artillery",
+      "model": "Hornet",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 230,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-artillery-hornet.webp"
+    },
+    {
+      "id": "filament-artillery-m1-pro",
+      "brand": "Artillery",
+      "model": "M1 Pro",
+      "printType": "filament",
+      "widthMm": 260,
+      "depthMm": 260,
+      "heightMm": 260,
+      "image": "/printer-presets/orcaslicer/filament-artillery-m1-pro.webp"
+    },
+    {
+      "id": "filament-artillery-sidewinder-x1",
+      "brand": "Artillery",
+      "model": "Sidewinder X1",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-artillery-sidewinder-x1.webp"
+    },
+    {
+      "id": "filament-artillery-sidewinder-x2",
+      "brand": "Artillery",
+      "model": "Sidewinder X2",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-artillery-sidewinder-x2.webp"
+    },
+    {
+      "id": "filament-artillery-sidewinder-x3-plus",
+      "brand": "Artillery",
+      "model": "Sidewinder X3 Plus",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 305,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-artillery-sidewinder-x3-plus.webp"
+    },
+    {
+      "id": "filament-artillery-sidewinder-x3-pro",
+      "brand": "Artillery",
+      "model": "Sidewinder X3 Pro",
+      "printType": "filament",
+      "widthMm": 240,
+      "depthMm": 245,
+      "heightMm": 260,
+      "image": "/printer-presets/orcaslicer/filament-artillery-sidewinder-x3-pro.webp"
+    },
+    {
+      "id": "filament-artillery-sidewinder-x4-plus",
+      "brand": "Artillery",
+      "model": "Sidewinder X4 Plus",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 310,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-artillery-sidewinder-x4-plus.webp"
+    },
+    {
+      "id": "filament-artillery-sidewinder-x4-pro",
+      "brand": "Artillery",
+      "model": "Sidewinder X4 Pro",
+      "printType": "filament",
+      "widthMm": 240,
+      "depthMm": 250,
+      "heightMm": 260,
+      "image": "/printer-presets/orcaslicer/filament-artillery-sidewinder-x4-pro.webp"
+    },
+    {
+      "id": "filament-bambu-lab-a1",
+      "brand": "Bambu Lab",
+      "model": "A1",
+      "printType": "filament",
+      "widthMm": 256,
+      "depthMm": 256,
+      "heightMm": 256,
+      "image": "/printer-presets/orcaslicer/filament-bambu-lab-a1.webp"
+    },
+    {
+      "id": "filament-bambu-lab-a1-mini",
+      "brand": "Bambu Lab",
+      "model": "A1 mini",
+      "printType": "filament",
+      "widthMm": 180,
+      "depthMm": 180,
+      "heightMm": 180,
+      "image": "/printer-presets/orcaslicer/filament-bambu-lab-a1-mini.webp"
+    },
+    {
+      "id": "filament-bambu-lab-a2l",
+      "brand": "Bambu Lab",
+      "model": "A2L",
+      "printType": "filament",
+      "widthMm": 330,
+      "depthMm": 320,
+      "heightMm": 325,
+      "image": "/printer-presets/orcaslicer/filament-bambu-lab-a2l.webp"
+    },
+    {
+      "id": "filament-bambu-lab-h2c",
+      "brand": "Bambu Lab",
+      "model": "H2C",
+      "printType": "filament",
+      "widthMm": 330,
+      "depthMm": 320,
+      "heightMm": 325,
+      "image": "/printer-presets/orcaslicer/filament-bambu-lab-h2c.webp"
+    },
+    {
+      "id": "filament-bambu-lab-h2d",
+      "brand": "Bambu Lab",
+      "model": "H2D",
+      "printType": "filament",
+      "widthMm": 350,
+      "depthMm": 320,
+      "heightMm": 325,
+      "image": "/printer-presets/orcaslicer/filament-bambu-lab-h2d.webp"
+    },
+    {
+      "id": "filament-bambu-lab-h2d-pro",
+      "brand": "Bambu Lab",
+      "model": "H2D Pro",
+      "printType": "filament",
+      "widthMm": 350,
+      "depthMm": 320,
+      "heightMm": 325,
+      "image": "/printer-presets/orcaslicer/filament-bambu-lab-h2d-pro.webp"
+    },
+    {
+      "id": "filament-bambu-lab-h2s",
+      "brand": "Bambu Lab",
+      "model": "H2S",
+      "printType": "filament",
+      "widthMm": 340,
+      "depthMm": 320,
+      "heightMm": 340,
+      "image": "/printer-presets/orcaslicer/filament-bambu-lab-h2s.webp"
+    },
+    {
+      "id": "filament-bambu-lab-p1p",
+      "brand": "Bambu Lab",
+      "model": "P1P",
+      "printType": "filament",
+      "widthMm": 256,
+      "depthMm": 256,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-bambu-lab-p1p.webp"
+    },
+    {
+      "id": "filament-bambu-lab-p1s",
+      "brand": "Bambu Lab",
+      "model": "P1S",
+      "printType": "filament",
+      "widthMm": 256,
+      "depthMm": 256,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-bambu-lab-p1s.webp"
+    },
+    {
+      "id": "filament-bambu-lab-p2s",
+      "brand": "Bambu Lab",
+      "model": "P2S",
+      "printType": "filament",
+      "widthMm": 256,
+      "depthMm": 256,
+      "heightMm": 256,
+      "image": "/printer-presets/orcaslicer/filament-bambu-lab-p2s.webp"
+    },
+    {
+      "id": "filament-bambu-lab-x1",
+      "brand": "Bambu Lab",
+      "model": "X1",
+      "printType": "filament",
+      "widthMm": 256,
+      "depthMm": 256,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-bambu-lab-x1.webp"
+    },
+    {
+      "id": "filament-bambu-lab-x1-carbon",
+      "brand": "Bambu Lab",
+      "model": "X1 Carbon",
+      "printType": "filament",
+      "widthMm": 256,
+      "depthMm": 256,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-bambu-lab-x1-carbon.webp"
+    },
+    {
+      "id": "filament-bambu-lab-x1e",
+      "brand": "Bambu Lab",
+      "model": "X1E",
+      "printType": "filament",
+      "widthMm": 256,
+      "depthMm": 256,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-bambu-lab-x1e.webp"
+    },
+    {
+      "id": "filament-bambu-lab-x2d",
+      "brand": "Bambu Lab",
+      "model": "X2D",
+      "printType": "filament",
+      "widthMm": 256,
+      "depthMm": 256,
+      "heightMm": 261,
+      "image": "/printer-presets/orcaslicer/filament-bambu-lab-x2d.webp"
+    },
+    {
+      "id": "filament-benfab-450",
+      "brand": "BenFab",
+      "model": "450",
+      "printType": "filament",
+      "widthMm": 426,
+      "depthMm": 426,
+      "heightMm": 480,
+      "image": "/printer-presets/orcaslicer/filament-benfab-450.webp"
+    },
+    {
+      "id": "filament-biqu-b1",
+      "brand": "BIQU",
+      "model": "B1",
+      "printType": "filament",
+      "widthMm": 235,
+      "depthMm": 235,
+      "heightMm": 270,
+      "image": "/printer-presets/orcaslicer/filament-biqu-b1.webp"
+    },
+    {
+      "id": "filament-biqu-bx",
+      "brand": "BIQU",
+      "model": "BX",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 250,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-biqu-bx.webp"
+    },
+    {
+      "id": "filament-biqu-hurakan",
+      "brand": "BIQU",
+      "model": "Hurakan",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 270,
+      "image": "/printer-presets/orcaslicer/filament-biqu-hurakan.webp"
+    },
+    {
+      "id": "filament-blocks-pro-s100",
+      "brand": "Blocks",
+      "model": "Pro S100",
+      "printType": "filament",
+      "widthMm": 1000,
+      "depthMm": 1000,
+      "heightMm": 900,
+      "image": "/printer-presets/orcaslicer/filament-blocks-pro-s100.webp"
+    },
+    {
+      "id": "filament-blocks-rd50-v2",
+      "brand": "Blocks",
+      "model": "RD50 V2",
+      "printType": "filament",
+      "widthMm": 500,
+      "depthMm": 500,
+      "heightMm": 500,
+      "image": "/printer-presets/orcaslicer/filament-blocks-rd50-v2.webp"
+    },
+    {
+      "id": "filament-blocks-rf50",
+      "brand": "Blocks",
+      "model": "RF50",
+      "printType": "filament",
+      "widthMm": 500,
+      "depthMm": 500,
+      "heightMm": 500,
+      "image": "/printer-presets/orcaslicer/filament-blocks-rf50.webp"
+    },
+    {
+      "id": "filament-chuanying-x1",
+      "brand": "Chuanying",
+      "model": "X1",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 220,
+      "image": "/printer-presets/orcaslicer/filament-chuanying-x1.webp"
+    },
+    {
+      "id": "filament-co-print-chromaset",
+      "brand": "Co Print",
+      "model": "ChromaSet",
+      "printType": "filament",
+      "widthMm": 290,
+      "depthMm": 283,
+      "heightMm": 330,
+      "image": "/printer-presets/orcaslicer/filament-co-print-chromaset.webp"
+    },
+    {
+      "id": "filament-colido-160-v2",
+      "brand": "CoLiDo",
+      "model": "160 V2",
+      "printType": "filament",
+      "widthMm": 160,
+      "depthMm": 160,
+      "heightMm": 180,
+      "image": "/printer-presets/orcaslicer/filament-colido-160-v2.webp"
+    },
+    {
+      "id": "filament-colido-diy-4-0",
+      "brand": "CoLiDo",
+      "model": "DIY 4.0",
+      "printType": "filament",
+      "widthMm": 225,
+      "depthMm": 220,
+      "heightMm": 230,
+      "image": "/printer-presets/orcaslicer/filament-colido-diy-4-0.webp"
+    },
+    {
+      "id": "filament-colido-diy-4-0-v2",
+      "brand": "CoLiDo",
+      "model": "DIY 4.0 V2",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 230,
+      "heightMm": 255,
+      "image": "/printer-presets/orcaslicer/filament-colido-diy-4-0-v2.webp"
+    },
+    {
+      "id": "filament-colido-sr1",
+      "brand": "CoLiDo",
+      "model": "SR1",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 251,
+      "image": "/printer-presets/orcaslicer/filament-colido-sr1.webp"
+    },
+    {
+      "id": "filament-colido-x16",
+      "brand": "CoLiDo",
+      "model": "X16",
+      "printType": "filament",
+      "widthMm": 160,
+      "depthMm": 160,
+      "heightMm": 180,
+      "image": "/printer-presets/orcaslicer/filament-colido-x16.webp"
+    },
+    {
+      "id": "filament-comgrow-t300",
+      "brand": "Comgrow",
+      "model": "T300",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 350,
+      "image": "/printer-presets/orcaslicer/filament-comgrow-t300.webp"
+    },
+    {
+      "id": "filament-comgrow-t500",
+      "brand": "Comgrow",
+      "model": "T500",
+      "printType": "filament",
+      "widthMm": 500,
+      "depthMm": 500,
+      "heightMm": 500,
+      "image": "/printer-presets/orcaslicer/filament-comgrow-t500.webp"
+    },
+    {
+      "id": "resin-concepts3d-athena-12k",
+      "brand": "Concepts3D",
+      "model": "Athena 12K",
+      "printType": "resin",
+      "widthMm": 218.88,
+      "depthMm": 122.88,
+      "heightMm": 245
+    },
+    {
+      "id": "resin-concepts3d-athena-8k",
+      "brand": "Concepts3D",
+      "model": "Athena 8K",
+      "printType": "resin",
+      "widthMm": 218.88,
+      "depthMm": 123.12,
+      "heightMm": 245
+    },
+    {
+      "id": "filament-construct3d-construct-1",
+      "brand": "CONSTRUCT3D",
+      "model": "Construct 1",
+      "printType": "filament",
+      "widthMm": 225,
+      "depthMm": 260,
+      "heightMm": 180,
+      "image": "/printer-presets/orcaslicer/filament-construct3d-construct-1.webp"
+    },
+    {
+      "id": "filament-construct3d-construct-1-xl",
+      "brand": "CONSTRUCT3D",
+      "model": "Construct 1 XL",
+      "printType": "filament",
+      "widthMm": 325,
+      "depthMm": 370,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-construct3d-construct-1-xl.webp"
+    },
+    {
+      "id": "filament-creality-cr-10",
+      "brand": "Creality",
+      "model": "CR-10",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-creality-cr-10.webp"
+    },
+    {
+      "id": "filament-creality-cr-10-max",
+      "brand": "Creality",
+      "model": "CR-10 Max",
+      "printType": "filament",
+      "widthMm": 450,
+      "depthMm": 450,
+      "heightMm": 470,
+      "image": "/printer-presets/orcaslicer/filament-creality-cr-10-max.webp"
+    },
+    {
+      "id": "filament-creality-cr-10-se",
+      "brand": "Creality",
+      "model": "CR-10 SE",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 265,
+      "image": "/printer-presets/orcaslicer/filament-creality-cr-10-se.webp"
+    },
+    {
+      "id": "filament-creality-cr-10-smart",
+      "brand": "Creality",
+      "model": "CR-10 Smart",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-creality-cr-10-smart.webp"
+    },
+    {
+      "id": "filament-creality-cr-10-smart-pro",
+      "brand": "Creality",
+      "model": "CR-10 Smart Pro",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-creality-cr-10-smart-pro.webp"
+    },
+    {
+      "id": "filament-creality-cr-10-v2",
+      "brand": "Creality",
+      "model": "CR-10 V2",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-creality-cr-10-v2.webp"
+    },
+    {
+      "id": "filament-creality-cr-10-v3",
+      "brand": "Creality",
+      "model": "CR-10 V3",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-creality-cr-10-v3.webp"
+    },
+    {
+      "id": "filament-creality-cr-10s-pro-v2",
+      "brand": "Creality",
+      "model": "CR-10S Pro V2",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-creality-cr-10s-pro-v2.webp"
+    },
+    {
+      "id": "filament-creality-cr-20-pro",
+      "brand": "Creality",
+      "model": "CR-20 Pro",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-creality-cr-20-pro.webp"
+    },
+    {
+      "id": "filament-creality-cr-6-max",
+      "brand": "Creality",
+      "model": "CR-6 Max",
+      "printType": "filament",
+      "widthMm": 390,
+      "depthMm": 390,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-creality-cr-6-max.webp"
+    },
+    {
+      "id": "filament-creality-cr-6-se",
+      "brand": "Creality",
+      "model": "CR-6 SE",
+      "printType": "filament",
+      "widthMm": 225,
+      "depthMm": 235,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-creality-cr-6-se.webp"
+    },
+    {
+      "id": "filament-creality-cr-m4",
+      "brand": "Creality",
+      "model": "CR-M4",
+      "printType": "filament",
+      "widthMm": 450,
+      "depthMm": 450,
+      "heightMm": 470,
+      "image": "/printer-presets/orcaslicer/filament-creality-cr-m4.webp"
+    },
+    {
+      "id": "filament-creality-cr-m4-se",
+      "brand": "Creality",
+      "model": "CR-M4 SE",
+      "printType": "filament",
+      "widthMm": 420,
+      "depthMm": 420,
+      "heightMm": 420,
+      "image": "/printer-presets/orcaslicer/filament-creality-cr-m4-se.webp"
+    },
+    {
+      "id": "resin-creality-ct-005-pro",
+      "brand": "Creality",
+      "model": "CT-005 Pro",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 250
+    },
+    {
+      "id": "resin-creality-ct-133-pro",
+      "brand": "Creality",
+      "model": "CT-133 Pro",
+      "printType": "resin",
+      "widthMm": 293.76,
+      "depthMm": 165.24,
+      "heightMm": 300
+    },
+    {
+      "id": "filament-creality-ender-2-pro",
+      "brand": "Creality",
+      "model": "Ender-2 Pro",
+      "printType": "filament",
+      "widthMm": 165,
+      "depthMm": 165,
+      "heightMm": 180,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-2-pro.webp"
+    },
+    {
+      "id": "filament-creality-ender-3",
+      "brand": "Creality",
+      "model": "Ender-3",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-3.webp"
+    },
+    {
+      "id": "filament-creality-ender-3-max",
+      "brand": "Creality",
+      "model": "Ender-3 Max",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 340,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-3-max.webp"
+    },
+    {
+      "id": "filament-creality-ender-3-max-neo",
+      "brand": "Creality",
+      "model": "Ender-3 Max Neo",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 320,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-3-max-neo.webp"
+    },
+    {
+      "id": "filament-creality-ender-3-neo",
+      "brand": "Creality",
+      "model": "Ender-3 Neo",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-3-neo.webp"
+    },
+    {
+      "id": "filament-creality-ender-3-pro",
+      "brand": "Creality",
+      "model": "Ender-3 Pro",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-3-pro.webp"
+    },
+    {
+      "id": "filament-creality-ender-3-s1",
+      "brand": "Creality",
+      "model": "Ender-3 S1",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 270,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-3-s1.webp"
+    },
+    {
+      "id": "filament-creality-ender-3-s1-plus",
+      "brand": "Creality",
+      "model": "Ender-3 S1 Plus",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-3-s1-plus.webp"
+    },
+    {
+      "id": "filament-creality-ender-3-s1-pro",
+      "brand": "Creality",
+      "model": "Ender-3 S1 Pro",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 270,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-3-s1-pro.webp"
+    },
+    {
+      "id": "filament-creality-ender-3-s1-sonic",
+      "brand": "Creality",
+      "model": "Ender-3 S1 Sonic",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 230,
+      "heightMm": 270,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-3-s1-sonic.webp"
+    },
+    {
+      "id": "filament-creality-ender-3-v2",
+      "brand": "Creality",
+      "model": "Ender-3 V2",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-3-v2.webp"
+    },
+    {
+      "id": "filament-creality-ender-3-v2-neo",
+      "brand": "Creality",
+      "model": "Ender-3 V2 Neo",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-3-v2-neo.webp"
+    },
+    {
+      "id": "filament-creality-ender-3-v3",
+      "brand": "Creality",
+      "model": "Ender-3 V3",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-3-v3.webp"
+    },
+    {
+      "id": "filament-creality-ender-3-v3-ke",
+      "brand": "Creality",
+      "model": "Ender-3 V3 KE",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 245,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-3-v3-ke.webp"
+    },
+    {
+      "id": "filament-creality-ender-3-v3-plus",
+      "brand": "Creality",
+      "model": "Ender-3 V3 Plus",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 330,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-3-v3-plus.webp"
+    },
+    {
+      "id": "filament-creality-ender-3-v3-se",
+      "brand": "Creality",
+      "model": "Ender-3 V3 SE",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-3-v3-se.webp"
+    },
+    {
+      "id": "filament-creality-ender-3-v4",
+      "brand": "Creality",
+      "model": "Ender-3 V4",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 235,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-3-v4.webp"
+    },
+    {
+      "id": "filament-creality-ender-5",
+      "brand": "Creality",
+      "model": "Ender-5",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-5.webp"
+    },
+    {
+      "id": "filament-creality-ender-5-max",
+      "brand": "Creality",
+      "model": "Ender-5 Max",
+      "printType": "filament",
+      "widthMm": 400,
+      "depthMm": 400,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-5-max.webp"
+    },
+    {
+      "id": "filament-creality-ender-5-plus",
+      "brand": "Creality",
+      "model": "Ender-5 Plus",
+      "printType": "filament",
+      "widthMm": 350,
+      "depthMm": 350,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-5-plus.webp"
+    },
+    {
+      "id": "filament-creality-ender-5-pro-2019",
+      "brand": "Creality",
+      "model": "Ender-5 Pro (2019)",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-5-pro-2019.webp"
+    },
+    {
+      "id": "filament-creality-ender-5-s1",
+      "brand": "Creality",
+      "model": "Ender-5 S1",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-5-s1.webp"
+    },
+    {
+      "id": "filament-creality-ender-5-s1-sonic",
+      "brand": "Creality",
+      "model": "Ender-5 S1 Sonic",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 280,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-5-s1-sonic.webp"
+    },
+    {
+      "id": "filament-creality-ender-5s",
+      "brand": "Creality",
+      "model": "Ender-5S",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-5s.webp"
+    },
+    {
+      "id": "filament-creality-ender-6",
+      "brand": "Creality",
+      "model": "Ender-6",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 250,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-creality-ender-6.webp"
+    },
+    {
+      "id": "resin-creality-halot-lite-cl-89l",
+      "brand": "Creality",
+      "model": "Halot Lite CL-89L",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 200
+    },
+    {
+      "id": "resin-creality-halot-mage-cl-103l",
+      "brand": "Creality",
+      "model": "Halot Mage CL-103L",
+      "printType": "resin",
+      "widthMm": 228.096,
+      "depthMm": 128.304,
+      "heightMm": 230
+    },
+    {
+      "id": "resin-creality-halot-mage-pro-cl-103",
+      "brand": "Creality",
+      "model": "Halot Mage Pro CL-103",
+      "printType": "resin",
+      "widthMm": 228.096,
+      "depthMm": 128.304,
+      "heightMm": 230
+    },
+    {
+      "id": "resin-creality-halot-max-cl-133",
+      "brand": "Creality",
+      "model": "Halot Max CL-133",
+      "printType": "resin",
+      "widthMm": 293.76,
+      "depthMm": 165.24,
+      "heightMm": 300
+    },
+    {
+      "id": "resin-creality-halot-one-cl-60",
+      "brand": "Creality",
+      "model": "Halot One CL-60",
+      "printType": "resin",
+      "widthMm": 81,
+      "depthMm": 128,
+      "heightMm": 160
+    },
+    {
+      "id": "resin-creality-halot-one-plus-cl-79",
+      "brand": "Creality",
+      "model": "Halot One Plus CL-79",
+      "printType": "resin",
+      "widthMm": 172.8,
+      "depthMm": 102.4,
+      "heightMm": 160
+    },
+    {
+      "id": "resin-creality-halot-one-pro-cl-70",
+      "brand": "Creality",
+      "model": "Halot One Pro CL-70",
+      "printType": "resin",
+      "widthMm": 130.56,
+      "depthMm": 122.4,
+      "heightMm": 160
+    },
+    {
+      "id": "resin-creality-halot-ray-cl925",
+      "brand": "Creality",
+      "model": "Halot Ray CL925",
+      "printType": "resin",
+      "widthMm": 198.14,
+      "depthMm": 123.84,
+      "heightMm": 210
+    },
+    {
+      "id": "resin-creality-halot-sky-cl-89",
+      "brand": "Creality",
+      "model": "Halot Sky CL-89",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 200
+    },
+    {
+      "id": "resin-creality-halot-sky-plus-cl-92",
+      "brand": "Creality",
+      "model": "Halot Sky Plus CL-92",
+      "printType": "resin",
+      "widthMm": 198.14,
+      "depthMm": 123.84,
+      "heightMm": 210
+    },
+    {
+      "id": "resin-creality-halot-x1",
+      "brand": "Creality",
+      "model": "Halot X1",
+      "printType": "resin",
+      "widthMm": 211.68,
+      "depthMm": 118.37,
+      "heightMm": 200
+    },
+    {
+      "id": "filament-creality-hi",
+      "brand": "Creality",
+      "model": "Hi",
+      "printType": "filament",
+      "widthMm": 260,
+      "depthMm": 260,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-creality-hi.webp"
+    },
+    {
+      "id": "filament-creality-k1",
+      "brand": "Creality",
+      "model": "K1",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-creality-k1.webp"
+    },
+    {
+      "id": "filament-creality-k1-max",
+      "brand": "Creality",
+      "model": "K1 Max",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-creality-k1-max.webp"
+    },
+    {
+      "id": "filament-creality-k1-max-cfs-c",
+      "brand": "Creality",
+      "model": "K1 Max_CFS-C",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-creality-k1-max-cfs-c.webp"
+    },
+    {
+      "id": "filament-creality-k1-se",
+      "brand": "Creality",
+      "model": "K1 SE",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-creality-k1-se.webp"
+    },
+    {
+      "id": "filament-creality-k1-se-cfs-c",
+      "brand": "Creality",
+      "model": "K1 SE_CFS-C",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-creality-k1-se-cfs-c.webp"
+    },
+    {
+      "id": "filament-creality-k1-cfs-c",
+      "brand": "Creality",
+      "model": "K1_CFS-C",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-creality-k1-cfs-c.webp"
+    },
+    {
+      "id": "filament-creality-k1c",
+      "brand": "Creality",
+      "model": "K1C",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-creality-k1c.webp"
+    },
+    {
+      "id": "filament-creality-k1c-cfs-c",
+      "brand": "Creality",
+      "model": "K1C_CFS-C",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-creality-k1c-cfs-c.webp"
+    },
+    {
+      "id": "filament-creality-k2",
+      "brand": "Creality",
+      "model": "K2",
+      "printType": "filament",
+      "widthMm": 260,
+      "depthMm": 260,
+      "heightMm": 260,
+      "image": "/printer-presets/orcaslicer/filament-creality-k2.webp"
+    },
+    {
+      "id": "filament-creality-k2-plus",
+      "brand": "Creality",
+      "model": "K2 Plus",
+      "printType": "filament",
+      "widthMm": 350,
+      "depthMm": 350,
+      "heightMm": 350,
+      "image": "/printer-presets/orcaslicer/filament-creality-k2-plus.webp"
+    },
+    {
+      "id": "filament-creality-k2-pro",
+      "brand": "Creality",
+      "model": "K2 Pro",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-creality-k2-pro.webp"
+    },
+    {
+      "id": "filament-creality-k2-se",
+      "brand": "Creality",
+      "model": "K2 SE",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 215,
+      "heightMm": 245,
+      "image": "/printer-presets/orcaslicer/filament-creality-k2-se.webp"
+    },
+    {
+      "id": "resin-creality-ld-002h",
+      "brand": "Creality",
+      "model": "LD-002H",
+      "printType": "resin",
+      "widthMm": 82.62,
+      "depthMm": 130.56,
+      "heightMm": 160
+    },
+    {
+      "id": "resin-creality-ld-002r",
+      "brand": "Creality",
+      "model": "LD-002R",
+      "printType": "resin",
+      "widthMm": 68.04,
+      "depthMm": 120.96,
+      "heightMm": 160
+    },
+    {
+      "id": "resin-creality-ld-006",
+      "brand": "Creality",
+      "model": "LD-006",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 245
+    },
+    {
+      "id": "filament-creality-sermoon-d3",
+      "brand": "Creality",
+      "model": "Sermoon D3",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 250,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-creality-sermoon-d3.webp"
+    },
+    {
+      "id": "filament-creality-sermoon-d3-pro",
+      "brand": "Creality",
+      "model": "Sermoon D3 Pro",
+      "printType": "filament",
+      "widthMm": 290,
+      "depthMm": 220,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-creality-sermoon-d3-pro.webp"
+    },
+    {
+      "id": "filament-creality-sermoon-m300",
+      "brand": "Creality",
+      "model": "Sermoon M300",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 200,
+      "image": "/printer-presets/orcaslicer/filament-creality-sermoon-m300.webp"
+    },
+    {
+      "id": "filament-creality-sermoon-v1",
+      "brand": "Creality",
+      "model": "Sermoon V1",
+      "printType": "filament",
+      "widthMm": 175,
+      "depthMm": 175,
+      "heightMm": 165,
+      "image": "/printer-presets/orcaslicer/filament-creality-sermoon-v1.webp"
+    },
+    {
+      "id": "filament-creality-sermoon-v1-pro",
+      "brand": "Creality",
+      "model": "Sermoon V1 Pro",
+      "printType": "filament",
+      "widthMm": 175,
+      "depthMm": 175,
+      "heightMm": 165,
+      "image": "/printer-presets/orcaslicer/filament-creality-sermoon-v1-pro.webp"
+    },
+    {
+      "id": "filament-creality-sparkx-i7",
+      "brand": "Creality",
+      "model": "SPARKX i7",
+      "printType": "filament",
+      "widthMm": 260,
+      "depthMm": 260,
+      "heightMm": 255,
+      "image": "/printer-presets/orcaslicer/filament-creality-sparkx-i7.webp"
+    },
+    {
+      "id": "filament-cubicon-xceler-i",
+      "brand": "Cubicon",
+      "model": "xCeler-I",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 250,
+      "heightMm": 290,
+      "image": "/printer-presets/orcaslicer/filament-cubicon-xceler-i.webp"
+    },
+    {
+      "id": "filament-cubicon-xceler-mini",
+      "brand": "Cubicon",
+      "model": "xCeler-Mini",
+      "printType": "filament",
+      "widthMm": 150,
+      "depthMm": 150,
+      "heightMm": 150,
+      "image": "/printer-presets/orcaslicer/filament-cubicon-xceler-mini.webp"
+    },
+    {
+      "id": "filament-cubicon-xceler-plus",
+      "brand": "Cubicon",
+      "model": "xCeler-Plus",
+      "printType": "filament",
+      "widthMm": 310,
+      "depthMm": 310,
+      "heightMm": 310,
+      "image": "/printer-presets/orcaslicer/filament-cubicon-xceler-plus.webp"
+    },
+    {
+      "id": "filament-deltamaker-2",
+      "brand": "DeltaMaker",
+      "model": "2",
+      "printType": "filament",
+      "widthMm": 276,
+      "depthMm": 240,
+      "heightMm": 260,
+      "image": "/printer-presets/orcaslicer/filament-deltamaker-2.webp"
+    },
+    {
+      "id": "filament-deltamaker-2t",
+      "brand": "DeltaMaker",
+      "model": "2T",
+      "printType": "filament",
+      "widthMm": 276,
+      "depthMm": 240,
+      "heightMm": 460,
+      "image": "/printer-presets/orcaslicer/filament-deltamaker-2t.webp"
+    },
+    {
+      "id": "filament-deltamaker-2xt",
+      "brand": "DeltaMaker",
+      "model": "2XT",
+      "printType": "filament",
+      "widthMm": 276,
+      "depthMm": 240,
+      "heightMm": 565,
+      "image": "/printer-presets/orcaslicer/filament-deltamaker-2xt.webp"
+    },
+    {
+      "id": "filament-dremel-3d20",
+      "brand": "Dremel",
+      "model": "3D20",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 150,
+      "heightMm": 140,
+      "image": "/printer-presets/orcaslicer/filament-dremel-3d20.webp"
+    },
+    {
+      "id": "filament-dremel-3d40",
+      "brand": "Dremel",
+      "model": "3D40",
+      "printType": "filament",
+      "widthMm": 225,
+      "depthMm": 155,
+      "heightMm": 170,
+      "image": "/printer-presets/orcaslicer/filament-dremel-3d40.webp"
+    },
+    {
+      "id": "filament-dremel-3d45",
+      "brand": "Dremel",
+      "model": "3D45",
+      "printType": "filament",
+      "widthMm": 225,
+      "depthMm": 155,
+      "heightMm": 170,
+      "image": "/printer-presets/orcaslicer/filament-dremel-3d45.webp"
+    },
+    {
+      "id": "filament-elegoo-centauri",
+      "brand": "Elegoo",
+      "model": "Centauri",
+      "printType": "filament",
+      "widthMm": 256,
+      "depthMm": 256,
+      "heightMm": 256,
+      "image": "/printer-presets/orcaslicer/filament-elegoo-centauri.webp"
+    },
+    {
+      "id": "filament-elegoo-centauri-2",
+      "brand": "Elegoo",
+      "model": "Centauri 2",
+      "printType": "filament",
+      "widthMm": 256,
+      "depthMm": 256,
+      "heightMm": 256,
+      "image": "/printer-presets/orcaslicer/filament-elegoo-centauri-2.webp"
+    },
+    {
+      "id": "filament-elegoo-centauri-carbon",
+      "brand": "Elegoo",
+      "model": "Centauri Carbon",
+      "printType": "filament",
+      "widthMm": 256,
+      "depthMm": 256,
+      "heightMm": 256,
+      "image": "/printer-presets/orcaslicer/filament-elegoo-centauri-carbon.webp"
+    },
+    {
+      "id": "filament-elegoo-centauri-carbon-2",
+      "brand": "Elegoo",
+      "model": "Centauri Carbon 2",
+      "printType": "filament",
+      "widthMm": 256,
+      "depthMm": 256,
+      "heightMm": 256,
+      "image": "/printer-presets/orcaslicer/filament-elegoo-centauri-carbon-2.webp"
+    },
+    {
+      "id": "resin-elegoo-jupiter",
+      "brand": "Elegoo",
+      "model": "Jupiter",
+      "printType": "resin",
+      "widthMm": 277.848,
+      "depthMm": 156.264,
+      "heightMm": 300,
+      "image": "/printer-presets/manufacturer/resin-elegoo-jupiter.webp"
+    },
+    {
+      "id": "resin-elegoo-jupiter-2",
+      "brand": "Elegoo",
+      "model": "Jupiter 2",
+      "printType": "resin",
+      "widthMm": 302.4,
+      "depthMm": 161.98,
+      "heightMm": 300,
+      "image": "/printer-presets/manufacturer/resin-elegoo-jupiter-2.webp"
+    },
+    {
+      "id": "resin-elegoo-jupiter-se",
+      "brand": "Elegoo",
+      "model": "Jupiter SE",
+      "printType": "resin",
+      "widthMm": 277.848,
+      "depthMm": 156.264,
+      "heightMm": 300,
+      "image": "/printer-presets/manufacturer/resin-elegoo-jupiter-se.webp"
+    },
+    {
+      "id": "resin-elegoo-mars",
+      "brand": "Elegoo",
+      "model": "Mars",
+      "printType": "resin",
+      "widthMm": 68.04,
+      "depthMm": 120.96,
+      "heightMm": 150,
+      "image": "/printer-presets/manufacturer/resin-elegoo-mars.webp"
+    },
+    {
+      "id": "resin-elegoo-mars-2",
+      "brand": "Elegoo",
+      "model": "Mars 2",
+      "printType": "resin",
+      "widthMm": 82.62,
+      "depthMm": 130.56,
+      "heightMm": 150,
+      "image": "/printer-presets/manufacturer/resin-elegoo-mars-2.webp"
+    },
+    {
+      "id": "resin-elegoo-mars-2-pro",
+      "brand": "Elegoo",
+      "model": "Mars 2 Pro",
+      "printType": "resin",
+      "widthMm": 82.62,
+      "depthMm": 130.56,
+      "heightMm": 160,
+      "image": "/printer-presets/manufacturer/resin-elegoo-mars-2-pro.webp"
+    },
+    {
+      "id": "resin-elegoo-mars-3",
+      "brand": "Elegoo",
+      "model": "Mars 3",
+      "printType": "resin",
+      "widthMm": 143.43,
+      "depthMm": 89.6,
+      "heightMm": 175,
+      "image": "/printer-presets/manufacturer/resin-elegoo-mars-3.webp"
+    },
+    {
+      "id": "resin-elegoo-mars-3-pro",
+      "brand": "Elegoo",
+      "model": "Mars 3 Pro",
+      "printType": "resin",
+      "widthMm": 143.43,
+      "depthMm": 89.6,
+      "heightMm": 175,
+      "image": "/printer-presets/manufacturer/resin-elegoo-mars-3-pro.webp"
+    },
+    {
+      "id": "resin-elegoo-mars-4",
+      "brand": "Elegoo",
+      "model": "Mars 4",
+      "printType": "resin",
+      "widthMm": 153.36,
+      "depthMm": 77.76,
+      "heightMm": 175,
+      "image": "/printer-presets/manufacturer/resin-elegoo-mars-4.webp"
+    },
+    {
+      "id": "resin-elegoo-mars-4-dlp",
+      "brand": "Elegoo",
+      "model": "Mars 4 DLP",
+      "printType": "resin",
+      "widthMm": 132.8,
+      "depthMm": 74.7,
+      "heightMm": 150,
+      "image": "/printer-presets/manufacturer/resin-elegoo-mars-4-dlp.webp"
+    },
+    {
+      "id": "resin-elegoo-mars-4-max",
+      "brand": "Elegoo",
+      "model": "Mars 4 Max",
+      "printType": "resin",
+      "widthMm": 195.84,
+      "depthMm": 122.4,
+      "heightMm": 150,
+      "image": "/printer-presets/manufacturer/resin-elegoo-mars-4-max.webp"
+    },
+    {
+      "id": "resin-elegoo-mars-4-ultra",
+      "brand": "Elegoo",
+      "model": "Mars 4 Ultra",
+      "printType": "resin",
+      "widthMm": 153.36,
+      "depthMm": 77.76,
+      "heightMm": 165,
+      "image": "/printer-presets/manufacturer/resin-elegoo-mars-4-ultra.webp"
+    },
+    {
+      "id": "resin-elegoo-mars-5",
+      "brand": "Elegoo",
+      "model": "Mars 5",
+      "printType": "resin",
+      "widthMm": 143.43,
+      "depthMm": 89.6,
+      "heightMm": 150,
+      "image": "/printer-presets/manufacturer/resin-elegoo-mars-5.webp"
+    },
+    {
+      "id": "resin-elegoo-mars-5-ultra",
+      "brand": "Elegoo",
+      "model": "Mars 5 Ultra",
+      "printType": "resin",
+      "widthMm": 153.36,
+      "depthMm": 77.76,
+      "heightMm": 165,
+      "image": "/printer-presets/manufacturer/resin-elegoo-mars-5-ultra.webp"
+    },
+    {
+      "id": "resin-elegoo-mars-c",
+      "brand": "Elegoo",
+      "model": "Mars C",
+      "printType": "resin",
+      "widthMm": 68.04,
+      "depthMm": 120.96,
+      "heightMm": 150
+    },
+    {
+      "id": "filament-elegoo-neptune",
+      "brand": "Elegoo",
+      "model": "Neptune",
+      "printType": "filament",
+      "widthMm": 210,
+      "depthMm": 210,
+      "heightMm": 200,
+      "image": "/printer-presets/orcaslicer/filament-elegoo-neptune.webp"
+    },
+    {
+      "id": "filament-elegoo-neptune-2",
+      "brand": "Elegoo",
+      "model": "Neptune 2",
+      "printType": "filament",
+      "widthMm": 235,
+      "depthMm": 235,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-elegoo-neptune-2.webp"
+    },
+    {
+      "id": "filament-elegoo-neptune-2d",
+      "brand": "Elegoo",
+      "model": "Neptune 2D",
+      "printType": "filament",
+      "widthMm": 235,
+      "depthMm": 235,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-elegoo-neptune-2d.webp"
+    },
+    {
+      "id": "filament-elegoo-neptune-2s",
+      "brand": "Elegoo",
+      "model": "Neptune 2S",
+      "printType": "filament",
+      "widthMm": 235,
+      "depthMm": 235,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-elegoo-neptune-2s.webp"
+    },
+    {
+      "id": "filament-elegoo-neptune-3",
+      "brand": "Elegoo",
+      "model": "Neptune 3",
+      "printType": "filament",
+      "widthMm": 235,
+      "depthMm": 235,
+      "heightMm": 280,
+      "image": "/printer-presets/orcaslicer/filament-elegoo-neptune-3.webp"
+    },
+    {
+      "id": "filament-elegoo-neptune-3-max",
+      "brand": "Elegoo",
+      "model": "Neptune 3 Max",
+      "printType": "filament",
+      "widthMm": 425,
+      "depthMm": 425,
+      "heightMm": 500,
+      "image": "/printer-presets/orcaslicer/filament-elegoo-neptune-3-max.webp"
+    },
+    {
+      "id": "filament-elegoo-neptune-3-plus",
+      "brand": "Elegoo",
+      "model": "Neptune 3 Plus",
+      "printType": "filament",
+      "widthMm": 325,
+      "depthMm": 325,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-elegoo-neptune-3-plus.webp"
+    },
+    {
+      "id": "filament-elegoo-neptune-3-pro",
+      "brand": "Elegoo",
+      "model": "Neptune 3 Pro",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 230,
+      "heightMm": 280,
+      "image": "/printer-presets/orcaslicer/filament-elegoo-neptune-3-pro.webp"
+    },
+    {
+      "id": "filament-elegoo-neptune-4",
+      "brand": "Elegoo",
+      "model": "Neptune 4",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 230,
+      "heightMm": 265,
+      "image": "/printer-presets/orcaslicer/filament-elegoo-neptune-4.webp"
+    },
+    {
+      "id": "filament-elegoo-neptune-4-max",
+      "brand": "Elegoo",
+      "model": "Neptune 4 Max",
+      "printType": "filament",
+      "widthMm": 426,
+      "depthMm": 426,
+      "heightMm": 480,
+      "image": "/printer-presets/orcaslicer/filament-elegoo-neptune-4-max.webp"
+    },
+    {
+      "id": "filament-elegoo-neptune-4-plus",
+      "brand": "Elegoo",
+      "model": "Neptune 4 Plus",
+      "printType": "filament",
+      "widthMm": 325,
+      "depthMm": 325,
+      "heightMm": 385,
+      "image": "/printer-presets/orcaslicer/filament-elegoo-neptune-4-plus.webp"
+    },
+    {
+      "id": "filament-elegoo-neptune-4-pro",
+      "brand": "Elegoo",
+      "model": "Neptune 4 Pro",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 230,
+      "heightMm": 265,
+      "image": "/printer-presets/orcaslicer/filament-elegoo-neptune-4-pro.webp"
+    },
+    {
+      "id": "filament-elegoo-neptune-x",
+      "brand": "Elegoo",
+      "model": "Neptune X",
+      "printType": "filament",
+      "widthMm": 235,
+      "depthMm": 235,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-elegoo-neptune-x.webp"
+    },
+    {
+      "id": "filament-elegoo-orangestorm-giga",
+      "brand": "Elegoo",
+      "model": "OrangeStorm Giga",
+      "printType": "filament",
+      "widthMm": 810,
+      "depthMm": 805,
+      "heightMm": 1010,
+      "image": "/printer-presets/orcaslicer/filament-elegoo-orangestorm-giga.webp"
+    },
+    {
+      "id": "resin-elegoo-saturn",
+      "brand": "Elegoo",
+      "model": "Saturn",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 200
+    },
+    {
+      "id": "resin-elegoo-saturn-2",
+      "brand": "Elegoo",
+      "model": "Saturn 2",
+      "printType": "resin",
+      "widthMm": 218.88,
+      "depthMm": 123.12,
+      "heightMm": 250,
+      "image": "/printer-presets/manufacturer/resin-elegoo-saturn-2.webp"
+    },
+    {
+      "id": "resin-elegoo-saturn-2-14k",
+      "brand": "Elegoo",
+      "model": "Saturn 2 14K",
+      "printType": "resin",
+      "widthMm": 223.776,
+      "depthMm": 126.976,
+      "heightMm": 250,
+      "image": "/printer-presets/manufacturer/resin-elegoo-saturn-2-14k.webp"
+    },
+    {
+      "id": "resin-elegoo-saturn-3",
+      "brand": "Elegoo",
+      "model": "Saturn 3",
+      "printType": "resin",
+      "widthMm": 218.88,
+      "depthMm": 122.88,
+      "heightMm": 250,
+      "image": "/printer-presets/manufacturer/resin-elegoo-saturn-3.webp"
+    },
+    {
+      "id": "resin-elegoo-saturn-3-ultra",
+      "brand": "Elegoo",
+      "model": "Saturn 3 Ultra",
+      "printType": "resin",
+      "widthMm": 218.88,
+      "depthMm": 122.88,
+      "heightMm": 260,
+      "image": "/printer-presets/manufacturer/resin-elegoo-saturn-3-ultra.webp"
+    },
+    {
+      "id": "resin-elegoo-saturn-4",
+      "brand": "Elegoo",
+      "model": "Saturn 4",
+      "printType": "resin",
+      "widthMm": 218.88,
+      "depthMm": 122.88,
+      "heightMm": 220,
+      "image": "/printer-presets/manufacturer/resin-elegoo-saturn-4.webp"
+    },
+    {
+      "id": "resin-elegoo-saturn-4-ultra",
+      "brand": "Elegoo",
+      "model": "Saturn 4 Ultra",
+      "printType": "resin",
+      "widthMm": 218.88,
+      "depthMm": 122.88,
+      "heightMm": 220,
+      "image": "/printer-presets/manufacturer/resin-elegoo-saturn-4-ultra.webp"
+    },
+    {
+      "id": "resin-elegoo-saturn-4-ultra-12k",
+      "brand": "Elegoo",
+      "model": "Saturn 4 Ultra 12K",
+      "printType": "resin",
+      "widthMm": 218.88,
+      "depthMm": 122.88,
+      "heightMm": 220
+    },
+    {
+      "id": "resin-elegoo-saturn-4-ultra-16k",
+      "brand": "Elegoo",
+      "model": "Saturn 4 Ultra 16K",
+      "printType": "resin",
+      "widthMm": 211.68,
+      "depthMm": 118.37,
+      "heightMm": 220,
+      "image": "/printer-presets/manufacturer/resin-elegoo-saturn-4-ultra-16k.webp"
+    },
+    {
+      "id": "resin-elegoo-saturn-8k",
+      "brand": "Elegoo",
+      "model": "Saturn 8K",
+      "printType": "resin",
+      "widthMm": 218.88,
+      "depthMm": 123.12,
+      "heightMm": 210
+    },
+    {
+      "id": "resin-elegoo-saturn-s",
+      "brand": "Elegoo",
+      "model": "Saturn S",
+      "printType": "resin",
+      "widthMm": 196.704,
+      "depthMm": 122.88,
+      "heightMm": 210
+    },
+    {
+      "id": "resin-emake3d-galaxy-1",
+      "brand": "Emake3D",
+      "model": "Galaxy 1",
+      "printType": "resin",
+      "widthMm": 400,
+      "depthMm": 200,
+      "heightMm": 400
+    },
+    {
+      "id": "resin-epax-dx1-pro",
+      "brand": "EPAX",
+      "model": "DX1 PRO",
+      "printType": "resin",
+      "widthMm": 143.43,
+      "depthMm": 89.6,
+      "heightMm": 155
+    },
+    {
+      "id": "resin-epax-dx10-pro-5k",
+      "brand": "EPAX",
+      "model": "DX10 Pro 5K",
+      "printType": "resin",
+      "widthMm": 221.4,
+      "depthMm": 129.6,
+      "heightMm": 120
+    },
+    {
+      "id": "resin-epax-dx10-pro-8k",
+      "brand": "EPAX",
+      "model": "DX10 Pro 8K",
+      "printType": "resin",
+      "widthMm": 218.88,
+      "depthMm": 123.12,
+      "heightMm": 120
+    },
+    {
+      "id": "resin-epax-e10-5k",
+      "brand": "EPAX",
+      "model": "E10 5K",
+      "printType": "resin",
+      "widthMm": 221.4,
+      "depthMm": 129.6,
+      "heightMm": 250
+    },
+    {
+      "id": "resin-epax-e10-8k",
+      "brand": "EPAX",
+      "model": "E10 8K",
+      "printType": "resin",
+      "widthMm": 218.88,
+      "depthMm": 123.12,
+      "heightMm": 250
+    },
+    {
+      "id": "resin-epax-e10-mono",
+      "brand": "EPAX",
+      "model": "E10 Mono",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 250
+    },
+    {
+      "id": "resin-epax-e6-mono",
+      "brand": "EPAX",
+      "model": "E6 Mono",
+      "printType": "resin",
+      "widthMm": 81,
+      "depthMm": 128,
+      "heightMm": 155
+    },
+    {
+      "id": "resin-epax-x1",
+      "brand": "EPAX",
+      "model": "X1",
+      "printType": "resin",
+      "widthMm": 68.04,
+      "depthMm": 120.96,
+      "heightMm": 155
+    },
+    {
+      "id": "resin-epax-x1-4ks",
+      "brand": "EPAX",
+      "model": "X1 4KS",
+      "printType": "resin",
+      "widthMm": 143.43,
+      "depthMm": 89.6,
+      "heightMm": 155
+    },
+    {
+      "id": "resin-epax-x10",
+      "brand": "EPAX",
+      "model": "X10",
+      "printType": "resin",
+      "widthMm": 135.36,
+      "depthMm": 216.57,
+      "heightMm": 250
+    },
+    {
+      "id": "resin-epax-x10-4k-mono",
+      "brand": "EPAX",
+      "model": "X10 4K Mono",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 250
+    },
+    {
+      "id": "resin-epax-x10-5k",
+      "brand": "EPAX",
+      "model": "X10 5K",
+      "printType": "resin",
+      "widthMm": 221.4,
+      "depthMm": 129.6,
+      "heightMm": 250
+    },
+    {
+      "id": "resin-epax-x133-4k-mono",
+      "brand": "EPAX",
+      "model": "X133 4K Mono",
+      "printType": "resin",
+      "widthMm": 293.76,
+      "depthMm": 165.24,
+      "heightMm": 400
+    },
+    {
+      "id": "resin-epax-x133-6k",
+      "brand": "EPAX",
+      "model": "X133 6K",
+      "printType": "resin",
+      "widthMm": 288,
+      "depthMm": 162,
+      "heightMm": 400
+    },
+    {
+      "id": "resin-epax-x156-4k-color",
+      "brand": "EPAX",
+      "model": "X156 4K Color",
+      "printType": "resin",
+      "widthMm": 345.6,
+      "depthMm": 194.4,
+      "heightMm": 400
+    },
+    {
+      "id": "resin-epax-x1k-2k-mono",
+      "brand": "EPAX",
+      "model": "X1K 2K Mono",
+      "printType": "resin",
+      "widthMm": 82.62,
+      "depthMm": 130.56,
+      "heightMm": 155
+    },
+    {
+      "id": "filament-eryone-er20",
+      "brand": "Eryone",
+      "model": "ER20",
+      "printType": "filament",
+      "widthMm": 243,
+      "depthMm": 220,
+      "heightMm": 200,
+      "image": "/printer-presets/orcaslicer/filament-eryone-er20.webp"
+    },
+    {
+      "id": "filament-eryone-er20-klipper",
+      "brand": "Eryone",
+      "model": "ER20 Klipper",
+      "printType": "filament",
+      "widthMm": 243,
+      "depthMm": 220,
+      "heightMm": 190,
+      "image": "/printer-presets/orcaslicer/filament-eryone-er20-klipper.webp"
+    },
+    {
+      "id": "filament-eryone-thinker-x400",
+      "brand": "Eryone",
+      "model": "Thinker X400",
+      "printType": "filament",
+      "widthMm": 400,
+      "depthMm": 400,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-eryone-thinker-x400.webp"
+    },
+    {
+      "id": "filament-felix-printers-pro-3",
+      "brand": "FELIX Printers",
+      "model": "Pro 3",
+      "printType": "filament",
+      "widthMm": 235,
+      "depthMm": 244,
+      "heightMm": 235,
+      "image": "/printer-presets/orcaslicer/filament-felix-printers-pro-3.webp"
+    },
+    {
+      "id": "filament-felix-printers-pro-l-3-0",
+      "brand": "FELIX Printers",
+      "model": "Pro L 3.0",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 400,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-felix-printers-pro-l-3-0.webp"
+    },
+    {
+      "id": "filament-felix-printers-pro-xl-3-0",
+      "brand": "FELIX Printers",
+      "model": "Pro XL 3.0",
+      "printType": "filament",
+      "widthMm": 600,
+      "depthMm": 400,
+      "heightMm": 600,
+      "image": "/printer-presets/orcaslicer/filament-felix-printers-pro-xl-3-0.webp"
+    },
+    {
+      "id": "filament-felix-printers-tec-4",
+      "brand": "FELIX Printers",
+      "model": "Tec 4",
+      "printType": "filament",
+      "widthMm": 205,
+      "depthMm": 255,
+      "heightMm": 255,
+      "image": "/printer-presets/orcaslicer/filament-felix-printers-tec-4.webp"
+    },
+    {
+      "id": "filament-flashforge-ad5x",
+      "brand": "FlashForge",
+      "model": "AD5X",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 220,
+      "image": "/printer-presets/orcaslicer/filament-flashforge-ad5x.webp"
+    },
+    {
+      "id": "filament-flashforge-adventurer-3-series",
+      "brand": "FlashForge",
+      "model": "Adventurer 3 Series",
+      "printType": "filament",
+      "widthMm": 150,
+      "depthMm": 150,
+      "heightMm": 150,
+      "image": "/printer-presets/orcaslicer/filament-flashforge-adventurer-3-series.webp"
+    },
+    {
+      "id": "filament-flashforge-adventurer-4-series",
+      "brand": "FlashForge",
+      "model": "Adventurer 4 Series",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 200,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-flashforge-adventurer-4-series.webp"
+    },
+    {
+      "id": "filament-flashforge-adventurer-5m",
+      "brand": "FlashForge",
+      "model": "Adventurer 5M",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 220,
+      "image": "/printer-presets/orcaslicer/filament-flashforge-adventurer-5m.webp"
+    },
+    {
+      "id": "filament-flashforge-adventurer-5m-pro",
+      "brand": "FlashForge",
+      "model": "Adventurer 5M Pro",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 220,
+      "image": "/printer-presets/orcaslicer/filament-flashforge-adventurer-5m-pro.webp"
+    },
+    {
+      "id": "filament-flashforge-adventurer-a5",
+      "brand": "FlashForge",
+      "model": "Adventurer A5",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 220,
+      "image": "/printer-presets/orcaslicer/filament-flashforge-adventurer-a5.webp"
+    },
+    {
+      "id": "filament-flashforge-artemis",
+      "brand": "FlashForge",
+      "model": "Artemis",
+      "printType": "filament",
+      "widthMm": 190,
+      "depthMm": 195,
+      "heightMm": 200,
+      "image": "/printer-presets/orcaslicer/filament-flashforge-artemis.webp"
+    },
+    {
+      "id": "filament-flashforge-creator-5",
+      "brand": "FlashForge",
+      "model": "Creator 5",
+      "printType": "filament",
+      "widthMm": 256,
+      "depthMm": 256,
+      "heightMm": 256,
+      "image": "/printer-presets/orcaslicer/filament-flashforge-creator-5.webp"
+    },
+    {
+      "id": "filament-flashforge-creator-5-pro",
+      "brand": "FlashForge",
+      "model": "Creator 5 Pro",
+      "printType": "filament",
+      "widthMm": 256,
+      "depthMm": 256,
+      "heightMm": 256,
+      "image": "/printer-presets/orcaslicer/filament-flashforge-creator-5-pro.webp"
+    },
+    {
+      "id": "resin-flashforge-explorer-max",
+      "brand": "FlashForge",
+      "model": "Explorer MAX",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 200
+    },
+    {
+      "id": "resin-flashforge-focus-13-3",
+      "brand": "FlashForge",
+      "model": "Focus 13.3",
+      "printType": "resin",
+      "widthMm": 292,
+      "depthMm": 165,
+      "heightMm": 400
+    },
+    {
+      "id": "resin-flashforge-focus-8-9",
+      "brand": "FlashForge",
+      "model": "Focus 8.9",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 200
+    },
+    {
+      "id": "resin-flashforge-foto-13-3",
+      "brand": "FlashForge",
+      "model": "Foto 13.3",
+      "printType": "resin",
+      "widthMm": 292,
+      "depthMm": 165,
+      "heightMm": 400
+    },
+    {
+      "id": "resin-flashforge-foto-6-0",
+      "brand": "FlashForge",
+      "model": "Foto 6.0",
+      "printType": "resin",
+      "widthMm": 130,
+      "depthMm": 78,
+      "heightMm": 155
+    },
+    {
+      "id": "resin-flashforge-foto-8-9",
+      "brand": "FlashForge",
+      "model": "Foto 8.9",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 200
+    },
+    {
+      "id": "resin-flashforge-foto-8-9s",
+      "brand": "FlashForge",
+      "model": "Foto 8.9S",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 200
+    },
+    {
+      "id": "filament-flashforge-guider-2s",
+      "brand": "FlashForge",
+      "model": "Guider 2s",
+      "printType": "filament",
+      "widthMm": 280,
+      "depthMm": 250,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-flashforge-guider-2s.webp"
+    },
+    {
+      "id": "filament-flashforge-guider-3-ultra",
+      "brand": "FlashForge",
+      "model": "Guider 3 Ultra",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 330,
+      "heightMm": 600,
+      "image": "/printer-presets/orcaslicer/filament-flashforge-guider-3-ultra.webp"
+    },
+    {
+      "id": "filament-flashforge-guider4",
+      "brand": "FlashForge",
+      "model": "Guider4",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-flashforge-guider4.webp"
+    },
+    {
+      "id": "filament-flashforge-guider4-pro",
+      "brand": "FlashForge",
+      "model": "Guider4 Pro",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-flashforge-guider4-pro.webp"
+    },
+    {
+      "id": "resin-flashforge-hunter",
+      "brand": "FlashForge",
+      "model": "Hunter",
+      "printType": "resin",
+      "widthMm": 120,
+      "depthMm": 67.5,
+      "heightMm": 150
+    },
+    {
+      "id": "filament-flsun-q5",
+      "brand": "FLSun",
+      "model": "Q5",
+      "printType": "filament",
+      "widthMm": 200,
+      "depthMm": 200,
+      "heightMm": 200,
+      "image": "/printer-presets/orcaslicer/filament-flsun-q5.webp"
+    },
+    {
+      "id": "filament-flsun-qq-s-pro",
+      "brand": "FLSun",
+      "model": "QQ-S Pro",
+      "printType": "filament",
+      "widthMm": 260,
+      "depthMm": 260,
+      "heightMm": 360,
+      "image": "/printer-presets/orcaslicer/filament-flsun-qq-s-pro.webp"
+    },
+    {
+      "id": "filament-flsun-s1",
+      "brand": "FLSun",
+      "model": "S1",
+      "printType": "filament",
+      "widthMm": 320,
+      "depthMm": 320,
+      "heightMm": 430,
+      "image": "/printer-presets/orcaslicer/filament-flsun-s1.webp"
+    },
+    {
+      "id": "filament-flsun-super-racer-sr",
+      "brand": "FLSun",
+      "model": "Super Racer (SR)",
+      "printType": "filament",
+      "widthMm": 270,
+      "depthMm": 270,
+      "heightMm": 330,
+      "image": "/printer-presets/orcaslicer/filament-flsun-super-racer-sr.webp"
+    },
+    {
+      "id": "filament-flsun-t1",
+      "brand": "FLSun",
+      "model": "T1",
+      "printType": "filament",
+      "widthMm": 260,
+      "depthMm": 260,
+      "heightMm": 330,
+      "image": "/printer-presets/orcaslicer/filament-flsun-t1.webp"
+    },
+    {
+      "id": "filament-flsun-v400",
+      "brand": "FLSun",
+      "model": "V400",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 410,
+      "image": "/printer-presets/orcaslicer/filament-flsun-v400.webp"
+    },
+    {
+      "id": "filament-flyingbear-ghost-6",
+      "brand": "FlyingBear",
+      "model": "Ghost 6",
+      "printType": "filament",
+      "widthMm": 255,
+      "depthMm": 210,
+      "heightMm": 210,
+      "image": "/printer-presets/orcaslicer/filament-flyingbear-ghost-6.webp"
+    },
+    {
+      "id": "filament-flyingbear-ghost7",
+      "brand": "FlyingBear",
+      "model": "Ghost7",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 250,
+      "heightMm": 205,
+      "image": "/printer-presets/orcaslicer/filament-flyingbear-ghost7.webp"
+    },
+    {
+      "id": "filament-flyingbear-reborn3",
+      "brand": "FlyingBear",
+      "model": "Reborn3",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 350,
+      "image": "/printer-presets/orcaslicer/filament-flyingbear-reborn3.webp"
+    },
+    {
+      "id": "filament-flyingbear-s1",
+      "brand": "FlyingBear",
+      "model": "S1",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-flyingbear-s1.webp"
+    },
+    {
+      "id": "filament-folgertech-ft-5",
+      "brand": "Folgertech",
+      "model": "FT-5",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-folgertech-ft-5.webp"
+    },
+    {
+      "id": "filament-folgertech-ft-6",
+      "brand": "Folgertech",
+      "model": "FT-6",
+      "printType": "filament",
+      "widthMm": 700,
+      "depthMm": 350,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-folgertech-ft-6.webp"
+    },
+    {
+      "id": "filament-folgertech-i3",
+      "brand": "Folgertech",
+      "model": "i3",
+      "printType": "filament",
+      "widthMm": 200,
+      "depthMm": 200,
+      "heightMm": 175,
+      "image": "/printer-presets/orcaslicer/filament-folgertech-i3.webp"
+    },
+    {
+      "id": "resin-formlabs-form-2",
+      "brand": "Formlabs",
+      "model": "Form 2",
+      "printType": "resin",
+      "widthMm": 145,
+      "depthMm": 145,
+      "heightMm": 175
+    },
+    {
+      "id": "resin-formlabs-form-3",
+      "brand": "Formlabs",
+      "model": "Form 3",
+      "printType": "resin",
+      "widthMm": 145,
+      "depthMm": 145,
+      "heightMm": 193,
+      "image": "/printer-presets/manufacturer/resin-formlabs-form-3.webp"
+    },
+    {
+      "id": "resin-formlabs-form-3-plus",
+      "brand": "Formlabs",
+      "model": "Form 3+",
+      "printType": "resin",
+      "widthMm": 145,
+      "depthMm": 145,
+      "heightMm": 193,
+      "image": "/printer-presets/manufacturer/resin-formlabs-form-3-plus.webp"
+    },
+    {
+      "id": "resin-formlabs-form-3b",
+      "brand": "Formlabs",
+      "model": "Form 3B",
+      "printType": "resin",
+      "widthMm": 145,
+      "depthMm": 145,
+      "heightMm": 193,
+      "image": "/printer-presets/manufacturer/resin-formlabs-form-3b.webp"
+    },
+    {
+      "id": "resin-formlabs-form-3b-plus",
+      "brand": "Formlabs",
+      "model": "Form 3B+",
+      "printType": "resin",
+      "widthMm": 145,
+      "depthMm": 145,
+      "heightMm": 193,
+      "image": "/printer-presets/manufacturer/resin-formlabs-form-3b-plus.webp"
+    },
+    {
+      "id": "resin-formlabs-form-3bl",
+      "brand": "Formlabs",
+      "model": "Form 3BL",
+      "printType": "resin",
+      "widthMm": 335,
+      "depthMm": 200,
+      "heightMm": 320,
+      "image": "/printer-presets/manufacturer/resin-formlabs-form-3bl.webp"
+    },
+    {
+      "id": "resin-formlabs-form-3l",
+      "brand": "Formlabs",
+      "model": "Form 3L",
+      "printType": "resin",
+      "widthMm": 335,
+      "depthMm": 200,
+      "heightMm": 320,
+      "image": "/printer-presets/manufacturer/resin-formlabs-form-3l.webp"
+    },
+    {
+      "id": "resin-formlabs-form-4",
+      "brand": "Formlabs",
+      "model": "Form 4",
+      "printType": "resin",
+      "widthMm": 200,
+      "depthMm": 125,
+      "heightMm": 210,
+      "image": "/printer-presets/manufacturer/resin-formlabs-form-4.webp"
+    },
+    {
+      "id": "resin-formlabs-form-4b",
+      "brand": "Formlabs",
+      "model": "Form 4B",
+      "printType": "resin",
+      "widthMm": 200,
+      "depthMm": 125,
+      "heightMm": 210,
+      "image": "/printer-presets/manufacturer/resin-formlabs-form-4b.webp"
+    },
+    {
+      "id": "resin-formlabs-form-4bl",
+      "brand": "Formlabs",
+      "model": "Form 4BL",
+      "printType": "resin",
+      "widthMm": 353,
+      "depthMm": 196,
+      "heightMm": 350,
+      "image": "/printer-presets/manufacturer/resin-formlabs-form-4bl.webp"
+    },
+    {
+      "id": "resin-formlabs-form-4l",
+      "brand": "Formlabs",
+      "model": "Form 4L",
+      "printType": "resin",
+      "widthMm": 353,
+      "depthMm": 196,
+      "heightMm": 350,
+      "image": "/printer-presets/manufacturer/resin-formlabs-form-4l.webp"
+    },
+    {
+      "id": "resin-formlabs-form-studio-1",
+      "brand": "Formlabs",
+      "model": "Form Studio 1",
+      "printType": "resin",
+      "widthMm": 200,
+      "depthMm": 125,
+      "heightMm": 235,
+      "image": "/printer-presets/manufacturer/resin-formlabs-form-studio-1.webp"
+    },
+    {
+      "id": "filament-geeetech-a10-m",
+      "brand": "Geeetech",
+      "model": "A10 M",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 260,
+      "image": "/printer-presets/orcaslicer/filament-geeetech-a10-m.webp"
+    },
+    {
+      "id": "filament-geeetech-a10-pro",
+      "brand": "Geeetech",
+      "model": "A10 Pro",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 260,
+      "image": "/printer-presets/orcaslicer/filament-geeetech-a10-pro.webp"
+    },
+    {
+      "id": "filament-geeetech-a10-t",
+      "brand": "Geeetech",
+      "model": "A10 T",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 260,
+      "image": "/printer-presets/orcaslicer/filament-geeetech-a10-t.webp"
+    },
+    {
+      "id": "filament-geeetech-a20",
+      "brand": "Geeetech",
+      "model": "A20",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 250,
+      "heightMm": 260,
+      "image": "/printer-presets/orcaslicer/filament-geeetech-a20.webp"
+    },
+    {
+      "id": "filament-geeetech-a20-m",
+      "brand": "Geeetech",
+      "model": "A20 M",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 250,
+      "heightMm": 260,
+      "image": "/printer-presets/orcaslicer/filament-geeetech-a20-m.webp"
+    },
+    {
+      "id": "filament-geeetech-a20-t",
+      "brand": "Geeetech",
+      "model": "A20 T",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 250,
+      "heightMm": 260,
+      "image": "/printer-presets/orcaslicer/filament-geeetech-a20-t.webp"
+    },
+    {
+      "id": "filament-geeetech-a30-m",
+      "brand": "Geeetech",
+      "model": "A30 M",
+      "printType": "filament",
+      "widthMm": 320,
+      "depthMm": 320,
+      "heightMm": 420,
+      "image": "/printer-presets/orcaslicer/filament-geeetech-a30-m.webp"
+    },
+    {
+      "id": "filament-geeetech-a30-pro",
+      "brand": "Geeetech",
+      "model": "A30 Pro",
+      "printType": "filament",
+      "widthMm": 320,
+      "depthMm": 320,
+      "heightMm": 420,
+      "image": "/printer-presets/orcaslicer/filament-geeetech-a30-pro.webp"
+    },
+    {
+      "id": "filament-geeetech-a30-t",
+      "brand": "Geeetech",
+      "model": "A30 T",
+      "printType": "filament",
+      "widthMm": 320,
+      "depthMm": 320,
+      "heightMm": 420,
+      "image": "/printer-presets/orcaslicer/filament-geeetech-a30-t.webp"
+    },
+    {
+      "id": "filament-geeetech-m1",
+      "brand": "Geeetech",
+      "model": "M1",
+      "printType": "filament",
+      "widthMm": 105,
+      "depthMm": 105,
+      "heightMm": 95,
+      "image": "/printer-presets/orcaslicer/filament-geeetech-m1.webp"
+    },
+    {
+      "id": "filament-geeetech-mizar",
+      "brand": "Geeetech",
+      "model": "Mizar",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 260,
+      "image": "/printer-presets/orcaslicer/filament-geeetech-mizar.webp"
+    },
+    {
+      "id": "filament-geeetech-mizar-m",
+      "brand": "Geeetech",
+      "model": "Mizar M",
+      "printType": "filament",
+      "widthMm": 255,
+      "depthMm": 255,
+      "heightMm": 260,
+      "image": "/printer-presets/orcaslicer/filament-geeetech-mizar-m.webp"
+    },
+    {
+      "id": "filament-geeetech-mizar-max",
+      "brand": "Geeetech",
+      "model": "Mizar Max",
+      "printType": "filament",
+      "widthMm": 320,
+      "depthMm": 320,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-geeetech-mizar-max.webp"
+    },
+    {
+      "id": "filament-geeetech-mizar-pro",
+      "brand": "Geeetech",
+      "model": "Mizar Pro",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 260,
+      "image": "/printer-presets/orcaslicer/filament-geeetech-mizar-pro.webp"
+    },
+    {
+      "id": "filament-geeetech-mizar-s",
+      "brand": "Geeetech",
+      "model": "Mizar S",
+      "printType": "filament",
+      "widthMm": 255,
+      "depthMm": 255,
+      "heightMm": 260,
+      "image": "/printer-presets/orcaslicer/filament-geeetech-mizar-s.webp"
+    },
+    {
+      "id": "filament-geeetech-thunder",
+      "brand": "Geeetech",
+      "model": "Thunder",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 250,
+      "heightMm": 260,
+      "image": "/printer-presets/orcaslicer/filament-geeetech-thunder.webp"
+    },
+    {
+      "id": "filament-goofoo-gp1",
+      "brand": "Goofoo",
+      "model": "GP1",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 250,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-goofoo-gp1.webp"
+    },
+    {
+      "id": "filament-goofoo-turbom",
+      "brand": "Goofoo",
+      "model": "TurboM",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 200,
+      "heightMm": 200,
+      "image": "/printer-presets/orcaslicer/filament-goofoo-turbom.webp"
+    },
+    {
+      "id": "filament-goofoo-velo",
+      "brand": "Goofoo",
+      "model": "Velo+",
+      "printType": "filament",
+      "widthMm": 600,
+      "depthMm": 500,
+      "heightMm": 600,
+      "image": "/printer-presets/orcaslicer/filament-goofoo-velo.webp"
+    },
+    {
+      "id": "filament-goofoo-velo-tool",
+      "brand": "Goofoo",
+      "model": "Velo+ Tool",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 600
+    },
+    {
+      "id": "resin-heygears-reflex",
+      "brand": "HeyGears",
+      "model": "Reflex",
+      "printType": "resin",
+      "widthMm": 191,
+      "depthMm": 121,
+      "heightMm": 220,
+      "image": "/printer-presets/manufacturer/resin-heygears-reflex.webp"
+    },
+    {
+      "id": "resin-heygears-reflex-2",
+      "brand": "HeyGears",
+      "model": "Reflex 2",
+      "printType": "resin",
+      "widthMm": 230,
+      "depthMm": 144,
+      "heightMm": 230,
+      "image": "/printer-presets/manufacturer/resin-heygears-reflex-2.webp"
+    },
+    {
+      "id": "resin-heygears-reflex-2-pro",
+      "brand": "HeyGears",
+      "model": "Reflex 2 Pro",
+      "printType": "resin",
+      "widthMm": 230,
+      "depthMm": 144,
+      "heightMm": 350,
+      "image": "/printer-presets/manufacturer/resin-heygears-reflex-2-pro.webp"
+    },
+    {
+      "id": "resin-heygears-reflex-rs",
+      "brand": "HeyGears",
+      "model": "Reflex RS",
+      "printType": "resin",
+      "widthMm": 222,
+      "depthMm": 122,
+      "heightMm": 228,
+      "image": "/printer-presets/manufacturer/resin-heygears-reflex-rs.webp"
+    },
+    {
+      "id": "resin-heygears-reflex-rs-turbo",
+      "brand": "HeyGears",
+      "model": "Reflex RS Turbo",
+      "printType": "resin",
+      "widthMm": 222,
+      "depthMm": 122,
+      "heightMm": 228,
+      "image": "/printer-presets/manufacturer/resin-heygears-reflex-rs-turbo.webp"
+    },
+    {
+      "id": "resin-heygears-reflex-turbo",
+      "brand": "HeyGears",
+      "model": "Reflex Turbo",
+      "printType": "resin",
+      "widthMm": 191,
+      "depthMm": 121,
+      "heightMm": 220,
+      "image": "/printer-presets/manufacturer/resin-heygears-reflex-turbo.webp"
+    },
+    {
+      "id": "filament-ideaformer-ir3-v2",
+      "brand": "IdeaFormer",
+      "model": "IR3 V2",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 2000,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-ideaformer-ir3-v2.webp"
+    },
+    {
+      "id": "filament-infimech-ex",
+      "brand": "InfiMech",
+      "model": "EX",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 250,
+      "heightMm": 205,
+      "image": "/printer-presets/orcaslicer/filament-infimech-ex.webp"
+    },
+    {
+      "id": "filament-infimech-ex-aps",
+      "brand": "InfiMech",
+      "model": "EX+APS",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 250,
+      "heightMm": 167,
+      "image": "/printer-presets/orcaslicer/filament-infimech-ex-aps.webp"
+    },
+    {
+      "id": "filament-infimech-tx",
+      "brand": "InfiMech",
+      "model": "TX",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-infimech-tx.webp"
+    },
+    {
+      "id": "filament-infimech-tx-hardened-steel-nozzle",
+      "brand": "InfiMech",
+      "model": "TX Hardened Steel Nozzle",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-infimech-tx-hardened-steel-nozzle.webp"
+    },
+    {
+      "id": "filament-innovatiq-tiq2",
+      "brand": "innovatiQ",
+      "model": "TiQ2",
+      "printType": "filament",
+      "widthMm": 330,
+      "depthMm": 330,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-innovatiq-tiq2.webp"
+    },
+    {
+      "id": "filament-innovatiq-tiq8",
+      "brand": "innovatiQ",
+      "model": "TiQ8",
+      "printType": "filament",
+      "widthMm": 500,
+      "depthMm": 400,
+      "heightMm": 450,
+      "image": "/printer-presets/orcaslicer/filament-innovatiq-tiq8.webp"
+    },
+    {
+      "id": "resin-kelant-s400",
+      "brand": "Kelant",
+      "model": "S400",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 200
+    },
+    {
+      "id": "filament-kingroon-klp1",
+      "brand": "Kingroon",
+      "model": "KLP1",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 230,
+      "heightMm": 210,
+      "image": "/printer-presets/orcaslicer/filament-kingroon-klp1.webp"
+    },
+    {
+      "id": "filament-kingroon-kp3s-3-0",
+      "brand": "Kingroon",
+      "model": "KP3S 3.0",
+      "printType": "filament",
+      "widthMm": 180,
+      "depthMm": 180,
+      "heightMm": 180,
+      "image": "/printer-presets/orcaslicer/filament-kingroon-kp3s-3-0.webp"
+    },
+    {
+      "id": "filament-kingroon-kp3s-pro-v2",
+      "brand": "Kingroon",
+      "model": "KP3S PRO V2",
+      "printType": "filament",
+      "widthMm": 205,
+      "depthMm": 205,
+      "heightMm": 200,
+      "image": "/printer-presets/orcaslicer/filament-kingroon-kp3s-pro-v2.webp"
+    },
+    {
+      "id": "filament-kingroon-kp3s-v1",
+      "brand": "Kingroon",
+      "model": "KP3S V1",
+      "printType": "filament",
+      "widthMm": 180,
+      "depthMm": 180,
+      "heightMm": 180,
+      "image": "/printer-presets/orcaslicer/filament-kingroon-kp3s-v1.webp"
+    },
+    {
+      "id": "filament-lh-stinger",
+      "brand": "LH",
+      "model": "Stinger",
+      "printType": "filament",
+      "widthMm": 200,
+      "depthMm": 200,
+      "heightMm": 180,
+      "image": "/printer-presets/orcaslicer/filament-lh-stinger.webp"
+    },
+    {
+      "id": "filament-lh-stinger-mmu",
+      "brand": "LH",
+      "model": "Stinger MMU",
+      "printType": "filament",
+      "widthMm": 200,
+      "depthMm": 200,
+      "heightMm": 180,
+      "image": "/printer-presets/orcaslicer/filament-lh-stinger-mmu.webp"
+    },
+    {
+      "id": "filament-longer-lk10",
+      "brand": "Longer",
+      "model": "LK10",
+      "printType": "filament",
+      "widthMm": 225,
+      "depthMm": 225,
+      "heightMm": 265,
+      "image": "/printer-presets/orcaslicer/filament-longer-lk10.webp"
+    },
+    {
+      "id": "filament-longer-lk10-plus",
+      "brand": "Longer",
+      "model": "LK10 Plus",
+      "printType": "filament",
+      "widthMm": 320,
+      "depthMm": 320,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-longer-lk10-plus.webp"
+    },
+    {
+      "id": "resin-longer-orange-10",
+      "brand": "Longer",
+      "model": "Orange 10",
+      "printType": "resin",
+      "widthMm": 55.44,
+      "depthMm": 98.64,
+      "heightMm": 140
+    },
+    {
+      "id": "resin-longer-orange-120",
+      "brand": "Longer",
+      "model": "Orange 120",
+      "printType": "resin",
+      "widthMm": 68.04,
+      "depthMm": 120.96,
+      "heightMm": 150
+    },
+    {
+      "id": "resin-longer-orange-30",
+      "brand": "Longer",
+      "model": "Orange 30",
+      "printType": "resin",
+      "widthMm": 68.04,
+      "depthMm": 120.96,
+      "heightMm": 170
+    },
+    {
+      "id": "resin-longer-orange-4k",
+      "brand": "Longer",
+      "model": "Orange 4K",
+      "printType": "resin",
+      "widthMm": 120.96,
+      "depthMm": 68.04,
+      "heightMm": 190
+    },
+    {
+      "id": "filament-lulzbot-mini-1",
+      "brand": "Lulzbot",
+      "model": "Mini 1",
+      "printType": "filament",
+      "widthMm": 154,
+      "depthMm": 154,
+      "heightMm": 158,
+      "image": "/printer-presets/orcaslicer/filament-lulzbot-mini-1.webp"
+    },
+    {
+      "id": "filament-lulzbot-taz-4-or-5",
+      "brand": "Lulzbot",
+      "model": "Taz 4 or 5",
+      "printType": "filament",
+      "widthMm": 280,
+      "depthMm": 280,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-lulzbot-taz-4-or-5.webp"
+    },
+    {
+      "id": "filament-lulzbot-taz-6",
+      "brand": "Lulzbot",
+      "model": "Taz 6",
+      "printType": "filament",
+      "widthMm": 280,
+      "depthMm": 280,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-lulzbot-taz-6.webp"
+    },
+    {
+      "id": "filament-lulzbot-taz-pro-dual",
+      "brand": "Lulzbot",
+      "model": "Taz Pro Dual",
+      "printType": "filament",
+      "widthMm": 280,
+      "depthMm": 280,
+      "heightMm": 280,
+      "image": "/printer-presets/orcaslicer/filament-lulzbot-taz-pro-dual.webp"
+    },
+    {
+      "id": "filament-lulzbot-taz-pro-s",
+      "brand": "Lulzbot",
+      "model": "Taz Pro S",
+      "printType": "filament",
+      "widthMm": 280,
+      "depthMm": 280,
+      "heightMm": 280,
+      "image": "/printer-presets/orcaslicer/filament-lulzbot-taz-pro-s.webp"
+    },
+    {
+      "id": "filament-m3d-enabler-d7500",
+      "brand": "M3D",
+      "model": "Enabler D7500",
+      "printType": "filament",
+      "widthMm": 150,
+      "depthMm": 150,
+      "heightMm": 150,
+      "image": "/printer-presets/orcaslicer/filament-m3d-enabler-d7500.webp"
+    },
+    {
+      "id": "filament-m3d-enabler-d8500",
+      "brand": "M3D",
+      "model": "Enabler D8500",
+      "printType": "filament",
+      "widthMm": 210,
+      "depthMm": 150,
+      "heightMm": 150,
+      "image": "/printer-presets/orcaslicer/filament-m3d-enabler-d8500.webp"
+    },
+    {
+      "id": "filament-magicmaker-mm-boneking",
+      "brand": "MagicMaker",
+      "model": "MM BoneKing",
+      "printType": "filament",
+      "widthMm": 310,
+      "depthMm": 306,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-magicmaker-mm-boneking.webp"
+    },
+    {
+      "id": "filament-magicmaker-mm-hj-sk",
+      "brand": "MagicMaker",
+      "model": "MM hj SK",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 210,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-magicmaker-mm-hj-sk.webp"
+    },
+    {
+      "id": "filament-magicmaker-mm-hqs-hj",
+      "brand": "MagicMaker",
+      "model": "MM hqs hj",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 210,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-magicmaker-mm-hqs-hj.webp"
+    },
+    {
+      "id": "filament-magicmaker-mm-hqs-sf",
+      "brand": "MagicMaker",
+      "model": "MM hqs SF",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 210,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-magicmaker-mm-hqs-sf.webp"
+    },
+    {
+      "id": "filament-magicmaker-mm-slb",
+      "brand": "MagicMaker",
+      "model": "MM slb",
+      "printType": "filament",
+      "widthMm": 125,
+      "depthMm": 125,
+      "heightMm": 160,
+      "image": "/printer-presets/orcaslicer/filament-magicmaker-mm-slb.webp"
+    },
+    {
+      "id": "filament-mellow-m1",
+      "brand": "Mellow",
+      "model": "M1",
+      "printType": "filament",
+      "widthMm": 106,
+      "depthMm": 106,
+      "heightMm": 100,
+      "image": "/printer-presets/orcaslicer/filament-mellow-m1.webp"
+    },
+    {
+      "id": "filament-meltingplot-chx-350",
+      "brand": "Meltingplot",
+      "model": "CHX 350",
+      "printType": "filament",
+      "widthMm": 880,
+      "depthMm": 422,
+      "heightMm": 943,
+      "image": "/printer-presets/orcaslicer/filament-meltingplot-chx-350.webp"
+    },
+    {
+      "id": "filament-meltingplot-mbl-133",
+      "brand": "Meltingplot",
+      "model": "MBL 133",
+      "printType": "filament",
+      "widthMm": 835,
+      "depthMm": 405,
+      "heightMm": 394,
+      "image": "/printer-presets/orcaslicer/filament-meltingplot-mbl-133.webp"
+    },
+    {
+      "id": "filament-meltingplot-mbl-136",
+      "brand": "Meltingplot",
+      "model": "MBL 136",
+      "printType": "filament",
+      "widthMm": 850,
+      "depthMm": 405,
+      "heightMm": 396,
+      "image": "/printer-presets/orcaslicer/filament-meltingplot-mbl-136.webp"
+    },
+    {
+      "id": "filament-meltingplot-mbl-308",
+      "brand": "Meltingplot",
+      "model": "MBL 308",
+      "printType": "filament",
+      "widthMm": 850,
+      "depthMm": 405,
+      "heightMm": 896,
+      "image": "/printer-presets/orcaslicer/filament-meltingplot-mbl-308.webp"
+    },
+    {
+      "id": "filament-meltingplot-mbl-480",
+      "brand": "Meltingplot",
+      "model": "MBL 480",
+      "printType": "filament",
+      "widthMm": 850,
+      "depthMm": 405,
+      "heightMm": 1396,
+      "image": "/printer-presets/orcaslicer/filament-meltingplot-mbl-480.webp"
+    },
+    {
+      "id": "resin-nova3d-bene4",
+      "brand": "Nova3D",
+      "model": "Bene4",
+      "printType": "resin",
+      "widthMm": 70,
+      "depthMm": 130,
+      "heightMm": 150
+    },
+    {
+      "id": "resin-nova3d-bene4-mono",
+      "brand": "Nova3D",
+      "model": "Bene4 Mono",
+      "printType": "resin",
+      "widthMm": 79.865,
+      "depthMm": 129.998,
+      "heightMm": 150
+    },
+    {
+      "id": "resin-nova3d-bene5",
+      "brand": "Nova3D",
+      "model": "Bene5",
+      "printType": "resin",
+      "widthMm": 79.865,
+      "depthMm": 129.998,
+      "heightMm": 150
+    },
+    {
+      "id": "resin-nova3d-bene6",
+      "brand": "Nova3D",
+      "model": "Bene6",
+      "printType": "resin",
+      "widthMm": 143.43,
+      "depthMm": 89.6,
+      "heightMm": 180
+    },
+    {
+      "id": "resin-nova3d-elfin",
+      "brand": "Nova3D",
+      "model": "Elfin",
+      "printType": "resin",
+      "widthMm": 73,
+      "depthMm": 131,
+      "heightMm": 150
+    },
+    {
+      "id": "resin-nova3d-elfin2",
+      "brand": "Nova3D",
+      "model": "Elfin2",
+      "printType": "resin",
+      "widthMm": 70,
+      "depthMm": 130,
+      "heightMm": 150
+    },
+    {
+      "id": "resin-nova3d-elfin2-mono-se",
+      "brand": "Nova3D",
+      "model": "Elfin2 Mono SE",
+      "printType": "resin",
+      "widthMm": 75,
+      "depthMm": 130,
+      "heightMm": 150
+    },
+    {
+      "id": "resin-nova3d-elfin3-mini",
+      "brand": "Nova3D",
+      "model": "Elfin3 Mini",
+      "printType": "resin",
+      "widthMm": 68,
+      "depthMm": 120,
+      "heightMm": 150
+    },
+    {
+      "id": "resin-nova3d-whale",
+      "brand": "Nova3D",
+      "model": "Whale",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 250
+    },
+    {
+      "id": "resin-nova3d-whale2",
+      "brand": "Nova3D",
+      "model": "Whale2",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 250
+    },
+    {
+      "id": "resin-nova3d-whale3-pro",
+      "brand": "Nova3D",
+      "model": "Whale3 Pro",
+      "printType": "resin",
+      "widthMm": 228.096,
+      "depthMm": 128.304,
+      "heightMm": 260
+    },
+    {
+      "id": "filament-openeye-peacock-v2",
+      "brand": "OpenEYE",
+      "model": "Peacock V2",
+      "printType": "filament",
+      "widthMm": 233.5,
+      "depthMm": 228,
+      "heightMm": 200,
+      "image": "/printer-presets/orcaslicer/filament-openeye-peacock-v2.webp"
+    },
+    {
+      "id": "filament-peopoly-magneto-x",
+      "brand": "Peopoly",
+      "model": "Magneto X",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 400,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-peopoly-magneto-x.webp"
+    },
+    {
+      "id": "resin-peopoly-phenom",
+      "brand": "Peopoly",
+      "model": "Phenom",
+      "printType": "resin",
+      "widthMm": 276.48,
+      "depthMm": 155.52,
+      "heightMm": 400
+    },
+    {
+      "id": "resin-peopoly-phenom-forge",
+      "brand": "Peopoly",
+      "model": "Phenom Forge",
+      "printType": "resin",
+      "widthMm": 288,
+      "depthMm": 162,
+      "heightMm": 350
+    },
+    {
+      "id": "resin-peopoly-phenom-l",
+      "brand": "Peopoly",
+      "model": "Phenom L",
+      "printType": "resin",
+      "widthMm": 345.6,
+      "depthMm": 194.4,
+      "heightMm": 400
+    },
+    {
+      "id": "resin-peopoly-phenom-noir",
+      "brand": "Peopoly",
+      "model": "Phenom Noir",
+      "printType": "resin",
+      "widthMm": 293.76,
+      "depthMm": 165.24,
+      "heightMm": 400
+    },
+    {
+      "id": "resin-peopoly-phenom-xxl",
+      "brand": "Peopoly",
+      "model": "Phenom XXL",
+      "printType": "resin",
+      "widthMm": 526.08,
+      "depthMm": 295.92,
+      "heightMm": 550
+    },
+    {
+      "id": "resin-peopoly-phenom-xxl-v2",
+      "brand": "Peopoly",
+      "model": "Phenom XXL V2",
+      "printType": "resin",
+      "widthMm": 526.08,
+      "depthMm": 295.92,
+      "heightMm": 550
+    },
+    {
+      "id": "filament-phrozen-arco",
+      "brand": "Phrozen",
+      "model": "Arco",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-phrozen-arco.webp"
+    },
+    {
+      "id": "resin-phrozen-shuffle",
+      "brand": "Phrozen",
+      "model": "Shuffle",
+      "printType": "resin",
+      "widthMm": 67.68,
+      "depthMm": 120.32,
+      "heightMm": 200
+    },
+    {
+      "id": "resin-phrozen-shuffle-16",
+      "brand": "Phrozen",
+      "model": "Shuffle 16",
+      "printType": "resin",
+      "widthMm": 337.92,
+      "depthMm": 190.08,
+      "heightMm": 400
+    },
+    {
+      "id": "resin-phrozen-shuffle-4k",
+      "brand": "Phrozen",
+      "model": "Shuffle 4K",
+      "printType": "resin",
+      "widthMm": 68.04,
+      "depthMm": 120.96,
+      "heightMm": 170
+    },
+    {
+      "id": "resin-phrozen-shuffle-lite",
+      "brand": "Phrozen",
+      "model": "Shuffle Lite",
+      "printType": "resin",
+      "widthMm": 68.04,
+      "depthMm": 120.96,
+      "heightMm": 170
+    },
+    {
+      "id": "resin-phrozen-shuffle-xl",
+      "brand": "Phrozen",
+      "model": "Shuffle XL",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 200
+    },
+    {
+      "id": "resin-phrozen-shuffle-xl-lite",
+      "brand": "Phrozen",
+      "model": "Shuffle XL Lite",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 200
+    },
+    {
+      "id": "resin-phrozen-sonic",
+      "brand": "Phrozen",
+      "model": "Sonic",
+      "printType": "resin",
+      "widthMm": 68.04,
+      "depthMm": 120.96,
+      "heightMm": 170
+    },
+    {
+      "id": "resin-phrozen-sonic-4k",
+      "brand": "Phrozen",
+      "model": "Sonic 4K",
+      "printType": "resin",
+      "widthMm": 134.4,
+      "depthMm": 75.6,
+      "heightMm": 200
+    },
+    {
+      "id": "resin-phrozen-sonic-mega-8k",
+      "brand": "Phrozen",
+      "model": "Sonic Mega 8K",
+      "printType": "resin",
+      "widthMm": 330.24,
+      "depthMm": 185.76,
+      "heightMm": 400
+    },
+    {
+      "id": "resin-phrozen-sonic-mega-8k-s",
+      "brand": "Phrozen",
+      "model": "Sonic Mega 8K S",
+      "printType": "resin",
+      "widthMm": 330,
+      "depthMm": 185,
+      "heightMm": 300,
+      "image": "/printer-presets/manufacturer/resin-phrozen-sonic-mega-8k-s.webp"
+    },
+    {
+      "id": "resin-phrozen-sonic-mega-8k-v2",
+      "brand": "Phrozen",
+      "model": "Sonic Mega 8K V2",
+      "printType": "resin",
+      "widthMm": 330,
+      "depthMm": 185,
+      "heightMm": 400,
+      "image": "/printer-presets/manufacturer/resin-phrozen-sonic-mega-8k-v2.webp"
+    },
+    {
+      "id": "resin-phrozen-sonic-mighty-12k",
+      "brand": "Phrozen",
+      "model": "Sonic Mighty 12K",
+      "printType": "resin",
+      "widthMm": 218,
+      "depthMm": 123,
+      "heightMm": 235
+    },
+    {
+      "id": "resin-phrozen-sonic-mighty-4k",
+      "brand": "Phrozen",
+      "model": "Sonic Mighty 4K",
+      "printType": "resin",
+      "widthMm": 199.68,
+      "depthMm": 124.8,
+      "heightMm": 220
+    },
+    {
+      "id": "resin-phrozen-sonic-mighty-8k",
+      "brand": "Phrozen",
+      "model": "Sonic Mighty 8K",
+      "printType": "resin",
+      "widthMm": 218.88,
+      "depthMm": 123.12,
+      "heightMm": 235,
+      "image": "/printer-presets/manufacturer/resin-phrozen-sonic-mighty-8k.webp"
+    },
+    {
+      "id": "resin-phrozen-sonic-mighty-revo",
+      "brand": "Phrozen",
+      "model": "Sonic Mighty Revo",
+      "printType": "resin",
+      "widthMm": 223.776,
+      "depthMm": 126.976,
+      "heightMm": 235,
+      "image": "/printer-presets/manufacturer/resin-phrozen-sonic-mighty-revo.webp"
+    },
+    {
+      "id": "resin-phrozen-sonic-mighty-revo-16k",
+      "brand": "Phrozen",
+      "model": "Sonic Mighty Revo 16K",
+      "printType": "resin",
+      "widthMm": 211.68,
+      "depthMm": 118.37,
+      "heightMm": 235,
+      "image": "/printer-presets/manufacturer/resin-phrozen-sonic-mighty-revo-16k.webp"
+    },
+    {
+      "id": "resin-phrozen-sonic-mighty-revo-16k-max",
+      "brand": "Phrozen",
+      "model": "Sonic Mighty Revo 16K MAX",
+      "printType": "resin",
+      "widthMm": 302.4,
+      "depthMm": 161.98,
+      "heightMm": 300,
+      "image": "/printer-presets/manufacturer/resin-phrozen-sonic-mighty-revo-16k-max.webp"
+    },
+    {
+      "id": "resin-phrozen-sonic-mini",
+      "brand": "Phrozen",
+      "model": "Sonic Mini",
+      "printType": "resin",
+      "widthMm": 68.04,
+      "depthMm": 120.96,
+      "heightMm": 130
+    },
+    {
+      "id": "resin-phrozen-sonic-mini-4k",
+      "brand": "Phrozen",
+      "model": "Sonic Mini 4K",
+      "printType": "resin",
+      "widthMm": 134.4,
+      "depthMm": 75.6,
+      "heightMm": 130
+    },
+    {
+      "id": "resin-phrozen-sonic-mini-8k",
+      "brand": "Phrozen",
+      "model": "Sonic Mini 8K",
+      "printType": "resin",
+      "widthMm": 165,
+      "depthMm": 71.28,
+      "heightMm": 180,
+      "image": "/printer-presets/manufacturer/resin-phrozen-sonic-mini-8k.webp"
+    },
+    {
+      "id": "resin-phrozen-sonic-mini-8k-s",
+      "brand": "Phrozen",
+      "model": "Sonic Mini 8K S",
+      "printType": "resin",
+      "widthMm": 165.792,
+      "depthMm": 71.28,
+      "heightMm": 170,
+      "image": "/printer-presets/manufacturer/resin-phrozen-sonic-mini-8k-s.webp"
+    },
+    {
+      "id": "resin-phrozen-transform",
+      "brand": "Phrozen",
+      "model": "Transform",
+      "printType": "resin",
+      "widthMm": 291.84,
+      "depthMm": 164.16,
+      "heightMm": 400
+    },
+    {
+      "id": "filament-positron-3d-the-positron",
+      "brand": "Positron 3D",
+      "model": "The Positron",
+      "printType": "filament",
+      "widthMm": 180,
+      "depthMm": 180,
+      "heightMm": 165,
+      "image": "/printer-presets/orcaslicer/filament-positron-3d-the-positron.webp"
+    },
+    {
+      "id": "filament-printcepts-babybelt-pro",
+      "brand": "Printcepts",
+      "model": "BabyBelt Pro",
+      "printType": "filament",
+      "widthMm": 95,
+      "depthMm": 500,
+      "heightMm": 100,
+      "image": "/printer-presets/orcaslicer/filament-printcepts-babybelt-pro.webp"
+    },
+    {
+      "id": "filament-prusa-core-one",
+      "brand": "Prusa",
+      "model": "CORE One",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 220,
+      "heightMm": 270,
+      "image": "/printer-presets/orcaslicer/filament-prusa-core-one.webp"
+    },
+    {
+      "id": "filament-prusa-core-one-hf",
+      "brand": "Prusa",
+      "model": "CORE One HF",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 220,
+      "heightMm": 270,
+      "image": "/printer-presets/orcaslicer/filament-prusa-core-one-hf.webp"
+    },
+    {
+      "id": "filament-prusa-core-one-indx-4t",
+      "brand": "Prusa",
+      "model": "CORE One INDX 4T",
+      "printType": "filament",
+      "widthMm": 248,
+      "depthMm": 205,
+      "heightMm": 270,
+      "image": "/printer-presets/orcaslicer/filament-prusa-core-one-indx-4t.webp"
+    },
+    {
+      "id": "filament-prusa-core-one-indx-8t",
+      "brand": "Prusa",
+      "model": "CORE One INDX 8T",
+      "printType": "filament",
+      "widthMm": 248,
+      "depthMm": 205,
+      "heightMm": 270,
+      "image": "/printer-presets/orcaslicer/filament-prusa-core-one-indx-8t.webp"
+    },
+    {
+      "id": "filament-prusa-core-one-l",
+      "brand": "Prusa",
+      "model": "CORE One L",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 331,
+      "image": "/printer-presets/orcaslicer/filament-prusa-core-one-l.webp"
+    },
+    {
+      "id": "filament-prusa-core-one-l-hf",
+      "brand": "Prusa",
+      "model": "CORE One L HF",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 331,
+      "image": "/printer-presets/orcaslicer/filament-prusa-core-one-l-hf.webp"
+    },
+    {
+      "id": "filament-prusa-core-one-mmu3",
+      "brand": "Prusa",
+      "model": "CORE One MMU3",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 220,
+      "heightMm": 270,
+      "image": "/printer-presets/orcaslicer/filament-prusa-core-one-mmu3.webp"
+    },
+    {
+      "id": "filament-prusa-mini",
+      "brand": "Prusa",
+      "model": "MINI",
+      "printType": "filament",
+      "widthMm": 180,
+      "depthMm": 180,
+      "heightMm": 180,
+      "image": "/printer-presets/orcaslicer/filament-prusa-mini.webp"
+    },
+    {
+      "id": "filament-prusa-mini-is",
+      "brand": "Prusa",
+      "model": "MINI IS",
+      "printType": "filament",
+      "widthMm": 180,
+      "depthMm": 180,
+      "heightMm": 180,
+      "image": "/printer-presets/orcaslicer/filament-prusa-mini-is.webp"
+    },
+    {
+      "id": "filament-prusa-mk3-5",
+      "brand": "Prusa",
+      "model": "MK3.5",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 210,
+      "heightMm": 210,
+      "image": "/printer-presets/orcaslicer/filament-prusa-mk3-5.webp"
+    },
+    {
+      "id": "filament-prusa-mk3s",
+      "brand": "Prusa",
+      "model": "MK3S",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 210,
+      "heightMm": 210,
+      "image": "/printer-presets/orcaslicer/filament-prusa-mk3s.webp"
+    },
+    {
+      "id": "filament-prusa-mk4",
+      "brand": "Prusa",
+      "model": "MK4",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 210,
+      "heightMm": 220,
+      "image": "/printer-presets/orcaslicer/filament-prusa-mk4.webp"
+    },
+    {
+      "id": "filament-prusa-mk4-mmu3",
+      "brand": "Prusa",
+      "model": "MK4 MMU3",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 210,
+      "heightMm": 220,
+      "image": "/printer-presets/orcaslicer/filament-prusa-mk4-mmu3.webp"
+    },
+    {
+      "id": "filament-prusa-mk4-mmu3-hf",
+      "brand": "Prusa",
+      "model": "MK4 MMU3 HF",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 210,
+      "heightMm": 220,
+      "image": "/printer-presets/orcaslicer/filament-prusa-mk4-mmu3-hf.webp"
+    },
+    {
+      "id": "filament-prusa-mk4s",
+      "brand": "Prusa",
+      "model": "MK4S",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 210,
+      "heightMm": 220,
+      "image": "/printer-presets/orcaslicer/filament-prusa-mk4s.webp"
+    },
+    {
+      "id": "filament-prusa-mk4s-hf",
+      "brand": "Prusa",
+      "model": "MK4S HF",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 210,
+      "heightMm": 220,
+      "image": "/printer-presets/orcaslicer/filament-prusa-mk4s-hf.webp"
+    },
+    {
+      "id": "resin-prusa-uvtools-prusa-sl1",
+      "brand": "Prusa",
+      "model": "UVtools Prusa SL1",
+      "printType": "resin",
+      "widthMm": 68.04,
+      "depthMm": 120.96,
+      "heightMm": 150,
+      "image": "/printer-presets/manufacturer/resin-prusa-uvtools-prusa-sl1.webp"
+    },
+    {
+      "id": "resin-prusa-uvtools-prusa-sl1s-speed",
+      "brand": "Prusa",
+      "model": "UVtools Prusa SL1S SPEED",
+      "printType": "resin",
+      "widthMm": 81,
+      "depthMm": 128,
+      "heightMm": 150,
+      "image": "/printer-presets/manufacturer/resin-prusa-uvtools-prusa-sl1s-speed.webp"
+    },
+    {
+      "id": "filament-prusa-xl",
+      "brand": "Prusa",
+      "model": "XL",
+      "printType": "filament",
+      "widthMm": 360,
+      "depthMm": 360,
+      "heightMm": 360,
+      "image": "/printer-presets/orcaslicer/filament-prusa-xl.webp"
+    },
+    {
+      "id": "filament-prusa-xl-5t",
+      "brand": "Prusa",
+      "model": "XL 5T",
+      "printType": "filament",
+      "widthMm": 360,
+      "depthMm": 360,
+      "heightMm": 360,
+      "image": "/printer-presets/orcaslicer/filament-prusa-xl-5t.webp"
+    },
+    {
+      "id": "resin-qidi-i-box-mono",
+      "brand": "QIDI",
+      "model": "I-Box Mono",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 200
+    },
+    {
+      "id": "filament-qidi-q1-pro",
+      "brand": "QIDI",
+      "model": "Q1 Pro",
+      "printType": "filament",
+      "widthMm": 245,
+      "depthMm": 245,
+      "heightMm": 240,
+      "image": "/printer-presets/orcaslicer/filament-qidi-q1-pro.webp"
+    },
+    {
+      "id": "filament-qidi-q2",
+      "brand": "QIDI",
+      "model": "Q2",
+      "printType": "filament",
+      "widthMm": 270,
+      "depthMm": 270,
+      "heightMm": 256,
+      "image": "/printer-presets/orcaslicer/filament-qidi-q2.webp"
+    },
+    {
+      "id": "filament-qidi-q2c",
+      "brand": "QIDI",
+      "model": "Q2C",
+      "printType": "filament",
+      "widthMm": 270,
+      "depthMm": 270,
+      "heightMm": 256,
+      "image": "/printer-presets/orcaslicer/filament-qidi-q2c.webp"
+    },
+    {
+      "id": "resin-qidi-s-box",
+      "brand": "QIDI",
+      "model": "S-Box",
+      "printType": "resin",
+      "widthMm": 135.36,
+      "depthMm": 216.576,
+      "heightMm": 200
+    },
+    {
+      "id": "resin-qidi-shadow5-5",
+      "brand": "QIDI",
+      "model": "Shadow5.5",
+      "printType": "resin",
+      "widthMm": 68.04,
+      "depthMm": 120.96,
+      "heightMm": 150
+    },
+    {
+      "id": "resin-qidi-shadow6-0-pro",
+      "brand": "QIDI",
+      "model": "Shadow6.0 Pro",
+      "printType": "resin",
+      "widthMm": 74.52,
+      "depthMm": 132.48,
+      "heightMm": 150
+    },
+    {
+      "id": "filament-qidi-x-cf-pro",
+      "brand": "QIDI",
+      "model": "X-CF Pro",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 250,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-qidi-x-cf-pro.webp"
+    },
+    {
+      "id": "filament-qidi-x-max",
+      "brand": "QIDI",
+      "model": "X-Max",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 250,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-qidi-x-max.webp"
+    },
+    {
+      "id": "filament-qidi-x-max-3",
+      "brand": "QIDI",
+      "model": "X-Max 3",
+      "printType": "filament",
+      "widthMm": 325,
+      "depthMm": 325,
+      "heightMm": 315,
+      "image": "/printer-presets/orcaslicer/filament-qidi-x-max-3.webp"
+    },
+    {
+      "id": "filament-qidi-x-max-4",
+      "brand": "QIDI",
+      "model": "X-Max 4",
+      "printType": "filament",
+      "widthMm": 390,
+      "depthMm": 390,
+      "heightMm": 340,
+      "image": "/printer-presets/orcaslicer/filament-qidi-x-max-4.webp"
+    },
+    {
+      "id": "filament-qidi-x-plus",
+      "brand": "QIDI",
+      "model": "X-Plus",
+      "printType": "filament",
+      "widthMm": 270,
+      "depthMm": 200,
+      "heightMm": 200,
+      "image": "/printer-presets/orcaslicer/filament-qidi-x-plus.webp"
+    },
+    {
+      "id": "filament-qidi-x-plus-3",
+      "brand": "QIDI",
+      "model": "X-Plus 3",
+      "printType": "filament",
+      "widthMm": 280,
+      "depthMm": 280,
+      "heightMm": 270,
+      "image": "/printer-presets/orcaslicer/filament-qidi-x-plus-3.webp"
+    },
+    {
+      "id": "filament-qidi-x-plus-4",
+      "brand": "QIDI",
+      "model": "X-Plus 4",
+      "printType": "filament",
+      "widthMm": 305,
+      "depthMm": 305,
+      "heightMm": 280,
+      "image": "/printer-presets/orcaslicer/filament-qidi-x-plus-4.webp"
+    },
+    {
+      "id": "filament-qidi-x-plus-5",
+      "brand": "QIDI",
+      "model": "X-Plus 5",
+      "printType": "filament",
+      "widthMm": 320,
+      "depthMm": 320,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-qidi-x-plus-5.webp"
+    },
+    {
+      "id": "filament-qidi-x-smart-3",
+      "brand": "QIDI",
+      "model": "X-Smart 3",
+      "printType": "filament",
+      "widthMm": 175,
+      "depthMm": 180,
+      "heightMm": 170,
+      "image": "/printer-presets/orcaslicer/filament-qidi-x-smart-3.webp"
+    },
+    {
+      "id": "filament-qidi-x-smart-5",
+      "brand": "QIDI",
+      "model": "X-Smart 5",
+      "printType": "filament",
+      "widthMm": 180,
+      "depthMm": 180,
+      "heightMm": 180,
+      "image": "/printer-presets/orcaslicer/filament-qidi-x-smart-5.webp"
+    },
+    {
+      "id": "filament-raise3d-pro3",
+      "brand": "Raise3D",
+      "model": "Pro3",
+      "printType": "filament",
+      "widthMm": 255,
+      "depthMm": 300,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-raise3d-pro3.webp"
+    },
+    {
+      "id": "filament-raise3d-pro3-plus",
+      "brand": "Raise3D",
+      "model": "Pro3 Plus",
+      "printType": "filament",
+      "widthMm": 255,
+      "depthMm": 300,
+      "heightMm": 605,
+      "image": "/printer-presets/orcaslicer/filament-raise3d-pro3-plus.webp"
+    },
+    {
+      "id": "filament-ratrig-v-cast",
+      "brand": "RatRig",
+      "model": "V-Cast",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-ratrig-v-cast.webp"
+    },
+    {
+      "id": "filament-ratrig-v-core-3-200",
+      "brand": "RatRig",
+      "model": "V-Core 3 200",
+      "printType": "filament",
+      "widthMm": 200,
+      "depthMm": 200,
+      "heightMm": 200,
+      "image": "/printer-presets/orcaslicer/filament-ratrig-v-core-3-200.webp"
+    },
+    {
+      "id": "filament-ratrig-v-core-3-300",
+      "brand": "RatRig",
+      "model": "V-Core 3 300",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-ratrig-v-core-3-300.webp"
+    },
+    {
+      "id": "filament-ratrig-v-core-3-400",
+      "brand": "RatRig",
+      "model": "V-Core 3 400",
+      "printType": "filament",
+      "widthMm": 400,
+      "depthMm": 400,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-ratrig-v-core-3-400.webp"
+    },
+    {
+      "id": "filament-ratrig-v-core-3-500",
+      "brand": "RatRig",
+      "model": "V-Core 3 500",
+      "printType": "filament",
+      "widthMm": 500,
+      "depthMm": 500,
+      "heightMm": 500,
+      "image": "/printer-presets/orcaslicer/filament-ratrig-v-core-3-500.webp"
+    },
+    {
+      "id": "filament-ratrig-v-core-4-300",
+      "brand": "RatRig",
+      "model": "V-Core 4 300",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-ratrig-v-core-4-300.webp"
+    },
+    {
+      "id": "filament-ratrig-v-core-4-400",
+      "brand": "RatRig",
+      "model": "V-Core 4 400",
+      "printType": "filament",
+      "widthMm": 400,
+      "depthMm": 400,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-ratrig-v-core-4-400.webp"
+    },
+    {
+      "id": "filament-ratrig-v-core-4-500",
+      "brand": "RatRig",
+      "model": "V-Core 4 500",
+      "printType": "filament",
+      "widthMm": 500,
+      "depthMm": 500,
+      "heightMm": 500,
+      "image": "/printer-presets/orcaslicer/filament-ratrig-v-core-4-500.webp"
+    },
+    {
+      "id": "filament-ratrig-v-core-4-hybrid-300",
+      "brand": "RatRig",
+      "model": "V-Core 4 HYBRID 300",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-ratrig-v-core-4-hybrid-300.webp"
+    },
+    {
+      "id": "filament-ratrig-v-core-4-hybrid-400",
+      "brand": "RatRig",
+      "model": "V-Core 4 HYBRID 400",
+      "printType": "filament",
+      "widthMm": 400,
+      "depthMm": 400,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-ratrig-v-core-4-hybrid-400.webp"
+    },
+    {
+      "id": "filament-ratrig-v-core-4-hybrid-500",
+      "brand": "RatRig",
+      "model": "V-Core 4 HYBRID 500",
+      "printType": "filament",
+      "widthMm": 500,
+      "depthMm": 500,
+      "heightMm": 500,
+      "image": "/printer-presets/orcaslicer/filament-ratrig-v-core-4-hybrid-500.webp"
+    },
+    {
+      "id": "filament-ratrig-v-core-4-idex-300",
+      "brand": "RatRig",
+      "model": "V-Core 4 IDEX 300",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-ratrig-v-core-4-idex-300.webp"
+    },
+    {
+      "id": "filament-ratrig-v-core-4-idex-300-copy-mode",
+      "brand": "RatRig",
+      "model": "V-Core 4 IDEX 300 COPY MODE",
+      "printType": "filament",
+      "widthMm": 150,
+      "depthMm": 300,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-ratrig-v-core-4-idex-300-copy-mode.webp"
+    },
+    {
+      "id": "filament-ratrig-v-core-4-idex-300-mirror-mode",
+      "brand": "RatRig",
+      "model": "V-Core 4 IDEX 300 MIRROR MODE",
+      "printType": "filament",
+      "widthMm": 120,
+      "depthMm": 300,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-ratrig-v-core-4-idex-300-mirror-mode.webp"
+    },
+    {
+      "id": "filament-ratrig-v-core-4-idex-400",
+      "brand": "RatRig",
+      "model": "V-Core 4 IDEX 400",
+      "printType": "filament",
+      "widthMm": 400,
+      "depthMm": 400,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-ratrig-v-core-4-idex-400.webp"
+    },
+    {
+      "id": "filament-ratrig-v-core-4-idex-400-copy-mode",
+      "brand": "RatRig",
+      "model": "V-Core 4 IDEX 400 COPY MODE",
+      "printType": "filament",
+      "widthMm": 200,
+      "depthMm": 400,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-ratrig-v-core-4-idex-400-copy-mode.webp"
+    },
+    {
+      "id": "filament-ratrig-v-core-4-idex-400-mirror-mode",
+      "brand": "RatRig",
+      "model": "V-Core 4 IDEX 400 MIRROR MODE",
+      "printType": "filament",
+      "widthMm": 170,
+      "depthMm": 400,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-ratrig-v-core-4-idex-400-mirror-mode.webp"
+    },
+    {
+      "id": "filament-ratrig-v-core-4-idex-500",
+      "brand": "RatRig",
+      "model": "V-Core 4 IDEX 500",
+      "printType": "filament",
+      "widthMm": 500,
+      "depthMm": 500,
+      "heightMm": 500,
+      "image": "/printer-presets/orcaslicer/filament-ratrig-v-core-4-idex-500.webp"
+    },
+    {
+      "id": "filament-ratrig-v-core-4-idex-500-copy-mode",
+      "brand": "RatRig",
+      "model": "V-Core 4 IDEX 500 COPY MODE",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 500,
+      "heightMm": 500,
+      "image": "/printer-presets/orcaslicer/filament-ratrig-v-core-4-idex-500-copy-mode.webp"
+    },
+    {
+      "id": "filament-ratrig-v-core-4-idex-500-mirror-mode",
+      "brand": "RatRig",
+      "model": "V-Core 4 IDEX 500 MIRROR MODE",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 500,
+      "heightMm": 500,
+      "image": "/printer-presets/orcaslicer/filament-ratrig-v-core-4-idex-500-mirror-mode.webp"
+    },
+    {
+      "id": "filament-ratrig-v-minion",
+      "brand": "RatRig",
+      "model": "V-Minion",
+      "printType": "filament",
+      "widthMm": 180,
+      "depthMm": 180,
+      "heightMm": 180,
+      "image": "/printer-presets/orcaslicer/filament-ratrig-v-minion.webp"
+    },
+    {
+      "id": "filament-re3d-gigabot-4",
+      "brand": "re3D",
+      "model": "Gigabot 4",
+      "printType": "filament",
+      "widthMm": 590,
+      "depthMm": 600,
+      "heightMm": 600,
+      "image": "/printer-presets/orcaslicer/filament-re3d-gigabot-4.webp"
+    },
+    {
+      "id": "filament-re3d-gigabot-4-xlt",
+      "brand": "re3D",
+      "model": "Gigabot 4 XLT",
+      "printType": "filament",
+      "widthMm": 590,
+      "depthMm": 760,
+      "heightMm": 900,
+      "image": "/printer-presets/orcaslicer/filament-re3d-gigabot-4-xlt.webp"
+    },
+    {
+      "id": "filament-re3d-gigabotx-2",
+      "brand": "re3D",
+      "model": "GigabotX 2",
+      "printType": "filament",
+      "widthMm": 552,
+      "depthMm": 593,
+      "heightMm": 470,
+      "image": "/printer-presets/orcaslicer/filament-re3d-gigabotx-2.webp"
+    },
+    {
+      "id": "filament-re3d-gigabotx-2-xlt",
+      "brand": "re3D",
+      "model": "GigabotX 2 XLT",
+      "printType": "filament",
+      "widthMm": 552,
+      "depthMm": 740,
+      "heightMm": 470,
+      "image": "/printer-presets/orcaslicer/filament-re3d-gigabotx-2-xlt.webp"
+    },
+    {
+      "id": "filament-re3d-terabot-4",
+      "brand": "re3D",
+      "model": "Terabot 4",
+      "printType": "filament",
+      "widthMm": 915,
+      "depthMm": 915,
+      "heightMm": 1000,
+      "image": "/printer-presets/orcaslicer/filament-re3d-terabot-4.webp"
+    },
+    {
+      "id": "filament-re3d-terabotx-2",
+      "brand": "re3D",
+      "model": "TerabotX 2",
+      "printType": "filament",
+      "widthMm": 892,
+      "depthMm": 908,
+      "heightMm": 870,
+      "image": "/printer-presets/orcaslicer/filament-re3d-terabotx-2.webp"
+    },
+    {
+      "id": "filament-rh3d-e3ng-v1-2s",
+      "brand": "RH3D",
+      "model": "E3NG v1.2S",
+      "printType": "filament",
+      "widthMm": 232,
+      "depthMm": 232,
+      "heightMm": 245,
+      "image": "/printer-presets/orcaslicer/filament-rh3d-e3ng-v1-2s.webp"
+    },
+    {
+      "id": "filament-rh3d-virtu-e3",
+      "brand": "RH3D",
+      "model": "VIRTU E3",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 232,
+      "heightMm": 232,
+      "image": "/printer-presets/orcaslicer/filament-rh3d-virtu-e3.webp"
+    },
+    {
+      "id": "filament-rolohaundesign-rolohaun-delta-flyer-refit",
+      "brand": "RolohaunDesign",
+      "model": "Rolohaun Delta Flyer Refit",
+      "printType": "filament",
+      "widthMm": 110,
+      "depthMm": 110,
+      "heightMm": 115,
+      "image": "/printer-presets/orcaslicer/filament-rolohaundesign-rolohaun-delta-flyer-refit.webp"
+    },
+    {
+      "id": "filament-rolohaundesign-rook-mk1-ldo",
+      "brand": "RolohaunDesign",
+      "model": "Rook MK1 LDO",
+      "printType": "filament",
+      "widthMm": 110,
+      "depthMm": 110,
+      "heightMm": 111,
+      "image": "/printer-presets/orcaslicer/filament-rolohaundesign-rook-mk1-ldo.webp"
+    },
+    {
+      "id": "filament-seckit-go3",
+      "brand": "SecKit",
+      "model": "Go3",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 275,
+      "image": "/printer-presets/orcaslicer/filament-seckit-go3.webp"
+    },
+    {
+      "id": "filament-seckit-sk-tank",
+      "brand": "SecKit",
+      "model": "SK-Tank",
+      "printType": "filament",
+      "widthMm": 350,
+      "depthMm": 350,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-seckit-sk-tank.webp"
+    },
+    {
+      "id": "filament-seemecnc-artemis-300",
+      "brand": "SeeMeCNC",
+      "model": "Artemis 300",
+      "printType": "filament",
+      "widthMm": 290,
+      "depthMm": 290,
+      "heightMm": 500,
+      "image": "/printer-presets/orcaslicer/filament-seemecnc-artemis-300.webp"
+    },
+    {
+      "id": "filament-seemecnc-bossdelta-300",
+      "brand": "SeeMeCNC",
+      "model": "BOSSdelta 300",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 495,
+      "image": "/printer-presets/orcaslicer/filament-seemecnc-bossdelta-300.webp"
+    },
+    {
+      "id": "filament-seemecnc-bossdelta-500-0505",
+      "brand": "SeeMeCNC",
+      "model": "BOSSdelta 500 0505",
+      "printType": "filament",
+      "widthMm": 500,
+      "depthMm": 500,
+      "heightMm": 500,
+      "image": "/printer-presets/orcaslicer/filament-seemecnc-bossdelta-500-0505.webp"
+    },
+    {
+      "id": "filament-seemecnc-bossdelta-500-0510",
+      "brand": "SeeMeCNC",
+      "model": "BOSSdelta 500 0510",
+      "printType": "filament",
+      "widthMm": 500,
+      "depthMm": 500,
+      "heightMm": 1000,
+      "image": "/printer-presets/orcaslicer/filament-seemecnc-bossdelta-500-0510.webp"
+    },
+    {
+      "id": "filament-seemecnc-bossdelta-500-0521",
+      "brand": "SeeMeCNC",
+      "model": "BOSSdelta 500 0521",
+      "printType": "filament",
+      "widthMm": 500,
+      "depthMm": 500,
+      "heightMm": 2100,
+      "image": "/printer-presets/orcaslicer/filament-seemecnc-bossdelta-500-0521.webp"
+    },
+    {
+      "id": "filament-seemecnc-rostockmax-v3-2",
+      "brand": "SeeMeCNC",
+      "model": "RostockMAX v3.2",
+      "printType": "filament",
+      "widthMm": 270,
+      "depthMm": 270,
+      "heightMm": 385,
+      "image": "/printer-presets/orcaslicer/filament-seemecnc-rostockmax-v3-2.webp"
+    },
+    {
+      "id": "filament-seemecnc-rostockmax-v4",
+      "brand": "SeeMeCNC",
+      "model": "RostockMAX v4",
+      "printType": "filament",
+      "widthMm": 280,
+      "depthMm": 280,
+      "heightMm": 385,
+      "image": "/printer-presets/orcaslicer/filament-seemecnc-rostockmax-v4.webp"
+    },
+    {
+      "id": "filament-snapmaker-a250",
+      "brand": "Snapmaker",
+      "model": "A250",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 250,
+      "heightMm": 230,
+      "image": "/printer-presets/orcaslicer/filament-snapmaker-a250.webp"
+    },
+    {
+      "id": "filament-snapmaker-a250-bkit",
+      "brand": "Snapmaker",
+      "model": "A250 BKit",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 250,
+      "heightMm": 224,
+      "image": "/printer-presets/orcaslicer/filament-snapmaker-a250-bkit.webp"
+    },
+    {
+      "id": "filament-snapmaker-a250-dual",
+      "brand": "Snapmaker",
+      "model": "A250 Dual",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 250,
+      "heightMm": 190,
+      "image": "/printer-presets/orcaslicer/filament-snapmaker-a250-dual.webp"
+    },
+    {
+      "id": "filament-snapmaker-a250-dual-bkit",
+      "brand": "Snapmaker",
+      "model": "A250 Dual BKit",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 250,
+      "heightMm": 184,
+      "image": "/printer-presets/orcaslicer/filament-snapmaker-a250-dual-bkit.webp"
+    },
+    {
+      "id": "filament-snapmaker-a250-dual-qs-b-kit",
+      "brand": "Snapmaker",
+      "model": "A250 Dual QS+B Kit",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 250,
+      "heightMm": 169,
+      "image": "/printer-presets/orcaslicer/filament-snapmaker-a250-dual-qs-b-kit.webp"
+    },
+    {
+      "id": "filament-snapmaker-a250-dual-qskit",
+      "brand": "Snapmaker",
+      "model": "A250 Dual QSKit",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 250,
+      "heightMm": 175,
+      "image": "/printer-presets/orcaslicer/filament-snapmaker-a250-dual-qskit.webp"
+    },
+    {
+      "id": "filament-snapmaker-a250-qs-b-kit",
+      "brand": "Snapmaker",
+      "model": "A250 QS+B Kit",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 250,
+      "heightMm": 209,
+      "image": "/printer-presets/orcaslicer/filament-snapmaker-a250-qs-b-kit.webp"
+    },
+    {
+      "id": "filament-snapmaker-a250-qskit",
+      "brand": "Snapmaker",
+      "model": "A250 QSKit",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 250,
+      "heightMm": 215,
+      "image": "/printer-presets/orcaslicer/filament-snapmaker-a250-qskit.webp"
+    },
+    {
+      "id": "filament-snapmaker-a350",
+      "brand": "Snapmaker",
+      "model": "A350",
+      "printType": "filament",
+      "widthMm": 320,
+      "depthMm": 350,
+      "heightMm": 325,
+      "image": "/printer-presets/orcaslicer/filament-snapmaker-a350.webp"
+    },
+    {
+      "id": "filament-snapmaker-a350-bkit",
+      "brand": "Snapmaker",
+      "model": "A350 BKit",
+      "printType": "filament",
+      "widthMm": 320,
+      "depthMm": 350,
+      "heightMm": 319,
+      "image": "/printer-presets/orcaslicer/filament-snapmaker-a350-bkit.webp"
+    },
+    {
+      "id": "filament-snapmaker-a350-dual",
+      "brand": "Snapmaker",
+      "model": "A350 Dual",
+      "printType": "filament",
+      "widthMm": 320,
+      "depthMm": 350,
+      "heightMm": 285,
+      "image": "/printer-presets/orcaslicer/filament-snapmaker-a350-dual.webp"
+    },
+    {
+      "id": "filament-snapmaker-a350-dual-bkit",
+      "brand": "Snapmaker",
+      "model": "A350 Dual BKit",
+      "printType": "filament",
+      "widthMm": 320,
+      "depthMm": 350,
+      "heightMm": 279,
+      "image": "/printer-presets/orcaslicer/filament-snapmaker-a350-dual-bkit.webp"
+    },
+    {
+      "id": "filament-snapmaker-a350-dual-qs-b-kit",
+      "brand": "Snapmaker",
+      "model": "A350 Dual QS+B Kit",
+      "printType": "filament",
+      "widthMm": 320,
+      "depthMm": 350,
+      "heightMm": 264,
+      "image": "/printer-presets/orcaslicer/filament-snapmaker-a350-dual-qs-b-kit.webp"
+    },
+    {
+      "id": "filament-snapmaker-a350-dual-qskit",
+      "brand": "Snapmaker",
+      "model": "A350 Dual QSKit",
+      "printType": "filament",
+      "widthMm": 320,
+      "depthMm": 350,
+      "heightMm": 270,
+      "image": "/printer-presets/orcaslicer/filament-snapmaker-a350-dual-qskit.webp"
+    },
+    {
+      "id": "filament-snapmaker-a350-qs-b-kit",
+      "brand": "Snapmaker",
+      "model": "A350 QS+B Kit",
+      "printType": "filament",
+      "widthMm": 320,
+      "depthMm": 350,
+      "heightMm": 304,
+      "image": "/printer-presets/orcaslicer/filament-snapmaker-a350-qs-b-kit.webp"
+    },
+    {
+      "id": "filament-snapmaker-a350-qskit",
+      "brand": "Snapmaker",
+      "model": "A350 QSKit",
+      "printType": "filament",
+      "widthMm": 320,
+      "depthMm": 350,
+      "heightMm": 310,
+      "image": "/printer-presets/orcaslicer/filament-snapmaker-a350-qskit.webp"
+    },
+    {
+      "id": "filament-snapmaker-artisan",
+      "brand": "Snapmaker",
+      "model": "Artisan",
+      "printType": "filament",
+      "widthMm": 400,
+      "depthMm": 400,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-snapmaker-artisan.webp"
+    },
+    {
+      "id": "filament-snapmaker-j1",
+      "brand": "Snapmaker",
+      "model": "J1",
+      "printType": "filament",
+      "widthMm": 324,
+      "depthMm": 200,
+      "heightMm": 200,
+      "image": "/printer-presets/orcaslicer/filament-snapmaker-j1.webp"
+    },
+    {
+      "id": "filament-snapmaker-u1",
+      "brand": "Snapmaker",
+      "model": "U1",
+      "printType": "filament",
+      "widthMm": 270,
+      "depthMm": 270,
+      "heightMm": 270.05,
+      "image": "/printer-presets/orcaslicer/filament-snapmaker-u1.webp"
+    },
+    {
+      "id": "filament-sovol-sv01",
+      "brand": "Sovol",
+      "model": "SV01",
+      "printType": "filament",
+      "widthMm": 280,
+      "depthMm": 240,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-sovol-sv01.webp"
+    },
+    {
+      "id": "filament-sovol-sv01-pro",
+      "brand": "Sovol",
+      "model": "SV01 Pro",
+      "printType": "filament",
+      "widthMm": 280,
+      "depthMm": 240,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-sovol-sv01-pro.webp"
+    },
+    {
+      "id": "filament-sovol-sv02",
+      "brand": "Sovol",
+      "model": "SV02",
+      "printType": "filament",
+      "widthMm": 280,
+      "depthMm": 240,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-sovol-sv02.webp"
+    },
+    {
+      "id": "filament-sovol-sv05",
+      "brand": "Sovol",
+      "model": "SV05",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-sovol-sv05.webp"
+    },
+    {
+      "id": "filament-sovol-sv06",
+      "brand": "Sovol",
+      "model": "SV06",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-sovol-sv06.webp"
+    },
+    {
+      "id": "filament-sovol-sv06-ace",
+      "brand": "Sovol",
+      "model": "SV06 ACE",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-sovol-sv06-ace.webp"
+    },
+    {
+      "id": "filament-sovol-sv06-plus",
+      "brand": "Sovol",
+      "model": "SV06 Plus",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 340,
+      "image": "/printer-presets/orcaslicer/filament-sovol-sv06-plus.webp"
+    },
+    {
+      "id": "filament-sovol-sv06-plus-ace",
+      "brand": "Sovol",
+      "model": "SV06 Plus ACE",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 350,
+      "image": "/printer-presets/orcaslicer/filament-sovol-sv06-plus-ace.webp"
+    },
+    {
+      "id": "filament-sovol-sv07",
+      "brand": "Sovol",
+      "model": "SV07",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-sovol-sv07.webp"
+    },
+    {
+      "id": "filament-sovol-sv07-plus",
+      "brand": "Sovol",
+      "model": "SV07 Plus",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 350,
+      "image": "/printer-presets/orcaslicer/filament-sovol-sv07-plus.webp"
+    },
+    {
+      "id": "filament-sovol-sv08",
+      "brand": "Sovol",
+      "model": "SV08",
+      "printType": "filament",
+      "widthMm": 350,
+      "depthMm": 350,
+      "heightMm": 345,
+      "image": "/printer-presets/orcaslicer/filament-sovol-sv08.webp"
+    },
+    {
+      "id": "filament-sovol-sv08-max",
+      "brand": "Sovol",
+      "model": "SV08 MAX",
+      "printType": "filament",
+      "widthMm": 500,
+      "depthMm": 500,
+      "heightMm": 500,
+      "image": "/printer-presets/orcaslicer/filament-sovol-sv08-max.webp"
+    },
+    {
+      "id": "filament-sovol-zero",
+      "brand": "Sovol",
+      "model": "Zero",
+      "printType": "filament",
+      "widthMm": 152.4,
+      "depthMm": 152.4,
+      "heightMm": 152.4,
+      "image": "/printer-presets/orcaslicer/filament-sovol-zero.webp"
+    },
+    {
+      "id": "filament-tiertime-up300-hs",
+      "brand": "Tiertime",
+      "model": "UP300 HS",
+      "printType": "filament",
+      "widthMm": 207,
+      "depthMm": 255,
+      "heightMm": 230,
+      "image": "/printer-presets/orcaslicer/filament-tiertime-up300-hs.webp"
+    },
+    {
+      "id": "filament-tiertime-up310-pro",
+      "brand": "Tiertime",
+      "model": "UP310 Pro",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-tiertime-up310-pro.webp"
+    },
+    {
+      "id": "filament-tiertime-up400-pro",
+      "brand": "Tiertime",
+      "model": "UP400 Pro",
+      "printType": "filament",
+      "widthMm": 400,
+      "depthMm": 350,
+      "heightMm": 380,
+      "image": "/printer-presets/orcaslicer/filament-tiertime-up400-pro.webp"
+    },
+    {
+      "id": "filament-tiertime-up600-hs",
+      "brand": "Tiertime",
+      "model": "UP600 HS",
+      "printType": "filament",
+      "widthMm": 500,
+      "depthMm": 400,
+      "heightMm": 600,
+      "image": "/printer-presets/orcaslicer/filament-tiertime-up600-hs.webp"
+    },
+    {
+      "id": "filament-tronxy-x5sa-400-marlin-firmware",
+      "brand": "Tronxy",
+      "model": "X5SA 400 Marlin Firmware",
+      "printType": "filament",
+      "widthMm": 400,
+      "depthMm": 400,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-tronxy-x5sa-400-marlin-firmware.webp"
+    },
+    {
+      "id": "filament-twotrees-sk1",
+      "brand": "TwoTrees",
+      "model": "SK1",
+      "printType": "filament",
+      "widthMm": 256,
+      "depthMm": 256,
+      "heightMm": 256,
+      "image": "/printer-presets/orcaslicer/filament-twotrees-sk1.webp"
+    },
+    {
+      "id": "filament-twotrees-sp-5-klipper",
+      "brand": "TwoTrees",
+      "model": "SP-5 Klipper",
+      "printType": "filament",
+      "widthMm": 310,
+      "depthMm": 310,
+      "heightMm": 350,
+      "image": "/printer-presets/orcaslicer/filament-twotrees-sp-5-klipper.webp"
+    },
+    {
+      "id": "filament-ultimaker-2-extended",
+      "brand": "UltiMaker",
+      "model": "2 extended+",
+      "printType": "filament",
+      "widthMm": 223,
+      "depthMm": 223,
+      "heightMm": 305,
+      "image": "/printer-presets/orcaslicer/filament-ultimaker-2-extended.webp"
+    },
+    {
+      "id": "filament-ultimaker-2",
+      "brand": "UltiMaker",
+      "model": "2+",
+      "printType": "filament",
+      "widthMm": 223,
+      "depthMm": 223,
+      "heightMm": 205,
+      "image": "/printer-presets/orcaslicer/filament-ultimaker-2.webp"
+    },
+    {
+      "id": "filament-ultimaker-s5",
+      "brand": "UltiMaker",
+      "model": "S5",
+      "printType": "filament",
+      "widthMm": 330,
+      "depthMm": 240,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-ultimaker-s5.webp"
+    },
+    {
+      "id": "resin-uniformation-gk3",
+      "brand": "Uniformation",
+      "model": "GK3",
+      "printType": "resin",
+      "widthMm": 211.68,
+      "depthMm": 118.37,
+      "heightMm": 240,
+      "image": "/printer-presets/manufacturer/resin-uniformation-gk3.webp"
+    },
+    {
+      "id": "resin-uniformation-gk3-pro",
+      "brand": "Uniformation",
+      "model": "GK3 Pro",
+      "printType": "resin",
+      "widthMm": 211.68,
+      "depthMm": 118.37,
+      "heightMm": 240,
+      "image": "/printer-presets/manufacturer/resin-uniformation-gk3-pro.webp"
+    },
+    {
+      "id": "resin-uniformation-gk3-ultra",
+      "brand": "Uniformation",
+      "model": "GK3 Ultra",
+      "printType": "resin",
+      "widthMm": 302.4,
+      "depthMm": 161.98,
+      "heightMm": 300,
+      "image": "/printer-presets/manufacturer/resin-uniformation-gk3-ultra.webp"
+    },
+    {
+      "id": "resin-uniformation-gkone",
+      "brand": "Uniformation",
+      "model": "GKone",
+      "printType": "resin",
+      "widthMm": 221.4,
+      "depthMm": 129.6,
+      "heightMm": 245
+    },
+    {
+      "id": "resin-uniformation-gktwo",
+      "brand": "Uniformation",
+      "model": "GKtwo",
+      "printType": "resin",
+      "widthMm": 228.089,
+      "depthMm": 128.3,
+      "heightMm": 245,
+      "image": "/printer-presets/manufacturer/resin-uniformation-gktwo.webp"
+    },
+    {
+      "id": "resin-uniz-ibee",
+      "brand": "Uniz",
+      "model": "IBEE",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 220
+    },
+    {
+      "id": "resin-uniz-ibee-klipper",
+      "brand": "Uniz",
+      "model": "IBEE (Klipper)",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 220
+    },
+    {
+      "id": "filament-vivedino-troodon-2-0-klipper",
+      "brand": "Vivedino",
+      "model": "Troodon 2.0 - Klipper",
+      "printType": "filament",
+      "widthMm": 350,
+      "depthMm": 350,
+      "heightMm": 330,
+      "image": "/printer-presets/orcaslicer/filament-vivedino-troodon-2-0-klipper.webp"
+    },
+    {
+      "id": "filament-vivedino-troodon-2-0-rrf",
+      "brand": "Vivedino",
+      "model": "Troodon 2.0 - RRF",
+      "printType": "filament",
+      "widthMm": 350,
+      "depthMm": 350,
+      "heightMm": 330,
+      "image": "/printer-presets/orcaslicer/filament-vivedino-troodon-2-0-rrf.webp"
+    },
+    {
+      "id": "filament-vivedino-xplorer-dual-gantry",
+      "brand": "Vivedino",
+      "model": "Xplorer Dual Gantry",
+      "printType": "filament",
+      "widthMm": 400,
+      "depthMm": 342.5,
+      "heightMm": 401,
+      "image": "/printer-presets/orcaslicer/filament-vivedino-xplorer-dual-gantry.webp"
+    },
+    {
+      "id": "filament-vivedino-xplorer-idex",
+      "brand": "Vivedino",
+      "model": "Xplorer IDEX",
+      "printType": "filament",
+      "widthMm": 400,
+      "depthMm": 400,
+      "heightMm": 401,
+      "image": "/printer-presets/orcaslicer/filament-vivedino-xplorer-idex.webp"
+    },
+    {
+      "id": "filament-vivedino-xplorer-iqex",
+      "brand": "Vivedino",
+      "model": "Xplorer IQEX",
+      "printType": "filament",
+      "widthMm": 400,
+      "depthMm": 342.5,
+      "heightMm": 401,
+      "image": "/printer-presets/orcaslicer/filament-vivedino-xplorer-iqex.webp"
+    },
+    {
+      "id": "filament-vivedino-xplorer-single",
+      "brand": "Vivedino",
+      "model": "Xplorer Single",
+      "printType": "filament",
+      "widthMm": 400,
+      "depthMm": 400,
+      "heightMm": 401,
+      "image": "/printer-presets/orcaslicer/filament-vivedino-xplorer-single.webp"
+    },
+    {
+      "id": "filament-volumic-exo42",
+      "brand": "Volumic",
+      "model": "EXO42",
+      "printType": "filament",
+      "widthMm": 420,
+      "depthMm": 420,
+      "heightMm": 420,
+      "image": "/printer-presets/orcaslicer/filament-volumic-exo42.webp"
+    },
+    {
+      "id": "filament-volumic-exo42-idre",
+      "brand": "Volumic",
+      "model": "EXO42 IDRE",
+      "printType": "filament",
+      "widthMm": 372,
+      "depthMm": 420,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-volumic-exo42-idre.webp"
+    },
+    {
+      "id": "filament-volumic-exo42-performance",
+      "brand": "Volumic",
+      "model": "EXO42 Performance",
+      "printType": "filament",
+      "widthMm": 420,
+      "depthMm": 420,
+      "heightMm": 420,
+      "image": "/printer-presets/orcaslicer/filament-volumic-exo42-performance.webp"
+    },
+    {
+      "id": "filament-volumic-exo42-stage-2",
+      "brand": "Volumic",
+      "model": "EXO42 Stage 2",
+      "printType": "filament",
+      "widthMm": 420,
+      "depthMm": 420,
+      "heightMm": 420,
+      "image": "/printer-presets/orcaslicer/filament-volumic-exo42-stage-2.webp"
+    },
+    {
+      "id": "filament-volumic-exo65",
+      "brand": "Volumic",
+      "model": "EXO65",
+      "printType": "filament",
+      "widthMm": 650,
+      "depthMm": 650,
+      "heightMm": 650,
+      "image": "/printer-presets/orcaslicer/filament-volumic-exo65.webp"
+    },
+    {
+      "id": "filament-volumic-exo65-idre",
+      "brand": "Volumic",
+      "model": "EXO65 IDRE",
+      "printType": "filament",
+      "widthMm": 602,
+      "depthMm": 650,
+      "heightMm": 630,
+      "image": "/printer-presets/orcaslicer/filament-volumic-exo65-idre.webp"
+    },
+    {
+      "id": "filament-volumic-exo65-performance",
+      "brand": "Volumic",
+      "model": "EXO65 Performance",
+      "printType": "filament",
+      "widthMm": 650,
+      "depthMm": 650,
+      "heightMm": 650,
+      "image": "/printer-presets/orcaslicer/filament-volumic-exo65-performance.webp"
+    },
+    {
+      "id": "filament-volumic-exo65-stage-2",
+      "brand": "Volumic",
+      "model": "EXO65 Stage 2",
+      "printType": "filament",
+      "widthMm": 650,
+      "depthMm": 650,
+      "heightMm": 650,
+      "image": "/printer-presets/orcaslicer/filament-volumic-exo65-stage-2.webp"
+    },
+    {
+      "id": "filament-volumic-sh65",
+      "brand": "Volumic",
+      "model": "SH65",
+      "printType": "filament",
+      "widthMm": 650,
+      "depthMm": 300,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-volumic-sh65.webp"
+    },
+    {
+      "id": "filament-volumic-sh65-idre",
+      "brand": "Volumic",
+      "model": "SH65 IDRE",
+      "printType": "filament",
+      "widthMm": 602,
+      "depthMm": 300,
+      "heightMm": 280,
+      "image": "/printer-presets/orcaslicer/filament-volumic-sh65-idre.webp"
+    },
+    {
+      "id": "filament-volumic-sh65-performance",
+      "brand": "Volumic",
+      "model": "SH65 Performance",
+      "printType": "filament",
+      "widthMm": 650,
+      "depthMm": 300,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-volumic-sh65-performance.webp"
+    },
+    {
+      "id": "filament-volumic-sh65-stage-2",
+      "brand": "Volumic",
+      "model": "SH65 Stage 2",
+      "printType": "filament",
+      "widthMm": 650,
+      "depthMm": 300,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-volumic-sh65-stage-2.webp"
+    },
+    {
+      "id": "filament-volumic-vs20mk2",
+      "brand": "Volumic",
+      "model": "VS20MK2",
+      "printType": "filament",
+      "widthMm": 200,
+      "depthMm": 200,
+      "heightMm": 220,
+      "image": "/printer-presets/orcaslicer/filament-volumic-vs20mk2.webp"
+    },
+    {
+      "id": "filament-volumic-vs30mk2",
+      "brand": "Volumic",
+      "model": "VS30MK2",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 200,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-volumic-vs30mk2.webp"
+    },
+    {
+      "id": "filament-volumic-vs30mk3",
+      "brand": "Volumic",
+      "model": "VS30MK3",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 200,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-volumic-vs30mk3.webp"
+    },
+    {
+      "id": "filament-volumic-vs30mk3-stage-2",
+      "brand": "Volumic",
+      "model": "VS30MK3 Stage 2",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 200,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-volumic-vs30mk3-stage-2.webp"
+    },
+    {
+      "id": "filament-volumic-vs30sc",
+      "brand": "Volumic",
+      "model": "VS30SC",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 200,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-volumic-vs30sc.webp"
+    },
+    {
+      "id": "filament-volumic-vs30sc2",
+      "brand": "Volumic",
+      "model": "VS30SC2",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 200,
+      "heightMm": 310,
+      "image": "/printer-presets/orcaslicer/filament-volumic-vs30sc2.webp"
+    },
+    {
+      "id": "filament-volumic-vs30sc2-performance",
+      "brand": "Volumic",
+      "model": "VS30SC2 Performance",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 200,
+      "heightMm": 310,
+      "image": "/printer-presets/orcaslicer/filament-volumic-vs30sc2-performance.webp"
+    },
+    {
+      "id": "filament-volumic-vs30sc2-stage-2",
+      "brand": "Volumic",
+      "model": "VS30SC2 Stage 2",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 200,
+      "heightMm": 310,
+      "image": "/printer-presets/orcaslicer/filament-volumic-vs30sc2-stage-2.webp"
+    },
+    {
+      "id": "filament-volumic-vs30ultra",
+      "brand": "Volumic",
+      "model": "VS30ULTRA",
+      "printType": "filament",
+      "widthMm": 290,
+      "depthMm": 200,
+      "heightMm": 300,
+      "image": "/printer-presets/orcaslicer/filament-volumic-vs30ultra.webp"
+    },
+    {
+      "id": "filament-voron-0-1",
+      "brand": "Voron",
+      "model": "0.1",
+      "printType": "filament",
+      "widthMm": 120,
+      "depthMm": 120,
+      "heightMm": 120,
+      "image": "/printer-presets/orcaslicer/filament-voron-0-1.webp"
+    },
+    {
+      "id": "filament-voron-2-4-250",
+      "brand": "Voron",
+      "model": "2.4 250",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 250,
+      "heightMm": 225,
+      "image": "/printer-presets/orcaslicer/filament-voron-2-4-250.webp"
+    },
+    {
+      "id": "filament-voron-2-4-300",
+      "brand": "Voron",
+      "model": "2.4 300",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 275,
+      "image": "/printer-presets/orcaslicer/filament-voron-2-4-300.webp"
+    },
+    {
+      "id": "filament-voron-2-4-350",
+      "brand": "Voron",
+      "model": "2.4 350",
+      "printType": "filament",
+      "widthMm": 350,
+      "depthMm": 350,
+      "heightMm": 325,
+      "image": "/printer-presets/orcaslicer/filament-voron-2-4-350.webp"
+    },
+    {
+      "id": "filament-voron-switchwire-250",
+      "brand": "Voron",
+      "model": "Switchwire 250",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 210,
+      "heightMm": 240,
+      "image": "/printer-presets/orcaslicer/filament-voron-switchwire-250.webp"
+    },
+    {
+      "id": "filament-voron-trident-250",
+      "brand": "Voron",
+      "model": "Trident 250",
+      "printType": "filament",
+      "widthMm": 250,
+      "depthMm": 250,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-voron-trident-250.webp"
+    },
+    {
+      "id": "filament-voron-trident-300",
+      "brand": "Voron",
+      "model": "Trident 300",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-voron-trident-300.webp"
+    },
+    {
+      "id": "filament-voron-trident-350",
+      "brand": "Voron",
+      "model": "Trident 350",
+      "printType": "filament",
+      "widthMm": 350,
+      "depthMm": 350,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-voron-trident-350.webp"
+    },
+    {
+      "id": "filament-voxelab-aquila-x2",
+      "brand": "Voxelab",
+      "model": "Aquila X2",
+      "printType": "filament",
+      "widthMm": 220,
+      "depthMm": 220,
+      "heightMm": 250,
+      "image": "/printer-presets/orcaslicer/filament-voxelab-aquila-x2.webp"
+    },
+    {
+      "id": "resin-voxelab-ceres-8-9",
+      "brand": "Voxelab",
+      "model": "Ceres 8.9",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 200
+    },
+    {
+      "id": "resin-voxelab-polaris-5-5",
+      "brand": "Voxelab",
+      "model": "Polaris 5.5",
+      "printType": "resin",
+      "widthMm": 68.04,
+      "depthMm": 120.96,
+      "heightMm": 155
+    },
+    {
+      "id": "resin-voxelab-proxima-6",
+      "brand": "Voxelab",
+      "model": "Proxima 6",
+      "printType": "resin",
+      "widthMm": 82.62,
+      "depthMm": 130.56,
+      "heightMm": 155
+    },
+    {
+      "id": "resin-voxelab-proxima-6-svgx",
+      "brand": "Voxelab",
+      "model": "Proxima 6 - SVGX",
+      "printType": "resin",
+      "widthMm": 130.56,
+      "depthMm": 82.62,
+      "heightMm": 155
+    },
+    {
+      "id": "filament-vzbot-235-awd",
+      "brand": "Vzbot",
+      "model": "235 AWD",
+      "printType": "filament",
+      "widthMm": 235,
+      "depthMm": 235,
+      "heightMm": 200,
+      "image": "/printer-presets/orcaslicer/filament-vzbot-235-awd.webp"
+    },
+    {
+      "id": "filament-vzbot-330-awd",
+      "brand": "Vzbot",
+      "model": "330 AWD",
+      "printType": "filament",
+      "widthMm": 330,
+      "depthMm": 330,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-vzbot-330-awd.webp"
+    },
+    {
+      "id": "resin-wanhao-cgr-mini-mono",
+      "brand": "Wanhao",
+      "model": "CGR Mini Mono",
+      "printType": "resin",
+      "widthMm": 82.62,
+      "depthMm": 130.56,
+      "heightMm": 200
+    },
+    {
+      "id": "resin-wanhao-cgr-mono",
+      "brand": "Wanhao",
+      "model": "CGR Mono",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 200
+    },
+    {
+      "id": "filament-wanhao-d12-300",
+      "brand": "Wanhao",
+      "model": "D12-300",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-wanhao-d12-300.webp"
+    },
+    {
+      "id": "resin-wanhao-d7",
+      "brand": "Wanhao",
+      "model": "D7",
+      "printType": "resin",
+      "widthMm": 120.96,
+      "depthMm": 68.5,
+      "heightMm": 180
+    },
+    {
+      "id": "resin-wanhao-d8",
+      "brand": "Wanhao",
+      "model": "D8",
+      "printType": "resin",
+      "widthMm": 192,
+      "depthMm": 120,
+      "heightMm": 180
+    },
+    {
+      "id": "filament-wanhao-d9-300-mk1",
+      "brand": "Wanhao",
+      "model": "D9-300 MK1",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 400
+    },
+    {
+      "id": "filament-wanhao-d9-300-mk1-bltouch-kit",
+      "brand": "Wanhao",
+      "model": "D9-300 MK1 BLTouch kit",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 400
+    },
+    {
+      "id": "filament-wanhao-d9-300-mk2",
+      "brand": "Wanhao",
+      "model": "D9-300 MK2",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 400
+    },
+    {
+      "id": "filament-wanhao-d9-300-mk3",
+      "brand": "Wanhao",
+      "model": "D9-300 MK3",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 400
+    },
+    {
+      "id": "filament-wanhao-d9-400-mk1",
+      "brand": "Wanhao",
+      "model": "D9-400 MK1",
+      "printType": "filament",
+      "widthMm": 400,
+      "depthMm": 400,
+      "heightMm": 400
+    },
+    {
+      "id": "filament-wanhao-d9-400-mk1-bltouch-kit",
+      "brand": "Wanhao",
+      "model": "D9-400 MK1 BLTouch kit",
+      "printType": "filament",
+      "widthMm": 400,
+      "depthMm": 400,
+      "heightMm": 400
+    },
+    {
+      "id": "filament-wanhao-d9-400-mk2",
+      "brand": "Wanhao",
+      "model": "D9-400 MK2",
+      "printType": "filament",
+      "widthMm": 400,
+      "depthMm": 400,
+      "heightMm": 400
+    },
+    {
+      "id": "filament-wanhao-d9-400-mk3",
+      "brand": "Wanhao",
+      "model": "D9-400 MK3",
+      "printType": "filament",
+      "widthMm": 400,
+      "depthMm": 400,
+      "heightMm": 400
+    },
+    {
+      "id": "filament-wanhao-d9-500-mk1",
+      "brand": "Wanhao",
+      "model": "D9-500 MK1",
+      "printType": "filament",
+      "widthMm": 500,
+      "depthMm": 500,
+      "heightMm": 500
+    },
+    {
+      "id": "filament-wanhao-d9-500-mk1-bltouch-kit",
+      "brand": "Wanhao",
+      "model": "D9-500 MK1 BLTouch kit",
+      "printType": "filament",
+      "widthMm": 500,
+      "depthMm": 500,
+      "heightMm": 500
+    },
+    {
+      "id": "filament-wanhao-d9-500-mk2",
+      "brand": "Wanhao",
+      "model": "D9-500 MK2",
+      "printType": "filament",
+      "widthMm": 500,
+      "depthMm": 500,
+      "heightMm": 500
+    },
+    {
+      "id": "filament-wanhao-d9-500-mk3",
+      "brand": "Wanhao",
+      "model": "D9-500 MK3",
+      "printType": "filament",
+      "widthMm": 500,
+      "depthMm": 500,
+      "heightMm": 500
+    },
+    {
+      "id": "filament-wanhao-france-d12-230-pro-m2-direct",
+      "brand": "Wanhao France",
+      "model": "D12 230 PRO M2 DIRECT",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 230,
+      "heightMm": 240,
+      "image": "/printer-presets/orcaslicer/filament-wanhao-france-d12-230-pro-m2-direct.webp"
+    },
+    {
+      "id": "filament-wanhao-france-d12-230-pro-m2-mono-dual",
+      "brand": "Wanhao France",
+      "model": "D12 230 PRO M2 MONO DUAL",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 230,
+      "heightMm": 240,
+      "image": "/printer-presets/orcaslicer/filament-wanhao-france-d12-230-pro-m2-mono-dual.webp"
+    },
+    {
+      "id": "filament-wanhao-france-d12-230-pro-m2-mono-dual-pooptool",
+      "brand": "Wanhao France",
+      "model": "D12 230 PRO M2 MONO DUAL PoopTool",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 230,
+      "heightMm": 240,
+      "image": "/printer-presets/orcaslicer/filament-wanhao-france-d12-230-pro-m2-mono-dual-pooptool.webp"
+    },
+    {
+      "id": "filament-wanhao-france-d12-230-pro-smartpad-direct",
+      "brand": "Wanhao France",
+      "model": "D12 230 PRO SMARTPAD DIRECT",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 230,
+      "heightMm": 240,
+      "image": "/printer-presets/orcaslicer/filament-wanhao-france-d12-230-pro-smartpad-direct.webp"
+    },
+    {
+      "id": "filament-wanhao-france-d12-230-pro-smartpad-mono-dual",
+      "brand": "Wanhao France",
+      "model": "D12 230 PRO SMARTPAD MONO DUAL",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 230,
+      "heightMm": 240,
+      "image": "/printer-presets/orcaslicer/filament-wanhao-france-d12-230-pro-smartpad-mono-dual.webp"
+    },
+    {
+      "id": "filament-wanhao-france-d12-230-pro-smartpad-mono-dual-pooptool",
+      "brand": "Wanhao France",
+      "model": "D12 230 PRO SMARTPAD MONO DUAL PoopTool",
+      "printType": "filament",
+      "widthMm": 230,
+      "depthMm": 230,
+      "heightMm": 240,
+      "image": "/printer-presets/orcaslicer/filament-wanhao-france-d12-230-pro-smartpad-mono-dual-pooptool.webp"
+    },
+    {
+      "id": "filament-wanhao-france-d12-300-pro-m2-direct",
+      "brand": "Wanhao France",
+      "model": "D12 300 PRO M2 DIRECT",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-wanhao-france-d12-300-pro-m2-direct.webp"
+    },
+    {
+      "id": "filament-wanhao-france-d12-300-pro-m2-mono-dual",
+      "brand": "Wanhao France",
+      "model": "D12 300 PRO M2 MONO DUAL",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-wanhao-france-d12-300-pro-m2-mono-dual.webp"
+    },
+    {
+      "id": "filament-wanhao-france-d12-300-pro-m2-mono-dual-pooptool",
+      "brand": "Wanhao France",
+      "model": "D12 300 PRO M2 MONO DUAL PoopTool",
+      "printType": "filament",
+      "widthMm": 310,
+      "depthMm": 310,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-wanhao-france-d12-300-pro-m2-mono-dual-pooptool.webp"
+    },
+    {
+      "id": "filament-wanhao-france-d12-300-pro-smartpad-direct",
+      "brand": "Wanhao France",
+      "model": "D12 300 PRO SMARTPAD DIRECT",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-wanhao-france-d12-300-pro-smartpad-direct.webp"
+    },
+    {
+      "id": "filament-wanhao-france-d12-300-pro-smartpad-mono-dual",
+      "brand": "Wanhao France",
+      "model": "D12 300 PRO SMARTPAD MONO DUAL",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-wanhao-france-d12-300-pro-smartpad-mono-dual.webp"
+    },
+    {
+      "id": "filament-wanhao-france-d12-300-pro-smartpad-mono-dual-pooptool",
+      "brand": "Wanhao France",
+      "model": "D12 300 PRO SMARTPAD MONO DUAL PoopTool",
+      "printType": "filament",
+      "widthMm": 310,
+      "depthMm": 310,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-wanhao-france-d12-300-pro-smartpad-mono-dual-pooptool.webp"
+    },
+    {
+      "id": "filament-wanhao-france-d12-500-pro-m2-mono-dual",
+      "brand": "Wanhao France",
+      "model": "D12 500 PRO M2 MONO DUAL",
+      "printType": "filament",
+      "widthMm": 500,
+      "depthMm": 500,
+      "heightMm": 500,
+      "image": "/printer-presets/orcaslicer/filament-wanhao-france-d12-500-pro-m2-mono-dual.webp"
+    },
+    {
+      "id": "filament-wanhao-france-d12-500-pro-m2-mono-dual-pooptool",
+      "brand": "Wanhao France",
+      "model": "D12 500 PRO M2 MONO DUAL PoopTool",
+      "printType": "filament",
+      "widthMm": 510,
+      "depthMm": 510,
+      "heightMm": 500,
+      "image": "/printer-presets/orcaslicer/filament-wanhao-france-d12-500-pro-m2-mono-dual-pooptool.webp"
+    },
+    {
+      "id": "filament-wanhao-france-d12-500-pro-smartpad-direct",
+      "brand": "Wanhao France",
+      "model": "D12 500 PRO SMARTPAD DIRECT",
+      "printType": "filament",
+      "widthMm": 500,
+      "depthMm": 500,
+      "heightMm": 500,
+      "image": "/printer-presets/orcaslicer/filament-wanhao-france-d12-500-pro-smartpad-direct.webp"
+    },
+    {
+      "id": "filament-wanhao-france-d12-500-pro-smartpad-mono-dual",
+      "brand": "Wanhao France",
+      "model": "D12 500 PRO SMARTPAD MONO DUAL",
+      "printType": "filament",
+      "widthMm": 500,
+      "depthMm": 500,
+      "heightMm": 500,
+      "image": "/printer-presets/orcaslicer/filament-wanhao-france-d12-500-pro-smartpad-mono-dual.webp"
+    },
+    {
+      "id": "filament-wanhao-france-d12-500-pro-smartpad-mono-dual-pooptool",
+      "brand": "Wanhao France",
+      "model": "D12 500 PRO SMARTPAD MONO DUAL PoopTool",
+      "printType": "filament",
+      "widthMm": 510,
+      "depthMm": 510,
+      "heightMm": 500,
+      "image": "/printer-presets/orcaslicer/filament-wanhao-france-d12-500-pro-smartpad-mono-dual-pooptool.webp"
+    },
+    {
+      "id": "filament-wemake3d-phoenixprov1",
+      "brand": "WEMAKE3D",
+      "model": "PhoenixProV1",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-wemake3d-phoenixprov1.webp"
+    },
+    {
+      "id": "filament-wemake3d-tinybotv1",
+      "brand": "WEMAKE3D",
+      "model": "TinyBotV1",
+      "printType": "filament",
+      "widthMm": 210,
+      "depthMm": 210,
+      "heightMm": 400,
+      "image": "/printer-presets/orcaslicer/filament-wemake3d-tinybotv1.webp"
+    },
+    {
+      "id": "filament-wondermaker-zr-ultra",
+      "brand": "WonderMaker",
+      "model": "ZR Ultra",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 270,
+      "heightMm": 290,
+      "image": "/printer-presets/orcaslicer/filament-wondermaker-zr-ultra.webp"
+    },
+    {
+      "id": "filament-wondermaker-zr-ultra-s",
+      "brand": "WonderMaker",
+      "model": "ZR Ultra S",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 270,
+      "heightMm": 290,
+      "image": "/printer-presets/orcaslicer/filament-wondermaker-zr-ultra-s.webp"
+    },
+    {
+      "id": "filament-z-bolt-s1000",
+      "brand": "Z-Bolt",
+      "model": "S1000",
+      "printType": "filament",
+      "widthMm": 1000,
+      "depthMm": 1000,
+      "heightMm": 1000,
+      "image": "/printer-presets/orcaslicer/filament-z-bolt-s1000.webp"
+    },
+    {
+      "id": "filament-z-bolt-s1000-dual",
+      "brand": "Z-Bolt",
+      "model": "S1000 Dual",
+      "printType": "filament",
+      "widthMm": 1000,
+      "depthMm": 1000,
+      "heightMm": 1000,
+      "image": "/printer-presets/orcaslicer/filament-z-bolt-s1000-dual.webp"
+    },
+    {
+      "id": "filament-z-bolt-s300",
+      "brand": "Z-Bolt",
+      "model": "S300",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 350,
+      "image": "/printer-presets/orcaslicer/filament-z-bolt-s300.webp"
+    },
+    {
+      "id": "filament-z-bolt-s300-dual",
+      "brand": "Z-Bolt",
+      "model": "S300 Dual",
+      "printType": "filament",
+      "widthMm": 300,
+      "depthMm": 300,
+      "heightMm": 350,
+      "image": "/printer-presets/orcaslicer/filament-z-bolt-s300-dual.webp"
+    },
+    {
+      "id": "filament-z-bolt-s400",
+      "brand": "Z-Bolt",
+      "model": "S400",
+      "printType": "filament",
+      "widthMm": 400,
+      "depthMm": 400,
+      "heightMm": 700,
+      "image": "/printer-presets/orcaslicer/filament-z-bolt-s400.webp"
+    },
+    {
+      "id": "filament-z-bolt-s400-dual",
+      "brand": "Z-Bolt",
+      "model": "S400 Dual",
+      "printType": "filament",
+      "widthMm": 400,
+      "depthMm": 400,
+      "heightMm": 700,
+      "image": "/printer-presets/orcaslicer/filament-z-bolt-s400-dual.webp"
+    },
+    {
+      "id": "filament-z-bolt-s600",
+      "brand": "Z-Bolt",
+      "model": "S600",
+      "printType": "filament",
+      "widthMm": 600,
+      "depthMm": 600,
+      "heightMm": 900,
+      "image": "/printer-presets/orcaslicer/filament-z-bolt-s600.webp"
+    },
+    {
+      "id": "filament-z-bolt-s600-dual",
+      "brand": "Z-Bolt",
+      "model": "S600 Dual",
+      "printType": "filament",
+      "widthMm": 600,
+      "depthMm": 600,
+      "heightMm": 900,
+      "image": "/printer-presets/orcaslicer/filament-z-bolt-s600-dual.webp"
+    },
+    {
+      "id": "filament-z-bolt-s800-dual",
+      "brand": "Z-Bolt",
+      "model": "S800 Dual",
+      "printType": "filament",
+      "widthMm": 802,
+      "depthMm": 802,
+      "heightMm": 802,
+      "image": "/printer-presets/orcaslicer/filament-z-bolt-s800-dual.webp"
+    },
+    {
+      "id": "resin-zortrax-inkspire",
+      "brand": "Zortrax",
+      "model": "Inkspire",
+      "printType": "resin",
+      "widthMm": 74.67,
+      "depthMm": 132.88,
+      "heightMm": 175
+    }
+  ]
+}

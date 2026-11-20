@@ -2,7 +2,7 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { AppShell } from '../client/components/AppShell'
-import { calculatorPrefill, validateCalculatorSearch } from '../client/calculatorSearch'
+import { calculatorPrefill, estimatedRequestIds, validateCalculatorSearch } from '../client/calculatorSearch'
 import { PriceCalculator } from '../client/components/PriceCalculator'
 import { sessionQuery } from '../client/queries'
 
@@ -20,7 +20,11 @@ function PriceCalculatorPage() {
   if (!authorized) return null
   return (
     <AppShell active="calculator">
-      <PriceCalculator workspaceSlug={identity!.workspaceSlug!} prefill={calculatorPrefill(search)} />
+      <PriceCalculator
+        workspaceSlug={identity!.workspaceSlug!}
+        prefill={calculatorPrefill(search)}
+        requestIds={estimatedRequestIds(search.requests)}
+      />
     </AppShell>
   )
 }

@@ -1,0 +1,110 @@
+import { sql } from 'drizzle-orm'
+import { bigint, check, doublePrecision, index, integer, pgTable, primaryKey, text } from 'drizzle-orm/pg-core'
+import { organization } from './auth'
+
+/**
+ * What a workspace owns. IDs are chosen by the browser, so they are unique only within a workspace; `position` keeps
+ * the order items were added in, which picks a quote's default material, and `archived_at` replaces deleting, so the
+ * prints and usage that reference an item keep resolving it.
+ */
+export const printers = pgTable(
+  'printers',
+  {
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    id: text().notNull(),
+    position: integer().notNull(),
+    name: text().notNull(),
+    printType: text('print_type', { enum: ['resin', 'filament'] }).notNull(),
+    presetId: text('preset_id'),
+    widthMm: doublePrecision('width_mm'),
+    depthMm: doublePrecision('depth_mm'),
+    heightMm: doublePrecision('height_mm'),
+    purchasePrice: doublePrecision('purchase_price'),
+    lifespanHours: doublePrecision('lifespan_hours'),
+    powerWatts: doublePrecision('power_watts'),
+    addOnPresetIdsJson: text('add_on_preset_ids_json').notNull().default('[]'),
+    archivedAt: bigint('archived_at', { mode: 'number' }),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+    updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.id] }),
+    check('printers_print_type_check', sql`${table.printType} IN ('resin', 'filament')`),
+    index('printers_position').on(table.workspaceId, table.position),
+  ],
+)
+
+export const equipment = pgTable(
+  'equipment',
+  {
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    id: text().notNull(),
+    position: integer().notNull(),
+    name: text().notNull(),
+    presetId: text('preset_id'),
+    kind: text({ enum: ['wash', 'cure', 'wash-cure', 'oven', 'ultrasonic', 'dryer', 'other'] }).notNull(),
+    stage: text({ enum: ['before-printing', 'finishing'] }).notNull(),
+    printType: text('print_type', { enum: ['resin', 'filament'] }),
+    powerWatts: doublePrecision('power_watts').notNull(),
+    minutesPerUse: doublePrecision('minutes_per_use').notNull(),
+    suppliesJson: text('supplies_json').notNull().default('[]'),
+    purchasePrice: doublePrecision('purchase_price'),
+    lifespanHours: doublePrecision('lifespan_hours'),
+    archivedAt: bigint('archived_at', { mode: 'number' }),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+    updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.id] }),
+    check('equipment_kind_check', sql`${table.kind} IN ('wash', 'cure', 'wash-cure', 'oven', 'ultrasonic', 'dryer', 'other')`),
+    check('equipment_stage_check', sql`${table.stage} IN ('before-printing', 'finishing')`),
+    check('equipment_print_type_check', sql`${table.printType} IN ('resin', 'filament') OR ${table.printType} IS NULL`),
+    index('equipment_position').on(table.workspaceId, table.position),
+  ],
+)
+
+/**
+ * Resins, filaments, wear parts, and supplies in one table: `price` is per litre, per kilogram, or per unit as the kind
+ * is bought, `preset_id` is the resin, filament, or part catalogue entry, and the remaining columns belong to one kind.
+ * A part's `printer_id` is the custom printer it belongs to; it has no foreign key, since a part may name a printer that
+ * no longer exists, which the library shows as a group of its own.
+ */
+export const consumables = pgTable(
+  'consumables',
+  {
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    id: text().notNull(),
+    position: integer().notNull(),
+    kind: text({ enum: ['resin', 'filament', 'part', 'supply'] }).notNull(),
+    name: text().notNull(),
+    presetId: text('preset_id'),
+    price: doublePrecision().notNull(),
+    densityGramsPerMl: doublePrecision('density_grams_per_ml'),
+    colourJson: text('colour_json'),
+    printType: text('print_type', { enum: ['resin', 'filament'] }),
+    lifespan: doublePrecision(),
+    lifespanUnit: text('lifespan_unit', { enum: ['plates', 'hours'] }),
+    printerPresetId: text('printer_preset_id'),
+    printerId: text('printer_id'),
+    unit: text({ enum: ['ml', 'g', 'item'] }),
+    minimumStock: doublePrecision('minimum_stock'),
+    packSize: doublePrecision('pack_size'),
+    archivedAt: bigint('archived_at', { mode: 'number' }),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+    updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.id] }),
+    check('consumables_kind_check', sql`${table.kind} IN ('resin', 'filament', 'part', 'supply')`),
+    check('consumables_print_type_check', sql`${table.printType} IN ('resin', 'filament') OR ${table.printType} IS NULL`),
+    check('consumables_lifespan_unit_check', sql`${table.lifespanUnit} IN ('plates', 'hours') OR ${table.lifespanUnit} IS NULL`),
+    check('consumables_unit_check', sql`${table.unit} IN ('ml', 'g', 'item') OR ${table.unit} IS NULL`),
+    index('consumables_position').on(table.workspaceId, table.position),
+  ],
+)

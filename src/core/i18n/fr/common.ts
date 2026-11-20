@@ -26,4 +26,7 @@ export const common: typeof en = {
   no: 'Non',
   somethingWentWrong: 'Une erreur est survenue',
   refreshToRetry: 'Actualisez la page pour réessayer.',
+  atLeast: (min: string) => `Saisissez ${min} ou plus.`,
+  between: (min: string, max: string) => `Saisissez un nombre entre ${min} et ${max}.`,
+  autosave: { saving: 'Enregistrement…', saved: 'Enregistré', failed: 'Échec de l’enregistrement', retry: 'Réessayer' },
 }

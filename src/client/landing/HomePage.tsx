@@ -1,45 +1,19 @@
 import { usePostHog } from '@posthog/react'
-import { useEffect, useRef, useState } from 'react'
-import {
-  Check,
-  CircleAlert,
-  Cloud,
-  Copy,
-  ExternalLink,
-  House,
-  Inbox,
-  ListOrdered,
-  Maximize2,
-  Menu,
-  Minimize2,
-  PackageCheck,
-  Pause,
-  Play,
-  Printer,
-  X,
-} from 'lucide-react'
-import { Brand } from '@/client/components/Brand'
+import { useState, type CSSProperties, type ReactNode } from 'react'
+import { Check, CircleAlert, Copy } from 'lucide-react'
 import { writeClipboard } from '@/client/components/useCopied'
+import { ButtonLink, Button } from '@/components/ui/button'
+import { LATEST_DOCUMENTATION_URL } from '@/client/sourceCode'
+import { MODEL_FORMATS } from '@/core/assetKeys'
+import { storagePlans } from '@/core/plans'
+import { workflow, type StatusId } from '@/core/workflow'
+import { cn } from '@/lib/utils'
+import { CopyDemo } from './CopyDemo'
 import { NasMark } from './NasMarks'
-import { Button, ButtonLink } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from './LandingCard'
-import { NAS_CATALOGUES, SELF_HOSTING_GUIDE_URL, SIGN_IN_PATH, SIGN_UP_PATH, STORAGE_PROVIDERS } from './site'
-import { REPOSITORY_URL } from '@/client/sourceCode'
-
-// One mark treatment across the run-it cards: the amber belongs to the action inside them, not the icon.
-const cardMarkClass = 'grid size-9 place-items-center rounded-full bg-muted text-muted-foreground'
-
-const sectionClass =
-  'mx-auto grid w-[min(1040px,calc(100%-48px))] gap-10 border-t py-11 min-[821px]:grid-cols-[210px_1fr] min-[821px]:gap-12 min-[821px]:py-14'
-
-// Coloured in board order, so the row teaches the sequence a request actually moves through:
-// queue, up next, printing, ready. The application uses these same four for those stages.
-const capabilities = [
-  [Inbox, 'Collect requests', 'Models, quantities, notes, resin, and filament.', 'bg-muted-foreground/10 text-muted-foreground'],
-  [ListOrdered, 'Plan the queue', 'Round robin, oldest first, requester priority, or manual.', 'bg-blueprint/10 text-blueprint'],
-  [Printer, 'Match printers', 'Filter by build volume and resin or filament compatibility.', 'bg-primary/10 text-primary'],
-  [PackageCheck, 'Follow every copy', 'Printing, finishing, and collection status per copy.', 'bg-success/10 text-success'],
-] as const
+import { Shot } from './Shot'
+import { ExternalLinkIcon, SiteBar, SiteFooter, column, useTrackLink } from './SiteChrome'
+import { HungTicket, Perforation } from './Ticket'
+import { NAS_CATALOGUES, OUTSIDE_THE_PRODUCT, SELF_HOSTING_GUIDE_URL, SIGN_UP_PATH, STORAGE_PROVIDERS } from './site'
 
 const dockerCommand = [
   'docker run -d \\',
@@ -49,8 +23,19 @@ const dockerCommand = [
   '  ghcr.io/richardsolomou/stl.quest:latest',
 ].join('\n')
 
-function ExternalLinkIcon() {
-  return <ExternalLink data-icon="inline-end" aria-hidden="true" />
+const sections = [
+  ['#board', 'How it works', 'how_it_works'],
+  ['#costs', 'Costs', 'costs'],
+  ['#run', 'Run it', 'run_it'],
+] as const
+
+/** What happens in each stage, keyed by the workflow's own stage IDs so the legend follows the board's order and names. */
+const stageNotes: Record<StatusId, string> = {
+  todo: 'Requests wait in a fair order: round robin between requesters, oldest first, requester priority, or yours.',
+  up_next: 'Tickets hang in firing order, each naming the printer it goes to.',
+  in_progress: 'Grouped by printer. An idle printer is flagged with the next job that fits it.',
+  post_processing: 'Washing, curing, and support removal: whatever happens after the plate.',
+  done: 'Grouped by who is collecting, so a pickup is one glance.',
 }
 
 const copyLabels = {
@@ -59,29 +44,24 @@ const copyLabels = {
   failed: 'Could not copy the Docker command',
 }
 
-function CommandBlock({ command }: { command: string }) {
+/** The Docker command on an ink plate, the one thing on the page a machine reads. */
+function CommandBlock() {
   const posthog = usePostHog()
   const [feedback, setFeedback] = useState<keyof typeof copyLabels>('idle')
 
   async function copy() {
-    const { copied, method } = await writeClipboard(command)
+    const { copied, method } = await writeClipboard(dockerCommand)
     posthog?.capture('docker_command_copy_completed', { success: copied, method })
     setFeedback(copied ? 'copied' : 'failed')
     setTimeout(() => setFeedback('idle'), 2000)
   }
 
   return (
-    <div className="relative mb-6 min-w-0">
-      <pre className="w-full overflow-x-auto rounded-md bg-background p-3 font-mono text-xs leading-relaxed text-foreground">
-        <code>{command}</code>
+    <div className="on-shell relative min-w-0 rounded-md bg-shell">
+      <pre className="overflow-x-auto p-3 font-mono text-[0.75rem] leading-relaxed">
+        <code>{dockerCommand}</code>
       </pre>
-      <Button
-        className="absolute top-1.5 right-1.5 [&_svg]:size-3.5"
-        variant="ghost"
-        size="icon"
-        onClick={copy}
-        aria-label={copyLabels[feedback]}
-      >
+      <Button className="absolute top-1.5 right-1.5" variant="ghost" size="icon" onClick={copy} aria-label={copyLabels[feedback]}>
         {feedback === 'copied' && <Check className="text-success" />}
         {feedback === 'failed' && <CircleAlert className="text-destructive" />}
         {feedback === 'idle' && <Copy />}
@@ -90,391 +70,457 @@ function CommandBlock({ command }: { command: string }) {
   )
 }
 
-function ProductTour() {
-  const posthog = usePostHog()
-  const frameRef = useRef<HTMLDivElement>(null)
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const milestones = useRef(new Set<number>())
-  // Driven by the video's own events, since playback can still be refused (iOS Low Power Mode).
-  const [playing, setPlaying] = useState(false)
-  const [expanded, setExpanded] = useState(false)
-
-  // Started here rather than with the autoplay attribute so the prerendered markup never moves
-  // before we can read the motion preference, and so a refused play just leaves the poster up.
-  useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    void videoRef.current?.play().catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    function trackFullscreen() {
-      setExpanded(document.fullscreenElement === frameRef.current)
-    }
-    document.addEventListener('fullscreenchange', trackFullscreen)
-    return () => document.removeEventListener('fullscreenchange', trackFullscreen)
-  }, [])
-
-  function togglePlayback() {
-    const video = videoRef.current
-    if (!video) return
-    const action = video.paused ? 'play' : 'pause'
-    posthog?.capture('product_tour_control_clicked', { action, current_time_seconds: Math.round(video.currentTime) })
-    // A refused play (e.g. Firefox's per-site block) rejects the promise; swallow it like the autoplay effect above.
-    if (action === 'play') void video.play().catch(() => {})
-    else video.pause()
-  }
-
-  async function toggleExpanded() {
-    const isFullscreen = document.fullscreenElement === frameRef.current
-    posthog?.capture('product_tour_control_clicked', { action: isFullscreen ? 'collapse' : 'expand' })
-    if (isFullscreen) {
-      await document.exitFullscreen()
-      return
-    }
-    if (frameRef.current?.requestFullscreen) {
-      await frameRef.current.requestFullscreen()
-      if (window.matchMedia('(max-width: 620px)').matches) {
-        const orientation = screen.orientation as ScreenOrientation & { lock?: (orientation: string) => Promise<void> }
-        void orientation.lock?.('landscape').catch(() => {})
-      }
-      return
-    }
-    const video = videoRef.current as HTMLVideoElement & { webkitEnterFullscreen?: () => void }
-    video?.webkitEnterFullscreen?.()
-  }
-
-  function trackProgress() {
-    const video = videoRef.current
-    if (!video?.duration) return
-    const milestone = Math.floor((video.currentTime / video.duration) * 4) * 25
-    if (milestone < 25 || milestone > 75 || milestones.current.has(milestone)) return
-    milestones.current.add(milestone)
-    posthog?.capture('product_tour_progress_reached', { percent: milestone })
-  }
-
+/** One line of the spec sheet: its name and purpose in the margin, the evidence beside it. */
+function SpecLine({
+  id,
+  title,
+  purpose,
+  aside,
+  children,
+}: {
+  id: string
+  title: string
+  purpose: ReactNode
+  aside?: ReactNode
+  children?: ReactNode
+}) {
   return (
-    <figure className="mx-auto mb-12 w-full min-[621px]:mb-16 min-[621px]:w-[min(1040px,calc(100%-48px))]">
-      <div
-        ref={frameRef}
-        className="product-tour-frame overflow-hidden border-y bg-background shadow-2xl min-[621px]:rounded-lg min-[621px]:border-x"
-      >
-        <div className="flex h-9 items-center gap-1.5 border-b bg-card px-3">
-          <span className="size-1.5 rounded-full bg-muted-foreground/50" aria-hidden="true" />
-          <span className="size-1.5 rounded-full bg-muted-foreground/50" aria-hidden="true" />
-          <span className="size-1.5 rounded-full bg-muted-foreground/50" aria-hidden="true" />
-          <Button
-            className="ml-auto size-7 [&_svg]:size-3.5"
-            variant="ghost"
-            size="icon"
-            onClick={toggleExpanded}
-            aria-label={expanded ? 'Exit the expanded product tour' : 'Expand the product tour'}
-          >
-            {expanded ? <Minimize2 /> : <Maximize2 />}
-          </Button>
-          <Button
-            className="-mr-1.5 size-7 [&_svg]:size-3.5"
-            variant="ghost"
-            size="icon"
-            onClick={togglePlayback}
-            aria-label={playing ? 'Pause the product tour' : 'Play the product tour'}
-          >
-            {playing ? <Pause /> : <Play />}
-          </Button>
-        </div>
-        <video
-          ref={videoRef}
-          className="aspect-4/5 w-full object-cover object-left min-[621px]:aspect-video min-[621px]:object-center"
-          muted
-          loop
-          playsInline
-          poster="/product-tour.webp"
-          aria-label="The STL Quest request board, with prints grouped into queue, printing, finishing, and ready columns"
-          onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
-          onTimeUpdate={trackProgress}
-        >
-          <source src="/product-tour.webm" type="video/webm" />
-          <source src="/product-tour.mp4" type="video/mp4" />
-        </video>
+    <section id={id} aria-labelledby={`${id}-title`} className="border-t border-border py-14 sm:py-20">
+      <div className={cn(column, 'grid gap-x-12 gap-y-8 lg:grid-cols-[15rem_1fr]')}>
+        <header>
+          <h2 id={`${id}-title`} className="font-heading text-[2rem] leading-none font-bold text-balance uppercase">
+            {title}
+          </h2>
+          <div className="mt-4 space-y-3 text-[0.95rem] leading-relaxed text-muted-foreground">{purpose}</div>
+          {aside}
+        </header>
+        {children && <div className="min-w-0">{children}</div>}
       </div>
-      <figcaption className="mt-2 px-4 font-mono text-xs text-muted-foreground min-[621px]:px-0">
-        Every request moves left to right: queue, up next, printing, finishing, ready.
-      </figcaption>
-    </figure>
+    </section>
   )
 }
 
+function Point({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <li className="border-t border-border pt-3">
+      <h3 className="font-semibold">{title}</h3>
+      <p className="mt-1 text-[0.95rem] leading-relaxed text-muted-foreground">{children}</p>
+    </li>
+  )
+}
+
+const gigabytes = new Intl.NumberFormat('en', { style: 'unit', unit: 'gigabyte' })
+
+function DemoCaption({ children }: { children: ReactNode }) {
+  return <figcaption className="mt-2 font-mono text-[11px] text-muted-foreground uppercase">{children}</figcaption>
+}
+
+/** A dashed tag, the calculator's "typical" mark, saying a feature waits until it is turned on. */
+function OptionalTag() {
+  return (
+    <span className="mt-4 inline-flex rounded-[3px] border border-dashed border-foreground/40 px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground uppercase">
+      Off until you turn it on
+    </span>
+  )
+}
+
+const catalogues = [
+  ['Printers', 'Resin and filament machines with their print type, build volume, and a photo.'],
+  ['Filaments', 'Every product and colour in SpoolmanDB, picked as a swatch.'],
+  ['Resins', 'Manufacturer resins with their type and density.'],
+  ['Equipment', 'Wash, cure, drying, and other kit, with its power draw.'],
+  ['Wear parts', 'Tanks, films, screens, nozzles, and build sheets for each printer model, with sourced lifespans.'],
+  ['Electricity', 'Household prices by country, so running costs start from a real figure.'],
+] as const
+
 export function HomePage() {
-  const posthog = usePostHog()
-  const [navigationOpen, setNavigationOpen] = useState(false)
-
-  function trackLink(link: string, location: string) {
-    posthog?.capture('website_link_clicked', { link, location })
-  }
-
-  function followHeaderLink(link: string) {
-    trackLink(link, 'header')
-    setNavigationOpen(false)
-  }
-
-  useEffect(() => {
-    if (!navigationOpen) return
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') setNavigationOpen(false)
-    }
-    document.addEventListener('keydown', closeOnEscape)
-    return () => document.removeEventListener('keydown', closeOnEscape)
-  }, [navigationOpen])
+  const trackLink = useTrackLink()
+  const first = workflow.statuses[0].label
+  const last = workflow.statuses.at(-1)!.label
+  const [truenas, unraid] = NAS_CATALOGUES
 
   return (
     <>
-      <a className="fixed top-2 left-2 z-50 -translate-y-16 bg-card px-3 py-2 focus:translate-y-0" href="#main">
-        Skip to content
-      </a>
-
-      <header className="relative mx-auto flex h-16 w-[min(1040px,calc(100%-48px))] items-center justify-between border-b-2 border-dashed border-blueprint/25">
-        <a className="shrink-0" href="#top" aria-label="STL Quest home" onClick={() => trackLink('home', 'header')}>
-          <Brand />
-        </a>
-        <Button
-          className="min-[921px]:hidden"
-          variant="ghost"
-          size="icon"
-          aria-expanded={navigationOpen}
-          aria-controls="site-navigation"
-          aria-label="Toggle navigation"
-          onClick={() => setNavigationOpen((open) => !open)}
-        >
-          {navigationOpen ? <X /> : <Menu />}
-        </Button>
-        {navigationOpen && (
-          <div
-            aria-hidden="true"
-            className="fixed inset-0 z-10 bg-background/70 min-[921px]:hidden"
-            onClick={() => setNavigationOpen(false)}
-          />
-        )}
-        <nav
-          id="site-navigation"
-          aria-label="Main navigation"
-          className={`${navigationOpen ? 'flex' : 'hidden'} absolute top-full right-0 left-0 z-20 mt-2 flex-col items-stretch gap-1 rounded-lg border bg-card p-3 shadow-xl min-[921px]:static min-[921px]:mt-0 min-[921px]:flex min-[921px]:flex-row min-[921px]:items-center min-[921px]:gap-5 min-[921px]:border-0 min-[921px]:bg-transparent min-[921px]:p-0 min-[921px]:shadow-none`}
-        >
-          <ButtonLink className="justify-start" variant="ghost" href="#what-it-does" onClick={() => followHeaderLink('what_it_does')}>
-            What it does
-          </ButtonLink>
-          <ButtonLink className="justify-start" variant="ghost" href="#ways-to-run" onClick={() => followHeaderLink('ways_to_run')}>
-            Ways to run it
-          </ButtonLink>
-          <ButtonLink
-            className="justify-start"
-            variant="ghost"
-            href={REPOSITORY_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => followHeaderLink('github')}
-          >
-            GitHub <ExternalLinkIcon />
-          </ButtonLink>
-          <ButtonLink className="justify-start" variant="ghost" href={SIGN_IN_PATH} onClick={() => followHeaderLink('sign_in')}>
-            Sign in
-          </ButtonLink>
-          <ButtonLink variant="outline" href={SIGN_UP_PATH} onClick={() => followHeaderLink('create_workspace')}>
-            Create a free workspace
-          </ButtonLink>
-        </nav>
-      </header>
+      <SiteBar sections={sections} />
 
       <main id="main">
-        <section id="top" className="mx-auto w-[min(1040px,calc(100%-48px))] py-12 min-[621px]:pt-17 min-[621px]:pb-10">
-          <h1 className="max-w-3xl font-heading text-5xl leading-[1.04] font-medium tracking-tight min-[621px]:text-[70px]">
-            A home for your 3D-print requests.
-          </h1>
-          <p className="mt-5 max-w-xl text-lg leading-normal text-muted-foreground min-[621px]:text-xl">
-            Free and open source, for anyone who prints for other people. Keep every request, printer, and copy in one place — without
-            handing over your model files.
-          </p>
-          <div className="mt-8 flex flex-col items-start gap-3 min-[621px]:flex-row min-[621px]:items-center">
-            <ButtonLink size="xl" href="#ways-to-run" onClick={() => trackLink('self_host', 'hero')}>
-              Run it on your own server
-            </ButtonLink>
-            <ButtonLink size="xl" variant="outline" href={SIGN_UP_PATH} onClick={() => trackLink('create_workspace', 'hero')}>
-              Or use the hosted version
-            </ButtonLink>
-          </div>
-        </section>
+        <section aria-labelledby="top-title" className="pt-7 pb-12 sm:pt-14 sm:pb-16">
+          <div
+            className={cn(
+              column,
+              'grid grid-cols-[minmax(0,1fr)] items-start gap-x-6 gap-y-10 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]',
+            )}
+          >
+            <HungTicket bar="up_next">
+              <h1
+                id="top-title"
+                className="font-heading text-[2.2rem] leading-[0.95] font-bold tracking-[-0.01em] text-balance uppercase sm:text-[3.6rem] xl:text-[4.25rem]"
+              >
+                The <span className="whitespace-nowrap">3D-print</span> queue you run yourself
+              </h1>
+              <p className="mt-4 max-w-[34rem] leading-normal text-ticket-muted sm:mt-5 sm:text-xl">
+                Take requests from the people you print for, decide what prints next and on which printer, and follow every copy from{' '}
+                {first} to {last}.
+              </p>
+              <p className="mt-5 flex gap-[3px] sm:mt-6" aria-hidden="true">
+                {workflow.statuses.map(({ id }) => (
+                  <span key={id} data-stage={id} className="size-2 rounded-[2px] bg-(--stage)" />
+                ))}
+              </p>
+              <Perforation className="mt-3" />
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+                <p className="font-mono text-[11px] text-ticket-muted uppercase">Free · AGPL-3.0</p>
+                <ButtonLink size="xl" href={SIGN_UP_PATH} onClick={() => trackLink('create_workspace', 'hero')}>
+                  Create a free workspace
+                </ButtonLink>
+              </div>
+            </HungTicket>
 
-        <ProductTour />
-
-        <section id="what-it-does" className={sectionClass}>
-          <h2 className="font-heading text-3xl font-medium">What it does</h2>
-          <div className="grid gap-x-11 min-[621px]:grid-cols-2">
-            {capabilities.map(([Icon, title, description, colour]) => (
-              <article className="border-t py-4" key={title}>
-                <h3 className="flex items-center gap-2.5 font-heading text-lg font-medium tracking-wide">
-                  <span className={`grid size-7 place-items-center rounded-full ${colour}`}>
-                    <Icon className="size-3.5" aria-hidden="true" />
-                  </span>
-                  {title}
-                </h3>
-                <p className="mt-2 text-base leading-normal text-muted-foreground">{description}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section id="your-files" className={sectionClass}>
-          <h2 className="font-heading text-3xl font-medium">Your files stay yours</h2>
-          <div>
-            <p className="max-w-xl text-lg leading-normal text-muted-foreground">
-              STL Quest keeps the queue — who asked for what, which printer it is on, and how far along it is. Use included hosted storage,
-              or keep model files in storage you connect and control.
-            </p>
-            <ul className="mt-6 flex flex-wrap gap-1.5">
-              {STORAGE_PROVIDERS.map((provider) => (
-                <li className="rounded-sm border bg-card px-2 py-1 font-mono text-xs text-muted-foreground" key={provider}>
-                  {provider}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-
-        <section id="ways-to-run" className={sectionClass}>
-          <h2 className="font-heading text-3xl font-medium">Ways to run it</h2>
-          {/* Two-up only once the container hits its 1040px cap, below which the Docker command would not fit a half-width card. */}
-          <div className="flex flex-col gap-4 min-[1088px]:grid min-[1088px]:grid-cols-[1.3fr_1fr] min-[1088px]:items-start">
-            <div className="contents min-[1088px]:flex min-[1088px]:flex-col min-[1088px]:gap-4">
-              <Card className="order-1 min-[1088px]:order-none">
-                <CardHeader>
-                  <span className={cardMarkClass}>
-                    <House className="size-4" aria-hidden="true" />
-                  </span>
-                  <CardTitle>Run it yourself</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="mt-4 mb-4 text-base leading-normal text-muted-foreground">
-                    One Docker container. Keep everything on your own hardware.
-                  </p>
-                  <CommandBlock command={dockerCommand} />
+            <HungTicket bar="ink" id="docker" style={{ '--settle-delay': '90ms' } as CSSProperties}>
+              <h2 className="font-heading text-[1.6rem] leading-none font-bold uppercase">Run it yourself</h2>
+              <p className="mt-3 mb-4 text-[0.95rem] leading-relaxed text-ticket-muted">
+                One container on your own hardware. SQLite by default, PostgreSQL when you want it.
+              </p>
+              <CommandBlock />
+              <Perforation className="mt-5" />
+              <ul className="mt-4 flex flex-wrap gap-2">
+                <li>
                   <ButtonLink
-                    className="self-start"
-                    size="xl"
                     variant="outline"
                     href={SELF_HOSTING_GUIDE_URL}
                     target="_blank"
                     rel="noopener noreferrer"
-                    onClick={() => trackLink('self_hosting_guide', 'self_hosted_card')}
+                    onClick={() => trackLink('self_hosting_guide', 'hero')}
                   >
                     Self-hosting guide <ExternalLinkIcon />
                   </ButtonLink>
-                </CardContent>
-              </Card>
-
-              {NAS_CATALOGUES.slice(1).map(([platform, name, href]) => (
-                <Card className="order-4 min-[1088px]:order-none" key={name}>
-                  <CardHeader>
-                    <span className={cardMarkClass}>
-                      <NasMark className="size-4" platform={platform} />
-                    </span>
-                    <CardTitle>Install on {name}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="mt-4 mb-6 text-base leading-normal text-muted-foreground">
-                      Install STL Quest straight from the {name} app catalogue.
-                    </p>
+                </li>
+                {[truenas, unraid].map(([platform, name, href]) => (
+                  <li key={platform}>
                     <ButtonLink
-                      className="self-start"
-                      size="xl"
                       variant="outline"
                       href={href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      onClick={() => trackLink(`${platform}_catalogue`, `${platform}_card`)}
+                      onClick={() => trackLink(`${platform}_catalogue`, 'hero')}
                     >
-                      Open the {name} catalogue <ExternalLinkIcon />
+                      <NasMark className="size-3.5" platform={platform} />
+                      {name}
+                      <span className="sr-only"> app catalogue</span>
                     </ButtonLink>
-                  </CardContent>
-                </Card>
+                  </li>
+                ))}
+              </ul>
+            </HungTicket>
+          </div>
+        </section>
+
+        <section id="board" aria-labelledby="board-title" className="border-t border-border py-14 sm:py-20">
+          <div className={cn(column, 'grid gap-x-12 gap-y-8 lg:grid-cols-[15rem_1fr]')}>
+            <header>
+              <h2 id="board-title" className="font-heading text-[2rem] leading-none font-bold text-balance uppercase">
+                One board, five stages
+              </h2>
+              <p className="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground">
+                The board is laid out like an expo pass: what to print next hangs in the middle, every printer shows what it is doing, and
+                finished prints wait for pickup on the right.
+              </p>
+            </header>
+            <figure className="relative min-w-0 lg:pb-10">
+              <div className="overflow-hidden rounded-lg border border-border max-sm:hidden">
+                <Shot
+                  name="board"
+                  wide
+                  width={2000}
+                  height={1250}
+                  sizes="(min-width: 1296px) 56rem, (min-width: 1024px) 70vw, 100vw"
+                  alt="The STL Quest board for a print farm: the queue on the left, tickets hanging in firing order with printers idle and busy above them, and finishing and ready shelves on the right."
+                />
+              </div>
+              <div className="mx-auto w-[14rem] overflow-hidden rounded-[1.4rem] border-[5px] border-shell shadow-2xl ring-1 ring-foreground/10 sm:hidden lg:absolute lg:-left-8 lg:-bottom-2 lg:block lg:w-[11.5rem] xl:w-[13rem]">
+                <Shot
+                  name="phone"
+                  width={600}
+                  height={1299}
+                  sizes="14rem"
+                  alt="The same board on a phone: a stage bar to jump between lanes, and the next ticket to fire."
+                />
+              </div>
+              <figcaption className="mt-3 font-mono text-[11px] text-muted-foreground uppercase lg:pl-[11rem] xl:pl-[12.5rem]">
+                A demo print farm · 27 printers · on desktop and phone
+              </figcaption>
+            </figure>
+          </div>
+          <ol className={cn(column, 'mt-12 grid gap-x-3 gap-y-6 sm:grid-cols-2 lg:grid-cols-5')}>
+            {workflow.statuses.map(({ id, label }) => (
+              <li key={id} data-stage={id} className="border-t-[6px] border-(--stage) pt-3">
+                <h3 className="font-heading text-[1.1rem] leading-none font-bold uppercase">{label}</h3>
+                <p className="mt-2 text-[0.9rem] leading-relaxed text-muted-foreground">{stageNotes[id]}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <SpecLine
+          id="copies"
+          title="Track the copy, not the request"
+          purpose={
+            <>
+              <p>
+                A request for six is six copies. Start three, finish two, hand one over: each copy sits in its own stage, and the board
+                draws every one as a cell in that stage&rsquo;s colour.
+              </p>
+              <p>Requesters see the same cells under My requests, so nobody has to ask whether theirs is done.</p>
+            </>
+          }
+        >
+          <CopyDemo />
+        </SpecLine>
+
+        <SpecLine
+          id="catalogues"
+          title="Pick it from a catalogue"
+          purpose={
+            <p>
+              Printers, materials, and equipment come from catalogues that ship with the app, so you choose a product instead of typing its
+              specs. The only figures you type are the prices you paid.
+            </p>
+          }
+        >
+          <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+            <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
+              {catalogues.map(([name, description]) => (
+                <li key={name} className="grid gap-1 px-4 py-3 sm:grid-cols-[9rem_1fr] sm:gap-4">
+                  <h3 className="font-semibold">{name}</h3>
+                  <p className="text-[0.95rem] leading-relaxed text-muted-foreground">{description}</p>
+                </li>
               ))}
+            </ul>
+            <figure>
+              <div className="overflow-hidden rounded-lg border border-border">
+                <Shot
+                  name="filament"
+                  width={900}
+                  height={634}
+                  sizes="(min-width: 1280px) 22rem, 100vw"
+                  alt="Adding Prusament PLA from the filament catalogue: the product with its material and density, and a grid of its colour swatches."
+                />
+              </div>
+              <DemoCaption>A filament from the catalogue, picked by its colour</DemoCaption>
+            </figure>
+          </div>
+        </SpecLine>
+
+        <SpecLine
+          id="costs"
+          title="Quote it before you print it"
+          purpose={
+            <p>
+              Enter your slicer&rsquo;s totals and get a suggested price built from what your printer, material, wear parts, electricity,
+              and time cost.
+            </p>
+          }
+        >
+          <div className="grid items-start gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+            <ul className="space-y-5">
+              <Point title="Rough quote in seconds">
+                Material and print time from the slicer, plates and hands-on minutes from you. Every rate shows what it costs per hour,
+                plate, or millilitre.
+              </Point>
+              <Point title="A batch at once">
+                Select prints on the board and choose Estimate price to quote them together, each on its assigned printer.
+              </Point>
+              <Point title="Compare printers">See the same job priced across every printer that could run it.</Point>
+            </ul>
+            <figure>
+              <div className="overflow-hidden rounded-lg border border-border">
+                <Shot
+                  name="quote"
+                  width={800}
+                  height={1123}
+                  sizes="22rem"
+                  alt="A rough quote: the suggested price, what it costs to make at a 40% margin, and the cost basis of the printer, its wear parts, the resin, and wash and cure."
+                />
+              </div>
+              <DemoCaption>A typical resin job on the demo print farm</DemoCaption>
+            </figure>
+          </div>
+        </SpecLine>
+
+        <SpecLine
+          id="usage"
+          title="Know what it used"
+          purpose={
+            <p>
+              Turn on usage and stock tracking and the board asks what each print used as it moves on, so stock, maintenance, and spend
+              count themselves.
+            </p>
+          }
+          aside={<OptionalTag />}
+        >
+          <ul className="grid gap-5 sm:grid-cols-2">
+            <Point title="Asked at the step">
+              Moving prints into Printing or Finishing opens a short sheet: what did you use? Prefilled, skippable, undoable.
+            </Point>
+            <Point title="Stock and reorder levels">Resin, filament, and supplies count down as they are used.</Point>
+            <Point title="Wear parts">Tanks, films, and nozzles show how close they are to due, with Replaced beside them.</Point>
+            <Point title="Spend">What prints cost at the prices you paid then, including failed runs and waste.</Point>
+          </ul>
+          <figure className="mt-8">
+            <div className="overflow-hidden rounded-lg border border-border">
+              <Shot
+                name="spend"
+                width={1400}
+                height={631}
+                sizes="(min-width: 1296px) 56rem, (min-width: 1024px) 70vw, 100vw"
+                alt="Spend for the month: the total spent, prints, failed runs, and wasted stock, with a chart of spend per day."
+              />
             </div>
+            <DemoCaption>A month of spend on the demo print farm</DemoCaption>
+          </figure>
+        </SpecLine>
 
-            <div className="contents min-[1088px]:flex min-[1088px]:flex-col min-[1088px]:gap-4">
-              <Card className="order-2 min-[1088px]:order-none">
-                <CardHeader>
-                  <span className={cardMarkClass}>
-                    <Cloud className="size-4" aria-hidden="true" />
-                  </span>
-                  <CardTitle>Use the hosted version</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="mt-4 mb-6 text-base leading-normal text-muted-foreground">
-                    Create a workspace in seconds. Connect your storage and start taking requests.
-                  </p>
-                  <ButtonLink
-                    className="mt-auto self-start"
-                    size="xl"
-                    href={SIGN_UP_PATH}
-                    onClick={() => trackLink('create_workspace', 'hosted_card')}
+        <SpecLine
+          id="run"
+          title="Run it your way"
+          purpose={
+            <>
+              <p>The same application either way, and your files stay yours.</p>
+              <p>
+                STL Quest keeps the queue: who asked for what, which printer it is on, and how far along it is. Model files live where you
+                choose.
+              </p>
+            </>
+          }
+        >
+          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-x-6 gap-y-10 md:grid-cols-2">
+            <HungTicket bar="ink">
+              <h3 className="font-heading text-[1.4rem] leading-none font-bold uppercase">On your own server</h3>
+              <ul className="mt-4 space-y-2 text-[0.95rem] leading-relaxed text-ticket-muted">
+                <li>
+                  One Docker container, with the{' '}
+                  <a
+                    className="text-ticket-foreground underline decoration-ticket-foreground/30 underline-offset-4 hover:decoration-ticket-foreground"
+                    href="#docker"
                   >
-                    Create a free workspace
-                  </ButtonLink>
-                </CardContent>
-              </Card>
+                    command at the top
+                  </a>
+                  , or Docker Compose.
+                </li>
+                <li>
+                  An app in the {truenas[1]} and {unraid[1]} catalogues.
+                </li>
+                <li>No plans: files live wherever you put them.</li>
+              </ul>
+              <Perforation className="mt-5" />
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="font-mono text-[11px] text-ticket-muted uppercase">SQLite or PostgreSQL</p>
+                <ButtonLink
+                  variant="outline"
+                  href={`${LATEST_DOCUMENTATION_URL}/deployment.md`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => trackLink('deployment_guide', 'run_it')}
+                >
+                  Deployment guide <ExternalLinkIcon />
+                </ButtonLink>
+              </div>
+            </HungTicket>
+            <HungTicket bar="up_next">
+              <h3 className="font-heading text-[1.4rem] leading-none font-bold uppercase">Hosted at stl.quest</h3>
+              <table className="mt-3 w-full text-[0.95rem]">
+                <caption className="sr-only">Hosted storage plans</caption>
+                <tbody className="divide-y divide-ticket-foreground/15">
+                  {Object.values(storagePlans).map((plan) => (
+                    <tr key={plan.name}>
+                      <th scope="row" className="py-2 text-left font-semibold">
+                        {plan.name}
+                      </th>
+                      <td className="py-2 font-mono text-[0.8rem] text-ticket-muted">{gigabytes.format(plan.quotaBytes / 1e9)}</td>
+                      <td className="py-2 text-right font-mono text-[0.8rem]">${plan.monthlyPrice}/month</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="mt-2 text-sm leading-relaxed text-ticket-muted">
+                Storage for model files, shared across the workspaces you own. A workspace can connect storage you manage instead.
+              </p>
+              <Perforation className="mt-5" />
+              <div className="mt-4 flex justify-end">
+                <ButtonLink variant="outline" href={SIGN_UP_PATH} onClick={() => trackLink('create_workspace', 'run_it')}>
+                  Create a free workspace
+                </ButtonLink>
+              </div>
+            </HungTicket>
+          </div>
+          <div className="mt-10 grid gap-6 sm:grid-cols-2">
+            <div>
+              <h3 className="font-semibold">Storage</h3>
+              <ul className="mt-3 flex flex-wrap gap-1.5">
+                {STORAGE_PROVIDERS.map((provider) => (
+                  <li key={provider} className="rounded-[3px] border border-border bg-card px-2 py-1 font-mono text-xs">
+                    {provider}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-[0.95rem] leading-relaxed text-muted-foreground">
+                Switching providers migrates the files you already have.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold">Models</h3>
+              <ul className="mt-3 flex flex-wrap gap-1.5">
+                {MODEL_FORMATS.map((format) => (
+                  <li key={format} className="rounded-[3px] border border-border bg-card px-2 py-1 font-mono text-xs uppercase">
+                    {format}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-[0.95rem] leading-relaxed text-muted-foreground">
+                Interactive 3D previews and thumbnails, or a saved link to the model page instead of a file.
+              </p>
+            </div>
+          </div>
+        </SpecLine>
 
-              {NAS_CATALOGUES.slice(0, 1).map(([platform, name, href]) => (
-                <Card className="order-3 min-[1088px]:order-none" key={name}>
-                  <CardHeader>
-                    <span className={cardMarkClass}>
-                      <NasMark className="size-4" platform={platform} />
-                    </span>
-                    <CardTitle>Install on {name}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="mt-4 mb-6 text-base leading-normal text-muted-foreground">
-                      Install STL Quest straight from the {name} app catalogue.
-                    </p>
-                    <ButtonLink
-                      className="self-start"
-                      size="xl"
-                      variant="outline"
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => trackLink(`${platform}_catalogue`, `${platform}_card`)}
-                    >
-                      Open the {name} catalogue <ExternalLinkIcon />
-                    </ButtonLink>
-                  </CardContent>
-                </Card>
-              ))}
+        <SpecLine
+          id="boundary"
+          title="What it leaves to other tools"
+          purpose={<p>STL Quest runs the queue. The jobs around it stay with the tools that already do them well.</p>}
+        >
+          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5 [&>li:last-child]:max-xl:sm:col-span-2">
+            {OUTSIDE_THE_PRODUCT.map(({ job, instead }) => (
+              <li key={job} className="rounded-[3px] border border-dashed border-foreground/30 px-4 py-3">
+                <h3 className="font-heading text-lg leading-none font-bold text-muted-foreground uppercase">{job}</h3>
+                <p className="mt-2 text-[0.9rem] leading-relaxed text-muted-foreground">{instead}</p>
+              </li>
+            ))}
+          </ul>
+        </SpecLine>
+
+        <section aria-labelledby="close-title" className="on-shell border-t-[0.375rem] border-rail bg-shell py-14 sm:py-20">
+          <div className={cn(column, 'grid items-end gap-8 lg:grid-cols-[minmax(0,1fr)_auto]')}>
+            <div>
+              <h2 id="close-title" className="font-heading text-[2.4rem] leading-[0.95] font-bold text-balance uppercase sm:text-[3rem]">
+                One printer or a whole farm
+              </h2>
+              <p className="mt-4 max-w-[36rem] text-lg leading-normal text-muted-foreground">
+                The board stays one screen at either end: a handful of requests on one printer, or hundreds of copies across a fleet.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <ButtonLink size="xl" href={SIGN_UP_PATH} onClick={() => trackLink('create_workspace', 'close')}>
+                Create a free workspace
+              </ButtonLink>
+              <ButtonLink size="xl" variant="outline" href="#docker" onClick={() => trackLink('docker_command', 'close')}>
+                Run it yourself
+              </ButtonLink>
             </div>
           </div>
         </section>
       </main>
 
-      <footer className="mx-auto flex w-[min(1040px,calc(100%-48px))] flex-col items-start gap-5 border-t py-6 font-mono text-xs text-muted-foreground min-[621px]:flex-row min-[621px]:items-center min-[621px]:justify-between">
-        <div className="flex flex-col gap-5 min-[621px]:flex-row min-[621px]:gap-6">
-          <span>© {new Date().getFullYear()} STL Quest</span>
-          <span>Free and open source under AGPL-3.0</span>
-        </div>
-        <div className="flex items-center gap-5">
-          <a className="hover:text-foreground" href="/terms" onClick={() => trackLink('terms', 'footer')}>
-            Terms
-          </a>
-          <a className="hover:text-foreground" href="/privacy" onClick={() => trackLink('privacy', 'footer')}>
-            Privacy
-          </a>
-          <a
-            className="inline-flex items-center gap-1 hover:text-foreground"
-            href={REPOSITORY_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => trackLink('github', 'footer')}
-          >
-            GitHub <ExternalLink className="size-3" aria-hidden="true" />
-          </a>
-        </div>
-      </footer>
+      <SiteFooter />
     </>
   )
 }

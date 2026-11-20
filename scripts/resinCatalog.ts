@@ -184,18 +184,19 @@ export function mergeResinPresets(generated: GeneratedResinPreset[], curated: Ge
   return [...presets.values()].sort(comparePresets)
 }
 
-function normalizeBrand(brand?: string) {
+export function normalizeBrand(brand?: string) {
   if (!brand) return undefined
   return (
     {
       Esun: 'eSUN',
+      eSun: 'eSUN',
       Monocure: 'Monocure 3D',
       'Prusa Polymers': 'Prusament',
     }[brand] ?? brand
   )
 }
 
-function stripBrand(name: string, brand: string, originalBrand?: string) {
+export function stripBrand(name: string, brand: string, originalBrand?: string) {
   for (const prefix of [brand, originalBrand].filter((candidate): candidate is string => !!candidate)) {
     if (!name.toLocaleLowerCase().startsWith(prefix.toLocaleLowerCase())) continue
     const remainder = name.slice(prefix.length)
@@ -208,7 +209,7 @@ function resinPresetId(brand: string, name: string) {
   return `resin-${slug(`${brand}-${name}`)}`
 }
 
-function slug(value: string) {
+export function slug(value: string) {
   return value
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -221,6 +222,6 @@ function comparePresets(first: GeneratedResinPreset, second: GeneratedResinPrese
   return first.brand.localeCompare(second.brand) || first.name.localeCompare(second.name)
 }
 
-function encodePath(value: string) {
+export function encodePath(value: string) {
   return value.split('/').map(encodeURIComponent).join('/')
 }

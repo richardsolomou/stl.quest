@@ -165,7 +165,7 @@ export default function StlViewer({ request, file, hasPreview = false }: { reque
 
   return (
     <div
-      className="viewer relative mb-3.5 aspect-4/3 w-full overflow-hidden rounded-lg border bg-background [background-image:var(--grid)] [&_canvas]:block [&_canvas]:size-full"
+      className="viewer relative mb-3.5 aspect-4/3 w-full overflow-hidden rounded-lg border bg-thumb [&_canvas]:block [&_canvas]:size-full"
       ref={mountRef}
     >
       {status === 'loading' && (

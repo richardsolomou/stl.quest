@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { useVirtualizer } from '@tanstack/react-virtual'
@@ -112,6 +112,15 @@ function ArchiveView() {
               {filtered ? t.requests.archive.noMatchesTitle : t.requests.archive.emptyTitle}
             </h2>
             <EmptyDescription>{filtered ? t.requests.archive.noMatches : t.requests.archive.empty}</EmptyDescription>
+            {!filtered && workspace?.identity?.role === 'admin' && (
+              <EmptyDescription>
+                {t.requests.archive.autoArchive.before}
+                <Link to="/settings/$section" params={{ section: 'board' }}>
+                  {t.requests.archive.autoArchive.link}
+                </Link>
+                {t.requests.archive.autoArchive.after}
+              </EmptyDescription>
+            )}
           </EmptyHeader>
         </Empty>
       ) : (
@@ -199,23 +208,23 @@ function ArchivedRequestRow({
           request={request}
           className="thumb size-16 shrink-0 rounded-sm border object-cover"
           fallback={
-            <div className="thumb grid size-16 shrink-0 place-items-center overflow-hidden rounded-sm border bg-background [background-image:var(--grid)] [background-size:12px_12px]">
-              <Link2 className="size-6 text-primary" aria-label={t.requests.thumb.linkedPrint} />
+            <div className="thumb grid size-16 shrink-0 place-items-center overflow-hidden rounded-sm border bg-thumb">
+              <Link2 className="size-6 text-ticket-muted" aria-label={t.requests.thumb.linkedPrint} />
             </div>
           }
         />
       ) : (
-        <div className="thumb grid size-16 shrink-0 place-items-center overflow-hidden rounded-sm border border-ticket-foreground/15 bg-background [background-image:var(--grid)] [background-size:12px_12px]">
+        <div className="thumb grid size-16 shrink-0 place-items-center overflow-hidden rounded-sm border border-ticket-foreground/15 bg-thumb">
           {request.hasFile ? (
             <ModelFormatLabel format={request.modelFormat} />
           ) : (
-            <Link2 className="size-6 text-primary" aria-label={t.requests.thumb.linkedPrint} />
+            <Link2 className="size-6 text-ticket-muted" aria-label={t.requests.thumb.linkedPrint} />
           )}
         </div>
       )}
       <div className="min-w-0 flex-1">
         <div className="truncate font-serif text-base font-semibold">{request.name}</div>
-        <div className="mt-1 flex items-center gap-x-2 text-xs text-muted-foreground">
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           {showRequester && (
             <>
               <UserAvatar name={requesterLabel(request, t.requests.requesterFallback)} image={request.requesterImage} size="sm" />
@@ -233,9 +242,9 @@ function ArchivedRequestRow({
         </div>
       </div>
       {request.canArchive && (
-        <Button type="button" variant="outline" size="sm" disabled={pending} onClick={onRestore}>
+        <Button type="button" variant="outline" size="sm" title={t.requests.archive.moveBack} disabled={pending} onClick={onRestore}>
           <ArchiveRestore />
-          {t.requests.archive.moveBack}
+          <span className="max-sm:sr-only">{t.requests.archive.moveBack}</span>
         </Button>
       )}
     </div>

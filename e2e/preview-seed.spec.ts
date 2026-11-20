@@ -14,10 +14,10 @@ async function signIn(page: Page) {
 test('seeds a disposable preview workspace', async ({ page, browser, baseURL }) => {
   test.setTimeout(120_000)
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'A home for your 3D-print requests.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'The 3D-print queue you run yourself' })).toBeVisible()
   await signIn(page)
   await expect(page.getByRole('button', { name: 'Set up STL Quest' })).toHaveCount(0)
-  await page.getByRole('button', { name: 'Add a print' }).waitFor()
+  await page.getByRole('region', { name: 'Board filters' }).getByRole('button', { name: 'Add a print' }).waitFor()
 
   await expect(page.locator('button.card').filter({ hasText: 'Calibration cube' }).first()).toContainText('Resin')
   await expect(page.locator('button.card').filter({ hasText: 'Replacement bracket' }).first()).toContainText(/Filament.*×2|×2.*Filament/)
@@ -33,7 +33,7 @@ test('seeds a disposable preview workspace', async ({ page, browser, baseURL }) 
   await realtimeConnection
 
   const realtimeRequest = `Preview realtime ${Date.now()}`
-  await page.getByRole('button', { name: 'Add a print' }).click()
+  await page.getByRole('region', { name: 'Board filters' }).getByRole('button', { name: 'Add a print' }).click()
   await page.getByRole('button', { name: 'Upload files' }).click()
   await page
     .locator('input[type=file]')
@@ -90,7 +90,7 @@ test('seeds a disposable preview workspace', async ({ page, browser, baseURL }) 
 
 test('paginates the admin users table', async ({ page }) => {
   await signIn(page)
-  await page.getByRole('button', { name: 'Add a print' }).waitFor()
+  await page.getByRole('region', { name: 'Board filters' }).getByRole('button', { name: 'Add a print' }).waitFor()
   await page.goto('/admin/users')
 
   const createResults = await page.evaluate(async () => {

@@ -38,7 +38,7 @@ test('requesters own queue priority while admins move work between stages', asyn
     .getByRole('button', { name: 'Delete request' })
     .click()
   await expect(requestCard(requesterPage, 'requester-delete')).toHaveCount(0)
-  await expect(requesterPage.getByRole('button', { name: 'STL Quest, 1 of 5 resolved, 20 XP' })).toBeVisible()
+  await expect(requesterPage.getByRole('button', { name: 'STL Quest, 1 of 3 resolved, 20 XP' })).toBeVisible()
   // Settings is for everyone; a member's lands on their own account rather than the workspace.
   await expect(
     requesterPage.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Settings', exact: true }),
@@ -49,32 +49,24 @@ test('requesters own queue priority while admins move work between stages', asyn
   await expect(inspectToast.getByText('+10 XP earned')).toBeVisible()
   await expect(inspectToast.getByRole('button', { name: 'View onboarding' })).toBeVisible()
   await screenshot(requesterPage, 'onboarding-completion-toast')
+  // The last quest completes the STL Quest with confetti.
   await requesterPage.getByRole('link', { name: 'Download model' }).click()
+  await expect(requesterPage.getByText('STL Quest complete!')).toHaveCount(0)
+  await expect(requesterPage.locator('canvas[style*="position: fixed"]')).toBeVisible()
+  await screenshot(requesterPage, 'onboarding-complete-confetti')
   await requesterPage.getByRole('button', { name: 'Close' }).click()
-  await requesterPage.getByRole('button', { name: 'STL Quest, 3 of 5 resolved, 40 XP' }).click()
-  await requesterPage.getByRole('button', { name: 'Choose your queue view 10 XP' }).click()
-  const requesterTour = requesterPage.getByRole('note', { name: 'STL Quest' })
-  await expect(requesterTour.getByRole('heading', { name: 'Choose your queue view' })).toBeVisible()
-  await expect(requesterTour.getByRole('heading', { name: 'Move work through the queue' })).toHaveCount(0)
+  await expect(requesterPage.getByRole('button', { name: /^STL Quest, / })).toHaveCount(0)
+  await requesterPage.getByRole('button', { name: 'Open account menu' }).click()
+  await requesterPage.getByRole('button', { name: 'Onboarding', exact: true }).click()
+  await expect(requesterPage.getByRole('heading', { name: 'Ready for the next quest' })).toBeVisible()
+  await expect(requesterPage.getByRole('button', { name: 'Review quests' })).toBeVisible()
+  await requesterPage.keyboard.press('Escape')
   await upload(requesterPage, 'requester-second', 11)
   const requesterSort = requesterPage.getByRole('button', { name: 'Sort requests: My priority' })
   await expect(requesterSort).toHaveText('Sort')
   await requesterSort.click()
   await expect(requesterPage.getByRole('menuitemradio', { name: 'Round robin' })).toHaveCount(0)
   await requesterPage.getByRole('menuitemradio', { name: 'Oldest first' }).click()
-  await requesterPage.getByRole('button', { name: 'STL Quest, 4 of 5 resolved, 50 XP' }).click()
-  await requesterPage.getByRole('button', { name: 'Find work with filters 10 XP' }).click()
-  await requesterPage.getByRole('button', { name: 'Filters', exact: true }).click()
-  await requesterPage.getByLabel('Minimum quantity').fill('1')
-  await expect(requesterPage.getByText('STL Quest complete!')).toHaveCount(0)
-  await expect(requesterPage.locator('canvas[style*="position: fixed"]')).toBeVisible()
-  await screenshot(requesterPage, 'onboarding-complete-confetti')
-  await expect(requesterPage.getByRole('button', { name: 'STL Quest, 5 of 5 resolved, 60 XP' })).toHaveCount(0)
-  await requesterPage.getByRole('button', { name: 'Open account menu' }).click()
-  await requesterPage.getByRole('button', { name: 'Onboarding' }).click()
-  await expect(requesterPage.getByRole('heading', { name: 'Ready for the next quest' })).toBeVisible()
-  await expect(requesterPage.getByRole('button', { name: 'Review quests' })).toBeVisible()
-  await requesterPage.keyboard.press('Escape')
   await requesterPage.goto('/?sort=round-robin')
   await expect(requesterPage.getByRole('button', { name: 'Sort requests: My priority' })).toBeVisible()
   await expect(requestCard(requesterPage, 'requester-first')).toBeVisible()
@@ -272,7 +264,7 @@ async function enterAdminWorkspace(page: Page) {
     await page.getByLabel('Email').fill('owner@example.com')
     await page.getByLabel('Password').fill(password)
     await signInButton.click()
-    await expect(page.getByRole('button', { name: 'Add a print' })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Board filters' }).getByRole('button', { name: 'Add a print' })).toBeVisible()
     return
   }
 
@@ -282,24 +274,25 @@ async function enterAdminWorkspace(page: Page) {
   await page.getByLabel('Password').fill(password)
   await page.getByLabel('Password').press('Enter')
   await page.getByRole('button', { name: 'Use this folder' }).click()
-  const printerName = page.getByLabel('Printer name').first()
-  if (!(await printerName.count())) {
+  if (!(await page.getByRole('button', { name: /^Edit / }).count())) {
     await page.getByRole('button', { name: 'Add printer' }).click()
     await page.getByRole('button', { name: 'Custom printer' }).click()
+    await page.getByLabel('Name', { exact: true }).fill('Resin printer')
+    await page.getByRole('button', { name: 'Done' }).click()
   }
-  await page.getByLabel('Printer name').first().fill('Resin printer')
   await page.getByRole('button', { name: 'Save and continue' }).click()
 }
 
 async function upload(page: Page, name: string, size: number, copies = 1) {
-  const fileInput = page.locator('input[type=file]')
-  await page.getByRole('button', { name: 'Add a print' }).click()
-  await expect(page.getByRole('dialog', { name: 'Add a print' })).toBeVisible()
-  await page.getByRole('button', { name: 'Upload files' }).click()
-  await fileInput.setInputFiles({ name: `${name}.stl`, mimeType: 'model/stl', buffer: boxStl(name, size, size, size) })
-  await page.getByLabel('Name').fill(name)
-  if (copies > 1) await page.getByRole('spinbutton', { name: 'Copies' }).fill(String(copies))
-  await page.getByRole('button', { name: 'Add 1 print' }).click()
+  await page.getByRole('region', { name: 'Board filters' }).getByRole('button', { name: 'Add a print' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Add a print' })
+  await dialog.getByRole('button', { name: 'Upload files' }).click()
+  await dialog
+    .locator('input[type=file]')
+    .setInputFiles({ name: `${name}.stl`, mimeType: 'model/stl', buffer: boxStl(name, size, size, size) })
+  await dialog.getByLabel('Name').fill(name)
+  if (copies > 1) await dialog.getByRole('spinbutton', { name: 'Copies' }).fill(String(copies))
+  await dialog.getByRole('button', { name: 'Add 1 print' }).click()
   await expect(requestCard(page, name)).toBeVisible({ timeout: 30_000 })
 }
 

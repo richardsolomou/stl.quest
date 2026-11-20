@@ -1,8 +1,8 @@
 import type { JSX } from 'react'
-import oswald500 from '@fontsource/oswald/files/oswald-latin-500-normal.woff2?url'
+import oswald700 from '@fontsource/oswald/files/oswald-latin-700-normal.woff2?url'
 import plexMono400 from '@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2?url'
 import plexSans400 from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-400-normal.woff2?url'
-import plexSans500 from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-500-normal.woff2?url'
+import plexSans600 from '@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-600-normal.woff2?url'
 import { REPOSITORY_URL } from '@/client/sourceCode'
 import landingCss from './landing.css?url'
 import { assetPath } from '../../basePath'
@@ -47,9 +47,6 @@ export function landingHead(page: SitePage) {
       { title: page.title },
       { name: 'description', content: page.description },
       { name: 'robots', content: 'index, follow' },
-      { name: 'theme-color', content: '#15171c' },
-      // Keeps the dark design whatever the visitor's theme; src/theme.css skips the light tokens on such pages.
-      { name: 'color-scheme', content: 'dark' },
       { property: 'og:type', content: 'website' },
       { property: 'og:url', content: url },
       { property: 'og:title', content: page.title },
@@ -59,7 +56,7 @@ export function landingHead(page: SitePage) {
       { property: 'og:image:height', content: '630' },
       {
         property: 'og:image:alt',
-        content: 'The STL Quest request board, with prints grouped into queue, printing, finishing, and ready columns.',
+        content: 'The STL Quest board: a queue of print requests, tickets hanging in firing order, and finished prints waiting for pickup.',
       },
       { name: 'twitter:card', content: 'summary_large_image' },
       ...(page.path === '/' ? [structuredData(homeStructuredData)] : []),
@@ -67,7 +64,7 @@ export function landingHead(page: SitePage) {
     links: [
       { rel: 'canonical', href: url },
       { rel: 'stylesheet', href: assetPath(landingCss) },
-      ...[oswald500, plexSans400, plexSans500, plexMono400].map((href) => ({
+      ...[oswald700, plexSans400, plexSans600, plexMono400].map((href) => ({
         rel: 'preload',
         as: 'font',
         type: 'font/woff2',

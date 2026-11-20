@@ -15,7 +15,7 @@ test('delivers presence and updates across Redis-backed replicas', async ({ page
   await page.getByLabel('Password').press('Enter')
   await page.getByRole('button', { name: 'Use included storage' }).click()
   await page.getByRole('button', { name: 'Skip for now' }).click()
-  await expect(page.getByRole('button', { name: 'Add a print' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Board filters' }).getByRole('button', { name: 'Add a print' })).toBeVisible()
 
   const observerContext = await browser.newContext({ baseURL: secondReplica })
   await observerContext.addCookies(await page.context().cookies())
@@ -23,7 +23,7 @@ test('delivers presence and updates across Redis-backed replicas', async ({ page
   const observerSocket = observer.waitForEvent('websocket', isRealtimeSocket)
   await observer.goto('/')
   await observerSocket
-  await expect(observer.getByRole('button', { name: 'Add a print' })).toBeVisible()
+  await expect(observer.getByRole('region', { name: 'Board filters' }).getByRole('button', { name: 'Add a print' })).toBeVisible()
   await expect(page.getByLabel('1 person viewing this board')).toBeVisible()
   await expect(observer.getByLabel('1 person viewing this board')).toBeVisible()
 

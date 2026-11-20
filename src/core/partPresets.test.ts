@@ -1,0 +1,48 @@
+import { describe, expect, it } from 'vitest'
+import catalog from '../../catalogs/parts/catalog.json'
+import { genericPartPresets, partPresetsForPrinter, partPresetUnitPrice, type PartPreset } from './partPresets'
+import { findPreset } from './presets'
+
+const PART_PRESETS = catalog.presets as PartPreset[]
+const getPartPreset = (id?: string) => findPreset(PART_PRESETS, id)
+
+describe('part presets', () => {
+  it('keeps unique IDs', () => {
+    expect(new Set(PART_PRESETS.map((preset) => preset.id)).size).toBe(PART_PRESETS.length)
+  })
+
+  it('finds a preset by ID', () => {
+    expect(getPartPreset('part-formlabs-form-4-resin-tank')).toMatchObject({ lifespan: 190, lifespanUnit: 'plates' })
+  })
+
+  it('finds no preset without an ID', () => {
+    expect(getPartPreset()).toBeUndefined()
+  })
+
+  it('lists the parts made for a printer model', () => {
+    expect(partPresetsForPrinter(PART_PRESETS, 'resin-formlabs-form-4').map((preset) => preset.id)).toEqual([
+      'part-formlabs-form-4-resin-tank',
+    ])
+  })
+
+  it('leaves generic parts out of a printer model', () => {
+    expect(partPresetsForPrinter(PART_PRESETS, 'resin-formlabs-form-4').some((preset) => !preset.fits.length)).toBe(false)
+  })
+
+  it('lists no parts for an unknown printer model', () => {
+    expect(partPresetsForPrinter(PART_PRESETS, 'resin-unknown')).toEqual([])
+  })
+
+  it('lists only parts that fit no particular model as generic', () => {
+    expect(genericPartPresets(PART_PRESETS, 'resin').every((preset) => preset.fits.length === 0 && preset.printType === 'resin')).toBe(true)
+  })
+
+  it('splits a pack price across its parts', () => {
+    expect(partPresetUnitPrice(getPartPreset('part-elegoo-fep-film-mars-4-5')!)).toBe(5)
+  })
+
+  it('has no unit price without a list price', () => {
+    const preset = getPartPreset('part-elegoo-fep-film-mars-4-5')!
+    expect(partPresetUnitPrice({ ...preset, listPrice: undefined })).toBeUndefined()
+  })
+})

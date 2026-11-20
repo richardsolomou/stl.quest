@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, notExists, lt, lte, max, ne, or, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, notExists, lt, lte, max, ne, or, sql } from 'drizzle-orm'
 import { isDeepStrictEqual } from 'node:util'
 import type { AdminAccountDetails, AdminWorkspace } from '../core/admin'
 import type {
@@ -10,7 +10,6 @@ import type {
   PrintGroupColor,
   PrintGroupItem,
   PrintRequest,
-  PrinterProfile,
   Repository,
   RequestFilters,
   RequestQuery,
@@ -38,8 +37,10 @@ import {
 } from '../core/workspaces'
 import { highestStoragePlan, storagePlans, type StoragePlan } from '../core/plans'
 import { ACTIVE_SUBSCRIPTION_STATUSES, BILLABLE_SUBSCRIPTION_STATUSES } from '../core/subscription'
-import { automaticallyAssignedPrinter, normalizePrinterProfile, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
+import { automaticallyAssignedPrinter } from '../core/printers'
+import type { InventoryItems, InventoryKind } from '../core/inventory'
 import { supportsDatabaseBackup, type DatabaseBackend } from './backend'
+import type { MigrationLog } from './dataMigrations/types'
 import { SQLiteBackend } from './backends/sqlite'
 import { configuredDatabaseBackend } from './config'
 import type { STLQuestDatabase } from './connection'
@@ -60,6 +61,8 @@ import {
   session as authSession,
   settings,
   uploadSessions,
+  usageEvents,
+  printers,
   managedStorageAccounts,
   managedStorageUsage,
   managedStorageEntitlements,
@@ -72,11 +75,24 @@ import { notificationPreferences, type NotificationKind } from '../core/notifica
 import { messagesFor, type Messages } from '../core/i18n'
 import { isLocale, type Locale } from '../core/i18n/locales'
 import { normalizeOnboardingTasks, onboardingTaskScope, type OnboardingProgress } from '../core/onboarding'
-import { mapAssetGenerationJob, mapInvite, mapRequest, mapUserIdentity, parseOperationPayload, type RequestRow } from './repository/mappers'
+import {
+  mapAssetGenerationJob,
+  mapInvite,
+  mapRequest,
+  mapUsageEvent,
+  mapUserIdentity,
+  parseOperationPayload,
+  type RequestRow,
+} from './repository/mappers'
+import { MAX_USAGE_LIST, type UsageEvent, type UsageFilters } from '../core/usage'
+import { inventoryColumns, inventoryItem, inventoryTables } from './repository/inventory'
 import { requestConditions, requestOrderBy, requestSelection, type RequestFilterOptions } from './repository/requestQuery'
 
 type DatabaseTransaction = Parameters<Parameters<STLQuestDatabase['transaction']>[0]>[0]
 type DatabaseExecutor = STLQuestDatabase | DatabaseTransaction
+const silentLog: MigrationLog = { info: () => undefined, warn: () => undefined }
+/** Any inventory table, for queries that touch only the columns they share. */
+type InventoryTable = typeof printers
 const MANAGED_STORAGE_DELETION_QUEUE = 'managed-storage-deletion-queue'
 const MANAGED_STORAGE_HOLDER_ATTEMPTS = 5
 
@@ -122,20 +138,19 @@ export class DrizzleRepository implements Repository {
 
   static async create(
     database: STLQuestDatabase | DatabaseBackend<STLQuestDatabase>,
-    options: { workspaceId?: string; initialize?: boolean; ownsDatabase?: boolean } = {},
+    options: { workspaceId?: string; initialize?: boolean; ownsDatabase?: boolean; log?: MigrationLog } = {},
   ) {
     const repository = new DrizzleRepository(database, options)
     if (options.initialize !== false) {
-      await repository.backend.initialize()
+      await repository.backend.initialize(options.log ?? silentLog)
       await repository.shortenLongWorkspaceNames()
-      await repository.backfillPrinterPresetIds()
       await repository.backfillAutomaticPrinterAssignments()
     }
     return repository
   }
 
-  static async open(file?: string) {
-    return DrizzleRepository.create(file ? SQLiteBackend.open(file) : configuredDatabaseBackend())
+  static async open(file?: string, log?: MigrationLog) {
+    return DrizzleRepository.create(file ? SQLiteBackend.open(file) : configuredDatabaseBackend(), { log })
   }
 
   async scoped(workspaceId: string) {
@@ -273,7 +288,7 @@ export class DrizzleRepository implements Repository {
     const workspaceId = await this.workspace()
     const now = Date.now()
     await this.database.transaction(async (tx) => {
-      await this.lockWorkspaceTags(tx, workspaceId)
+      await this.lockWorkspace(tx, workspaceId)
       await this.requireUnusedGroupName(tx, workspaceId, name, parentId ?? null)
       if (parentId) {
         const parent = await tx
@@ -310,7 +325,7 @@ export class DrizzleRepository implements Repository {
     const workspaceId = await this.workspace()
     await this.database.transaction(async (tx) => {
       if (fields.name !== undefined || fields.parentId !== undefined) {
-        await this.lockWorkspaceTags(tx, workspaceId)
+        await this.lockWorkspace(tx, workspaceId)
         if (fields.parentId) await this.requireTagParent(tx, workspaceId, id, fields.parentId)
         const current = await tx
           .select({ name: printGroups.name, parentId: printGroups.parentId })
@@ -335,8 +350,8 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  /** A no-op write on the workspace row serializes concurrent tag creates, renames, and moves, so two cannot both pass the checks that follow. */
-  private async lockWorkspaceTags(tx: DatabaseExecutor, workspaceId: string) {
+  /** A no-op write on the workspace row serializes concurrent changes to its tags or inventory, so two cannot both pass the checks that follow. */
+  private async lockWorkspace(tx: DatabaseExecutor, workspaceId: string) {
     await tx
       .update(organization)
       .set({ name: sql`${organization.name}` })
@@ -344,7 +359,7 @@ export class DrizzleRepository implements Repository {
       .run()
   }
 
-  /** Rejects a parent that is missing or would put the tag inside its own branch; call under `lockWorkspaceTags`. */
+  /** Rejects a parent that is missing or would put the tag inside its own branch; call under `lockWorkspace`. */
   private async requireTagParent(tx: DatabaseExecutor, workspaceId: string, id: string, parentId: string) {
     const parents = new Map(
       (
@@ -364,7 +379,7 @@ export class DrizzleRepository implements Repository {
     }
   }
 
-  /** Sibling names are unique because tags are shown by full path; checked under `lockWorkspaceTags` rather than by a unique index so tags that already share a name stay editable. */
+  /** Sibling names are unique because tags are shown by full path; checked under `lockWorkspace` rather than by a unique index so tags that already share a name stay editable. */
   private async requireUnusedGroupName(
     tx: DatabaseExecutor,
     workspaceId: string,
@@ -398,7 +413,7 @@ export class DrizzleRepository implements Repository {
         if (found.length !== new Set(tagIds).size) throw new Response('tag not found', { status: 404 })
       }
       if (createTag && createdTagId) {
-        await this.lockWorkspaceTags(tx, workspaceId)
+        await this.lockWorkspace(tx, workspaceId)
         await this.requireUnusedGroupName(tx, workspaceId, createTag.name, null)
         const now = Date.now()
         await tx
@@ -1423,8 +1438,6 @@ export class DrizzleRepository implements Repository {
       if (active) throw new Response('another operation is already running for this request', { status: 409 })
       const request = await this.getRequestFrom(tx, id)
       if (!request) throw new Error('not found')
-      const printerId = fields.printerId === undefined ? request.printerId : (fields.printerId ?? undefined)
-      if (printerId) await this.markPrinterUsedWith(tx, printerId)
       if (fields.quantity !== undefined) {
         const started = workflow.statuses.slice(1).reduce((sum, status) => sum + (request.counts[status.id] ?? 0), 0)
         if (fields.quantity < Math.max(started, 1)) throw new Response('cannot reduce below started copies', { status: 409 })
@@ -2118,88 +2131,92 @@ export class DrizzleRepository implements Repository {
   }
 
   async listAdminWorkspaces(workspaceId?: string): Promise<AdminWorkspace[]> {
-    const [workspaceRows, memberRows, ownerRows, requestRows, jobRows, settingRows, managedRows, subscriptionRows] = await Promise.all([
-      this.database
-        .select({
-          id: organization.id,
-          name: organization.name,
-          slug: organization.slug,
-          createdAt: organization.createdAt,
-          personalOwnerId: organization.personalOwnerId,
-        })
-        .from(organization)
-        .where(workspaceId ? eq(organization.id, workspaceId) : undefined)
-        .orderBy(organization.createdAt)
-        .all(),
-      this.database
-        .select({ workspaceId: member.organizationId, memberCount: count(member.id).as('member_count') })
-        .from(member)
-        .where(workspaceId ? eq(member.organizationId, workspaceId) : undefined)
-        .groupBy(member.organizationId)
-        .all(),
-      this.database
-        .select({
-          workspaceId: member.organizationId,
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          image: user.image,
-        })
-        .from(member)
-        .innerJoin(user, eq(user.id, member.userId))
-        .where(and(eq(member.role, 'owner'), workspaceId ? eq(member.organizationId, workspaceId) : undefined))
-        .orderBy(user.name, user.id)
-        .all(),
-      this.database
-        .select({
-          workspaceId: requests.workspaceId,
-          requestCount: count(requests.id).as('request_count'),
-          copyCount: sql<number>`COALESCE(SUM(${requests.quantity}), 0)`.as('copy_count'),
-          lastRequestAt: max(requests.updatedAt).as('last_request_at'),
-        })
-        .from(requests)
-        .where(workspaceId ? eq(requests.workspaceId, workspaceId) : undefined)
-        .groupBy(requests.workspaceId)
-        .all(),
-      this.database
-        .select({
-          workspaceId: assetGenerationJobs.workspaceId,
-          activeJobCount: sql<number>`SUM(CASE WHEN ${assetGenerationJobs.status} IN ('pending', 'running') THEN 1 ELSE 0 END)`.as(
-            'active_job_count',
-          ),
-          failedJobCount: sql<number>`SUM(CASE WHEN ${assetGenerationJobs.status} = 'failed' THEN 1 ELSE 0 END)`.as('failed_job_count'),
-        })
-        .from(assetGenerationJobs)
-        .where(workspaceId ? eq(assetGenerationJobs.workspaceId, workspaceId) : undefined)
-        .groupBy(assetGenerationJobs.workspaceId)
-        .all(),
-      this.database
-        .select({ workspaceId: settings.workspaceId, key: settings.key, valueJson: settings.valueJson })
-        .from(settings)
-        .where(
-          and(
-            inArray(settings.key, ['storage', 'storageEncrypted', PRINTERS_SETTING]),
-            workspaceId ? eq(settings.workspaceId, workspaceId) : undefined,
-          ),
-        )
-        .all(),
-      this.database
-        .select({
-          workspaceId: managedStorageEntitlements.workspaceId,
-          ownerId: managedStorageEntitlements.ownerId,
-          persistedBytes: managedStorageUsage.persistedBytes,
-          reservedBytes: managedStorageUsage.assetReservedBytes,
-        })
-        .from(managedStorageEntitlements)
-        .leftJoin(managedStorageUsage, eq(managedStorageUsage.workspaceId, managedStorageEntitlements.workspaceId))
-        .where(workspaceId ? eq(managedStorageEntitlements.workspaceId, workspaceId) : undefined)
-        .all(),
-      this.database
-        .select({ ownerId: subscription.referenceId, plan: subscription.plan })
-        .from(subscription)
-        .where(inArray(subscription.status, ACTIVE_SUBSCRIPTION_STATUSES))
-        .all(),
-    ])
+    const [workspaceRows, memberRows, ownerRows, requestRows, jobRows, settingRows, printerRows, managedRows, subscriptionRows] =
+      await Promise.all([
+        this.database
+          .select({
+            id: organization.id,
+            name: organization.name,
+            slug: organization.slug,
+            createdAt: organization.createdAt,
+            personalOwnerId: organization.personalOwnerId,
+          })
+          .from(organization)
+          .where(workspaceId ? eq(organization.id, workspaceId) : undefined)
+          .orderBy(organization.createdAt)
+          .all(),
+        this.database
+          .select({ workspaceId: member.organizationId, memberCount: count(member.id).as('member_count') })
+          .from(member)
+          .where(workspaceId ? eq(member.organizationId, workspaceId) : undefined)
+          .groupBy(member.organizationId)
+          .all(),
+        this.database
+          .select({
+            workspaceId: member.organizationId,
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            image: user.image,
+          })
+          .from(member)
+          .innerJoin(user, eq(user.id, member.userId))
+          .where(and(eq(member.role, 'owner'), workspaceId ? eq(member.organizationId, workspaceId) : undefined))
+          .orderBy(user.name, user.id)
+          .all(),
+        this.database
+          .select({
+            workspaceId: requests.workspaceId,
+            requestCount: count(requests.id).as('request_count'),
+            copyCount: sql<number>`COALESCE(SUM(${requests.quantity}), 0)`.as('copy_count'),
+            lastRequestAt: max(requests.updatedAt).as('last_request_at'),
+          })
+          .from(requests)
+          .where(workspaceId ? eq(requests.workspaceId, workspaceId) : undefined)
+          .groupBy(requests.workspaceId)
+          .all(),
+        this.database
+          .select({
+            workspaceId: assetGenerationJobs.workspaceId,
+            activeJobCount: sql<number>`SUM(CASE WHEN ${assetGenerationJobs.status} IN ('pending', 'running') THEN 1 ELSE 0 END)`.as(
+              'active_job_count',
+            ),
+            failedJobCount: sql<number>`SUM(CASE WHEN ${assetGenerationJobs.status} = 'failed' THEN 1 ELSE 0 END)`.as('failed_job_count'),
+          })
+          .from(assetGenerationJobs)
+          .where(workspaceId ? eq(assetGenerationJobs.workspaceId, workspaceId) : undefined)
+          .groupBy(assetGenerationJobs.workspaceId)
+          .all(),
+        this.database
+          .select({ workspaceId: settings.workspaceId })
+          .from(settings)
+          .where(
+            and(inArray(settings.key, ['storage', 'storageEncrypted']), workspaceId ? eq(settings.workspaceId, workspaceId) : undefined),
+          )
+          .all(),
+        this.database
+          .select({ workspaceId: printers.workspaceId, printerCount: count(printers.id).as('printer_count') })
+          .from(printers)
+          .where(and(isNull(printers.archivedAt), workspaceId ? eq(printers.workspaceId, workspaceId) : undefined))
+          .groupBy(printers.workspaceId)
+          .all(),
+        this.database
+          .select({
+            workspaceId: managedStorageEntitlements.workspaceId,
+            ownerId: managedStorageEntitlements.ownerId,
+            persistedBytes: managedStorageUsage.persistedBytes,
+            reservedBytes: managedStorageUsage.assetReservedBytes,
+          })
+          .from(managedStorageEntitlements)
+          .leftJoin(managedStorageUsage, eq(managedStorageUsage.workspaceId, managedStorageEntitlements.workspaceId))
+          .where(workspaceId ? eq(managedStorageEntitlements.workspaceId, workspaceId) : undefined)
+          .all(),
+        this.database
+          .select({ ownerId: subscription.referenceId, plan: subscription.plan })
+          .from(subscription)
+          .where(inArray(subscription.status, ACTIVE_SUBSCRIPTION_STATUSES))
+          .all(),
+      ])
 
     const membersByWorkspace = new Map(memberRows.map((row) => [row.workspaceId, row.memberCount]))
     const ownersByWorkspace = new Map<string, AdminWorkspace['owners']>()
@@ -2210,19 +2227,8 @@ export class DrizzleRepository implements Repository {
     }
     const requestsByWorkspace = new Map(requestRows.map((row) => [row.workspaceId, row]))
     const jobsByWorkspace = new Map(jobRows.map((row) => [row.workspaceId, row]))
-    const storageConfigured = new Set<string>()
-    const printerCounts = new Map<string, number>()
-    for (const setting of settingRows) {
-      if (setting.key === 'storage' || setting.key === 'storageEncrypted') storageConfigured.add(setting.workspaceId)
-      if (setting.key !== PRINTERS_SETTING) continue
-      try {
-        const profiles: unknown = JSON.parse(setting.valueJson)
-        if (Array.isArray(profiles))
-          printerCounts.set(setting.workspaceId, profiles.filter((profile) => !(profile as { archived?: boolean }).archived).length)
-      } catch {
-        printerCounts.set(setting.workspaceId, 0)
-      }
-    }
+    const storageConfigured = new Set(settingRows.map((row) => row.workspaceId))
+    const printerCounts = new Map(printerRows.map((row) => [row.workspaceId, row.printerCount]))
     const plansByOwner = new Map<string, string[]>()
     for (const row of subscriptionRows) plansByOwner.set(row.ownerId, [...(plansByOwner.get(row.ownerId) ?? []), row.plan])
     const managedByWorkspace = new Map(
@@ -2462,57 +2468,123 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  async replacePrinterProfiles(profiles: PrinterProfile[]) {
+  async appendUsageEvents(events: UsageEvent[]) {
+    if (events.length === 0) return
+    const workspaceId = await this.workspace()
     await this.database.transaction(async (tx) => {
-      const previous = ((await this.getSettingFrom<PrinterProfile[]>(tx, PRINTERS_SETTING)) ?? []).map(normalizePrinterProfile)
-      const assignedPrinterIds = new Set(
-        (
-          await tx
-            .selectDistinct({ printerId: requests.printerId })
-            .from(requests)
-            .where(and(eq(requests.workspaceId, await this.workspace()), isNotNull(requests.printerId)))
-            .all()
-        ).flatMap(({ printerId }) => (printerId ? [printerId] : [])),
-      )
-      const previousById = new Map(previous.map((profile) => [profile.id, profile]))
-      const next = profiles.map((profile) => {
-        const existing = previousById.get(profile.id)
-        return normalizePrinterProfile({
-          ...profile,
-          archived: profile.archived,
-          used: existing?.used || profile.used || assignedPrinterIds.has(profile.id),
-        })
-      })
-      const nextById = new Map(next.map((profile) => [profile.id, profile]))
-
-      const now = Date.now()
-      for (const profile of previous) {
-        if (assignedPrinterIds.has(profile.id)) profile.used = true
-        const replacement = nextById.get(profile.id)
-        if (!replacement) {
-          if (profile.used) {
-            const archived = normalizePrinterProfile({ ...profile, archived: true })
-            next.push(archived)
-            nextById.set(archived.id, archived)
-          }
-          continue
-        }
-        if (profile.printType !== replacement.printType) {
-          await tx
-            .update(requests)
-            .set({ printType: null, updatedAt: now })
-            .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.printerId, profile.id)))
-            .run()
-        }
-      }
       await tx
-        .update(requests)
-        .set({ printType: null })
-        .where(and(eq(requests.workspaceId, await this.workspace()), isNotNull(requests.printerId)))
+        .insert(usageEvents)
+        .values(events.map((event) => ({ ...event, workspaceId })))
         .run()
-
-      await this.setSettingWith(tx, PRINTERS_SETTING, next)
     })
+  }
+
+  async listUsage(filters: UsageFilters) {
+    const workspaceId = await this.workspace()
+    const rows = await this.database
+      .select()
+      .from(usageEvents)
+      .where(
+        and(
+          eq(usageEvents.workspaceId, workspaceId),
+          filters.requestId === undefined ? undefined : eq(usageEvents.requestId, filters.requestId),
+          filters.consumableId === undefined ? undefined : eq(usageEvents.consumableId, filters.consumableId),
+          filters.printerId === undefined ? undefined : eq(usageEvents.printerId, filters.printerId),
+          filters.equipmentId === undefined ? undefined : eq(usageEvents.equipmentId, filters.equipmentId),
+          filters.from === undefined ? undefined : gte(usageEvents.createdAt, filters.from),
+          filters.to === undefined ? undefined : lt(usageEvents.createdAt, filters.to),
+          filters.includeUndone ? undefined : isNull(usageEvents.undoneAt),
+        ),
+      )
+      .orderBy(desc(usageEvents.createdAt), desc(usageEvents.id))
+      .limit(Math.min(filters.limit ?? MAX_USAGE_LIST, MAX_USAGE_LIST))
+      .all()
+    return rows.map(mapUsageEvent)
+  }
+
+  async stockTotals() {
+    const workspaceId = await this.workspace()
+    const rows = await this.database
+      .select({
+        consumableId: usageEvents.consumableId,
+        kind: usageEvents.kind,
+        unit: usageEvents.unit,
+        amount: sql<number>`coalesce(sum(${usageEvents.amount}), 0)`.mapWith(Number),
+      })
+      .from(usageEvents)
+      .where(and(eq(usageEvents.workspaceId, workspaceId), isNotNull(usageEvents.consumableId), isNull(usageEvents.undoneAt)))
+      .groupBy(usageEvents.consumableId, usageEvents.kind, usageEvents.unit)
+      .all()
+    return rows.flatMap(({ consumableId, ...total }) => (consumableId ? [{ consumableId, ...total }] : []))
+  }
+
+  async undoUsageTransaction(transactionId: string, undoneAt: number) {
+    const workspaceId = await this.workspace()
+    return (
+      await this.database
+        .update(usageEvents)
+        .set({ undoneAt })
+        .where(and(eq(usageEvents.workspaceId, workspaceId), eq(usageEvents.transactionId, transactionId), isNull(usageEvents.undoneAt)))
+        .run()
+    ).changes
+  }
+
+  async listInventory<Kind extends InventoryKind>(kind: Kind) {
+    return await this.inventoryWith(this.database, kind)
+  }
+
+  async changeInventory<Kind extends InventoryKind>(kind: Kind, change: (items: InventoryItems[Kind][]) => InventoryItems[Kind][]) {
+    const workspaceId = await this.workspace()
+    const table = inventoryTables[kind] as InventoryTable
+    return await this.database.transaction(async (tx) => {
+      await this.lockWorkspace(tx, workspaceId)
+      const rows = await this.inventoryRows(tx, kind)
+      const previous = rows.map((row) => inventoryItem(kind, row))
+      const items = change(previous)
+      const ids = new Set(items.map(({ id }) => id))
+      if (ids.size !== items.length || previous.some(({ id }) => !ids.has(id)))
+        throw new Error('inventory items are archived, never removed or repeated')
+      const stored = new Map(rows.map((row, index) => [row.id, { row, item: previous[index] }]))
+      let position = Math.max(-1, ...rows.map((row) => row.position))
+      const now = Date.now()
+      for (const item of items) {
+        const before = stored.get(item.id)
+        const columns = inventoryColumns(kind, item)
+        if (
+          before &&
+          Boolean(before.item.archived) === Boolean(item.archived) &&
+          isDeepStrictEqual(inventoryColumns(kind, before.item), columns)
+        )
+          continue
+        const archivedAt = item.archived ? (before?.row.archivedAt ?? now) : null
+        if (!before)
+          await tx
+            .insert(table)
+            .values({ ...columns, workspaceId, id: item.id, position: ++position, archivedAt, createdAt: now, updatedAt: now } as never)
+            .run()
+        else
+          await tx
+            .update(table)
+            .set({ ...columns, archivedAt, updatedAt: now } as never)
+            .where(and(eq(table.workspaceId, workspaceId), eq(table.id, item.id)))
+            .run()
+      }
+      return { previous, items: (await this.inventoryRows(tx, kind)).map((row) => inventoryItem(kind, row)) }
+    })
+  }
+
+  private async inventoryWith<Kind extends InventoryKind>(database: DatabaseExecutor, kind: Kind) {
+    return (await this.inventoryRows(database, kind)).map((row) => inventoryItem(kind, row))
+  }
+
+  private async inventoryRows<Kind extends InventoryKind>(database: DatabaseExecutor, kind: Kind) {
+    const table = inventoryTables[kind] as InventoryTable
+    return (await database
+      .select()
+      .from(table)
+      .where(eq(table.workspaceId, await this.workspace()))
+      .orderBy(asc(table.position), asc(table.id))
+      .all()) as (typeof inventoryTables)[Kind]['$inferSelect'][]
   }
 
   /** Names stored before the length limit existed would otherwise be impossible to confirm when deleting the workspace. */
@@ -2529,22 +2601,6 @@ export class DrizzleRepository implements Repository {
     }
   }
 
-  private async backfillPrinterPresetIds() {
-    const workspaceIds = this.workspaceId
-      ? [this.workspaceId]
-      : (await this.database.select({ id: organization.id }).from(organization).orderBy(organization.createdAt).all()).map(({ id }) => id)
-
-    for (const workspaceId of workspaceIds) {
-      const repository = this.workspaceId === workspaceId ? this : await this.scoped(workspaceId)
-      const stored = await repository.getSetting<PrinterProfile[]>(PRINTERS_SETTING)
-      if (!stored) continue
-      const normalized = stored.map(normalizePrinterProfile)
-      if (normalized.some((profile, index) => profile.presetId !== stored[index]?.presetId)) {
-        await repository.setSetting(PRINTERS_SETTING, normalized)
-      }
-    }
-  }
-
   private async backfillAutomaticPrinterAssignments(requestIds?: string[]) {
     const workspaceIds = this.workspaceId
       ? [this.workspaceId]
@@ -2552,7 +2608,7 @@ export class DrizzleRepository implements Repository {
 
     for (const workspaceId of workspaceIds) {
       const repository = this.workspaceId === workspaceId ? this : await this.scoped(workspaceId)
-      const profiles = await storedPrinterProfiles(repository)
+      const profiles = await repository.listInventory('printers')
       if (!profiles.length) continue
       const existingRequests = await repository.listRequests()
       const automatic = existingRequests
@@ -2584,14 +2640,6 @@ export class DrizzleRepository implements Repository {
         request.automaticPrinterAssignment = true
       }
     }
-  }
-
-  private async markPrinterUsedWith(tx: DatabaseExecutor, printerId: string) {
-    const profiles = ((await this.getSettingFrom<PrinterProfile[]>(tx, PRINTERS_SETTING)) ?? []).map(normalizePrinterProfile)
-    const index = profiles.findIndex((profile) => profile.id === printerId)
-    if (index === -1 || profiles[index].used) return
-    profiles[index] = normalizePrinterProfile({ ...profiles[index], used: true })
-    await this.setSettingWith(tx, PRINTERS_SETTING, profiles)
   }
 
   async countUsers() {
@@ -3422,7 +3470,7 @@ export class DrizzleRepository implements Repository {
   }
 
   private async requestConditions(filters: RequestFilters, query: RequestQuery, options: RequestFilterOptions = {}) {
-    const profiles = filters.printType ? await storedPrinterProfiles(this) : []
+    const profiles = filters.printType ? await this.listInventory('printers') : []
     return requestConditions(await this.workspace(), filters, query, profiles, options)
   }
   private async insertRequest(db: DatabaseExecutor, id: string, request: NewPrintRequest) {
@@ -3432,7 +3480,6 @@ export class DrizzleRepository implements Repository {
     if (hasFile !== Boolean(request.fileName) || hasFile !== Boolean(request.filePath) || (!hasFile && !request.sourceUrl?.trim())) {
       throw new Response('invalid request source', { status: 400 })
     }
-    if (request.printerId) await this.markPrinterUsedWith(db, request.printerId)
     await db
       .insert(requests)
       .values({

@@ -194,34 +194,9 @@ describe('tus upload transport', () => {
     const { DrizzleRepository } = await import('../db/repository')
     const repository = await DrizzleRepository.open(path.join(process.env.DATA_DIR, 'stlquest.sqlite'))
     await repository.setSetting('storage', { adapter: 'local', root: prints })
-    await repository.setSetting('printers', [
-      {
-        id: 'resin-printer',
-        name: 'Resin printer',
-        printType: 'resin',
-        enabled: true,
-        widthMm: 100,
-        depthMm: 60,
-        heightMm: 150,
-        spacingMm: 2,
-        supportMarginMm: 2,
-        adhesionMarginMm: 1,
-        heightAllowanceMm: 4,
-        maxHeightDifferenceMm: 20,
-      },
-      {
-        id: 'filament-printer',
-        name: 'Filament printer',
-        printType: 'filament',
-        enabled: true,
-        widthMm: 220,
-        depthMm: 220,
-        heightMm: 250,
-        spacingMm: 3,
-        brimMarginMm: 2,
-        filamentDiameterMm: 1.75,
-        materialDensityGPerCm3: 1.24,
-      },
+    await repository.changeInventory('printers', () => [
+      { id: 'resin-printer', name: 'Resin printer', printType: 'resin', widthMm: 100, depthMm: 60, heightMm: 150 },
+      { id: 'filament-printer', name: 'Filament printer', printType: 'filament', widthMm: 220, depthMm: 220, heightMm: 250 },
     ])
     await repository.close()
 

@@ -387,90 +387,90 @@
       "id": "printer-formlabs-form-4",
       "brand": "Formlabs",
       "model": "Form 4",
-      "powerProfiles": [{ "phase": "printing", "watts": 480, "basis": "rated power" }],
+      "powerProfiles": [{ "phase": "printing", "watts": 200, "basis": "typical use, middle of the published 150–250 W" }],
       "source": {
-        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
-        "accessedAt": "2026-11-19"
+        "url": "https://formlabs.com/support/Choosing-an-Uninterruptible-Power-Supply-UPS-for-your-Formlabs-printer/",
+        "accessedAt": "2026-11-20"
       }
     },
     {
       "id": "printer-formlabs-form-4b",
       "brand": "Formlabs",
       "model": "Form 4B",
-      "powerProfiles": [{ "phase": "printing", "watts": 480, "basis": "rated power" }],
+      "powerProfiles": [{ "phase": "printing", "watts": 200, "basis": "typical use, middle of the published 150–250 W" }],
       "source": {
-        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
-        "accessedAt": "2026-11-19"
+        "url": "https://formlabs.com/support/Choosing-an-Uninterruptible-Power-Supply-UPS-for-your-Formlabs-printer/",
+        "accessedAt": "2026-11-20"
       }
     },
     {
       "id": "printer-formlabs-form-4l",
       "brand": "Formlabs",
       "model": "Form 4L",
-      "powerProfiles": [{ "phase": "printing", "watts": 900, "basis": "rated power" }],
+      "powerProfiles": [{ "phase": "printing", "watts": 300, "basis": "typical use, middle of the published 250–350 W" }],
       "source": {
-        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
-        "accessedAt": "2026-11-19"
+        "url": "https://formlabs.com/support/Choosing-an-Uninterruptible-Power-Supply-UPS-for-your-Formlabs-printer/",
+        "accessedAt": "2026-11-20"
       }
     },
     {
       "id": "printer-formlabs-form-4bl",
       "brand": "Formlabs",
       "model": "Form 4BL",
-      "powerProfiles": [{ "phase": "printing", "watts": 900, "basis": "rated power" }],
+      "powerProfiles": [{ "phase": "printing", "watts": 300, "basis": "typical use, middle of the published 250–350 W" }],
       "source": {
-        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
-        "accessedAt": "2026-11-19"
+        "url": "https://formlabs.com/support/Choosing-an-Uninterruptible-Power-Supply-UPS-for-your-Formlabs-printer/",
+        "accessedAt": "2026-11-20"
       }
     },
     {
       "id": "printer-formlabs-form-3",
       "brand": "Formlabs",
       "model": "Form 3",
-      "powerProfiles": [{ "phase": "printing", "watts": 220, "basis": "rated power" }],
+      "powerProfiles": [{ "phase": "printing", "watts": 100, "basis": "typical use" }],
       "source": {
-        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
-        "accessedAt": "2026-11-19"
+        "url": "https://formlabs.com/support/Choosing-an-Uninterruptible-Power-Supply-UPS-for-your-Formlabs-printer/",
+        "accessedAt": "2026-11-20"
       }
     },
     {
       "id": "printer-formlabs-form-3b",
       "brand": "Formlabs",
       "model": "Form 3B",
-      "powerProfiles": [{ "phase": "printing", "watts": 220, "basis": "rated power" }],
+      "powerProfiles": [{ "phase": "printing", "watts": 100, "basis": "typical use" }],
       "source": {
-        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
-        "accessedAt": "2026-11-19"
+        "url": "https://formlabs.com/support/Choosing-an-Uninterruptible-Power-Supply-UPS-for-your-Formlabs-printer/",
+        "accessedAt": "2026-11-20"
       }
     },
     {
       "id": "printer-formlabs-form-3l",
       "brand": "Formlabs",
       "model": "Form 3L",
-      "powerProfiles": [{ "phase": "printing", "watts": 650, "basis": "rated power" }],
+      "powerProfiles": [{ "phase": "printing", "watts": 400, "basis": "typical use" }],
       "source": {
-        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
-        "accessedAt": "2026-11-19"
+        "url": "https://formlabs.com/support/Choosing-an-Uninterruptible-Power-Supply-UPS-for-your-Formlabs-printer/",
+        "accessedAt": "2026-11-20"
       }
     },
     {
       "id": "printer-formlabs-form-3bl",
       "brand": "Formlabs",
       "model": "Form 3BL",
-      "powerProfiles": [{ "phase": "printing", "watts": 650, "basis": "rated power" }],
+      "powerProfiles": [{ "phase": "printing", "watts": 400, "basis": "typical use" }],
       "source": {
-        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
-        "accessedAt": "2026-11-19"
+        "url": "https://formlabs.com/support/Choosing-an-Uninterruptible-Power-Supply-UPS-for-your-Formlabs-printer/",
+        "accessedAt": "2026-11-20"
       }
     },
     {
       "id": "printer-formlabs-form-2",
       "brand": "Formlabs",
       "model": "Form 2",
-      "powerProfiles": [{ "phase": "printing", "watts": 65, "basis": "rated power" }],
+      "powerProfiles": [{ "phase": "printing", "watts": 50, "basis": "typical use" }],
       "source": {
-        "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
-        "accessedAt": "2026-11-19"
+        "url": "https://formlabs.com/support/Choosing-an-Uninterruptible-Power-Supply-UPS-for-your-Formlabs-printer/",
+        "accessedAt": "2026-11-20"
       }
     },
     {
@@ -511,10 +511,10 @@
       "brand": "Bambu Lab",
       "model": "P1S",
       "printType": "filament",
-      "powerProfiles": [{ "phase": "printing", "watts": 1000, "basis": "maximum power at 220 V" }],
+      "powerProfiles": [{ "phase": "printing", "watts": 105, "basis": "measured average while printing PLA" }],
       "source": {
-        "url": "https://cdn1.bambulab.com/documentation/quick-start-2024-01-17/Quick-Start-P1S_en.pdf",
-        "accessedAt": "2026-08-27"
+        "url": "https://wiki.bambulab.com/en/general/power-consumption",
+        "accessedAt": "2026-11-20"
       }
     },
     {
@@ -522,10 +522,43 @@
       "brand": "Bambu Lab",
       "model": "X1 Carbon",
       "printType": "filament",
-      "powerProfiles": [{ "phase": "printing", "watts": 1000, "basis": "maximum power at 220 V" }],
+      "powerProfiles": [{ "phase": "printing", "watts": 105, "basis": "measured average while printing PLA" }],
       "source": {
-        "url": "https://public-cdn.bambulab.com/store/bambulab-X1-carbon-tech-specs.pdf?v=20250715085516",
-        "accessedAt": "2026-08-27"
+        "url": "https://wiki.bambulab.com/en/general/power-consumption",
+        "accessedAt": "2026-11-20"
+      }
+    },
+    {
+      "id": "printer-bambu-lab-x1",
+      "brand": "Bambu Lab",
+      "model": "X1",
+      "printType": "filament",
+      "powerProfiles": [{ "phase": "printing", "watts": 105, "basis": "measured average while printing PLA" }],
+      "source": {
+        "url": "https://wiki.bambulab.com/en/general/power-consumption",
+        "accessedAt": "2026-11-20"
+      }
+    },
+    {
+      "id": "printer-bambu-lab-x1e",
+      "brand": "Bambu Lab",
+      "model": "X1E",
+      "printType": "filament",
+      "powerProfiles": [{ "phase": "printing", "watts": 185, "basis": "measured average while printing PLA" }],
+      "source": {
+        "url": "https://wiki.bambulab.com/en/general/power-consumption",
+        "accessedAt": "2026-11-20"
+      }
+    },
+    {
+      "id": "printer-bambu-lab-p1p",
+      "brand": "Bambu Lab",
+      "model": "P1P",
+      "printType": "filament",
+      "powerProfiles": [{ "phase": "printing", "watts": 110, "basis": "measured average while printing PLA" }],
+      "source": {
+        "url": "https://wiki.bambulab.com/en/general/power-consumption",
+        "accessedAt": "2026-11-20"
       }
     },
     {
@@ -533,10 +566,10 @@
       "brand": "Bambu Lab",
       "model": "A1",
       "printType": "filament",
-      "powerProfiles": [{ "phase": "printing", "watts": 1300, "basis": "maximum power at 220 V" }],
+      "powerProfiles": [{ "phase": "printing", "watts": 95, "basis": "measured average while printing PLA" }],
       "source": {
-        "url": "https://cdn1.bambulab.com/documentation/quick-start-b5f1a684f77/A1%20Combo%20Quick%20Start_V0%28EN%29.pdf",
-        "accessedAt": "2026-08-27"
+        "url": "https://wiki.bambulab.com/en/general/power-consumption",
+        "accessedAt": "2026-11-20"
       }
     },
     {
@@ -544,10 +577,10 @@
       "brand": "Bambu Lab",
       "model": "A1 mini",
       "printType": "filament",
-      "powerProfiles": [{ "phase": "printing", "watts": 150, "basis": "maximum power" }],
+      "powerProfiles": [{ "phase": "printing", "watts": 80, "basis": "measured average while printing PLA" }],
       "source": {
-        "url": "https://cdn1.bambulab.com/documentation/quick-start-f507128172bdf/Quick%20start%20guide%20-%20A1%20mini-EN.pdf",
-        "accessedAt": "2026-08-27"
+        "url": "https://wiki.bambulab.com/en/general/power-consumption",
+        "accessedAt": "2026-11-20"
       }
     },
     {

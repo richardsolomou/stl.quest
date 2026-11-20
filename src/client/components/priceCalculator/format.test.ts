@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import catalog from '../../../../catalogs/electricity/catalog.generated.json'
 import { getElectricityPricePreset } from '../../../core/electricityPresets'
-import { countryName, currencyLabel, currencySymbol, formatMoney } from './format'
+import { countryName, currencyLabel, currencySymbol, formatMoney, formatRate } from './format'
 
 describe('calculator money format', () => {
   it('shows the workspace currency instead of euros', () => {
@@ -17,8 +18,18 @@ describe('calculator money format', () => {
   })
 })
 
+describe('calculator rate format', () => {
+  it('keeps a third digit on a rate under one', () => {
+    expect(formatRate(0.1494, 'EUR')).toBe('€0.149')
+  })
+
+  it('keeps the currency digits on a rate of one or more', () => {
+    expect(formatRate(1.234, 'EUR')).toBe('€1.23')
+  })
+})
+
 describe('electricity country names', () => {
-  const cyprus = getElectricityPricePreset('CY')!
+  const cyprus = getElectricityPricePreset(catalog.presets, 'CY')!
 
   it('keeps the catalog name in English', () => {
     expect(countryName(cyprus, 'en')).toBe('Cyprus')

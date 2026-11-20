@@ -15,6 +15,6 @@ export function messagesFor(locale: Locale = DEFAULT_LOCALE): Messages {
 }
 
 /** Workflow ids are open strings, so an unknown one falls back to the id rather than failing. */
-export function statusText(messages: Messages, field: 'label' | 'empty' | 'rankLabel', id: string): string {
+export function statusText(messages: Messages, field: 'label' | 'rankLabel', id: string): string {
   return (messages.status[field] as Record<string, string | undefined>)[id] ?? id
 }

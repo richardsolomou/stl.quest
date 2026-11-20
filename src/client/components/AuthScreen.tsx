@@ -2,10 +2,10 @@ import { useState } from 'react'
 import { useLocation, useHydrated } from '@tanstack/react-router'
 import { hasSocialSignInError } from '../socialSignIn'
 import { useQuery } from '@tanstack/react-query'
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { SignInCapabilities } from '../../core/auth'
 import { AuthenticationMethods } from './AuthenticationMethods'
 import { AuthIntroduction, AuthSourceOffer } from './AuthIntroduction'
+import { AuthTicket } from './AuthTicket'
 import { AuthBrand } from './Brand'
 import { useI18n } from '../i18n'
 import { authCapabilitiesQuery } from '../queries'
@@ -38,11 +38,10 @@ export function AuthScreen({
     <main className="grid min-h-dvh place-items-center p-6">
       <div className="flex w-full max-w-[440px] flex-col gap-8">
         <AuthBrand />
-        <Card className="w-full shadow-xl shadow-black/10">
-          <CardHeader>
-            <CardTitle>{initialAdmin ? t.auth.screen.welcome : signingUp ? t.auth.createAccount : t.auth.signIn}</CardTitle>
-            {setupRequired && <CardDescription>{initialAdmin ? t.auth.screen.adminSetup : t.auth.screen.accountSetup}</CardDescription>}
-          </CardHeader>
+        <AuthTicket
+          title={initialAdmin ? t.auth.screen.welcome : signingUp ? t.auth.createAccount : t.auth.signIn}
+          description={setupRequired && (initialAdmin ? t.auth.screen.adminSetup : t.auth.screen.accountSetup)}
+        >
           <AuthenticationMethods
             auth={currentAuth}
             hydrated={hydrated}
@@ -52,7 +51,7 @@ export function AuthScreen({
             creatingAccount={creatingAccount}
             setCreatingAccount={setCreatingAccount}
           />
-        </Card>
+        </AuthTicket>
         <AuthSourceOffer />
       </div>
     </main>

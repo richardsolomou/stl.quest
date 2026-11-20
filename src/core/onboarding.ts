@@ -1,22 +1,10 @@
 import type { Repository } from './types'
 
-export const onboardingTaskIds = [
-  'upload',
-  'move',
-  'inspect',
-  'download',
-  'actions',
-  'sort',
-  'filter',
-  'printers',
-  'storage',
-  'visibility',
-  'invite',
-] as const
+export const onboardingTaskIds = ['printers', 'stock', 'upload', 'move', 'inspect', 'download', 'invite', 'tracking'] as const
 
 export type OnboardingTaskId = (typeof onboardingTaskIds)[number]
 
-export const onboardingSectionIds = ['getting-started', 'managing-queue', 'workspace-setup'] as const
+export const onboardingSectionIds = ['getting-started', 'optional'] as const
 
 export type OnboardingSectionId = (typeof onboardingSectionIds)[number]
 
@@ -28,110 +16,47 @@ export type OnboardingQuest = {
   section: OnboardingSectionId
   prerequisites: readonly OnboardingTaskId[]
   requiresRequests?: boolean
-  admin?: boolean
+  /** Who the quest is for; everyone when absent. */
+  audience?: 'admin' | 'requester'
 }
 
+/** The setup that matters, in the order it pays off; requesters only add and inspect their own prints. */
 export const onboardingQuests: readonly OnboardingQuest[] = [
+  { id: 'printers', version: 1, points: 20, scope: 'workspace', section: 'getting-started', prerequisites: [], audience: 'admin' },
+  { id: 'stock', version: 1, points: 10, scope: 'workspace', section: 'getting-started', prerequisites: [], audience: 'admin' },
+  { id: 'upload', version: 1, points: 20, scope: 'user', section: 'getting-started', prerequisites: [] },
   {
-    id: 'upload',
-    version: 1,
+    id: 'move',
+    version: 2,
     points: 20,
     scope: 'user',
     section: 'getting-started',
     prerequisites: [],
-  },
-  {
-    id: 'move',
-    version: 1,
-    points: 20,
-    scope: 'user',
-    section: 'managing-queue',
-    prerequisites: [],
     requiresRequests: true,
-    admin: true,
+    audience: 'admin',
   },
   {
     id: 'inspect',
     version: 1,
     points: 10,
     scope: 'user',
-    section: 'managing-queue',
+    section: 'getting-started',
     prerequisites: ['upload'],
     requiresRequests: true,
+    audience: 'requester',
   },
   {
     id: 'download',
     version: 1,
     points: 10,
     scope: 'user',
-    section: 'managing-queue',
+    section: 'getting-started',
     prerequisites: ['inspect'],
     requiresRequests: true,
+    audience: 'requester',
   },
-  {
-    id: 'actions',
-    version: 1,
-    points: 10,
-    scope: 'user',
-    section: 'managing-queue',
-    prerequisites: ['move'],
-    requiresRequests: true,
-    admin: true,
-  },
-  {
-    id: 'sort',
-    version: 1,
-    points: 10,
-    scope: 'user',
-    section: 'managing-queue',
-    prerequisites: [],
-    requiresRequests: true,
-  },
-  {
-    id: 'filter',
-    version: 1,
-    points: 10,
-    scope: 'user',
-    section: 'managing-queue',
-    prerequisites: [],
-    requiresRequests: true,
-  },
-  {
-    id: 'printers',
-    version: 1,
-    points: 20,
-    scope: 'workspace',
-    section: 'workspace-setup',
-    prerequisites: ['upload'],
-    admin: true,
-  },
-  {
-    id: 'storage',
-    version: 1,
-    points: 10,
-    scope: 'workspace',
-    section: 'workspace-setup',
-    prerequisites: ['upload'],
-    admin: true,
-  },
-  {
-    id: 'visibility',
-    version: 1,
-    points: 10,
-    scope: 'workspace',
-    section: 'workspace-setup',
-    prerequisites: [],
-    admin: true,
-  },
-  {
-    id: 'invite',
-    version: 1,
-    points: 20,
-    scope: 'workspace',
-    section: 'workspace-setup',
-    prerequisites: [],
-    admin: true,
-  },
+  { id: 'invite', version: 1, points: 20, scope: 'workspace', section: 'getting-started', prerequisites: [], audience: 'admin' },
+  { id: 'tracking', version: 1, points: 10, scope: 'workspace', section: 'optional', prerequisites: [], audience: 'admin' },
 ]
 
 export type OnboardingProgress = {
@@ -158,7 +83,7 @@ export function onboardingQuestVersion(quest: OnboardingQuest) {
 }
 
 export function applicableOnboardingQuests(isAdmin: boolean) {
-  return onboardingQuests.filter((quest) => !quest.admin || isAdmin)
+  return onboardingQuests.filter((quest) => !quest.audience || quest.audience === (isAdmin ? 'admin' : 'requester'))
 }
 
 export function availableOnboardingQuests(quests: readonly OnboardingQuest[], progress: OnboardingProgress, hasRequests: boolean) {

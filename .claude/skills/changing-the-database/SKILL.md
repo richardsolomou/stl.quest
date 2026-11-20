@@ -13,4 +13,5 @@ Workflow:
 2. Generate both migration sets without editing existing migrations.
 3. Update scoped repository methods and tests.
 4. Run `pnpm db:generate && pnpm db:generate:postgres && pnpm db:check`.
-5. Run `pnpm check`.
+5. For a one-way change to existing data, append a numbered data migration to `src/db/dataMigrations/` that runs after the schema migration it needs, and test it against a database migrated only to the release before.
+6. Run `pnpm check`.

@@ -1,6 +1,7 @@
 import type { auth as en } from '../en/auth'
 
 export const auth: typeof en = {
+  tagline: 'La file d’impression, de la demande au retrait.',
   passwordTooShort: (min) => `Utilisez au moins ${min} caractères`,
   signIn: 'Se connecter',
   createAccount: 'Créer un compte',

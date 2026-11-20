@@ -1,5 +1,6 @@
-import { Brand } from '@/client/components/Brand'
 import { ISSUES_URL } from '@/client/sourceCode'
+import { cn } from '@/lib/utils'
+import { SiteBar, SiteFooter, column } from './SiteChrome'
 
 const effectiveDate = '29 July 2026'
 
@@ -157,32 +158,24 @@ export function LegalPage({ policy }: { policy: 'privacy' | 'terms' }) {
 
   return (
     <>
-      <a className="fixed top-2 left-2 z-50 -translate-y-16 bg-card px-3 py-2 focus:translate-y-0" href="#main">
-        Skip to content
-      </a>
-      <header className="mx-auto flex h-16 w-[min(760px,calc(100%-48px))] items-center justify-between border-b">
-        <a href="/home" aria-label="STL Quest home">
-          <Brand />
-        </a>
-        <a className="text-sm text-muted-foreground hover:text-foreground" href="/home">
-          Back to home
-        </a>
-      </header>
-      <main id="main" className="mx-auto w-[min(760px,calc(100%-48px))] py-12 min-[621px]:py-16">
-        <p className="mb-3 font-mono text-xs text-muted-foreground">Effective {effectiveDate}</p>
-        <h1 className="font-heading text-5xl font-medium tracking-tight min-[621px]:text-6xl">{content.title}</h1>
-        <p className="mt-6 text-lg leading-relaxed text-muted-foreground">{content.introduction}</p>
-        <div className="mt-12 space-y-10">
+      <SiteBar />
+      <main id="main" className={cn(column, 'grid gap-x-12 py-12 sm:py-16 lg:grid-cols-[15rem_minmax(0,55ch)]')}>
+        <header className="lg:sticky lg:top-8 lg:self-start">
+          <h1 className="font-heading text-[2.6rem] leading-[0.95] font-bold text-balance uppercase">{content.title}</h1>
+          <p className="mt-3 font-mono text-[11px] text-muted-foreground uppercase">Effective {effectiveDate}</p>
+        </header>
+        <div className="mt-8 max-w-[55ch] lg:mt-0">
+          <p className="text-lg leading-relaxed">{content.introduction}</p>
           {content.sections.map((section) => (
-            <section key={section.heading}>
-              <h2 className="font-heading text-2xl font-medium">{section.heading}</h2>
+            <section key={section.heading} className="mt-10 border-t border-border pt-6">
+              <h2 className="font-heading text-xl leading-none font-bold uppercase">{section.heading}</h2>
               {section.paragraphs.map((paragraph) => (
                 <p className="mt-3 leading-relaxed text-muted-foreground" key={paragraph}>
                   {paragraph}
                 </p>
               ))}
               {section.items && (
-                <ul className="mt-4 list-disc space-y-2 pl-6 leading-relaxed text-muted-foreground">
+                <ul className="mt-4 list-disc space-y-2 pl-6 leading-relaxed text-muted-foreground marker:text-foreground/40">
                   {section.items.map((item) => (
                     <li key={item}>{item}</li>
                   ))}
@@ -190,12 +183,12 @@ export function LegalPage({ policy }: { policy: 'privacy' | 'terms' }) {
               )}
             </section>
           ))}
-          <section>
-            <h2 className="font-heading text-2xl font-medium">Contact</h2>
+          <section className="mt-10 border-t border-border pt-6">
+            <h2 className="font-heading text-xl leading-none font-bold uppercase">Contact</h2>
             <p className="mt-3 leading-relaxed text-muted-foreground">
               Questions or requests can be submitted through the{' '}
               <a
-                className="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground"
+                className="text-foreground underline decoration-foreground/30 underline-offset-4 hover:decoration-foreground"
                 href={ISSUES_URL}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -207,15 +200,7 @@ export function LegalPage({ policy }: { policy: 'privacy' | 'terms' }) {
           </section>
         </div>
       </main>
-      <footer className="mx-auto flex w-[min(760px,calc(100%-48px))] flex-wrap gap-x-6 gap-y-3 border-t py-6 font-mono text-xs text-muted-foreground">
-        <span>© {new Date().getFullYear()} STL Quest</span>
-        <a className="hover:text-foreground" href="/terms">
-          Terms
-        </a>
-        <a className="hover:text-foreground" href="/privacy">
-          Privacy
-        </a>
-      </footer>
+      <SiteFooter />
     </>
   )
 }

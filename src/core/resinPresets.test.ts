@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { getResinPreset, RESIN_PRESETS } from './resinPresets'
+import catalog from '../../catalogs/resins/catalog.generated.json'
+import { findPreset } from './presets'
+import type { ResinPreset } from './resinPresets'
+
+const RESIN_PRESETS = catalog.presets as ResinPreset[]
+const getResinPreset = (id: string) => findPreset(RESIN_PRESETS, id)
 
 describe('resin presets', () => {
   it('keeps stable unique IDs and provenance', () => {

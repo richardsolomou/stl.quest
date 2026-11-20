@@ -259,7 +259,9 @@ async function createApp() {
           logger.warn({ err: error, event: 'distributed_coordination_failed' }, 'distributed coordination failed'),
         )
       : undefined
-    repository = await withWorkLease(distributedRuntime?.workLocker, 'database-migrations', async () => await DrizzleRepository.open())
+    repository = await withWorkLease(distributedRuntime?.workLocker, 'database-migrations', async () =>
+      DrizzleRepository.open(undefined, logger),
+    )
     if (process.env.NODE_ENV === 'test' && (await repository.listWorkspaces()).length === 0) {
       await repository.database
         .insert(organization)
