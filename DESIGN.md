@@ -364,7 +364,7 @@ The pass is flat steel with paper on it. Steel surfaces carry no shadow; depth c
 
 Corners are small and mechanical. The base radius is 0.375rem (`lg`): zones, printer stations, inputs, and dialogs. Buttons use 0.28rem (`md`). Paper is cut tighter at 3px (tickets and slips, with only the top corners rounded on the stage bar). Plates are 4px: requester initials and station-strip chips; zone count chips are 3px. Copy cells and zone markers are 2px squares. Circles are reserved for the storage gauge, notification dots, and the feedback button.
 
-A ticket is drawn from parts: a stage bar across its top (0.375rem thick, thickening to 0.625rem and turning note red when the age is hot), a rail-steel hanger tab above it on the wide pass, a mono header, the condensed name, and a dashed perforation rule at 20% ink before the mono meta strip. Dialogs carry a 6px ink top edge, the shell carried onto paper.
+A ticket is drawn from parts: a stage bar across its top (0.375rem thick, thickening to 0.625rem and turning note red when the age is hot), a rail-steel hanger tab above it on the wide pass, a mono header, the condensed name beside the model's thumbnail (the requester's plate as a badge on its corner, as on rows), and a dashed perforation rule at 20% ink before the mono meta strip. Dialogs carry a 6px ink top edge, the shell carried onto paper.
 
 ## Components
 
