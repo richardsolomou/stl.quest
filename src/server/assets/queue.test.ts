@@ -103,6 +103,16 @@ describe('asset generation queue', () => {
     expect(await repository.requestsNeedingAssets()).toHaveLength(0)
   })
 
+  it('settles a worker that exceeds its deadline', async () => {
+    const worker = path.join(root, 'waiting-worker.mjs')
+    await fs.promises.writeFile(worker, 'setInterval(() => {}, 1000)')
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { workerConfig: { path: worker, timeoutMs: 50 } })
+    const id = await requestWithFile()
+    await queue.enqueue(id)
+    await queue.idle()
+    expect((await repository.assetGenerationJobs(id)).map((job) => job.error)).toContain('model processing exceeded the time limit')
+  })
+
   it('regenerates every asset after the model is replaced', async () => {
     const staging = new UploadStaging(await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-assets-staging-')))
     await staging.initialize()

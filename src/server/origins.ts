@@ -19,8 +19,8 @@ function forwardedOrigin(request: Request) {
   return host && (protocol === 'http' || protocol === 'https') ? parseOrigin(`${protocol}://${host}`) : undefined
 }
 
-function additionalOrigins() {
-  return (process.env.BETTER_AUTH_TRUSTED_ORIGINS?.split(',') ?? []).map(parseOrigin)
+export function additionalOrigins(): string[] {
+  return (process.env.BETTER_AUTH_TRUSTED_ORIGINS?.split(',') ?? []).map(parseOrigin).filter((origin): origin is string => !!origin)
 }
 
 /** Every origin this request may legitimately come from: its own, the forwarded one, `BETTER_AUTH_URL`, and `BETTER_AUTH_TRUSTED_ORIGINS`. */

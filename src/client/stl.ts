@@ -18,7 +18,9 @@ export function isWebGLAvailable(): boolean {
 }
 
 export async function parseStl(buffer: ArrayBuffer): Promise<THREE.BufferGeometry> {
-  const preview = await decodePreviewMesh(new Uint8Array(buffer))
+  const preview = await decodePreviewMesh(new Uint8Array(buffer)).catch((cause: unknown) => {
+    throw new InvalidMeshError('invalid preview mesh', { cause })
+  })
   if (preview) {
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(preview, 3))

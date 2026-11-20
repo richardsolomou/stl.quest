@@ -9,7 +9,9 @@ export function resolveStorageInput(data: StorageConfig, current: StorageConfig)
   if (data.adapter === 'local') return { adapter: 'local', root: path.resolve(data.root) }
   if (isCloudStorageConfig(data)) return { adapter: data.adapter, root: '', layout: 'workspace-root-v1' }
   if (data.adapter === 'webdav') {
-    const password = data.password || (current.adapter === 'webdav' ? current.password : '')
+    const password =
+      data.password ||
+      (current.adapter === 'webdav' && data.endpoint === current.endpoint && data.username === current.username ? current.password : '')
     if (!password) throw new Response(serverMessages().storage.errors.missingWebdavPassword, { status: 400 })
     return {
       adapter: 'webdav',

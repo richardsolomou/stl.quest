@@ -140,6 +140,10 @@ export default function StlViewer({ request, file, hasPreview = false }: { reque
         }
         // Still captured, so we learn which model feature the parser rejected, but the file
         // will never parse — so it gets a terminal state without a retry, not the retryable one.
+        if (reason === 'invalid_mesh' && showingPreview && !file) {
+          setFullRequested(true)
+          return
+        }
         posthog.captureException(error, { area: 'stl_viewer', showing_preview: showingPreview, reason })
         setStatus(reason === 'invalid_mesh' ? 'invalid_mesh' : 'error')
       }

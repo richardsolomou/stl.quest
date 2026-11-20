@@ -20,6 +20,12 @@ describe('preview mesh format', () => {
     expect((await encodePreviewMesh(positions, indices)).byteLength).toBeLessThan(25_000)
   })
 
+  it('rejects a vertex count larger than the indexed corners', async () => {
+    const encoded = await encodePreviewMesh(new Float32Array(9), new Uint32Array([0, 1, 2]))
+    new DataView(encoded.buffer as ArrayBuffer).setUint32(8, 4, true)
+    await expect(decodePreviewMesh(encoded)).rejects.toThrow('preview exceeds the geometry budget')
+  })
+
   it('ignores STL data', async () => {
     expect(await decodePreviewMesh(new Uint8Array(84))).toBeUndefined()
   })

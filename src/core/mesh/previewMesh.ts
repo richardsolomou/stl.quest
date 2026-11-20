@@ -1,5 +1,7 @@
+import { InvalidMeshError } from './stl'
 import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer'
 
+export const MAX_PREVIEW_TRIANGLES = 1_000_000
 const MAGIC = 0x50484d32
 const HEADER_BYTES = 44
 const VERTEX_STRIDE = 8
@@ -60,6 +62,8 @@ export async function decodePreviewMesh(file: Uint8Array): Promise<Float32Array 
 
   const triangleCount = view.getUint32(4, true)
   const vertexCount = view.getUint32(8, true)
+  if (triangleCount > MAX_PREVIEW_TRIANGLES || vertexCount > triangleCount * 3)
+    throw new InvalidMeshError('preview exceeds the geometry budget')
   const vertexBytes = view.getUint32(12, true)
   const indexBytes = view.getUint32(16, true)
   if (!triangleCount || !vertexCount || HEADER_BYTES + vertexBytes + indexBytes !== file.byteLength) {

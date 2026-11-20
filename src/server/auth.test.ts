@@ -623,6 +623,24 @@ describe('better-auth integration', () => {
     })
   })
 
+  it('requires a configured origin for password reset email', async () => {
+    const { repository } = await build()
+    cleanup = () => repository.close()
+    const email = { send: vi.fn(), verify: vi.fn() }
+    const auth = createAuth(repository.database, SECRET, { email })
+    await expect(auth.api.requestPasswordReset({ body: { email: 'user@example.com' } })).rejects.toMatchObject({ status: 'BAD_REQUEST' })
+  })
+
+  it.each([
+    ['list-members', 'GET'],
+    ['get-full-organization', 'GET'],
+    ['delete', 'POST'],
+  ])('keeps organization %s internal', async (path, method) => {
+    const { repository, auth } = await build()
+    cleanup = () => repository.close()
+    expect((await auth.handler(new Request('http://localhost/api/auth/organization/' + path, { method }))).status).toBe(404)
+  })
+
   it('delivers password reset messages through the email adapter', async () => {
     const { repository } = await build()
     cleanup = () => repository.close()
@@ -631,7 +649,7 @@ describe('better-auth integration', () => {
       send: async (message: EmailMessage) => void messages.push(message),
       verify: async () => undefined,
     } as EmailDelivery
-    const auth = createAuth(repository.database, SECRET, { email })
+    const auth = createAuth(repository.database, SECRET, { email, baseURL: 'http://localhost' })
     await auth.api.signUpEmail({ body: { email: 'user@example.com', password: 'password1234', name: 'User' } })
 
     await auth.api.requestPasswordReset({
@@ -652,7 +670,7 @@ describe('better-auth integration', () => {
       send: async (message: EmailMessage) => void messages.push(message),
       verify: async () => undefined,
     } as EmailDelivery
-    const auth = createAuth(repository.database, SECRET, { email })
+    const auth = createAuth(repository.database, SECRET, { email, baseURL: 'http://localhost' })
     const created = await auth.api.signUpEmail({ body: { email: 'user@example.com', password: 'password1234', name: 'User' } })
     await repository.setUserLocale(created.user.id, 'fr')
 

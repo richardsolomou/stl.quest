@@ -83,7 +83,7 @@ Use **Workspace Settings** to manage printers, members, board behavior, and stor
 
 OIDC sign-in creates new accounts by default when self-signup is open. Change **Allow account creation on sign-in** in the OIDC setup dialog, or set `AUTH_OIDC_ALLOW_SIGNUP=false` to restrict OIDC to existing accounts. Invited people and the first account on a new install can still sign up through OIDC.
 
-See the [deployment guide](docs/deployment.md) for environment variables, reverse proxy setup, health checks, backups, and upgrades.
+Set `BETTER_AUTH_URL` to the public URL and configure SMTP to enable password-reset and email-verification links. See the [deployment guide](docs/deployment.md) for environment variables, reverse proxy setup, health checks, backups, and upgrades.
 
 ## Storage and backups 💾
 

@@ -34,7 +34,8 @@
         "`src/client/useAuthAction.ts` reads hydration from TanStack Router's `useHydrated` instead of its own `useSyncExternalStore` flag, matching the application's other hydration checks.",
         "`src/server/session.ts` and `src/server/random.ts` are left out: the composition root's `identity`, `requireIdentity`, and `workspace` own session lookups, and invite tokens use `node:crypto` directly.",
         "`localRedirectPath` is left out because sign-in has no `next` destination.",
-        "`better-auth` and `@better-auth/stripe` are pinned to the same version and grouped in Dependabot because the Stripe plugin pins the core version."
+        "`better-auth` and `@better-auth/stripe` are pinned to the same version and grouped in Dependabot because the Stripe plugin pins the core version.",
+        "Emailed authentication links require a configured public URL. Organization APIs are internal so workspace access and deletion go through the application."
       ]
     },
     "ci": {
@@ -165,7 +166,8 @@
         "`PostHogIntegration` takes the translated `fallback` the root route renders.",
         "`postHogOptions` in `src/client/posthogOptions.ts` adds the application's `before_send` filters (expected storage rejections, duplicate server function exceptions, opaque cross-origin script errors), turns off console error capture, masks all text and element attributes, and blocks `.ph-no-capture` in replay, because workspaces hold names, filenames, and notes.",
         "The Docker build maps the existing repository variables `POSTHOG_PROJECT_ID` and `POSTHOG_HOST` and secret `POSTHOG_API_KEY` onto the `POSTHOG_CLI_*` names in `.github/workflows/docker.yml`, which is this application's deploy workflow, and keeps the `GITHUB_*` build arguments that name the uploaded release.",
-        "`vitest.config.ts` defines `__APP_VERSION__`, which `postHogOptions` reads."
+        "`vitest.config.ts` defines `__APP_VERSION__`, which `postHogOptions` reads.",
+        "The ingestion proxy limits request bodies to 4 MiB."
       ]
     },
     "realtime": {
@@ -194,7 +196,8 @@
         "The event bus in `src/adapters/events.ts` publishes each workspace event as `{ event }` on its workspace channel through `app().realtime.publish`, and storage changes to the other replicas.",
         "The token route keeps its path at `src/routes/api/realtime/token.ts` and runs inside the request context for logs.",
         "`src/client/workspaceUpdates.ts` refreshes every active query on a workspace publication or an unrecovered reconnect and leaves a deleted workspace; the root route keys `RealtimeProvider` by the workspace.",
-        "`just dev` starts `pnpm realtime` in the background and removes its container when Vite exits."
+        "`just dev` starts `pnpm realtime` in the background and removes its container when Vite exits.",
+        "The ticket handler authenticates the viewer before reading a body limited to 4 KiB."
       ]
     },
     "start-app": {

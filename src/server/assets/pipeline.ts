@@ -1,5 +1,5 @@
 import { MeshoptSimplifier } from 'meshoptimizer'
-import { decodePreviewMesh, encodePreviewMesh } from '../../core/mesh/previewMesh'
+import { decodePreviewMesh, encodePreviewMesh, MAX_PREVIEW_TRIANGLES } from '../../core/mesh/previewMesh'
 import { parseModelPositions } from '../../core/mesh/model'
 import { rasterize } from '../../core/mesh/rasterize'
 import { encodePng } from './png'
@@ -11,7 +11,6 @@ const PREVIEW_MIN_TRIANGLES = 400_000
 const PREVIEW_MAX_BYTES = 5_000_000
 const PREVIEW_MAX_FRACTION = 0.45
 const PREVIEW_MAX_ERROR = 0.02
-const PREVIEW_INITIAL_TRIANGLES = 1_000_000
 const PREVIEW_TARGET_FILL = 0.9
 
 export type GeneratedAssets = {
@@ -91,22 +90,23 @@ async function buildPreview(positions: Float32Array, originalBytes: number): Pro
   const indices = new Uint32Array(positions.length / 3)
   for (let index = 0; index < indices.length; index++) indices[index] = index
   await MeshoptSimplifier.ready
-  let targetTriangles = Math.min(triangleCount, PREVIEW_INITIAL_TRIANGLES)
+  const maxTriangles = Math.min(triangleCount, MAX_PREVIEW_TRIANGLES)
+  let targetTriangles = maxTriangles
   let best: Uint8Array | undefined
   for (let attempt = 0; attempt < 4; attempt++) {
     const previewIndices =
       targetTriangles < triangleCount
         ? MeshoptSimplifier.simplifySloppy(indices, positions, 3, null, targetTriangles * 3, PREVIEW_MAX_ERROR)[0]
         : indices
-    if (!previewIndices.length) return best
+    if (!previewIndices.length || previewIndices.length > MAX_PREVIEW_TRIANGLES * 3) return best
     const preview = await encodePreviewMesh(positions, previewIndices)
     if (preview.byteLength <= byteCap) {
       best = preview
       if (targetTriangles === triangleCount || preview.byteLength >= byteCap * PREVIEW_TARGET_FILL) return preview
     }
-    const adjusted = Math.floor(targetTriangles * (byteCap / preview.byteLength) * PREVIEW_TARGET_FILL)
+    const adjusted = Math.min(maxTriangles, Math.floor(targetTriangles * (byteCap / preview.byteLength) * PREVIEW_TARGET_FILL))
     if (adjusted === targetTriangles || adjusted <= 0) return best
-    targetTriangles = Math.min(triangleCount, adjusted)
+    targetTriangles = adjusted
   }
   return best
 }

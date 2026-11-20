@@ -7,19 +7,26 @@ export const UPLOAD_TTL = 86_400_000
 // An upload with no request for this long is treated as abandoned once its owner needs the slot; a chunk upload refreshes it.
 export const UPLOAD_IDLE = 15 * 60_000
 
+class ResumableFileStore extends FileStore {
+  override async remove(uploadId: string) {
+    if (!/^[a-z0-9-]{10,64}$/i.test(uploadId)) throw new Error('invalid upload id')
+    const filePath = path.join(this.directory, uploadId)
+    await fs.promises.rm(filePath, { force: true })
+    await this.configstore.delete(uploadId)
+  }
+}
+
 export class TusUploadStore implements UploadStore {
   readonly datastore: FileStore
 
   constructor(dataRoot = process.env.DATA_DIR ?? '/data') {
-    this.datastore = new FileStore({
+    this.datastore = new ResumableFileStore({
       directory: path.join(path.resolve(dataRoot), 'tus'),
       expirationPeriodInMilliseconds: UPLOAD_TTL,
     })
   }
 
   async remove(uploadId: string) {
-    if (!/^[a-z0-9-]{10,64}$/i.test(uploadId)) throw new Error('invalid upload id')
-    const filePath = path.join(this.datastore.directory, uploadId)
-    await Promise.all([fs.promises.rm(filePath, { force: true }), this.datastore.configstore.delete(uploadId)])
+    await this.datastore.remove(uploadId)
   }
 }

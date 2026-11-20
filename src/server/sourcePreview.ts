@@ -1,3 +1,5 @@
+import { readLimitedBody } from './readLimitedBody'
+
 const MAX_METADATA_BYTES = 1024 * 1024
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 // Model sites canonicalise pasted URLs (locale prefixes, renamed categories), so a few hops are
@@ -178,7 +180,7 @@ async function readTruncated(response: Response, limit: number) {
     size += value.byteLength
   }
   await reader.cancel().catch(() => {})
-  return concat(chunks, size)
+  return new Uint8Array(Buffer.concat(chunks, size).subarray(0, limit))
 }
 
 /** Reads the first `og:image` (or `twitter:image`) content value, tolerating either attribute order. */
@@ -200,33 +202,8 @@ function decodeHtmlEntities(value: string) {
 }
 
 async function readBounded(response: Response, limit: number) {
-  const declaredSize = Number(response.headers.get('content-length'))
-  if (Number.isFinite(declaredSize) && declaredSize > limit)
-    throw new Response('source preview is too large', { status: 413, statusText: 'source image is too large' })
-  if (!response.body) return new Uint8Array()
-  const reader = response.body.getReader()
-  const chunks: Uint8Array[] = []
-  let size = 0
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    size += value.byteLength
-    if (size > limit) {
-      await reader.cancel()
-      throw new Response('source preview is too large', { status: 413, statusText: 'source image is too large' })
-    }
-    chunks.push(value)
-  }
-  return concat(chunks, size)
-}
-
-function concat(chunks: Uint8Array[], size: number) {
-  const bytes = new Uint8Array(size)
-  let offset = 0
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset)
-    offset += chunk.byteLength
-  }
+  const bytes = await readLimitedBody(response, limit)
+  if (!bytes) throw new Response('source preview is too large', { status: 413, statusText: 'source image is too large' })
   return bytes
 }
 

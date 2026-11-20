@@ -65,6 +65,10 @@ describe('realtime ticket', () => {
     expect((await tokenIn(response)).payload).toMatchObject({ channel: 'open:one', sub: 'user-1' })
   })
 
+  it('limits ticket bodies without a declared length', async () => {
+    expect((await realtimeTicket(ticketRequest({ channel: 'a'.repeat(5000) }), options)).status).toBe(413)
+  })
+
   it('keeps tokens out of caches', async () => {
     const response = await realtimeTicket(ticketRequest({}), options, now)
     expect(response.headers.get('cache-control')).toBe('no-store')

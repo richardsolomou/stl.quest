@@ -365,7 +365,7 @@ async function createApp() {
       selfSignupAllowed: async () => (await resolveSelfSignupConfig(settings)).enabled,
       inviteClaimable: async (token, recipientEmail) =>
         await repository!.inviteClaimableGlobally(hashInviteToken(token), Date.now(), recipientEmail),
-      auth: { ...authConfig, passwordReset: authConfig.password && email !== undefined },
+      auth: { ...authConfig, passwordReset: authConfig.password && Boolean(email && authUrl) },
       email,
       baseURL: authUrl,
       onError: (error) => {
@@ -672,6 +672,7 @@ async function createApp() {
       telemetry: appTelemetry,
       auth,
       authCapabilities: {
+        emailLinks: Boolean(authUrl && email),
         password: authConfig.password,
         socialProviders: authConfig.socialProviders,
         oidcName: authConfig.oidcName,
