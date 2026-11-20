@@ -9,6 +9,9 @@ import { createAssetKey } from '../src/core/assetKeys'
 import { expectTablesFitWidth, expectWithinViewportWidth } from './fixtures/layout'
 import { boxStl } from './fixtures/stl'
 
+// A 1×1 red PNG: enough for the browser to decode and redraw as a cover.
+const COVER_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=='
+
 const email = 'owner@example.com'
 const password = 'correct-horse-battery-staple'
 const screenshots = path.join(process.cwd(), 'test-results/manual-inspection')
@@ -1715,6 +1718,17 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(linkedRequest.getByLabel('Notes')).toHaveCount(0)
   await expect(linkedRequest.getByRole('link', { name: 'Download model' })).toHaveCount(0)
   await screenshot(page, 'linked-request-read-view')
+
+  // A link whose site gives no cover takes a picture someone supplies, and the card shows it in place of the link glyph.
+  await linkedRequest
+    .getByRole('button', { name: 'Choose image' })
+    .locator('input[type=file]')
+    .setInputFiles({ name: 'cover.png', mimeType: 'image/png', buffer: Buffer.from(COVER_PNG, 'base64') })
+  await expect(linkedRequest.getByRole('button', { name: 'Replace cover' })).toBeVisible()
+  const linkedCover = linkedCard.locator('img.thumb')
+  await expect.poll(() => linkedCover.evaluate((image: HTMLImageElement) => image.naturalWidth), { timeout: 30_000 }).toBeGreaterThan(0)
+  await expect(linkedCard.getByLabel('Linked print')).toHaveCount(0)
+  await screenshot(page, 'linked-request-cover-added')
 
   // A saved link becomes a real print once its model arrives, keeping its queue position and history.
   await linkedRequest.getByRole('button', { name: 'Edit' }).click()

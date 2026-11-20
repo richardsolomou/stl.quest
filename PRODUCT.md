@@ -31,7 +31,7 @@ Supporting, not headline: dimension-aware auto-assignment across mixed resin and
 
 - **The board is the product's center of gravity.** Laid out as an expo pass: the queue as a backlog list, up-next prints as tickets on a rail in firing order, printing grouped by printer with idle printers flagged, and finishing and ready as a pickup shelf. Drag-and-drop, one-click advance to the next stage, filtering, search, multi-select, board presence showing who else is looking, and realtime updates with no extra service to install.
 - **Workspaces are the tenancy boundary.** Each has its own board, printers, members, settings, and storage. Users can belong to several by invitation. Roles are owner / admin / member.
-- **Intake is two-track:** uploaded model files, or saved source links. Links to MakerWorld, Printables, MyMiniFactory, Cults3D, and Thingiverse resolve a cover preview.
+- **Intake is two-track:** uploaded model files, or saved source links. Links to MakerWorld and Printables resolve a cover preview; any other link takes a cover image pasted, dropped, or chosen by the requester.
 - **Models are viewed in-app** through interactive STL previews and generated thumbnails; geometry, thumbnail, and preview assets are generated asynchronously per request.
 - **The slicer stays outside.** Orientation, arrangement, supports, infill, and material use are the operator's slicer's job, not STL Quest's.
 - **The print calculator is a private scratchpad.** Operators manually enter slicer totals and save their material, country electricity, and equipment defaults; calculations never attach to requests or accept payments.

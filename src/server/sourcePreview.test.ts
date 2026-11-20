@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { loadSourceImage, openGraphImage, resolveSourceImage, sourceImageFailure } from './sourcePreview'
+import { loadSourceImage, resolveSourceImage, sourceImageFailure } from './sourcePreview'
 
 const html = (image: string) =>
   new Response(`<!doctype html><html><head><meta property="og:image" content="${image}"></head><body></body></html>`, {
@@ -30,54 +30,47 @@ describe('source previews', () => {
     expect(request).toHaveBeenCalledWith('https://api.printables.com/graphql/', expect.objectContaining({ method: 'POST' }))
   })
 
-  it('resolves MyMiniFactory covers from the page OpenGraph tag', async () => {
-    const request = vi.fn<typeof fetch>().mockResolvedValue(html('https://dl.myminifactory.com/object-assets/abc/images/720X720.jpg'))
+  it('reads MakerWorld metadata larger than a megabyte, as models with many print profiles return', async () => {
+    const instances = Array.from({ length: 2_000 }, (_, index) => ({ id: index, title: 'Plate profile '.repeat(40) }))
+    const metadata = JSON.stringify({ instances, coverUrl: 'https://makerworld.bblmw.com/makerworld/model/design/grip.jpg' })
+    const request = vi.fn<typeof fetch>().mockResolvedValue(new Response(metadata, { headers: { 'content-type': 'application/json' } }))
+    expect(metadata.length).toBeGreaterThan(1024 * 1024)
 
-    await expect(resolveSourceImage('https://www.myminifactory.com/object/3d-print-dragon-107603', request)).resolves.toBe(
-      'https://dl.myminifactory.com/object-assets/abc/images/720X720.jpg',
+    await expect(resolveSourceImage('https://makerworld.com/en/models/12702-bambu-scraper-grip#profileId-12703', request)).resolves.toBe(
+      'https://makerworld.bblmw.com/makerworld/model/design/grip.jpg',
     )
-    expect(request).toHaveBeenCalledWith(
+  })
+
+  it('stops reading MakerWorld metadata once the cover is in, since its API sometimes stalls partway through a large body', async () => {
+    const head = new TextEncoder().encode('{"id":12702,"coverUrl":"https:\\/\\/makerworld.bblmw.com\\/grip.jpg","instances":[')
+    const stalled = new ReadableStream<Uint8Array>({ start: (controller) => controller.enqueue(head) })
+    const request = vi.fn<typeof fetch>().mockResolvedValue(new Response(stalled))
+
+    await expect(resolveSourceImage('https://makerworld.com/en/models/12702-bambu-scraper-grip', request)).resolves.toBe(
+      'https://makerworld.bblmw.com/grip.jpg',
+    )
+  })
+
+  it('still bounds MakerWorld metadata', async () => {
+    const filler = JSON.stringify('x'.repeat(9 * 1024 * 1024))
+    const metadata = `{"description":${filler},"coverUrl":"https://makerworld.bblmw.com/grip.jpg"}`
+    const request = vi.fn<typeof fetch>().mockResolvedValue(new Response(metadata))
+
+    await expect(resolveSourceImage('https://makerworld.com/en/models/12702-bambu-scraper-grip', request)).resolves.toBeUndefined()
+  })
+
+  it('has no cover for sites that refuse every server request, without asking them', async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(html('https://cdn.thingiverse.com/site/img/default/Thingiverse_Logo.png'))
+
+    for (const link of [
+      'https://www.thingiverse.com/thing:763622',
+      'https://cults3d.com/en/3d-model/game/articulated-dragon-mcgybeer',
       'https://www.myminifactory.com/object/3d-print-dragon-107603',
-      expect.objectContaining({ redirect: 'manual' }),
-    )
-  })
-
-  it('resolves Cults3D covers from the page OpenGraph tag', async () => {
-    const request = vi.fn<typeof fetch>().mockResolvedValue(html('https://images.cults3d.com/abc=/516x516/dragon.jpg'))
-
-    await expect(resolveSourceImage('https://cults3d.com/en/3d-model/game/articulated-dragon', request)).resolves.toBe(
-      'https://images.cults3d.com/abc=/516x516/dragon.jpg',
-    )
-  })
-
-  it('resolves Thingiverse covers from the page OpenGraph tag', async () => {
-    const request = vi.fn<typeof fetch>().mockResolvedValue(html('https://resize.thingiverse.com/?url=x&amp;w=628'))
-
-    await expect(resolveSourceImage('https://www.thingiverse.com/thing:2810483', request)).resolves.toBe(
-      'https://resize.thingiverse.com/?url=x&w=628',
-    )
-  })
-
-  it('follows a canonicalising redirect that stays on the provider', async () => {
-    const request = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(new Response(null, { status: 301, headers: { location: 'https://cults3d.com/en/3d-model/art/dragon' } }))
-      .mockResolvedValueOnce(html('https://images.cults3d.com/abc/dragon.jpg'))
-
-    await expect(resolveSourceImage('https://cults3d.com/en/3d-model/game/dragon', request)).resolves.toBe(
-      'https://images.cults3d.com/abc/dragon.jpg',
-    )
-    expect(request).toHaveBeenLastCalledWith('https://cults3d.com/en/3d-model/art/dragon', expect.objectContaining({ redirect: 'manual' }))
-  })
-
-  it('refuses a redirect that leaves the provider it started on', async () => {
-    const request = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(new Response(null, { status: 302, headers: { location: 'https://internal.example/admin' } }))
-      .mockResolvedValueOnce(html('https://images.cults3d.com/abc/dragon.jpg'))
-
-    await expect(resolveSourceImage('https://cults3d.com/en/3d-model/game/dragon', request)).resolves.toBeUndefined()
-    expect(request).toHaveBeenCalledTimes(1)
+      'https://thangs.com/designer/maker/3d-model/dragon-30573',
+    ]) {
+      await expect(resolveSourceImage(link, request)).resolves.toBeUndefined()
+    }
+    expect(request).not.toHaveBeenCalled()
   })
 
   it('refuses an image redirect that leaves the trusted CDNs', async () => {
@@ -86,12 +79,6 @@ describe('source previews', () => {
       .mockResolvedValue(new Response(null, { status: 302, headers: { location: 'http://169.254.169.254/latest/meta-data' } }))
 
     await expect(loadSourceImage('https://media.printables.com/media/a/b.jpg', request)).rejects.toMatchObject({ status: 502 })
-  })
-
-  it('drops OpenGraph covers served from a host the proxy does not trust', async () => {
-    const request = vi.fn<typeof fetch>().mockResolvedValue(html('https://internal.example/secret.png'))
-
-    await expect(resolveSourceImage('https://cults3d.com/en/3d-model/game/dragon', request)).resolves.toBeUndefined()
   })
 
   it('ignores unrelated sources and lookalike hosts without making a request', async () => {
@@ -134,14 +121,39 @@ describe('source previews', () => {
     await loadSourceImage('https://makerworld.bblmw.com/makerworld/model/design/cover.jpg', request)
     await loadSourceImage('https://public-cdn.bblmw.com/design/cover.jpg?x-oss-process=image/resize,w_6000', request)
     await loadSourceImage('https://public-cdn.bambulab.com/design/cover.jpg', request)
-    await loadSourceImage('https://media.printables.com/media/a/b.jpg', request)
 
     expect(request.mock.calls.map(([url]) => url)).toEqual([
       'https://makerworld.bblmw.com/makerworld/model/design/cover.jpg?x-oss-process=image%2Fresize%2Cw_1200',
       'https://public-cdn.bblmw.com/design/cover.jpg?x-oss-process=image%2Fresize%2Cw_1200',
       'https://public-cdn.bambulab.com/design/cover.jpg',
-      'https://media.printables.com/media/a/b.jpg',
     ])
+  })
+
+  it('asks the Printables CDN for the rendition its gallery shows, so a large original stays under the size limit', async () => {
+    const bytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0])
+    const request = vi.fn<typeof fetch>().mockImplementation(async () => new Response(bytes))
+
+    await loadSourceImage('https://media.printables.com/media/prints/3161/images/20206_70fde6a0/benchy.jpg', request)
+    await loadSourceImage('https://media.printables.com/media/prints/900000/images/6882786_b368/Storage-Box.PNG', request)
+
+    expect(request.mock.calls.map(([url]) => url)).toEqual([
+      'https://media.printables.com/media/prints/3161/images/20206_70fde6a0/thumbs/inside/1600x1200/jpg/benchy.webp',
+      'https://media.printables.com/media/prints/900000/images/6882786_b368/thumbs/inside/1600x1200/PNG/Storage-Box.webp',
+    ])
+  })
+
+  it('falls back to the original Printables image when the CDN has no rendition of it', async () => {
+    const bytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0])
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json({ message: 'No such object' }, { status: 400 }))
+      .mockResolvedValueOnce(new Response(bytes))
+
+    await expect(loadSourceImage('https://media.printables.com/media/prints/3161/images/20206/benchy.jpg', request)).resolves.toEqual({
+      bytes,
+      contentType: 'image/png',
+    })
+    expect(request).toHaveBeenLastCalledWith('https://media.printables.com/media/prints/3161/images/20206/benchy.jpg', expect.anything())
   })
 
   it('names the upstream status when a source image is unavailable', async () => {
@@ -192,25 +204,6 @@ describe('source previews', () => {
       bytes,
       contentType: 'image/png',
     })
-  })
-})
-
-describe('OpenGraph image parsing', () => {
-  it('reads the content value when it precedes the property attribute', () => {
-    expect(openGraphImage(`<meta content='https://cdn.example/a.png' property='og:image'/>`)).toBe('https://cdn.example/a.png')
-  })
-
-  it('falls back to twitter:image when no og:image is present', () => {
-    expect(openGraphImage('<meta name="twitter:image" content="https://cdn.example/b.png">')).toBe('https://cdn.example/b.png')
-  })
-
-  it('skips meta tags that only mention the image dimensions', () => {
-    const head = '<meta property="og:image:width" content="720"><meta property="og:image" content="https://cdn.example/c.png">'
-    expect(openGraphImage(head)).toBe('https://cdn.example/c.png')
-  })
-
-  it('returns nothing when the document declares no image', () => {
-    expect(openGraphImage('<meta property="og:title" content="Dragon">')).toBeUndefined()
   })
 })
 

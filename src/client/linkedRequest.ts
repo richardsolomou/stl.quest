@@ -14,6 +14,8 @@ export type LinkedRequestValues = {
   notes: string
   sourceUrl: string
   printType: PrintType | ''
+  /** A picture for a link whose site gives none, sent in place of looking one up. */
+  cover?: File
 }
 
 export function linkedRequestValues(printType: PrintType | undefined): LinkedRequestValues {
@@ -21,7 +23,7 @@ export function linkedRequestValues(printType: PrintType | undefined): LinkedReq
 }
 
 export function linkedRequestDirty(values: LinkedRequestValues) {
-  return Boolean(values.name || values.notes || values.sourceUrl || values.quantity !== '1')
+  return Boolean(values.name || values.notes || values.sourceUrl || values.quantity !== '1' || values.cover)
 }
 
 export function linkedRequestData(workspaceSlug: string, values: LinkedRequestValues) {

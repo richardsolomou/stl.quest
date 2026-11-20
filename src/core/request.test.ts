@@ -7,6 +7,7 @@ import {
   MAX_REQUEST_SOURCE_URL_LENGTH,
   normalizeRequestQuantity,
   requestAssetPaths,
+  sourceCoverChange,
   validRequestQuantity,
   validRequestUpdate,
   validSourceUrl,
@@ -88,5 +89,29 @@ describe('validRequestUpdate', () => {
     ['long printer IDs', { printerId: 'x'.repeat(MAX_REQUEST_PRINTER_ID_LENGTH + 1) }],
   ])('rejects %s', (_name, fields) => {
     expect(validRequestUpdate(fields)).toBe(false)
+  })
+})
+
+describe('sourceCoverChange', () => {
+  const link = 'https://makerworld.com/en/models/12702'
+
+  it('replaces the cover when the link changes', () => {
+    expect(sourceCoverChange({ sourceUrl: link, sourceImagePath: 'covers/a' }, 'https://www.printables.com/model/3161')).toBe('replace')
+  })
+
+  it('fills in a cover for the same link while the print has none', () => {
+    expect(sourceCoverChange({ sourceUrl: link }, ` ${link} `)).toBe('fill')
+  })
+
+  it('keeps a supplied cover when the same link is saved again', () => {
+    expect(sourceCoverChange({ sourceUrl: link, sourceImagePath: 'covers/a' }, link)).toBe('keep')
+  })
+
+  it('keeps a resolved cover when the same link is saved again', () => {
+    expect(sourceCoverChange({ sourceUrl: link, sourceImageUrl: 'https://makerworld.bblmw.com/a.png' }, link)).toBe('keep')
+  })
+
+  it('keeps the cover when the link is not part of the save', () => {
+    expect(sourceCoverChange({ sourceUrl: link }, undefined)).toBe('keep')
   })
 })

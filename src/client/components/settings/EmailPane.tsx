@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
 import type { PublicSmtpConfig } from '../../../core/auth'
+import { base64 } from '../../base64'
 import type { Messages } from '../../../core/i18n'
 import {
   EMAIL_LOGO_TYPES,
@@ -403,16 +404,4 @@ function TemplateEditor({
       )}
     </div>
   )
-}
-
-function base64(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const dataUrl = reader.result as string
-      resolve(dataUrl.slice(dataUrl.indexOf(',') + 1))
-    }
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
 }

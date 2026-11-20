@@ -49,6 +49,7 @@ import {
   type RequestUpdateFields,
 } from './request'
 import { modelFormat, sourceImageKey } from './assetKeys'
+import { imageContentType, MAX_COVER_BYTES } from './coverImage'
 import { automaticEstimateFields, requestPrintEstimate } from './printEstimates'
 import { consumablesOfKind, type Consumable } from './consumables'
 import type { EquipmentItem } from './equipment'
@@ -78,7 +79,7 @@ export type NewUploadedRequestInput = Omit<NewPrintRequest, 'ownerUserId' | 'fil
 export type NewLinkedRequestInput = Pick<
   NewPrintRequest,
   'name' | 'quantity' | 'notes' | 'sourceUrl' | 'sourceImageUrl' | 'printerId' | 'requestedPrintType' | 'automaticPrinterAssignment'
-> & { sourceUrl: string }
+> & { sourceUrl: string; cover?: Uint8Array }
 type CopyMoveInput = Pick<CopyMove, 'id' | 'from' | 'to' | 'count' | 'tagIds' | 'order'>
 
 export class STLQuestService {
@@ -139,6 +140,7 @@ export class STLQuestService {
         ownerEmail: _ownerEmail,
         ownerName,
         sourceImageUrl: _sourceImageUrl,
+        sourceImagePath: _sourceImagePath,
         thumbnailPath: _thumbnailPath,
         previewPath,
         requestedPrintType,
@@ -193,7 +195,7 @@ export class STLQuestService {
           }),
           hasFile: Boolean(_filePath),
           modelFormat: _fileName ? modelFormat(_fileName) : undefined,
-          hasSourceImage: Boolean(_sourceImageUrl),
+          hasSourceImage: Boolean(_sourceImageUrl || _sourceImagePath),
           hasPreview: !!previewPath,
           canEdit: admin || (mine && !started),
           canDelete: admin || (mine && !started),
@@ -252,6 +254,7 @@ export class STLQuestService {
     ) {
       throw new Response(this.text.request.invalidLinkedRequest, { status: 400 })
     }
+    if (input.cover) await this.assertCover(input.cover)
     const target = await this.resolveTarget(input.requestedPrintType, input.printerId)
     const id = await this.repository.createRequest({
       name,
@@ -262,6 +265,10 @@ export class STLQuestService {
       sourceImageUrl: input.sourceImageUrl,
       ...target,
     })
+    if (input.cover) {
+      await this.repository.recordSourceImagePath(id, await this.writeCover(id, input.cover))
+      this.capture(identity.id, 'request_cover_added', { replaced: false })
+    }
     const printType = await this.requestPrintType(target)
     this.changed('request.created')
     this.capture(identity.id, 'request_created', {
@@ -270,6 +277,35 @@ export class STLQuestService {
       model_source: 'link',
     })
     return id
+  }
+
+  /** Puts a person's own picture on a print saved from a link, in place of whatever its source link resolved. */
+  async setCover(id: string, bytes: Uint8Array, identity: Identity) {
+    const request = await this.requiredRequest(id)
+    if (identity.role !== 'admin' && (request.ownerUserId !== identity.id || requestStarted(request.counts))) {
+      throw new Response(this.text.access.forbidden, { status: 403 })
+    }
+    if (request.filePath) throw new Response(this.text.request.coverHasModel, { status: 409 })
+    await this.assertCover(bytes)
+    const sourceImagePath = await this.writeCover(id, bytes)
+    await this.repository.updateRequest(id, { sourceImageUrl: null, sourceImagePath })
+    this.changed('request.updated')
+    this.capture(identity.id, 'request_cover_added', { replaced: Boolean(request.sourceImageUrl || request.sourceImagePath) })
+  }
+
+  private async assertCover(bytes: Uint8Array) {
+    if (bytes.byteLength > MAX_COVER_BYTES) {
+      throw new Response(this.text.request.coverTooLarge(MAX_COVER_BYTES / 1024 / 1024), { status: 413 })
+    }
+    if (!imageContentType(bytes)) throw new Response(this.text.request.coverNotImage, { status: 400 })
+    await this.assertAssetsMutable()
+  }
+
+  // The key is derived from the print alone, so a replacement overwrites the cover in place and never orphans one.
+  private async writeCover(requestId: string, bytes: Uint8Array) {
+    const key = sourceImageKey(requestId)
+    await this.assets.write(key, bytes)
+    return key
   }
 
   async createUploadedRequest(uploadId: string, partPath: string, input: NewUploadedRequestInput, identity: Identity) {
@@ -380,6 +416,9 @@ export class STLQuestService {
         requestedPrintType: source.requestedPrintType,
         automaticPrinterAssignment: source.automaticPrinterAssignment,
       })
+      // Each print keeps its own cover, so a supplied one would otherwise stay behind with the original.
+      const cover = await this.cachedSourceImage(source)
+      if (cover) await this.cacheSourceImage(repeatedId, cover)
       this.changed('request.created')
       this.capture(identity.id, 'request_created', {
         print_type: await this.requestPrintType(source),
@@ -755,10 +794,10 @@ export class STLQuestService {
 
   /** Best effort: a workspace without working storage keeps serving covers straight from the source. */
   async cacheSourceImage(requestId: string, bytes: Uint8Array) {
-    const key = sourceImageKey(requestId)
+    let key: string
     try {
       await this.assertAssetsMutable()
-      await this.assets.write(key, bytes)
+      key = await this.writeCover(requestId, bytes)
     } catch {
       return
     }

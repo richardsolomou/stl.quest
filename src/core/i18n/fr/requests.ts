@@ -92,6 +92,19 @@ export const requests: typeof en = {
     linkOnlyHint: 'Cette impression est enregistrée à partir d’un lien. Choisissez un modèle pour la rendre imprimable.',
     deleteToReplace: 'Supprimez ce modèle pour en mettre un autre à sa place.',
   },
+  cover: {
+    label: 'Image de couverture',
+    prompt: 'Collez, déposez ou choisissez une image',
+    hint: 'Copiez l’image sur la page du modèle, puis collez-la ici.',
+    choose: 'Choisir une image',
+    replace: 'Remplacer la couverture',
+    remove: 'Retirer l’image de couverture',
+    saving: 'Enregistrement de la couverture…',
+    failedTitle: 'La couverture n’a pas été enregistrée',
+    failedHint: 'L’impression garde l’image qu’elle avait. Essayez une autre image.',
+    unreadable: 'Ce fichier n’est pas une image que ce navigateur peut lire.',
+    rejected: 'Le serveur n’a pas accepté cette image.',
+  },
   thumb: {
     linkedPrint: 'Impression liée',
     loadingThumbnail: 'Chargement de la miniature',
@@ -119,7 +132,8 @@ export const requests: typeof en = {
   },
   linked: {
     sourcePlaceholder: 'https://…',
-    linkHint: 'Tous les liens fonctionnent. Les aperçus sont récupérés pour MakerWorld, Printables, MyMiniFactory, Cults3D et Thingiverse.',
+    linkHint:
+      'Tous les liens fonctionnent. Les liens MakerWorld et Printables apportent leur couverture ; pour les autres sites, ajoutez-en une ci-dessous.',
     notesPlaceholder: 'couleur, pour qui c’est — tout ce que l’imprimeur doit savoir',
     failedTitle: 'Cette impression n’a pas pu être ajoutée',
     failedHint: 'Rien n’a été ajouté. Vérifiez les informations et votre connexion, puis réessayez.',

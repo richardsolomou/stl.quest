@@ -8,6 +8,7 @@ export const board: typeof en = {
     loadError: 'Das Board konnte nicht geladen werden',
     dropToReplace: 'Modell hier ablegen, um dieses zu ersetzen',
     dropToAttach: 'Modell hier ablegen, um es anzuhängen',
+    dropToCover: 'Bild hier ablegen, um es als Titelbild zu verwenden',
     dropToAdd: 'Modelle hier ablegen, um Drucke hinzuzufügen',
     tagCreateFailed: 'Der Tag konnte nicht erstellt werden.',
     tagUpdateFailed: 'Der Tag konnte nicht aktualisiert werden.',

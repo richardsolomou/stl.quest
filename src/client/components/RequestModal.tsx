@@ -37,6 +37,8 @@ import {
 } from '../requestEditor'
 import { useWorkspacePrintTypes, useWorkspaceSlug } from '../workspace'
 import { useModelAttachment } from '../modelAttachment'
+import { useRequestCover } from '../requestCover'
+import { droppedFileRole } from '../coverImage'
 import { workflow } from '../../core/workflow'
 import { estimatePending, formatEstimateMaterial, formatEstimateTime } from '../../core/printEstimates'
 import { RequestModelField } from './RequestModelField'
@@ -50,8 +52,8 @@ export function RequestModal({
   isAdmin,
   printers,
   uploadsEnabled,
-  droppedModel,
-  onDroppedModelHandled,
+  droppedFile,
+  onDroppedFileHandled,
   onClose,
 }: {
   request: PublicPrintRequest
@@ -60,8 +62,8 @@ export function RequestModal({
   isAdmin: boolean
   printers: PrinterSummary[]
   uploadsEnabled: boolean
-  droppedModel?: File
-  onDroppedModelHandled: () => void
+  droppedFile?: File
+  onDroppedFileHandled: () => void
   onClose: () => void
 }) {
   const { t, locale } = useI18n()
@@ -75,16 +77,20 @@ export function RequestModal({
   const callMoveCopies = useServerFn(moveCopies)
   const queryClient = useQueryClient()
   const attachment = useModelAttachment(request)
+  const cover = useRequestCover(request)
   const canAttach = canAttachModel(request, uploadsEnabled)
   // A file dropped while this dialog is open belongs to this print, not to a new one.
   useEffect(() => {
-    if (!droppedModel) return
-    onDroppedModelHandled()
+    if (!droppedFile) return
+    onDroppedFileHandled()
     if (!canAttach) return
-    attachment.choose(droppedModel)
+    const role = droppedFileRole(request, droppedFile.type)
+    if (role === 'cover' && !editing) cover.choose(droppedFile)
+    if (role !== 'model') return
+    attachment.choose(droppedFile)
     setEditing(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [droppedModel])
+  }, [droppedFile])
   const [values, setValues] = useState(() => requestEditorValues(request))
   const [editing, setEditing] = useState(false)
   const patchValues = (patch: Partial<RequestEditorValues>) => setValues((current) => ({ ...current, ...patch }))
@@ -249,7 +255,12 @@ export function RequestModal({
         footer={editing ? editActions : viewActions}
       >
         <div className="max-md:[&_.viewer]:aspect-video md:sticky md:top-0 md:self-start md:[&_.viewer]:mb-0">
-          <RequestModelField request={request} editing={editing && canAttach} attachment={attachment} />
+          <RequestModelField
+            request={request}
+            editing={editing && canAttach}
+            attachment={attachment}
+            cover={canAttach && !editing && !request.hasFile ? cover : undefined}
+          />
         </div>
 
         {!editing && <RequestDetails request={request} people={people} hideRequester={hideRequester} showCost={isAdmin} />}

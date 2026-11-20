@@ -1,12 +1,13 @@
+import { COVER_WIDTH, imageContentType, MAX_COVER_BYTES } from '../core/coverImage'
 import { readLimitedBody } from './readLimitedBody'
 
-const MAX_METADATA_BYTES = 1024 * 1024
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024
-// Model sites canonicalise pasted URLs (locale prefixes, renamed categories), so a few hops are
-// followed by hand. Every hop is re-checked against the allowlist, which `redirect: 'follow'` would not do.
+// MakerWorld returns every print profile with a model, so one with many profiles runs to several megabytes.
+const MAX_METADATA_BYTES = 8 * 1024 * 1024
+// A JSON string value, escapes included, so the field can be read without parsing the rest of the document.
+const JSON_STRING = String.raw`"((?:[^"\\]|\\.)*)"`
+// Printables only renders a fixed set of boxes; this is the one its model gallery shows.
+const PRINTABLES_RENDITION = 'thumbs/inside/1600x1200'
 const MAX_REDIRECTS = 3
-// Covers fill a board card or the print dialog, so a CDN that resizes on request is asked for this width.
-const COVER_WIDTH = 1200
 
 type SourceProvider = {
   /** Page hosts this provider claims, matched against the parsed hostname with an optional `www.` prefix. */
@@ -14,12 +15,13 @@ type SourceProvider = {
   /** CDN hosts whose images the proxy will fetch. Nothing outside this list is ever requested. */
   imageHosts: string[]
   resolve: (url: URL, request: typeof fetch) => Promise<string | undefined>
-  /** Rewrites a trusted cover URL to a smaller rendition, so a large original still fits under `MAX_IMAGE_BYTES`. */
+  /** Rewrites a trusted cover URL to a smaller rendition, so a large original still fits under `MAX_COVER_BYTES`. */
   sized?: (image: URL) => URL
 }
 
-// MakerWorld and Printables sit behind bot protection that rejects server-side HTML requests,
-// so those providers read a public JSON API instead of the page's OpenGraph tags.
+// Model pages sit behind bot protection that rejects server-side requests, so covers come from public JSON APIs.
+// Thingiverse, Cults3D, MyMiniFactory, and Thangs answer every server request, API and oEmbed alike, with a
+// challenge page, so links to them have no cover until someone supplies one.
 const PROVIDERS: SourceProvider[] = [
   {
     hosts: ['makerworld.com'],
@@ -32,13 +34,24 @@ const PROVIDERS: SourceProvider[] = [
     resolve: async (url, request) => {
       const modelId = url.pathname.match(/(?:^|\/)models\/(\d+)(?:[-/]|$)/)?.[1]
       if (!modelId) return undefined
-      const metadata = await readJson(request, `https://api.bambulab.com/v1/design-service/design/${modelId}`)
-      return typeof metadata?.coverUrl === 'string' ? metadata.coverUrl : undefined
+      const response = await request(`https://api.bambulab.com/v1/design-service/design/${modelId}`, {
+        redirect: 'error',
+        signal: AbortSignal.timeout(5_000),
+        headers: { accept: 'application/json' },
+      })
+      if (!response.ok) return undefined
+      return await readJsonStringField(response, 'coverUrl', MAX_METADATA_BYTES)
     },
   },
   {
     hosts: ['printables.com'],
     imageHosts: ['media.printables.com'],
+    // Originals are often several megabytes; renditions sit beside them as thumbs/<box>/<original extension>/<name>.webp.
+    sized: (image) => {
+      const original = image.pathname.match(/^(.*\/)([^/]+)\.([^./]+)$/)
+      if (original) image.pathname = `${original[1]}${PRINTABLES_RENDITION}/${original[3]}/${original[2]}.webp`
+      return image
+    },
     resolve: async (url, request) => {
       const modelId = url.pathname.match(/(?:^|\/)model\/(\d+)(?:[-/]|$)/)?.[1]
       if (!modelId) return undefined
@@ -54,14 +67,7 @@ const PROVIDERS: SourceProvider[] = [
       return typeof filePath === 'string' && filePath ? new URL(filePath, 'https://media.printables.com/').toString() : undefined
     },
   },
-  openGraphProvider(['myminifactory.com'], ['dl.myminifactory.com', 'cdn.myminifactory.com', 'images.myminifactory.com']),
-  openGraphProvider(['cults3d.com'], ['images.cults3d.com', 'fbi.cults3d.com']),
-  openGraphProvider(['thingiverse.com'], ['resize.thingiverse.com', 'cdn.thingiverse.com', 'media.thingiverse.com']),
 ]
-
-function openGraphProvider(hosts: string[], imageHosts: string[]): SourceProvider {
-  return { hosts, imageHosts, resolve: (url, request) => readOpenGraphImage(request, url, hosts) }
-}
 
 function matchesHost(hostname: string, hosts: string[]) {
   return hosts.some((host) => hostname === host || hostname === `www.${host}`)
@@ -91,14 +97,17 @@ export async function resolveSourceImage(source: string, request: typeof fetch =
 
 export async function loadSourceImage(source: string, request: typeof fetch = fetch) {
   if (!validSourceImageUrl(source)) throw new Response('invalid source image', { status: 400, statusText: 'untrusted source image url' })
-  const response = await fetchWithin(request, sizedSourceImageUrl(source), {
-    signal: AbortSignal.timeout(5_000),
-    headers: { accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif' },
-  })
+  const sized = sizedSourceImageUrl(source)
+  let response = await fetchImage(request, sized)
+  // A CDN may have no rendition of an original it never processed, so the original is the fallback.
+  if (response && !response.ok && sized !== source) {
+    await response.body?.cancel().catch(() => {})
+    response = await fetchImage(request, source)
+  }
   if (!response) throw new Response('source image unavailable', { status: 502, statusText: 'source redirect refused' })
   if (!response.ok) throw new Response('source image unavailable', { status: 502, statusText: `source returned ${response.status}` })
-  const bytes = await readBounded(response, MAX_IMAGE_BYTES)
-  const contentType = sourceImageContentType(bytes)
+  const bytes = await readBounded(response, MAX_COVER_BYTES)
+  const contentType = imageContentType(bytes)
   if (!contentType) throw new Response('invalid source image', { status: 502, statusText: 'source is not an image' })
   return { bytes, contentType }
 }
@@ -107,6 +116,13 @@ export async function loadSourceImage(source: string, request: typeof fetch = fe
 export function sourceImageFailure(error: unknown) {
   if (error instanceof Response) return { status: error.status, details: { status: error.status, reason: error.statusText } }
   return { status: 502, details: { err: error } }
+}
+
+function fetchImage(request: typeof fetch, url: string) {
+  return fetchWithin(request, url, {
+    signal: AbortSignal.timeout(5_000),
+    headers: { accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif' },
+  })
 }
 
 function sizedSourceImageUrl(source: string) {
@@ -127,7 +143,7 @@ function validSourceImageUrl(source: string) {
 async function readJson(request: typeof fetch, url: string, init?: RequestInit) {
   const response = await request(url, {
     redirect: 'error',
-    signal: AbortSignal.timeout(3_000),
+    signal: AbortSignal.timeout(5_000),
     headers: { accept: 'application/json' },
     ...init,
   })
@@ -136,24 +152,8 @@ async function readJson(request: typeof fetch, url: string, init?: RequestInit) 
   return JSON.parse(new TextDecoder().decode(bytes)) as Record<string, unknown> | undefined
 }
 
-async function readOpenGraphImage(request: typeof fetch, url: URL, hosts: string[]) {
-  const response = await fetchWithin(
-    request,
-    url.toString(),
-    { signal: AbortSignal.timeout(5_000), headers: { accept: 'text/html' } },
-    (candidate) => matchesHost(candidate.hostname.toLowerCase(), hosts),
-  )
-  if (!response?.ok) return undefined
-  // Meta tags live in <head>, so a long page body is truncated rather than treated as a failure.
-  return openGraphImage(new TextDecoder().decode(await readTruncated(response, MAX_METADATA_BYTES)))
-}
-
-async function fetchWithin(
-  request: typeof fetch,
-  url: string,
-  init: RequestInit,
-  allowed: (candidate: URL) => boolean = (candidate) => validSourceImageUrl(candidate.toString()),
-) {
+// Every redirect hop is re-checked against the image allowlist, which `redirect: 'follow'` would not do.
+async function fetchWithin(request: typeof fetch, url: string, init: RequestInit) {
   let target = url
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const response = await request(target, { ...init, redirect: 'manual' })
@@ -162,63 +162,40 @@ async function fetchWithin(
     await response.body?.cancel().catch(() => {})
     if (!location) return undefined
     const next = new URL(location, target)
-    if (next.protocol !== 'https:' || !allowed(next)) return undefined
+    if (next.protocol !== 'https:' || !validSourceImageUrl(next.toString())) return undefined
     target = next.toString()
   }
   return undefined
 }
 
-async function readTruncated(response: Response, limit: number) {
-  if (!response.body) return new Uint8Array()
+/**
+ * Reads a body only until the first `field` string appears, then stops. MakerWorld puts `coverUrl` in the first few
+ * hundred bytes of a document that can run to megabytes, and its API sometimes stalls partway through sending one.
+ */
+async function readJsonStringField(response: Response, field: string, limit: number) {
+  if (!response.body) return undefined
+  const pattern = new RegExp(`"${field}"\\s*:\\s*${JSON_STRING}`, 'g')
   const reader = response.body.getReader()
-  const chunks: Uint8Array[] = []
-  let size = 0
-  while (size < limit) {
-    const { done, value } = await reader.read()
-    if (done) break
-    chunks.push(value)
-    size += value.byteLength
+  const decoder = new TextDecoder()
+  let text = ''
+  try {
+    while (text.length < limit) {
+      const { done, value } = await reader.read()
+      if (done) return undefined
+      // Rescanning only the end of the text keeps a long document linear; no cover URL is anywhere near this long.
+      pattern.lastIndex = Math.max(0, text.length - 4096)
+      text = (text + decoder.decode(value, { stream: true })).slice(0, limit)
+      const match = pattern.exec(text)
+      if (match) return JSON.parse(`"${match[1]}"`) as string
+    }
+    return undefined
+  } finally {
+    await reader.cancel().catch(() => {})
   }
-  await reader.cancel().catch(() => {})
-  return new Uint8Array(Buffer.concat(chunks, size).subarray(0, limit))
-}
-
-/** Reads the first `og:image` (or `twitter:image`) content value, tolerating either attribute order. */
-export function openGraphImage(html: string) {
-  for (const tag of html.match(/<meta\b[^>]*>/gi) ?? []) {
-    if (!/\b(?:property|name)\s*=\s*["']?(?:og:image|twitter:image)(?::url)?["'\s>]/i.test(tag)) continue
-    const content = tag.match(/\bcontent\s*=\s*(?:"([^"]*)"|'([^']*)')/i)
-    const value = content?.[1] ?? content?.[2]
-    if (value) return decodeHtmlEntities(value.trim())
-  }
-  return undefined
-}
-
-function decodeHtmlEntities(value: string) {
-  return value
-    .replace(/&(?:amp|#38|#x26);/gi, '&')
-    .replace(/&(?:quot|#34|#x22);/gi, '"')
-    .replace(/&(?:#39|#x27|apos);/gi, "'")
 }
 
 async function readBounded(response: Response, limit: number) {
   const bytes = await readLimitedBody(response, limit)
   if (!bytes) throw new Response('source preview is too large', { status: 413, statusText: 'source image is too large' })
   return bytes
-}
-
-export function sourceImageContentType(bytes: Uint8Array) {
-  if (startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return 'image/png'
-  if (startsWith(bytes, [0xff, 0xd8, 0xff])) return 'image/jpeg'
-  if (new TextDecoder().decode(bytes.subarray(0, 6)).match(/^GIF8[79]a$/)) return 'image/gif'
-  if (new TextDecoder().decode(bytes.subarray(0, 4)) === 'RIFF' && new TextDecoder().decode(bytes.subarray(8, 12)) === 'WEBP') {
-    return 'image/webp'
-  }
-  const boxType = new TextDecoder().decode(bytes.subarray(4, 12))
-  if (boxType === 'ftypavif' || boxType === 'ftypavis') return 'image/avif'
-  return undefined
-}
-
-function startsWith(bytes: Uint8Array, signature: number[]) {
-  return signature.every((value, index) => bytes[index] === value)
 }

@@ -41,6 +41,19 @@ export function requestAssetPaths(request: { filePath?: string; previewPath?: st
   return [request.filePath, request.previewPath, request.thumbnailPath, request.sourceImagePath].filter((value): value is string => !!value)
 }
 
+/**
+ * What saving a print with `sourceUrl` does to its cover: a new link replaces the cover with whatever that link
+ * resolves to, and the same link only fills one in while the print has none, so a supplied cover survives a save.
+ */
+export function sourceCoverChange(
+  current: { sourceUrl?: string; sourceImageUrl?: string; sourceImagePath?: string },
+  sourceUrl: string | undefined,
+): 'replace' | 'fill' | 'keep' {
+  if (sourceUrl === undefined) return 'keep'
+  if (sourceUrl.trim() !== (current.sourceUrl ?? '')) return 'replace'
+  return current.sourceImageUrl || current.sourceImagePath ? 'keep' : 'fill'
+}
+
 // A model can be put on a print — its first one or a replacement — while the requester may still edit
 // the print and storage can take writes.
 export function canAttachModel(request: { canEdit: boolean }, uploadsEnabled: boolean) {

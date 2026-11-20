@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { MAX_EMAIL_TEMPLATE_PLACEHOLDERS } from '../core/email'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from '../core/priceCalculator'
 import { MAX_BULK_CARDS } from '../core/request'
+import { MAX_COVER_BYTES } from '../core/coverImage'
 import {
   archiveRequestsSchema,
   deleteRequestsSchema,
@@ -10,6 +11,7 @@ import {
   acceptInviteSchema,
   boardSettingsSchema,
   createLinkedRequestSchema,
+  requestCoverSchema,
   createPrintGroupSchema,
   createInviteSchema,
   emailSenderSchema,
@@ -134,6 +136,36 @@ describe('server input schemas', () => {
         requestedPrintType: 'filament',
       }),
     ).toThrow()
+  })
+
+  it('accepts a cover image supplied with a linked print', () => {
+    const cover = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).toString('base64')
+
+    expect(
+      createLinkedRequestSchema.parse({
+        name: 'Dragon',
+        quantity: 1,
+        sourceUrl: 'https://cults3d.com/x',
+        requestedPrintType: 'resin',
+        cover,
+      }),
+    ).toMatchObject({ cover })
+  })
+
+  it('accepts a cover image at the size limit', () => {
+    const image = Buffer.alloc(MAX_COVER_BYTES).toString('base64')
+
+    expect(requestCoverSchema.safeParse({ id: 'print', image }).success).toBe(true)
+  })
+
+  it('refuses a cover image over the size limit before decoding it', () => {
+    const image = Buffer.alloc(MAX_COVER_BYTES + 3).toString('base64')
+
+    expect(requestCoverSchema.safeParse({ id: 'print', image }).success).toBe(false)
+  })
+
+  it('refuses a cover that is not base64', () => {
+    expect(requestCoverSchema.safeParse({ id: 'print', image: '<svg/>' }).success).toBe(false)
   })
 
   it('accepts the business rates', () => {

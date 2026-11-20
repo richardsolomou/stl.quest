@@ -8,6 +8,7 @@ export const board: typeof en = {
     loadError: 'Impossible de charger le tableau',
     dropToReplace: 'Déposez un modèle pour remplacer celui-ci',
     dropToAttach: 'Déposez un modèle pour le joindre',
+    dropToCover: 'Déposez une image pour en faire la couverture',
     dropToAdd: 'Déposez des modèles pour ajouter des impressions',
     tagCreateFailed: 'L’étiquette n’a pas pu être créée.',
     tagUpdateFailed: 'L’étiquette n’a pas pu être mise à jour.',
