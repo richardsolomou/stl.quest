@@ -360,7 +360,8 @@ export function Column({
       <div
         ref={bodyRef}
         className={cn(
-          'column-body app-scrollbar relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain rounded-lg transition-[background-color]',
+          // The gutter is always reserved: a scrollbar that took width when it appeared would rewrap the cards, change the shelf's height, and flicker on and off.
+          'column-body app-scrollbar relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain [scrollbar-gutter:stable] rounded-lg transition-[background-color]',
           (layout === 'list' || layout === 'shelf') && 'virtualized px-1',
           layout === 'rail' &&
             'gap-3 px-1 pb-2 @min-[960px]:flex-row @min-[960px]:flex-wrap @min-[960px]:items-start @min-[960px]:gap-x-4 @min-[960px]:gap-y-8 @min-[960px]:px-3 @min-[960px]:pt-6 @min-[960px]:pb-4',
@@ -438,7 +439,8 @@ export function Column({
           </div>
         )}
         {layout === 'stations' && stations && stations.length > 0 && (
-          <div className="grid items-start gap-3 @min-[1300px]:grid-cols-2">
+          // Two printers or more sit two to a row on a wide pass; a lone printer takes the whole column and lays its jobs out across it.
+          <div className={cn('grid items-start gap-3', stations.length > 1 && '@min-[1300px]:grid-cols-2')}>
             {stations.map((station) => {
               const copies = station.entries.reduce((sum, entry) => sum + entry.count, 0)
               const name = station.printer?.name ?? pass.unassigned
@@ -479,12 +481,12 @@ export function Column({
                     <h3 className="min-w-0 truncate font-heading text-base leading-tight font-extrabold">{name}</h3>
                     <span className="ml-auto shrink-0 font-mono text-[11px] uppercase opacity-90">{summary}</span>
                   </header>
-                  <div className="flex flex-col gap-2 p-2">
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-2 p-2">
                     {station.entries.map((entry) => (
                       <div key={entry.key}>{renderCard(entry, 'job')}</div>
                     ))}
                     {copies === 0 && station.next && (
-                      <div className="flex flex-col gap-1.5">
+                      <div className="col-span-full flex flex-col gap-1.5">
                         <span className="px-0.5 text-xs font-semibold text-muted-foreground">{pass.nextForPrinter}</span>
                         <StationSuggestion
                           entry={station.next}

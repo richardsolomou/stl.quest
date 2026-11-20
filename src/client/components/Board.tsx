@@ -794,8 +794,8 @@ export function Board({
           {zone('up_next', 'rail', pass.upNextDetail)}
           {zone('in_progress', 'stations', pass.stationsDetail(stations.filter(({ printer }) => printer).length, idlePrinters))}
         </div>
-        {/* Each shelf grows to its contents from an equal share, so a short shelf yields its space and two full ones split the column. */}
-        <div className="grid min-h-0 min-w-0 grid-rows-[minmax(0,auto)_minmax(0,auto)] content-start gap-4 @max-[959px]:contents">
+        {/* Finishing and ready each hold half the column, so neither shelf's height depends on what the other holds. */}
+        <div className="grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-4 @max-[959px]:contents">
           {zone('post_processing', 'shelf')}
           {zone('done', 'shelf', showRequesters && readyPeople ? pass.shelfDetail(readyPeople) : undefined)}
         </div>
