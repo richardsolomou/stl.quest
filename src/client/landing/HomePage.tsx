@@ -135,7 +135,7 @@ const catalogues = [
 
 export function HomePage() {
   const trackLink = useTrackLink()
-  const first = workflow.statuses[0]!.label
+  const first = workflow.statuses[0].label
   const last = workflow.statuses.at(-1)!.label
   const [truenas, unraid] = NAS_CATALOGUES
 

@@ -26,8 +26,8 @@ export function CopyDemo() {
       return
     }
     const from = stages.findLastIndex(({ id }, index) => index < stages.length - 1 && (counts[id] ?? 0) > 0)
-    const to = stages[from + 1]!.id
-    setCounts({ ...counts, [stages[from]!.id]: counts[stages[from]!.id]! - 1, [to]: (counts[to] ?? 0) + 1 })
+    const to = stages[from + 1].id
+    setCounts({ ...counts, [stages[from].id]: counts[stages[from].id] - 1, [to]: (counts[to] ?? 0) + 1 })
     setLanded({ stage: to, move: (landed?.move ?? 0) + 1 })
   }
 
