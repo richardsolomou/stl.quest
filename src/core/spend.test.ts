@@ -415,6 +415,18 @@ describe('summariseProfit', () => {
     expect(summariseProfit([{ ...spanning, finishedAt: november.from }], november, 'EUR').charged).toBe(1)
   })
 
+  it('knows a charge was recorded when none falls in the period', () => {
+    expect(summariseProfit([spanning], october, 'EUR').recorded).toBe(true)
+  })
+
+  it('knows no charge was recorded', () => {
+    expect(summariseProfit([], november, 'EUR').recorded).toBe(false)
+  })
+
+  it('does not count a charge in another currency as recorded', () => {
+    expect(summariseProfit([{ ...spanning, charged: { amount: 20, currency: 'GBP' } }], november, 'EUR').recorded).toBe(false)
+  })
+
   it('leaves out a print that finished at the end of the period', () => {
     expect(summariseProfit([{ ...spanning, finishedAt: october.to }], october, 'EUR').charged).toBe(0)
   })
