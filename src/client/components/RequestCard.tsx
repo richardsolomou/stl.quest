@@ -334,19 +334,19 @@ export function RequestCard({
             className="absolute -top-3 left-1/2 hidden h-4 w-8 -translate-x-1/2 rounded-[3px] border border-foreground/25 bg-rail @min-[960px]:block"
           />
           <span className="flex flex-col">
-            <span className="mt-2 flex items-start gap-2">
-              <span
-                className={cn(
-                  'line-clamp-4 min-w-0 flex-1 font-heading font-bold uppercase',
-                  variant === 'lead' ? 'text-[1.85rem]/[1]' : 'text-lg/[1.05]',
-                )}
-              >
-                {request.name}
-              </span>
-              <span className={cn('relative shrink-0', variant === 'lead' ? 'size-14' : 'size-10')}>
+            {/* The thumbnail floats so the name flows around it, and a word too long to sit beside it drops below whole. The
+                negative margin keeps the requester plate on the thumbnail's corner inside the clipped five-line block. */}
+            <span
+              className={cn(
+                '-mr-1.5 mt-2 block max-h-[5lh] overflow-hidden pr-1.5 font-heading font-bold uppercase',
+                variant === 'lead' ? 'text-[1.85rem]/[1]' : 'text-lg/[1.05]',
+              )}
+            >
+              <span className={cn('relative float-right mb-1.5 ml-2', variant === 'lead' ? 'size-20' : 'size-14')}>
                 <RequestThumb request={request} />
                 {avatar && <span className="absolute -right-1.5 -bottom-1.5 flex rounded-[5px] ring-2 ring-ticket">{avatar}</span>}
               </span>
+              {request.name}
             </span>
             <span className="-order-1 flex items-center gap-2 font-mono text-[11px] leading-none text-ticket-muted uppercase">
               {position !== undefined && <span>#{String(position).padStart(2, '0')}</span>}
@@ -372,9 +372,9 @@ export function RequestCard({
           <span
             className={cn(
               'relative shrink-0',
-              variant === 'row' && 'size-10',
-              variant === 'job' && 'size-12 max-[620px]:size-10',
-              variant === 'slip' && 'size-8',
+              variant === 'row' && 'size-14',
+              variant === 'job' && 'size-16 max-[620px]:size-14',
+              variant === 'slip' && 'size-12',
             )}
           >
             <RequestThumb request={request} />

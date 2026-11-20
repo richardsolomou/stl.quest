@@ -784,9 +784,10 @@ export function Board({
         className="@min-[960px]:hidden"
         stages={workflow.statuses.map(({ id }) => ({ id, label: statusText(t, 'label', id), total: totalOf(id) }))}
       />
+      {/* The side columns keep their laptop width and widen only on large screens, so the centre column is never squeezed. */}
       <div
         ref={lanesRef}
-        className="grid min-h-0 flex-1 gap-4 p-3 @max-[959px]:snap-x @max-[959px]:snap-mandatory @max-[959px]:scroll-px-3 @max-[959px]:auto-cols-[min(86cqw,24rem)] @max-[959px]:grid-flow-col @max-[959px]:overflow-x-auto @min-[960px]:grid-cols-[minmax(14rem,17rem)_minmax(22rem,1fr)_minmax(13rem,15rem)]"
+        className="grid min-h-0 flex-1 gap-4 p-3 @max-[959px]:snap-x @max-[959px]:snap-mandatory @max-[959px]:scroll-px-3 @max-[959px]:auto-cols-[min(86cqw,24rem)] @max-[959px]:grid-flow-col @max-[959px]:overflow-x-auto @min-[960px]:grid-cols-[minmax(14rem,clamp(17rem,22cqw,21rem))_minmax(22rem,1fr)_minmax(13rem,clamp(15rem,20cqw,19rem))]"
       >
         {zone('todo', 'list', pass.queueDetail(new Set(entriesOf('todo').map(({ request }) => request.id)).size))}
         <div className="app-scrollbar flex min-h-0 min-w-0 flex-col gap-4 overflow-x-hidden overflow-y-auto overscroll-y-contain @max-[959px]:contents">
