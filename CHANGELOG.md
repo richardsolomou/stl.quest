@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.52.2
+
+### Patch Changes
+
+- 36a6eee: Require a configured public URL for account emails, protect workspace credentials and membership, and limit upload and model processing resources.
+
 ## 1.52.1
 
 ### Patch Changes
