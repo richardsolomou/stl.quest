@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.0.0
+
+### Major Changes
+
+- 0c18cea: Back up your data before upgrading, because version 2 moves calculator costing onto printers and consumables and stores printers, equipment, and consumables in their own tables in a one-way upgrade that only that backup can undo; quotes now itemise printer wear and supplies instead of adding the old flat hourly and per-plate charges, and a print still assigned to a printer that was removed loses that assignment.
+
+### Minor Changes
+
+- 0c18cea: Redesign the hosted landing and legal pages in the app's new look, with real screenshots in light and dark, a copy-tracking demo, and sections on catalogues, quotes, usage tracking, and hosted plans.
+- 0c18cea: Redesign the board as an expo pass, with the queue as a backlog, up-next tickets on a rail, printing grouped by printer, finishing and ready shelves, stage tabs on phones, a selection bar for bulk actions and price estimates, and a Start button that asks which printer, so that you can see what to print next and start it in one click.
+- 0c18cea: Price quotes from the printer, material, and equipment a job uses, with business rates in Settings → Pricing, measured printing power, and a typical printer wear until a printer has its purchase price, and move material prices and custom printer costs from the old calculator onto your consumables and printers when you upgrade; quotes no longer add the old flat hourly and per-plate charges, so upgraded quotes may come out lower.
+- 0c18cea: Regroup settings by task into pages that save as you edit, and add printers, equipment, resins, filaments with their colours, and wear parts for each printer model from searchable catalogues, so that you only fill in prices and what you own.
+- 0c18cea: Add optional usage and stock tracking in General settings that asks what each print used as it moves into printing or finishing, then keeps stock and reorder levels, wear-part maintenance, each print's actual cost, and spend per currency, so that you know what to buy and what jobs really cost.
+
+### Patch Changes
+
+- 0c18cea: Shorten the onboarding quest, open dialogs full screen on phones, and load printer and material catalogues only when they are needed, so that the app is quicker to learn and lighter on small devices.
+
 ## 1.52.2
 
 ### Patch Changes
