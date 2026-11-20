@@ -1,0 +1,1 @@
+ALTER TABLE "usage_events" ADD COLUMN "estimated" integer DEFAULT 0 NOT NULL;

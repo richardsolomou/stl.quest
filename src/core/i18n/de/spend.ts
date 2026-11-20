@@ -27,6 +27,28 @@ export const spend: typeof en = {
     failed: 'Fehldrucke',
     wasted: 'Verworfener Bestand',
     share: (percent) => `${percent} der Ausgaben`,
+    estimated: (amount) => `Davon ${amount} aus Druckschätzungen geschätzt.`,
+    slicer: (amount) => `${amount} stammen aus deinem Slicer.`,
+    earned: 'Eingenommen',
+    earnedNote: (count) => `${count} ${count === 1 ? 'Druck' : 'Drucke'} mit Betrag fertig`,
+    profit: 'Gewinn',
+    profitNote: (spent) => `Gezählt, wenn ein Druck fertig war, gegen alles, was er verbraucht hat: ${spent}.`,
+    noCharges:
+      'In diesem Zeitraum wurde kein Druck mit Betrag fertig. Erfasse in den Details eines Drucks, was du berechnet hast; er zählt, sobald sein Verbrauch erfasst ist.',
+  },
+  estimated: 'Geschätzt',
+  fromSlicer: 'Aus deinem Slicer',
+  backfill: {
+    action: 'Aus früheren Drucken ergänzen',
+    since: (prints, month) => `${prints} ${prints === 1 ? 'Druck' : 'Drucke'} seit ${month}`,
+    whatItDoes: 'Was das macht',
+    explanation:
+      'Drucke, die vor dem Einschalten der Erfassung fertig wurden, haben keinen Verbrauch. Dies erfasst für jeden den Druck aus seiner Schätzung, auf seinem Drucker mit Ihrem ersten Material seiner Druckart, zu heutigen Preisen und mit dem Datum, an dem er fertig wurde. Das zählt als Ausgabe, als geschätzt markiert, ändert aber nie Bestand oder Teileverschleiß.',
+    filled: (prints) => `${prints} ${prints === 1 ? 'früherer Druck ergänzt' : 'frühere Drucke ergänzt'}.`,
+    failed: 'Frühere Drucke konnten nicht ergänzt werden.',
+    undo: 'Rückgängig',
+    undone: 'Ergänzte Drucke entfernt.',
+    undoFailed: 'Ergänzte Drucke konnten nicht entfernt werden.',
   },
   trend: {
     title: 'Ausgaben im Zeitverlauf',
@@ -69,6 +91,7 @@ export const spend: typeof en = {
     cost: 'Ausgegeben',
     removed: 'Entfernter Druck',
     failed: 'Mit Fehldruck',
+    profit: (amount) => `${amount} Gewinn`,
   },
   unpriced: (count) =>
     `${count} ${count === 1 ? 'Verbrauch hat' : 'Verbräuche haben'} keinen Preis und ${count === 1 ? 'zählt' : 'zählen'} als nichts. Preise festlegen unter`,

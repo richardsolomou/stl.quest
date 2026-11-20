@@ -1,0 +1,274 @@
+import { wearPartsFor, type Consumable } from './consumables'
+import { printerCostPerMinute, type CostedPrinter, type PriceCalculatorSettings } from './priceCalculator'
+import { consumed, priced, supplied, type UsageDraft, type UsageEvent } from './usage'
+
+/**
+ * A plate is what went on one run of a printer. The slicer knows the run's totals, and a labelled slicer file knows what
+ * each object on it used, so recording a plate splits the run across its prints: by the slicer's own per-object amounts
+ * when the file has them, otherwise by each print's model volume, then its material estimate, then evenly by copies.
+ * Print time follows each print's share of the material. What the plate's prints did not use (objects that are not in
+ * STL Quest) is recorded without a print, so stock and spend still count it but no print is charged for it.
+ */
+
+export const MAX_PLATE_PRINTS = 100
+export const MAX_PLATE_OBJECTS = 1_000
+export const MAX_PLATE_FILAMENTS = 32
+
+export const PLATE_SPLIT_METHODS = ['measured', 'volume', 'estimate', 'even'] as const
+export type PlateSplitMethod = (typeof PLATE_SPLIT_METHODS)[number]
+export const PLATE_SOURCES = ['file', 'totals'] as const
+export type PlateSource = (typeof PLATE_SOURCES)[number]
+
+export type PlateItem = { requestId: string; copies: number; amount?: number; minutes?: number }
+
+export type PlateRecording = {
+  transactionId: string
+  source: PlateSource
+  method: PlateSplitMethod
+  unit: 'g' | 'ml'
+  minutes: number
+  /** Material on the plate that no print used, overhead share included. */
+  otherAmount: number
+  /** Material extruded outside any object (purge, prime tower, flushing), already spread into the amounts. */
+  overheadAmount: number
+  recordedAt: number
+}
+
+export type Plate = {
+  id: string
+  number: number
+  printerId?: string
+  /** Things not in STL Quest share the plate, so typed totals keep a share of it unattributed. */
+  otherStuff: boolean
+  items: PlateItem[]
+  recording?: PlateRecording
+  createdAt: number
+  updatedAt: number
+}
+
+/** A library material, or one outside the library named and priced on the spot (per kg of filament or litre of resin). */
+export type PlateMaterialChoice = { consumableId: string } | { name: string; price?: number }
+
+/** A slicer file's amounts: each object's material per filament slot, assigned to a print or to none. */
+export type PlateMeasured = { objects: { requestId?: string; amounts: number[] }[]; overhead: number[] }
+/** A plate total typed from the slicer summary, with the share of it that went to things not in STL Quest. */
+export type PlateTotals = { total: number; otherShare: number }
+
+export type PlateRecordInput = { plateId: string; minutes: number; materials: PlateMaterialChoice[] } & (PlateMeasured | PlateTotals)
+
+export function isMeasured(input: PlateMeasured | PlateTotals): input is PlateMeasured {
+  return 'objects' in input
+}
+
+/** What a print on the plate can be weighed by when the slicer did not say what it used. */
+export type PlatePrint = { requestId: string; copies: number; volumeMm3?: number; estimatedMaterial?: number }
+
+export type PlateSplit = {
+  method: PlateSplitMethod
+  prints: { requestId: string; copies: number; amounts: number[]; minutes: number }[]
+  other: { amounts: number[]; minutes: number }
+  overhead: number
+}
+
+const MODEL_EXTENSION = /\.(stl|3mf|obj|step|stp|amf|ply|oltp)(?=$|[^a-z0-9])/i
+/** What slicers append to a cut or duplicated object: `_A`, `_B_A`, ` (2)`, `-1`. */
+const SLICER_SUFFIX = /(?:_[a-z]|\s*\(\d+\)|-\d+)+$/i
+
+/**
+ * A slicer object's name reduced to the model it came from: lower case, without a folder, and without the extension
+ * or anything a cut, connector, or copy added after it.
+ */
+export function slicedObjectStem(label: string) {
+  const name = label.trim().split(/[\\/]/).at(-1) ?? ''
+  const extension = MODEL_EXTENSION.exec(name)
+  const stem = extension ? name.slice(0, extension.index) : name.replace(SLICER_SUFFIX, '')
+  return stem.trim().toLowerCase()
+}
+
+/**
+ * The print each object belongs to, by its model's file name, or else the print's name; when several fit, the longest
+ * name wins, so `Hull_Bolter` is not taken for `Hull`.
+ */
+export function matchSlicedObjects(
+  objects: { name?: string }[],
+  prints: { requestId: string; name: string; fileName?: string }[],
+): (string | undefined)[] {
+  const stems = prints
+    .flatMap(({ requestId, name, fileName }) => [
+      ...(fileName ? [{ requestId, stem: slicedObjectStem(fileName) }] : []),
+      { requestId, stem: slicedObjectStem(name) },
+    ])
+    .filter(({ stem }) => stem)
+    .sort((left, right) => right.stem.length - left.stem.length)
+  return objects.map(({ name }) => {
+    if (!name) return undefined
+    const stem = slicedObjectStem(name)
+    return stems.find((candidate) => candidate.stem === stem)?.requestId
+  })
+}
+
+/** How the prints share a plate total: by model volume when all have one, else by estimate, else by copies. */
+export function splitWeights(prints: PlatePrint[]): { method: Exclude<PlateSplitMethod, 'measured'>; weights: number[] } {
+  if (prints.every(({ volumeMm3 }) => positive(volumeMm3)))
+    return { method: 'volume', weights: prints.map(({ volumeMm3, copies }) => volumeMm3! * copies) }
+  if (prints.every(({ estimatedMaterial }) => positive(estimatedMaterial)))
+    return { method: 'estimate', weights: prints.map(({ estimatedMaterial, copies }) => estimatedMaterial! * copies) }
+  return { method: 'even', weights: prints.map(({ copies }) => copies) }
+}
+
+/** Splits the plate's material per filament slot and its time across the prints, keeping other stuff's share apart. */
+export function splitPlate(input: PlateMeasured | PlateTotals, minutes: number, prints: PlatePrint[], slots: number): PlateSplit {
+  const zero = () => Array.from({ length: slots }, () => 0)
+  const amounts = prints.map(zero)
+  const other = zero()
+  const index = new Map(prints.map(({ requestId }, position) => [requestId, position]))
+  let method: PlateSplitMethod = 'measured'
+  let overhead = 0
+  if (isMeasured(input)) {
+    for (let slot = 0; slot < slots; slot++) {
+      for (const object of input.objects) {
+        const amount = Math.max(0, object.amounts[slot] ?? 0)
+        const position = object.requestId === undefined ? undefined : index.get(object.requestId)
+        if (position === undefined) other[slot] += amount
+        else amounts[position][slot] += amount
+      }
+      const spread = Math.max(0, input.overhead[slot] ?? 0)
+      overhead += spread
+      const used = amounts.reduce((total, print) => total + print[slot], other[slot])
+      // A slot used only for purging takes the shares the prints have across every slot.
+      const shares = used > 0 ? [...amounts.map((print) => print[slot]), other[slot]] : [...amounts.map(sum), sum(other)]
+      const total = sum(shares)
+      shares.forEach((share, position) => {
+        const part = total > 0 ? (spread * share) / total : position === shares.length - 1 ? spread : 0
+        if (position < amounts.length) amounts[position][slot] += part
+        else other[slot] += part
+      })
+    }
+  } else {
+    const { method: weighed, weights } = splitWeights(prints)
+    method = weighed
+    const attributed = input.total * (1 - input.otherShare)
+    const weight = sum(weights)
+    weights.forEach((share, position) => (amounts[position][0] = weight > 0 ? (attributed * share) / weight : 0))
+    other[0] = input.total - (weight > 0 ? attributed : 0)
+  }
+  const material = amounts.reduce((total, print) => total + sum(print), sum(other))
+  const copies = sum(prints.map((print) => print.copies))
+  const minutesOf = (share: number, copyShare: number) =>
+    material > 0 ? (minutes * share) / material : copies > 0 ? minutes * copyShare : 0
+  return {
+    method,
+    prints: prints.map((print, position) => ({
+      requestId: print.requestId,
+      copies: print.copies,
+      amounts: amounts[position],
+      minutes: minutesOf(sum(amounts[position]), print.copies / copies),
+    })),
+    other: { amounts: other, minutes: minutesOf(sum(other), 0) },
+    overhead,
+  }
+}
+
+/**
+ * The events a recorded plate appends: per print and for what is not in STL Quest, the printer's minutes, its wear parts
+ * (by the minute, or by the plate in proportion to the share of the run), and the material of each slot.
+ */
+export function plateUsageDrafts(
+  split: PlateSplit,
+  resolved: {
+    plateId: string
+    rates: Pick<PriceCalculatorSettings, 'electricityPricePerKwh'>
+    printer?: CostedPrinter
+    /** The material of each filament slot. */
+    materials: Consumable[]
+    consumables: Consumable[]
+  },
+): UsageDraft[] {
+  const { plateId, rates, printer } = resolved
+  const wear = printer ? wearPartsFor(resolved.consumables, printer.printType, printer) : []
+  const runMinutes = split.prints.reduce((total, print) => total + print.minutes, split.other.minutes)
+  const shares = [...split.prints, { requestId: undefined, copies: undefined, ...split.other }]
+  return shares.flatMap(({ requestId, copies, amounts, minutes }) => {
+    const base = { stage: 'printing' as const, kind: 'use' as const, plateId, ...(requestId && { requestId, copies }) }
+    const drafts: UsageDraft[] = []
+    if (printer && minutes > 0) {
+      drafts.push({ ...base, printerId: printer.id, amount: minutes, unit: 'minute', ...priced(printerCostPerMinute(rates, printer)) })
+      for (const part of wear) {
+        const used = supplied(part)
+        const amount = used.unit === 'plate' ? (runMinutes > 0 ? minutes / runMinutes : 0) : minutes
+        if (amount > 0) drafts.push({ ...base, printerId: printer.id, ...used, amount })
+      }
+    }
+    amounts.forEach((amount, slot) => {
+      const material = resolved.materials[slot]
+      if (material && amount > 0) drafts.push({ ...base, ...(printer && { printerId: printer.id }), ...consumed(material), amount })
+    })
+    return drafts
+  })
+}
+
+/** A print's live step-sheet or filled-in printing usage, by transaction, newest first. */
+function printingSteps(events: UsageEvent[], requestId: string) {
+  const steps = new Map<string, { ids: string[]; copies: number; createdAt: number }>()
+  for (const event of events) {
+    if (
+      event.requestId !== requestId ||
+      event.stage !== 'printing' ||
+      event.kind !== 'use' ||
+      event.undoneAt ||
+      event.plateId ||
+      event.outcome === 'failed'
+    )
+      continue
+    const step = steps.get(event.transactionId) ?? { ids: [], copies: event.copies ?? 0, createdAt: event.createdAt }
+    step.ids.push(event.id)
+    steps.set(event.transactionId, step)
+  }
+  return [...steps.values()].sort((left, right) => right.createdAt - left.createdAt)
+}
+
+/** Copies of a print whose earlier printing usage the plate's transaction already replaced. */
+function coveredCopies(events: UsageEvent[], requestId: string, transactionId: string) {
+  const covered = new Map<string, number>()
+  for (const event of events)
+    if (event.requestId === requestId && event.supersededBy === transactionId) covered.set(event.transactionId, event.copies ?? 0)
+  return sum([...covered.values()])
+}
+
+/**
+ * The plate's measured numbers win: recording it replaces the print's printing usage from the step sheet or a fill-in
+ * for the copies on the plate, newest step first, taking only steps whose copies all fit, so usage of other copies and
+ * failed runs stay. `events` is the print's printing usage, undone events included.
+ */
+export function supersededByPlate(events: UsageEvent[], requestId: string, copies: number, transactionId: string) {
+  let remaining = copies - coveredCopies(events, requestId, transactionId)
+  const ids: string[] = []
+  for (const step of printingSteps(events, requestId)) {
+    if (step.copies < 1 || step.copies > remaining) continue
+    ids.push(...step.ids)
+    remaining -= step.copies
+  }
+  return ids
+}
+
+/**
+ * The transaction of the recorded plate a printing step recorded after it belongs to, so the step is kept but never
+ * counted: the newest plate holding the print with enough of its copies not yet matched to a step.
+ */
+export function coveringPlateTransaction(plates: Plate[], events: UsageEvent[], requestId: string, copies: number) {
+  return [...plates]
+    .sort((left, right) => (right.recording?.recordedAt ?? 0) - (left.recording?.recordedAt ?? 0))
+    .flatMap((plate) => {
+      const transactionId = plate.recording?.transactionId
+      const item = plate.items.find((candidate) => candidate.requestId === requestId)
+      return transactionId && item && item.copies - coveredCopies(events, requestId, transactionId) >= copies ? [transactionId] : []
+    })[0]
+}
+
+function sum(values: number[]) {
+  return values.reduce((total, value) => total + value, 0)
+}
+
+function positive(value?: number): value is number {
+  return value !== undefined && Number.isFinite(value) && value > 0
+}

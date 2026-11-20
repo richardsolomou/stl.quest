@@ -1,7 +1,8 @@
 import type { PriceCalculatorCurrency } from '../../core/priceCalculator'
 import type { AssetGenerationJob, Invite, OperationPayload, PrintRequest } from '../../core/types'
+import type { Plate } from '../../core/plates'
 import type { UsageEvent } from '../../core/usage'
-import { assetGenerationJobs, invites, requests, requestStatuses, usageEvents, user } from '../schema'
+import { assetGenerationJobs, invites, plateItems, plates, requests, requestStatuses, usageEvents, user } from '../schema'
 
 export type RequestRow = typeof requests.$inferSelect & {
   ownerEmail: string
@@ -54,6 +55,44 @@ export function mapUsageEvent(row: typeof usageEvents.$inferSelect): UsageEvent 
     userId: row.userId ?? undefined,
     createdAt: row.createdAt,
     undoneAt: row.undoneAt ?? undefined,
+    ...(row.estimated && { estimated: true }),
+    ...(row.plateId && { plateId: row.plateId }),
+    ...(row.supersededBy && { supersededBy: row.supersededBy }),
+  }
+}
+
+export function mapPlate(row: typeof plates.$inferSelect, items: (typeof plateItems.$inferSelect)[]): Plate {
+  const { transactionId, source, method, unit, minutes, recordedAt } = row
+  return {
+    id: row.id,
+    number: row.number,
+    ...(row.printerId && { printerId: row.printerId }),
+    otherStuff: row.otherStuff,
+    items: items.map((item) => ({
+      requestId: item.requestId,
+      copies: item.copies,
+      ...(item.amount !== null && { amount: item.amount }),
+      ...(item.minutes !== null && { minutes: item.minutes }),
+    })),
+    ...(transactionId &&
+      source &&
+      method &&
+      unit &&
+      minutes !== null &&
+      recordedAt !== null && {
+        recording: {
+          transactionId,
+          source,
+          method,
+          unit,
+          minutes,
+          otherAmount: row.otherAmount ?? 0,
+          overheadAmount: row.overheadAmount ?? 0,
+          recordedAt,
+        },
+      }),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   }
 }
 
@@ -100,6 +139,10 @@ export function mapRequest(row: RequestRow, states: RequestStatusRow[]): PrintRe
     hasThumbnail: row.thumbnailPath !== null,
     archivedAt: row.archivedAt ?? undefined,
     unarchivedAt: row.unarchivedAt ?? undefined,
+    ...(row.chargedAmount !== null &&
+      row.chargedCurrency !== null && {
+        charged: { amount: row.chargedAmount, currency: row.chargedCurrency as PriceCalculatorCurrency },
+      }),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     counts: Object.fromEntries(states.map((state) => [state.statusId, state.quantity])),

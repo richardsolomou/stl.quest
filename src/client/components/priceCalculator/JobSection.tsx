@@ -1,11 +1,14 @@
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { cn } from '@/lib/utils'
 import type { PriceCalculatorJob, PrintCost } from '../../../core/priceCalculator'
 import type { PrintType } from '../../../core/types'
 import { useI18n } from '../../i18n'
 import { Docket } from '../settings/SettingsLayout'
 import { NumberInput } from './fields'
 import { formatNumber } from './format'
+
+const jobRow = 'row-span-3 grid grid-rows-subgrid gap-y-2'
 
 /** The slicer's totals and the hands-on time: the amounts the quote multiplies its cost basis by. */
 export function JobSection({
@@ -66,9 +69,11 @@ export function JobSection({
               : copy.filamentHint}
           </FieldDescription>
         </Field>
-        {/* Inputs side by side line up even when one label wraps at phone width. */}
-        <Field className="justify-end">
-          <FieldLabel htmlFor="calculator-hours">{copy.printHours}</FieldLabel>
+        {/* The three share label, input, and hint rows, so the inputs line up when a label wraps or one has a hint. */}
+        <Field className={jobRow}>
+          <FieldLabel htmlFor="calculator-hours" className="self-end">
+            {copy.printHours}
+          </FieldLabel>
           <NumberInput
             id="calculator-hours"
             value={job.printHours}
@@ -77,8 +82,10 @@ export function JobSection({
             onChange={(printHours) => onJobChange({ ...job, printHours })}
           />
         </Field>
-        <Field className="justify-end">
-          <FieldLabel htmlFor="calculator-plates">{copy.plateRuns}</FieldLabel>
+        <Field className={jobRow}>
+          <FieldLabel htmlFor="calculator-plates" className="self-end">
+            {copy.plateRuns}
+          </FieldLabel>
           <NumberInput
             id="calculator-plates"
             value={job.plates}
@@ -87,8 +94,10 @@ export function JobSection({
             onChange={(plates) => onJobChange({ ...job, plates: Math.round(plates) })}
           />
         </Field>
-        <Field className="col-span-2 sm:col-span-1">
-          <FieldLabel htmlFor="calculator-labour">{copy.handsOnTime}</FieldLabel>
+        <Field className={cn(jobRow, 'col-span-2 sm:col-span-1')}>
+          <FieldLabel htmlFor="calculator-labour" className="self-end">
+            {copy.handsOnTime}
+          </FieldLabel>
           <NumberInput
             id="calculator-labour"
             value={job.handsOnMinutes}

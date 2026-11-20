@@ -20,6 +20,7 @@ import type {
   AssetGenerationOutcome,
   AssetGenerationStage,
   ModelDimensions,
+  PrintCharge,
   PrintType,
   WorkspaceRole,
   WorkspaceSummary,
@@ -62,6 +63,8 @@ import {
   settings,
   uploadSessions,
   usageEvents,
+  plateItems,
+  plates,
   printers,
   managedStorageAccounts,
   managedStorageUsage,
@@ -78,6 +81,7 @@ import { normalizeOnboardingTasks, onboardingTaskScope, type OnboardingProgress 
 import {
   mapAssetGenerationJob,
   mapInvite,
+  mapPlate,
   mapRequest,
   mapUsageEvent,
   mapUserIdentity,
@@ -85,6 +89,8 @@ import {
   type RequestRow,
 } from './repository/mappers'
 import { MAX_USAGE_LIST, type UsageEvent, type UsageFilters } from '../core/usage'
+import type { PriceCalculatorCurrency } from '../core/priceCalculator'
+import type { Plate, PlateItem, PlateRecording } from '../core/plates'
 import { inventoryColumns, inventoryItem, inventoryTables } from './repository/inventory'
 import { requestConditions, requestOrderBy, requestSelection, type RequestFilterOptions } from './repository/requestQuery'
 
@@ -95,6 +101,17 @@ const silentLog: MigrationLog = { info: () => undefined, warn: () => undefined }
 type InventoryTable = typeof printers
 const MANAGED_STORAGE_DELETION_QUEUE = 'managed-storage-deletion-queue'
 const MANAGED_STORAGE_HOLDER_ATTEMPTS = 5
+const USAGE_INSERT_BATCH = 500
+const UNRECORDED_PLATE = {
+  transactionId: null,
+  source: null,
+  method: null,
+  unit: null,
+  minutes: null,
+  otherAmount: null,
+  overheadAmount: null,
+  recordedAt: null,
+}
 
 class ManagedStorageHolderMoved extends Error {}
 
@@ -2473,12 +2490,40 @@ export class DrizzleRepository implements Repository {
   async appendUsageEvents(events: UsageEvent[]) {
     if (events.length === 0) return
     const workspaceId = await this.workspace()
-    await this.database.transaction(async (tx) => {
+    await this.database.transaction(async (tx) => await this.insertUsageEvents(tx, workspaceId, events))
+  }
+
+  async appendUsageBackfill(events: UsageEvent[]) {
+    const workspaceId = await this.workspace()
+    return await this.database.transaction(async (tx) => {
+      const recorded = new Set(await this.usageRequestIdsWith(tx, workspaceId))
+      const fresh = events.filter((event) => event.requestId && !recorded.has(event.requestId))
+      await this.insertUsageEvents(tx, workspaceId, fresh)
+      return fresh
+    })
+  }
+
+  async usageRequestIds() {
+    return await this.usageRequestIdsWith(this.database, await this.workspace())
+  }
+
+  private async usageRequestIdsWith(database: DatabaseExecutor, workspaceId: string) {
+    const rows = await database
+      .selectDistinct({ requestId: usageEvents.requestId })
+      .from(usageEvents)
+      .where(and(eq(usageEvents.workspaceId, workspaceId), isNotNull(usageEvents.requestId), isNull(usageEvents.undoneAt)))
+      .all()
+    return rows.flatMap(({ requestId }) => (requestId ? [requestId] : []))
+  }
+
+  /** Inserts in slices, since a backfill of a whole history would exceed the bound parameters one statement may carry. */
+  private async insertUsageEvents(tx: DatabaseTransaction, workspaceId: string, events: UsageEvent[]) {
+    for (let start = 0; start < events.length; start += USAGE_INSERT_BATCH) {
       await tx
         .insert(usageEvents)
-        .values(events.map((event) => ({ ...event, workspaceId })))
+        .values(events.slice(start, start + USAGE_INSERT_BATCH).map((event) => ({ ...event, workspaceId })))
         .run()
-    })
+    }
   }
 
   async listUsage(filters: UsageFilters) {
@@ -2514,21 +2559,248 @@ export class DrizzleRepository implements Repository {
         amount: sql<number>`coalesce(sum(${usageEvents.amount}), 0)`.mapWith(Number),
       })
       .from(usageEvents)
-      .where(and(eq(usageEvents.workspaceId, workspaceId), isNotNull(usageEvents.consumableId), isNull(usageEvents.undoneAt)))
+      .where(
+        and(
+          eq(usageEvents.workspaceId, workspaceId),
+          isNotNull(usageEvents.consumableId),
+          isNull(usageEvents.undoneAt),
+          eq(usageEvents.estimated, false),
+        ),
+      )
       .groupBy(usageEvents.consumableId, usageEvents.kind, usageEvents.unit)
       .all()
     return rows.flatMap(({ consumableId, ...total }) => (consumableId ? [{ consumableId, ...total }] : []))
   }
 
+  async chargedPrints(currency: PriceCalculatorCurrency) {
+    const workspaceId = await this.workspace()
+    const rows = await this.database
+      .select({
+        requestId: requests.id,
+        amount: requests.chargedAmount,
+        currency: requests.chargedCurrency,
+        cost: sql<number>`coalesce(sum(${usageEvents.amount} * ${usageEvents.unitPrice}), 0)`.mapWith(Number),
+        finishedAt: max(usageEvents.createdAt),
+      })
+      .from(requests)
+      .leftJoin(
+        usageEvents,
+        and(
+          eq(usageEvents.workspaceId, requests.workspaceId),
+          eq(usageEvents.requestId, requests.id),
+          isNull(usageEvents.undoneAt),
+          inArray(usageEvents.kind, ['use', 'waste', 'replace']),
+          or(isNull(usageEvents.currency), eq(usageEvents.currency, currency)),
+        ),
+      )
+      .where(and(eq(requests.workspaceId, workspaceId), isNotNull(requests.chargedAmount), isNotNull(requests.chargedCurrency)))
+      .groupBy(requests.id, requests.chargedAmount, requests.chargedCurrency)
+      .all()
+    return rows.flatMap(({ requestId, amount, currency: charged, cost, finishedAt }) =>
+      amount === null || charged === null
+        ? []
+        : [
+            {
+              requestId,
+              charged: { amount, currency: charged as PriceCalculatorCurrency },
+              cost,
+              ...(finishedAt !== null && { finishedAt }),
+            },
+          ],
+    )
+  }
+
   async undoUsageTransaction(transactionId: string, undoneAt: number) {
     const workspaceId = await this.workspace()
-    return (
-      await this.database
+    return await this.database.transaction(async (tx) => await this.undoUsageWith(tx, workspaceId, transactionId, undoneAt))
+  }
+
+  private async undoUsageWith(tx: DatabaseExecutor, workspaceId: string, transactionId: string, undoneAt: number) {
+    const undone = (
+      await tx
         .update(usageEvents)
         .set({ undoneAt })
         .where(and(eq(usageEvents.workspaceId, workspaceId), eq(usageEvents.transactionId, transactionId), isNull(usageEvents.undoneAt)))
         .run()
     ).changes
+    await tx
+      .update(usageEvents)
+      .set({ undoneAt: null, supersededBy: null })
+      .where(and(eq(usageEvents.workspaceId, workspaceId), eq(usageEvents.supersededBy, transactionId)))
+      .run()
+    const recorded = and(eq(plates.workspaceId, workspaceId), eq(plates.transactionId, transactionId))
+    const plate = await tx.select({ id: plates.id }).from(plates).where(recorded).get()
+    if (plate) {
+      await tx
+        .update(plates)
+        .set({ ...UNRECORDED_PLATE, updatedAt: undoneAt })
+        .where(recorded)
+        .run()
+      await tx
+        .update(plateItems)
+        .set({ amount: null, minutes: null })
+        .where(and(eq(plateItems.workspaceId, workspaceId), eq(plateItems.plateId, plate.id)))
+        .run()
+    }
+    return undone
+  }
+
+  async printingUsage(requestIds: string[]) {
+    return await this.printingUsageWith(this.database, await this.workspace(), requestIds)
+  }
+
+  private async printingUsageWith(database: DatabaseExecutor, workspaceId: string, requestIds: string[]) {
+    if (requestIds.length === 0) return []
+    const rows = await database
+      .select()
+      .from(usageEvents)
+      .where(
+        and(
+          eq(usageEvents.workspaceId, workspaceId),
+          inArray(usageEvents.requestId, requestIds),
+          eq(usageEvents.stage, 'printing'),
+          eq(usageEvents.kind, 'use'),
+        ),
+      )
+      .all()
+    return rows.map(mapUsageEvent)
+  }
+
+  async listPlates() {
+    return await this.platesWith(this.database, await this.workspace())
+  }
+
+  private async platesWith(database: DatabaseExecutor, workspaceId: string, id?: string) {
+    const rows = await database
+      .select()
+      .from(plates)
+      .where(and(eq(plates.workspaceId, workspaceId), id === undefined ? undefined : eq(plates.id, id)))
+      .orderBy(desc(plates.number))
+      .all()
+    if (rows.length === 0) return []
+    const items = await database
+      .select()
+      .from(plateItems)
+      .where(
+        and(
+          eq(plateItems.workspaceId, workspaceId),
+          inArray(
+            plateItems.plateId,
+            rows.map((row) => row.id),
+          ),
+        ),
+      )
+      .all()
+    return rows.map((row) =>
+      mapPlate(
+        row,
+        items.filter((item) => item.plateId === row.id),
+      ),
+    )
+  }
+
+  async createPlate(plate: { id: string; printerId?: string; otherStuff: boolean; items: PlateItem[]; createdAt: number }) {
+    const workspaceId = await this.workspace()
+    return await this.database.transaction(async (tx) => {
+      await this.lockWorkspace(tx, workspaceId)
+      const last = await tx
+        .select({ number: sql<number>`coalesce(max(${plates.number}), 0)`.mapWith(Number) })
+        .from(plates)
+        .where(eq(plates.workspaceId, workspaceId))
+        .get()
+      await tx
+        .insert(plates)
+        .values({
+          id: plate.id,
+          workspaceId,
+          number: (last?.number ?? 0) + 1,
+          printerId: plate.printerId ?? null,
+          otherStuff: plate.otherStuff,
+          createdAt: plate.createdAt,
+          updatedAt: plate.createdAt,
+        })
+        .run()
+      await tx
+        .insert(plateItems)
+        .values(plate.items.map(({ requestId, copies }) => ({ workspaceId, plateId: plate.id, requestId, copies })))
+        .run()
+      return (await this.platesWith(tx, workspaceId, plate.id))[0]
+    })
+  }
+
+  async deletePlate(id: string, undoneAt: number) {
+    const workspaceId = await this.workspace()
+    return await this.database.transaction(async (tx) => {
+      const [plate] = await this.platesWith(tx, workspaceId, id)
+      if (!plate) return false
+      if (plate.recording) await this.undoUsageWith(tx, workspaceId, plate.recording.transactionId, undoneAt)
+      await tx
+        .delete(plates)
+        .where(and(eq(plates.workspaceId, workspaceId), eq(plates.id, id)))
+        .run()
+      return true
+    })
+  }
+
+  async recordPlate(
+    id: string,
+    at: number,
+    record: (
+      plate: Plate,
+      printing: UsageEvent[],
+    ) => { recording: PlateRecording; items: PlateItem[]; events: UsageEvent[]; superseded: string[] },
+  ) {
+    const workspaceId = await this.workspace()
+    return await this.database.transaction(async (tx) => {
+      // Recording reads the prints' usage and replaces some of it, so two recordings must not interleave.
+      await this.lockWorkspace(tx, workspaceId)
+      let [plate] = await this.platesWith(tx, workspaceId, id)
+      if (!plate) return undefined
+      if (plate.recording) {
+        await this.undoUsageWith(tx, workspaceId, plate.recording.transactionId, at)
+        ;[plate] = await this.platesWith(tx, workspaceId, id)
+      }
+      const printing = await this.printingUsageWith(
+        tx,
+        workspaceId,
+        plate.items.map(({ requestId }) => requestId),
+      )
+      const { recording, items, events, superseded } = record(plate, printing)
+      for (let start = 0; start < superseded.length; start += USAGE_INSERT_BATCH) {
+        await tx
+          .update(usageEvents)
+          .set({ undoneAt: at, supersededBy: recording.transactionId })
+          .where(
+            and(
+              eq(usageEvents.workspaceId, workspaceId),
+              inArray(usageEvents.id, superseded.slice(start, start + USAGE_INSERT_BATCH)),
+              isNull(usageEvents.undoneAt),
+            ),
+          )
+          .run()
+      }
+      await this.insertUsageEvents(tx, workspaceId, events)
+      await tx
+        .update(plates)
+        .set({ ...recording, updatedAt: at })
+        .where(and(eq(plates.workspaceId, workspaceId), eq(plates.id, id)))
+        .run()
+      for (const item of items)
+        await tx
+          .update(plateItems)
+          .set({ amount: item.amount ?? null, minutes: item.minutes ?? null })
+          .where(and(eq(plateItems.workspaceId, workspaceId), eq(plateItems.plateId, id), eq(plateItems.requestId, item.requestId)))
+          .run()
+      return (await this.platesWith(tx, workspaceId, id))[0]
+    })
+  }
+
+  async setRequestCharge(id: string, charged: PrintCharge | null) {
+    await this.database
+      .update(requests)
+      .set({ chargedAmount: charged?.amount ?? null, chargedCurrency: charged?.currency ?? null })
+      .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, id)))
+      .run()
   }
 
   async listInventory<Kind extends InventoryKind>(kind: Kind) {

@@ -27,6 +27,28 @@ export const spend: typeof en = {
     failed: 'Impressions ratées',
     wasted: 'Stock perdu',
     share: (percent) => `${percent} des dépenses`,
+    estimated: (amount) => `Dont ${amount} estimés d’après les estimations d’impression.`,
+    slicer: (amount) => `${amount} viennent de votre trancheur.`,
+    earned: 'Encaissé',
+    earnedNote: (count) => `${count} ${count === 1 ? 'impression facturée terminée' : 'impressions facturées terminées'}`,
+    profit: 'Marge',
+    profitNote: (spent) => `Comptée à la fin de chaque impression, face à tout ce qu’elle a consommé : ${spent}.`,
+    noCharges:
+      'Aucune impression facturée ne s’est terminée sur cette période. Renseignez ce que vous avez facturé dans le détail d’une impression ; elle compte dès que sa consommation est enregistrée.',
+  },
+  estimated: 'Estimé',
+  fromSlicer: 'D’après votre trancheur',
+  backfill: {
+    action: 'Compléter à partir des impressions passées',
+    since: (prints, month) => `${prints} ${prints === 1 ? 'impression' : 'impressions'} depuis ${month}`,
+    whatItDoes: 'Ce que cela fait',
+    explanation:
+      'Les impressions terminées avant l’activation du suivi n’ont aucune consommation. Ceci enregistre l’impression de chacune d’après son estimation, sur son imprimante avec votre premier matériau de son type, aux prix d’aujourd’hui et à la date où elle a été terminée. Cela compte dans les dépenses, marqué comme estimé, mais ne modifie jamais le stock ni l’usure des pièces.',
+    filled: (prints) => `${prints} ${prints === 1 ? 'impression passée complétée' : 'impressions passées complétées'}.`,
+    failed: 'Impossible de compléter les impressions passées.',
+    undo: 'Annuler',
+    undone: 'Impressions complétées retirées.',
+    undoFailed: 'Impossible de retirer les impressions complétées.',
   },
   trend: {
     title: 'Dépenses dans le temps',
@@ -69,6 +91,7 @@ export const spend: typeof en = {
     cost: 'Dépensé',
     removed: 'Impression supprimée',
     failed: 'Avec un échec',
+    profit: (amount) => `${amount} de marge`,
   },
   unpriced: (count) =>
     `${count} ${count === 1 ? 'utilisation n’a' : 'utilisations n’ont'} pas de prix et ${count === 1 ? 'compte' : 'comptent'} pour rien. Définissez les prix dans`,

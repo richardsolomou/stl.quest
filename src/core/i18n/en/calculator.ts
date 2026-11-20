@@ -133,4 +133,18 @@ export const calculator = {
     markup: 'Markup on cost (%)',
     markupHint: (markup: string, share: string) => `A ${markup}% markup keeps ${share}% of each sale as profit.`,
   },
+  estimates: {
+    title: 'Material estimates',
+    description:
+      'Supports and waste is added to every material estimate to cover supports, rafts, purge, and failed bits, and plate totals you record replace it. Usage already recorded keeps its amounts.',
+    supportsAndWaste: 'Supports and waste (%)',
+    resinExample: (model: string, estimated: string) => `A ${model} model is estimated at ${estimated}.`,
+    filamentExample: (estimated: string) => `A 20 mm cube is estimated at ${estimated}.`,
+    infill: 'Infill (%)',
+    resinPerPart: 'Per part (mL)',
+    resinCalibration: 'Both defaults were measured on resin miniatures with auto-generated supports; lower them for lighter supports.',
+    walls: 'Walls',
+    filamentProfile:
+      'Infill and walls as your slicer profile sets them. Heavily supported figures can need about 50–75% extra, while simple parts need almost none.',
+  },
 }

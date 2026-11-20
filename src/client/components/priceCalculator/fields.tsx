@@ -23,23 +23,28 @@ export function ModeSelector({ legend, value, onChange }: { legend: string; valu
 }
 
 export function NumberSetting({
+  id: givenId,
   label,
   value,
   min,
   max,
+  whole = false,
   description,
   onChange,
 }: {
+  /** Needed when the label alone repeats on the page. */
+  id?: string
   label: string
   value: number
   min: number
   max?: number
+  whole?: boolean
   description?: ReactNode
   onChange: (value: number) => void
 }) {
   const { t, locale } = useI18n()
-  const id = settingId(label)
-  const outOfRange = value < min || (max !== undefined && value > max)
+  const id = givenId ?? settingId(label)
+  const outOfRange = value < min || (max !== undefined && value > max) || (whole && !Number.isInteger(value))
   return (
     <Field data-invalid={outOfRange || undefined}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
@@ -48,7 +53,7 @@ export function NumberSetting({
         value={value}
         min={min}
         max={max}
-        step="any"
+        step={whole ? 1 : 'any'}
         required
         aria-invalid={outOfRange || undefined}
         onChange={onChange}
@@ -57,7 +62,7 @@ export function NumberSetting({
         <FieldError>
           {max === undefined
             ? t.common.atLeast(min.toLocaleString(locale))
-            : t.common.between(min.toLocaleString(locale), max.toLocaleString(locale))}
+            : (whole ? t.common.wholeBetween : t.common.between)(min.toLocaleString(locale), max.toLocaleString(locale))}
         </FieldError>
       ) : (
         description && <FieldDescription>{description}</FieldDescription>

@@ -110,6 +110,13 @@ export const requests: typeof en = {
     loadingThumbnail: 'Chargement de la miniature',
   },
   downloadModel: 'Télécharger le modèle',
+  charge: {
+    label: 'Facturé',
+    placeholder: 'Non renseigné',
+    hint: 'Ce que vous avez facturé pour cette impression. Seuls les admins le voient ; Dépenses s’en sert pour la marge.',
+    failed: 'Le montant facturé n’a pas pu être enregistré.',
+  },
+  plates: 'Plateaux',
   cost: {
     label: 'Coût estimé',
     suggested: (price, quantity) => (quantity > 1 ? `${price} suggéré pour l’ensemble des ${quantity} copies` : `${price} suggéré`),

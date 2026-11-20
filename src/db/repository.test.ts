@@ -705,6 +705,142 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     ]).toEqual([[], [], 0])
   })
 
+  describe('charged prints', () => {
+    const october = new Date(2026, 9, 20).getTime()
+    const november = new Date(2026, 10, 12).getTime()
+
+    async function chargedPrint(target = repository) {
+      const id = await target.createRequest({
+        name: 'Model',
+        fileName: 'model.stl',
+        filePath: 'todo/model.stl',
+        quantity: 1,
+        ownerUserId: 'owner',
+      })
+      await target.setRequestCharge(id, { amount: 20, currency: 'EUR' })
+      return id
+    }
+
+    function printing(requestId: string, overrides: Partial<UsageEvent> = {}) {
+      return usageEvent({ requestId, stage: 'printing', kind: 'use', amount: 100, unitPrice: 0.04, currency: 'EUR', ...overrides })
+    }
+
+    it('totals what a charged print used across every period', async () => {
+      await stock(repository, 'consumables', [ipa])
+      const id = await chargedPrint()
+      await repository.appendUsageEvents([printing(id, { createdAt: october }), printing(id, { createdAt: november })])
+
+      expect((await repository.chargedPrints('EUR'))[0].cost).toBeCloseTo(8)
+    })
+
+    it('says what a charged print was charged', async () => {
+      const id = await chargedPrint()
+
+      expect((await repository.chargedPrints('EUR'))[0]).toMatchObject({ requestId: id, charged: { amount: 20, currency: 'EUR' } })
+    })
+
+    it('dates a charged print by its latest usage', async () => {
+      await stock(repository, 'consumables', [ipa])
+      const id = await chargedPrint()
+      await repository.appendUsageEvents([printing(id, { createdAt: october }), printing(id, { createdAt: november })])
+
+      expect((await repository.chargedPrints('EUR'))[0].finishedAt).toBe(november)
+    })
+
+    it('leaves undone usage out of when a charged print finished', async () => {
+      await stock(repository, 'consumables', [ipa])
+      const id = await chargedPrint()
+      await repository.appendUsageEvents([
+        printing(id, { createdAt: october }),
+        printing(id, { transactionId: 'later', createdAt: november }),
+      ])
+      await repository.undoUsageTransaction('later', november + 1)
+
+      expect((await repository.chargedPrints('EUR'))[0].finishedAt).toBe(october)
+    })
+
+    it('leaves superseded usage out of when a charged print finished', async () => {
+      await stock(repository, 'consumables', [ipa])
+      const id = await chargedPrint()
+      await repository.appendUsageEvents([
+        printing(id, { createdAt: october }),
+        printing(id, { transactionId: 'replaced', createdAt: november, undoneAt: november, supersededBy: 'plate' }),
+      ])
+
+      expect((await repository.chargedPrints('EUR'))[0].finishedAt).toBe(october)
+    })
+
+    it('leaves undone usage out of what a charged print used', async () => {
+      await stock(repository, 'consumables', [ipa])
+      const id = await chargedPrint()
+      await repository.appendUsageEvents([
+        printing(id, { createdAt: october }),
+        printing(id, { transactionId: 'later', createdAt: november }),
+      ])
+      await repository.undoUsageTransaction('later', november + 1)
+
+      expect((await repository.chargedPrints('EUR'))[0].cost).toBeCloseTo(4)
+    })
+
+    it('leaves usage in another currency out of what a charged print used', async () => {
+      await stock(repository, 'consumables', [ipa])
+      const id = await chargedPrint()
+      await repository.appendUsageEvents([printing(id, { createdAt: october }), printing(id, { createdAt: november, currency: 'GBP' })])
+
+      expect((await repository.chargedPrints('EUR'))[0].cost).toBeCloseTo(4)
+    })
+
+    it('leaves usage in another currency out of when a charged print finished', async () => {
+      await stock(repository, 'consumables', [ipa])
+      const id = await chargedPrint()
+      await repository.appendUsageEvents([printing(id, { createdAt: october }), printing(id, { createdAt: november, currency: 'GBP' })])
+
+      expect((await repository.chargedPrints('EUR'))[0].finishedAt).toBe(october)
+    })
+
+    it('dates a charged print by unpriced usage too', async () => {
+      await stock(repository, 'consumables', [ipa])
+      const id = await chargedPrint()
+      await repository.appendUsageEvents([
+        printing(id, { createdAt: october }),
+        printing(id, { createdAt: november, unitPrice: undefined, currency: undefined }),
+      ])
+
+      expect((await repository.chargedPrints('EUR'))[0].finishedAt).toBe(november)
+    })
+
+    it('gives a charged print with no usage no finished date', async () => {
+      await chargedPrint()
+
+      expect((await repository.chargedPrints('EUR'))[0].finishedAt).toBeUndefined()
+    })
+
+    it('lists only prints with a charge', async () => {
+      await repository.createRequest({ name: 'Free', fileName: 'free.stl', filePath: 'todo/free.stl', quantity: 1, ownerUserId: 'owner' })
+
+      expect(await repository.chargedPrints('EUR')).toEqual([])
+    })
+
+    it('keeps charged prints within their workspace', async () => {
+      await stock(repository, 'consumables', [ipa])
+      const id = await chargedPrint()
+      await repository.appendUsageEvents([printing(id, { createdAt: october })])
+      const secondary = await repository.scoped((await repository.createWorkspace({ id: 'owner' }, 'Second farm')).id)
+
+      expect(await secondary.chargedPrints('EUR')).toEqual([])
+    })
+
+    it('leaves another workspace’s usage of the same print id out of a charged print', async () => {
+      await stock(repository, 'consumables', [ipa])
+      const id = await chargedPrint()
+      const secondary = await repository.scoped((await repository.createWorkspace({ id: 'owner' }, 'Second farm')).id)
+      await stock(secondary, 'consumables', [ipa])
+      await secondary.appendUsageEvents([printing(id, { createdAt: november })])
+
+      expect(await repository.chargedPrints('EUR')).toEqual([{ requestId: id, charged: { amount: 20, currency: 'EUR' }, cost: 0 }])
+    })
+  })
+
   it('journals asset migrations per workspace', async () => {
     const primary = await repository.scoped('test-workspace')
     const secondaryWorkspace = await repository.createWorkspace({ id: 'owner' }, 'Second farm')
@@ -1674,7 +1810,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 38 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 40 })
     await migrated.close()
   })
 

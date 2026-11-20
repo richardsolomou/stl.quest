@@ -6,6 +6,8 @@ import { PrintTypeBadge } from './PrintType'
 import { PrintEstimateDetails } from './PrintEstimate'
 import { RequestCostEstimate } from './RequestCostEstimate'
 import { RequestActualCost } from './RequestActualCost'
+import { RequestCharge } from './RequestCharge'
+import { RequestPlates } from './plates/RequestPlates'
 import { ExternalLink } from 'lucide-react'
 import { useI18n } from '../i18n'
 import { statusText } from '../../core/i18n'
@@ -73,7 +75,13 @@ export function RequestDetails({
         {showCost && (
           <>
             <RequestCostEstimate request={request} />
-            {usageTracking && <RequestActualCost requestId={request.id} people={people} />}
+            {usageTracking && (
+              <>
+                <RequestActualCost requestId={request.id} people={people} />
+                <RequestPlates requestId={request.id} />
+                <RequestCharge request={request} />
+              </>
+            )}
           </>
         )}
         {request.sourceUrl && (

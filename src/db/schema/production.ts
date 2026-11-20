@@ -38,6 +38,8 @@ export const requests = sqliteTable(
     estimatedPrintMinutesOverride: real('estimated_print_minutes_override'),
     archivedAt: integer('archived_at'),
     unarchivedAt: integer('unarchived_at'),
+    chargedAmount: real('charged_amount'),
+    chargedCurrency: text('charged_currency'),
   },
   (table) => [
     check('requests_print_type_check', sql`${table.printType} IN ('resin', 'filament') OR ${table.printType} IS NULL`),
@@ -241,9 +243,12 @@ export const usageEvents = sqliteTable(
     outcome: text({ enum: ['completed', 'failed'] }),
     unitPrice: real('unit_price'),
     currency: text(),
+    estimated: integer({ mode: 'boolean' }).notNull().default(false),
     userId: text('user_id'),
     createdAt: integer('created_at').notNull(),
     undoneAt: integer('undone_at'),
+    plateId: text('plate_id'),
+    supersededBy: text('superseded_by'),
   },
   (table) => [
     check('usage_events_stage_check', sql`${table.stage} IN ('printing', 'finishing', 'stock')`),
@@ -255,6 +260,7 @@ export const usageEvents = sqliteTable(
     index('usage_events_consumable').on(table.workspaceId, table.consumableId),
     index('usage_events_transaction').on(table.workspaceId, table.transactionId),
     index('usage_events_created').on(table.workspaceId, table.createdAt),
+    index('usage_events_superseded').on(table.workspaceId, table.supersededBy),
     foreignKey({
       columns: [table.workspaceId, table.printerId],
       foreignColumns: [printers.workspaceId, printers.id],
@@ -270,5 +276,72 @@ export const usageEvents = sqliteTable(
       foreignColumns: [consumables.workspaceId, consumables.id],
       name: 'usage_events_workspace_consumable_fk',
     }),
+  ],
+)
+
+/**
+ * What went on one run of a printer, so the slicer's totals for the run can be split across its prints (see core/plates).
+ * A plate is a record, not a board stage: its prints move as before, and it keeps the usage transaction it recorded so a
+ * new upload replaces it.
+ */
+export const plates = sqliteTable(
+  'plates',
+  {
+    id: text().primaryKey(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    number: integer().notNull(),
+    printerId: text('printer_id'),
+    otherStuff: integer('other_stuff', { mode: 'boolean' }).notNull().default(false),
+    transactionId: text('transaction_id'),
+    source: text({ enum: ['file', 'totals'] }),
+    method: text({ enum: ['measured', 'volume', 'estimate', 'even'] }),
+    unit: text({ enum: ['g', 'ml'] }),
+    minutes: real(),
+    otherAmount: real('other_amount'),
+    overheadAmount: real('overhead_amount'),
+    recordedAt: integer('recorded_at'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('plates_workspace_id_unique').on(table.workspaceId, table.id),
+    uniqueIndex('plates_workspace_number_unique').on(table.workspaceId, table.number),
+    check('plates_source_check', sql`${table.source} IN ('file', 'totals') OR ${table.source} IS NULL`),
+    check('plates_method_check', sql`${table.method} IN ('measured', 'volume', 'estimate', 'even') OR ${table.method} IS NULL`),
+    check('plates_unit_check', sql`${table.unit} IN ('g', 'ml') OR ${table.unit} IS NULL`),
+    foreignKey({
+      columns: [table.workspaceId, table.printerId],
+      foreignColumns: [printers.workspaceId, printers.id],
+      name: 'plates_workspace_printer_fk',
+    }),
+  ],
+)
+
+export const plateItems = sqliteTable(
+  'plate_items',
+  {
+    workspaceId: text('workspace_id').notNull(),
+    plateId: text('plate_id').notNull(),
+    requestId: text('request_id').notNull(),
+    copies: integer().notNull(),
+    amount: real(),
+    minutes: real(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.plateId, table.requestId] }),
+    index('plate_items_request').on(table.workspaceId, table.requestId),
+    foreignKey({
+      columns: [table.workspaceId, table.plateId],
+      foreignColumns: [plates.workspaceId, plates.id],
+      name: 'plate_items_workspace_plate_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.requestId],
+      foreignColumns: [requests.workspaceId, requests.id],
+      name: 'plate_items_workspace_request_fk',
+    }).onDelete('cascade'),
+    check('plate_items_copies_check', sql`${table.copies} > 0`),
   ],
 )

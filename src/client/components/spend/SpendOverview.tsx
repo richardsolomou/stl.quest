@@ -15,14 +15,17 @@ import {
   SPEND_PERIODS,
   spendPeriod,
   spendTrend,
+  summariseProfit,
   summariseSpend,
   type SpendCategory,
   type SpendItem,
+  type PrintSpend,
   type SpendOutcome,
   type SpendPeriodPreset,
 } from '../../../core/spend'
 import { useI18n } from '../../i18n'
 import {
+  chargedPrintsQuery,
   consumablesQuery,
   equipmentQuery,
   priceCalculatorSettingsQuery,
@@ -32,11 +35,13 @@ import {
   usageQuery,
 } from '../../queries'
 import { CalculatorTabs } from '../priceCalculator/CalculatorTabs'
+import { TypicalTag } from '../priceCalculator/CostBasis'
 import { formatMoney, formatNumber } from '../priceCalculator/format'
 import { QueryState } from '../QueryState'
 import { Docket, PageHeader, SettingsPage } from '../settings/SettingsLayout'
 import { formatUsageAmount, usedItemName, type UsageLibrary } from './format'
 import { SpendTrendChart } from './SpendTrendChart'
+import { UsageBackfillOffer } from './UsageBackfillOffer'
 
 export type SpendSearch = { period?: SpendPeriodPreset; from?: string; to?: string }
 
@@ -59,6 +64,7 @@ export function SpendOverview({
   const period = spendPeriod(preset, now, search)
   const settings = useQuery(priceCalculatorSettingsQuery(workspaceSlug))
   const usage = useQuery(usagePeriodQuery(workspaceSlug, period))
+  const charged = useQuery(chargedPrintsQuery(workspaceSlug))
   const anything = useQuery(usageQuery(workspaceSlug, { limit: 1 }))
   const library = {
     consumables: useQuery(consumablesQuery(workspaceSlug)).data?.consumables ?? [],
@@ -96,11 +102,15 @@ export function SpendOverview({
           </div>
         )}
       </div>
+      <UsageBackfillOffer
+        workspaceSlug={workspaceSlug}
+        onFilled={(from) => onSearchChange({ period: 'custom', from: dayString(from), to: dayString(now) })}
+      />
     </>
   )
 
-  const failed = settings.error ?? usage.error ?? anything.error
-  if (!settings.data || !usage.data || !anything.data) {
+  const failed = settings.error ?? usage.error ?? anything.error ?? charged.error
+  if (!settings.data || !usage.data || !anything.data || !charged.data) {
     return (
       <SettingsPage>
         {header}
@@ -109,7 +119,7 @@ export function SpendOverview({
           error={failed}
           loadingLabel={copy.loading}
           errorTitle={copy.loadError}
-          onRetry={() => void Promise.all([settings.refetch(), usage.refetch(), anything.refetch()])}
+          onRetry={() => void Promise.all([settings.refetch(), usage.refetch(), anything.refetch(), charged.refetch()])}
         />
       </SettingsPage>
     )
@@ -146,6 +156,13 @@ export function SpendOverview({
   const summary = summariseSpend(events, library.consumables, currency)
   const share = (value: number) => (summary.total > 0 ? formatNumber((value / summary.total) * 100, locale, 0) + '%' : '0%')
   const requests = new Map([...active, ...archived].map((request) => [request.id, request.name]))
+  const profit = summariseProfit(charged.data.prints, period, currency)
+  const basis = [
+    summary.slicer > 0 ? copy.totals.slicer(money(summary.slicer)) : undefined,
+    summary.estimated > 0 ? copy.totals.estimated(money(summary.estimated)) : undefined,
+  ]
+    .filter(Boolean)
+    .join(' ')
   return (
     <SettingsPage>
       {header}
@@ -159,13 +176,29 @@ export function SpendOverview({
           </Empty>
         ) : (
           <>
-            <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border lg:grid-cols-4">
-              <Stat label={copy.totals.total} className="col-span-2 lg:col-span-1">
+            <dl
+              className={cn(
+                'grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border',
+                profit.charged > 0 ? 'lg:grid-cols-3' : 'lg:grid-cols-4',
+              )}
+            >
+              <Stat label={copy.totals.total} note={basis || undefined} className="col-span-2 lg:col-span-1">
                 <span className="text-5xl leading-none font-semibold">{money(summary.total)}</span>
               </Stat>
+              {profit.charged > 0 && (
+                <>
+                  <Stat label={copy.totals.earned} note={copy.totals.earnedNote(profit.charged)}>
+                    {money(profit.earned)}
+                  </Stat>
+                  <Stat label={copy.totals.profit} note={copy.totals.profitNote(money(profit.spent))}>
+                    {money(profit.profit)}
+                  </Stat>
+                </>
+              )}
               <Stat
                 label={copy.totals.prints}
                 note={summary.prints.length ? copy.totals.perPrint(money(summary.total / summary.prints.length)) : undefined}
+                className={profit.charged > 0 ? 'col-span-2 lg:col-span-1' : undefined}
               >
                 {formatNumber(summary.prints.length, locale)}
               </Stat>
@@ -175,11 +208,12 @@ export function SpendOverview({
               <Stat
                 label={copy.totals.wasted}
                 note={copy.totals.share(share(summary.outcomes.wasted))}
-                className="col-span-2 lg:col-span-1"
+                className={profit.charged > 0 ? undefined : 'col-span-2 lg:col-span-1'}
               >
                 {money(summary.outcomes.wasted)}
               </Stat>
             </dl>
+            {profit.charged === 0 && <p className="-mt-3 text-xs text-muted-foreground">{copy.totals.noCharges}</p>}
             {(summary.unpriced > 0 || summary.otherCurrencies.length > 0) && (
               <div className="-mt-3 flex flex-col gap-1 text-xs text-muted-foreground">
                 {summary.unpriced > 0 && (
@@ -246,7 +280,7 @@ export function SpendOverview({
                 <ItemTable items={summary.items} library={library} money={money} />
               </Docket>
               <Docket title={copy.prints.title}>
-                <PrintList prints={summary.prints} names={requests} money={money} />
+                <PrintList prints={summary.prints} names={requests} profits={profit.byPrint} money={money} />
               </Docket>
             </div>
           </>
@@ -339,10 +373,12 @@ function MeterRow({ name, hint, value, share }: { name: string; hint?: string; v
 function PrintList({
   prints,
   names,
+  profits,
   money,
 }: {
-  prints: { requestId: string; cost: number; failed: boolean }[]
+  prints: PrintSpend[]
   names: Map<string, string>
+  profits: Map<string, number>
   money: (value: number) => string
 }) {
   const { t } = useI18n()
@@ -355,13 +391,22 @@ function PrintList({
           const name = names.get(print.requestId)
           return (
             <li key={print.requestId} className="flex items-baseline gap-2 border-b border-border/60 py-1.5 text-sm last:border-0">
-              <span className={cn('min-w-0 flex-1 truncate', !name && 'text-muted-foreground italic')}>{name ?? copy.removed}</span>
+              <span className={cn('min-w-0 flex-1 truncate', !name && 'text-muted-foreground italic')}>
+                {name ?? copy.removed}
+                {print.slicer && <TypicalTag label={t.spend.fromSlicer} />}
+                {print.estimated && <TypicalTag label={t.spend.estimated} />}
+              </span>
               {print.failed && (
                 <Badge variant="destructive" className="h-4 rounded-[4px] px-1.5">
                   {copy.failed}
                 </Badge>
               )}
-              <span className="font-mono tabular-nums">{money(print.cost)}</span>
+              <span className="flex flex-col items-end">
+                <span className="font-mono tabular-nums">{money(print.cost)}</span>
+                {profits.has(print.requestId) && (
+                  <span className="text-xs text-muted-foreground tabular-nums">{copy.profit(money(profits.get(print.requestId)!))}</span>
+                )}
+              </span>
             </li>
           )
         })}

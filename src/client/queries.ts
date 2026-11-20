@@ -31,6 +31,9 @@ import {
   listUsage,
   getStockLevels,
   getUsagePrefills,
+  getUsageBackfillPreview,
+  getChargedPrints,
+  getPlates,
 } from '../server/fns'
 import type { ElectricityPricePreset } from '../core/electricityPresets'
 import type { FilamentPreset } from '../core/filamentPresets'
@@ -153,6 +156,13 @@ export const stockQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['stock', workspaceSlug], queryFn: () => getStockLevels({ data: { workspaceSlug } }) })
 export const usagePrefillsQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['usage-prefills', workspaceSlug], queryFn: () => getUsagePrefills({ data: { workspaceSlug } }) })
+export const platesQuery = (workspaceSlug: string) =>
+  queryOptions({ queryKey: ['plates', workspaceSlug], queryFn: () => getPlates({ data: { workspaceSlug } }) })
+export type PlateView = Awaited<ReturnType<typeof getPlates>>['plates'][number]
+export const chargedPrintsQuery = (workspaceSlug: string) =>
+  queryOptions({ queryKey: ['usage', workspaceSlug, 'charged'], queryFn: () => getChargedPrints({ data: { workspaceSlug } }) })
+export const usageBackfillQuery = (workspaceSlug: string) =>
+  queryOptions({ queryKey: ['usage-backfill', workspaceSlug], queryFn: () => getUsageBackfillPreview({ data: { workspaceSlug } }) })
 
 export const priceCalculatorSettingsQuery = (workspaceSlug: string) =>
   queryOptions({

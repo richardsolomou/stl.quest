@@ -459,6 +459,7 @@ function useStepUsageRecorder() {
         result.status === 'fulfilled' && result.value.transactionId ? [result.value.transactionId] : [],
       )
       if (results.some((result) => result.status === 'rejected')) toast.error(copy.recordFailed, above)
+      if (results.some((result) => result.status === 'fulfilled' && 'coveredByPlate' in result.value)) toast(copy.coveredByPlate, above)
       if (!transactionIds.length) return
       const prints = new Set(inputs.filter((_, index) => results[index].status === 'fulfilled').map(({ requestId }) => requestId)).size
       toast.success(copy.recorded(prints), {

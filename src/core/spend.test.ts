@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Consumable } from './consumables'
-import { localDay, spendCategory, spendPeriod, spendTrend, summariseSpend, usageSteps } from './spend'
+import { costBasis, localDay, spendCategory, spendPeriod, spendTrend, summariseProfit, summariseSpend, usageSteps } from './spend'
 import type { UsageEvent } from './usage'
 
 const resin: Consumable = { id: 'grey', kind: 'resin', name: 'Grey', pricePerLitre: 40, densityGramsPerMl: 1.1 }
@@ -69,6 +69,66 @@ describe('summariseSpend', () => {
     expect(summary.total).toBeCloseTo(6.5)
   })
 
+  it('includes estimates of past prints in the total', () => {
+    const summary = summariseSpend(
+      [
+        event({ consumableId: resin.id, amount: 100, unitPrice: 0.04 }),
+        event({ consumableId: resin.id, amount: 50, unitPrice: 0.04, estimated: true }),
+      ],
+      [resin],
+      'EUR',
+    )
+
+    expect(summary.total).toBeCloseTo(6)
+  })
+
+  it('says how much of the total was estimated rather than taken from the slicer', () => {
+    const summary = summariseSpend(
+      [
+        event({ consumableId: resin.id, amount: 100, unitPrice: 0.04, plateId: 'plate' }),
+        event({ consumableId: resin.id, amount: 50, unitPrice: 0.04, estimated: true }),
+        event({ consumableId: resin.id, amount: 25, unitPrice: 0.04 }),
+      ],
+      [resin],
+      'EUR',
+    )
+
+    expect(summary.estimated).toBeCloseTo(3)
+  })
+
+  it('says how much of the total came from slicer totals', () => {
+    const summary = summariseSpend(
+      [
+        event({ consumableId: resin.id, amount: 100, unitPrice: 0.04, plateId: 'plate' }),
+        event({ consumableId: resin.id, amount: 50, unitPrice: 0.04 }),
+      ],
+      [resin],
+      'EUR',
+    )
+
+    expect(summary.slicer).toBeCloseTo(4)
+  })
+
+  it('marks a print whose spend was estimated', () => {
+    const summary = summariseSpend(
+      [event({ requestId: 'past', consumableId: resin.id, amount: 50, unitPrice: 0.04, estimated: true })],
+      [resin],
+      'EUR',
+    )
+
+    expect(summary.prints).toEqual([expect.objectContaining({ requestId: 'past', estimated: true })])
+  })
+
+  it('marks a print whose spend came from the slicer', () => {
+    const summary = summariseSpend(
+      [event({ requestId: 'plated', consumableId: resin.id, amount: 50, unitPrice: 0.04, plateId: 'plate' })],
+      [resin],
+      'EUR',
+    )
+
+    expect(summary.prints).toEqual([expect.objectContaining({ requestId: 'plated', slicer: true, estimated: false })])
+  })
+
   it('leaves out undone events', () => {
     const summary = summariseSpend([event({ consumableId: resin.id, amount: 100, unitPrice: 1, undoneAt: 2_000 })], [resin], 'EUR')
 
@@ -122,7 +182,7 @@ describe('summariseSpend', () => {
       'EUR',
     )
 
-    expect(summary.prints).toEqual([{ requestId: 'a', cost: 5, failed: false }])
+    expect(summary.prints).toEqual([{ requestId: 'a', cost: 5, failed: false, estimated: true, slicer: false }])
   })
 
   it('keeps another currency out of the items', () => {
@@ -180,8 +240,8 @@ describe('summariseSpend', () => {
     )
 
     expect(summary.prints).toEqual([
-      { requestId: 'a', cost: 5, failed: false },
-      { requestId: 'b', cost: 4, failed: true },
+      { requestId: 'a', cost: 5, failed: false, estimated: true, slicer: false },
+      { requestId: 'b', cost: 4, failed: true, estimated: true, slicer: false },
     ])
   })
 
@@ -224,6 +284,12 @@ describe('usageSteps', () => {
     const [step] = usageSteps([event({ printerId: 'form', unit: 'minute', outcome: 'failed' })])
 
     expect(step.failed).toBe(true)
+  })
+
+  it('marks a step estimated from a past print', () => {
+    const [step] = usageSteps([event({ printerId: 'form', unit: 'minute', estimated: true })])
+
+    expect(step.estimated).toBe(true)
   })
 })
 
@@ -289,5 +355,67 @@ describe('spendTrend', () => {
     )
 
     expect(trend.map(({ cost }) => cost)).toEqual([0])
+  })
+})
+
+describe('costBasis', () => {
+  it('takes plate usage from the slicer', () => {
+    expect(costBasis(event({ plateId: 'plate' }))).toBe('slicer')
+  })
+
+  it('takes a printing step from the print’s estimate', () => {
+    expect(costBasis(event())).toBe('estimate')
+  })
+
+  it('takes a filled-in print from its estimate', () => {
+    expect(costBasis(event({ estimated: true }))).toBe('estimate')
+  })
+
+  it('gives finishing no basis of its own', () => {
+    expect(costBasis(event({ stage: 'finishing' }))).toBeUndefined()
+  })
+})
+
+describe('summariseProfit', () => {
+  const october = { from: new Date(2026, 9, 1).getTime(), to: new Date(2026, 10, 1).getTime() }
+  const november = { from: new Date(2026, 10, 1).getTime(), to: new Date(2026, 11, 1).getTime() }
+  const finishedInNovember = new Date(2026, 10, 12).getTime()
+  // Printed in October and finished in November: its €8 cost covers both months.
+  const spanning = { requestId: 'a', charged: { amount: 20, currency: 'EUR' as const }, cost: 8, finishedAt: finishedInNovember }
+
+  it('counts a charge in the period its print finished', () => {
+    expect(summariseProfit([spanning], november, 'EUR').earned).toBe(20)
+  })
+
+  it('leaves a charge out of a period before its print finished', () => {
+    expect(summariseProfit([spanning], october, 'EUR').charged).toBe(0)
+  })
+
+  it('sets a charge against everything its print used', () => {
+    expect(summariseProfit([spanning], november, 'EUR').profit).toBe(12)
+  })
+
+  it('totals what the counted prints used', () => {
+    expect(summariseProfit([spanning, { ...spanning, requestId: 'b', cost: 3 }], november, 'EUR').spent).toBe(11)
+  })
+
+  it('gives each counted print its profit', () => {
+    expect(summariseProfit([spanning], november, 'EUR').byPrint.get('a')).toBe(12)
+  })
+
+  it('leaves out a print that never finished', () => {
+    expect(summariseProfit([{ ...spanning, finishedAt: undefined }], november, 'EUR').charged).toBe(0)
+  })
+
+  it('leaves out a charge in another currency', () => {
+    expect(summariseProfit([{ ...spanning, charged: { amount: 20, currency: 'GBP' } }], november, 'EUR').charged).toBe(0)
+  })
+
+  it('counts a print that finished at the start of the period', () => {
+    expect(summariseProfit([{ ...spanning, finishedAt: november.from }], november, 'EUR').charged).toBe(1)
+  })
+
+  it('leaves out a print that finished at the end of the period', () => {
+    expect(summariseProfit([{ ...spanning, finishedAt: october.to }], october, 'EUR').charged).toBe(0)
   })
 })

@@ -28,5 +28,6 @@ export const common: typeof en = {
   refreshToRetry: 'Laden Sie die Seite neu, um es erneut zu versuchen.',
   atLeast: (min: string) => `Geben Sie ${min} oder mehr ein.`,
   between: (min: string, max: string) => `Geben Sie eine Zahl von ${min} bis ${max} ein.`,
+  wholeBetween: (min: string, max: string) => `Geben Sie eine ganze Zahl von ${min} bis ${max} ein.`,
   autosave: { saving: 'Speichert…', saved: 'Gespeichert', failed: 'Nicht gespeichert', retry: 'Erneut versuchen' },
 }

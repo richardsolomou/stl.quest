@@ -56,6 +56,10 @@ describe('part wear', () => {
     expect(partWear([event({ undoneAt: 99 })], 'form-4-a', tank).used).toBe(0)
   })
 
+  it('ignores estimates of past prints, which predate any replacement on record', () => {
+    expect(partWear([event({ estimated: true })], 'form-4-a', tank).used).toBe(0)
+  })
+
   it('starts counting again after the part is replaced on the printer', () => {
     const events = [
       event({ copies: 4 }),

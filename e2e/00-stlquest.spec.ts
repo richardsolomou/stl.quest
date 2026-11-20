@@ -7,6 +7,7 @@ import type { Locator, Page } from '@playwright/test'
 import { expect, test } from './fixtures/test'
 import { createAssetKey } from '../src/core/assetKeys'
 import { expectTablesFitWidth, expectWithinViewportWidth } from './fixtures/layout'
+import { slicedPlateFile } from './fixtures/slicedPlate'
 import { boxStl } from './fixtures/stl'
 
 // A 1×1 red PNG: enough for the browser to decode and redraw as a cover.
@@ -1894,7 +1895,55 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await stepSheet.getByRole('button', { name: 'Record' }).click()
   await expect(stepSheet).toHaveCount(0)
   await expect(page.getByText('Usage recorded for 1 print.')).toBeVisible()
-  for (const name of ['start-on-printer', 'step-usage']) {
+  // Prints that shared a plate split what the slicer measured for each object, matched to them by model file name.
+  await page.goto('/settings/printers')
+  await page.getByRole('button', { name: 'Add printer', exact: true }).click()
+  await page.getByLabel('Search printers').fill('Bambu Lab X1 Carbon')
+  // A resin-only fleet narrows the catalogue to resin until asked for every printer.
+  await page.getByRole('button', { name: 'Show all', exact: true }).click()
+  await page.getByRole('button', { name: 'Add Bambu Lab X1 Carbon', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Edit Bambu Lab X1 Carbon' })).toBeVisible()
+  await expect(page.locator('[data-slot="settings-page"]')).toHaveAttribute('data-saving', 'false')
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Board' }).click()
+  for (const name of ['plate-hull', 'plate-turret']) await upload(page, { name, printType: 'Filament', buffer: boxStl(name, 10, 10, 10) })
+  await selectRequestCards(page, ['plate-hull', 'plate-turret'], multipleSelectionModifier)
+  await page.getByRole('toolbar', { name: 'Selection actions' }).getByRole('button', { name: 'Put on a plate' }).click()
+  const planPlate = page.getByRole('dialog', { name: 'Put on a plate' })
+  await expect(planPlate.getByLabel('Printer')).toContainText('Bambu Lab X1 Carbon')
+  await planPlate.getByRole('button', { name: 'Put on a plate' }).click()
+  await expect(page.getByText('Made plate #1.')).toBeVisible()
+  await requestCard(page, 'plate-hull').click()
+  await page.getByRole('button', { name: 'On plate #1' }).click()
+  const plateDialog = page.getByRole('dialog', { name: 'Plate #1' })
+  await plateDialog.getByRole('button', { name: 'Upload slicer file' }).click()
+  await plateDialog.locator('[data-plate-file]').setInputFiles({
+    name: 'plate.gcode.3mf',
+    mimeType: 'application/octet-stream',
+    buffer: Buffer.from(
+      slicedPlateFile({
+        objects: [
+          { id: '1', name: 'plate-hull.stl_A', extrusionMm: 1000 },
+          { id: '2', name: 'plate-hull.stl_B', extrusionMm: 400 },
+          { id: '3', name: 'plate-turret.stl', extrusionMm: 600 },
+        ],
+        overheadMm: 100,
+        predictionSeconds: 3_600,
+      }),
+    ),
+  })
+  await expect(plateDialog.locator('[data-plate-objects] li')).toHaveCount(3)
+  await expect(plateDialog.getByRole('combobox', { name: 'Material' })).toContainText('Prusament PLA · Galaxy Silver')
+  await screenshot(page, 'plate-slicer-file')
+  await plateDialog.getByRole('button', { name: 'Record usage' }).click()
+  const platePrints = plateDialog.locator('[data-plate-prints]')
+  await expect(platePrints.getByRole('row').filter({ hasText: 'plate-hull' })).toContainText('4.38 g')
+  await expect(platePrints.getByRole('row').filter({ hasText: 'plate-turret' })).toContainText('1.88 g')
+  await screenshot(page, 'plate-recorded')
+  await plateDialog.getByRole('button', { name: 'Delete plate' }).click()
+  await page.getByRole('alertdialog', { name: 'Delete plate' }).getByRole('button', { name: 'Delete plate' }).click()
+  await expect(page.getByText('Plate deleted.')).toBeVisible()
+  await page.keyboard.press('Escape')
+  for (const name of ['start-on-printer', 'step-usage', 'plate-hull', 'plate-turret']) {
     await requestCard(page, name).click({ button: 'right' })
     await page.getByRole('menuitem', { name: 'Delete' }).click()
     await page
@@ -1908,6 +1957,10 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('dialog', { name: 'Elegoo Mars 3' }).getByRole('button', { name: 'Archive', exact: true }).click()
   await page.getByRole('alertdialog', { name: 'Archive “Elegoo Mars 3”?' }).getByRole('button', { name: 'Archive printer' }).click()
   await expect(page.getByText('Archived printers', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Edit Bambu Lab X1 Carbon' }).click()
+  await page.getByRole('dialog', { name: 'Bambu Lab X1 Carbon' }).getByRole('button', { name: 'Archive', exact: true }).click()
+  await page.getByRole('alertdialog', { name: 'Archive “Bambu Lab X1 Carbon”?' }).getByRole('button', { name: 'Archive printer' }).click()
+  await expect(page.getByRole('alertdialog')).toHaveCount(0)
   await page.goto('/settings/board')
   await page.getByRole('switch', { name: 'Track usage and stock' }).click()
   await expect(autosaveStatus(page)).toHaveText('Saved')

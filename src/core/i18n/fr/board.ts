@@ -166,6 +166,8 @@ export const board: typeof en = {
     skip: 'Passer',
     recorded: (prints) => `Consommation enregistrée pour ${prints} ${prints === 1 ? 'impression' : 'impressions'}.`,
     recordFailed: 'La consommation n’a pas pu être enregistrée.',
+    coveredByPlate:
+      'Son plateau a déjà enregistré la consommation indiquée par le trancheur ; cette étape d’impression n’entre donc ni dans les dépenses ni dans le stock.',
     undo: 'Annuler',
     undone: 'Consommation annulée.',
     undoFailed: 'La consommation n’a pas pu être annulée.',

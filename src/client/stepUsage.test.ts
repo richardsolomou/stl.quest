@@ -132,6 +132,11 @@ describe('prefillPrinter', () => {
     expect(prefillPrinter(request('r'), 'resin', catalog({ events }))).toBe('mars')
   })
 
+  it('ignores estimates of past prints', () => {
+    const events = [used({ printerId: 'mars' }), used({ printerId: 'saturn', estimated: true })]
+    expect(prefillPrinter(request('r'), 'resin', catalog({ events }))).toBe('mars')
+  })
+
   it('takes the only printer of the type when nothing was used yet', () => {
     expect(prefillPrinter(request('r', { printType: 'filament' }), 'filament', catalog())).toBe('a1')
   })

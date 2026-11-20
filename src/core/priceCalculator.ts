@@ -9,6 +9,7 @@ import {
 } from './consumables'
 import { supplyUnitPrice, type EquipmentItem } from './equipment'
 import { printingPower } from './equipmentPresets'
+import { DEFAULT_MATERIAL_ESTIMATE_SETTINGS, validMaterialEstimateSettings, type MaterialEstimateSettings } from './printEstimates'
 import type { PrinterProfile, PrintType } from './types'
 
 export const PRICE_CALCULATOR_SETTING = 'price_calculator'
@@ -50,8 +51,11 @@ export function electricityPresetsAvailable(currency: PriceCalculatorCurrency) {
   return currency === 'EUR'
 }
 
-/** Business rates only: what a printer, material, or piece of equipment costs lives on that thing, not here. */
-export type PriceCalculatorSettings = {
+/**
+ * Business rates and how the workspace slices: what a printer, material, or piece of equipment costs lives on that
+ * thing, not here.
+ */
+export type PriceCalculatorSettings = MaterialEstimateSettings & {
   currency: PriceCalculatorCurrency
   electricityCountryCode?: string
   electricityPricePerKwh: number
@@ -77,12 +81,15 @@ export function profitSharePercent(markupPercent: number) {
 
 /** Whether every rate is a number from zero to its maximum, as storing them requires. */
 export function validPriceCalculatorSettings(settings: PriceCalculatorSettings) {
-  return (Object.keys(PRICE_CALCULATOR_MAXIMUMS) as (keyof typeof PRICE_CALCULATOR_MAXIMUMS)[]).every(
-    (key) => Number.isFinite(settings[key]) && settings[key] >= 0 && settings[key] <= PRICE_CALCULATOR_MAXIMUMS[key],
+  return (
+    (Object.keys(PRICE_CALCULATOR_MAXIMUMS) as (keyof typeof PRICE_CALCULATOR_MAXIMUMS)[]).every(
+      (key) => Number.isFinite(settings[key]) && settings[key] >= 0 && settings[key] <= PRICE_CALCULATOR_MAXIMUMS[key],
+    ) && validMaterialEstimateSettings(settings)
   )
 }
 
 export const DEFAULT_PRICE_CALCULATOR_SETTINGS: PriceCalculatorSettings = {
+  ...DEFAULT_MATERIAL_ESTIMATE_SETTINGS,
   currency: 'EUR',
   electricityPricePerKwh: 0.135,
   labourCostPerHour: 15,

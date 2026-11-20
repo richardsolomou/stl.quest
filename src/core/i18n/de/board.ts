@@ -167,6 +167,8 @@ export const board: typeof en = {
     skip: 'Überspringen',
     recorded: (prints) => `Verbrauch für ${prints} ${prints === 1 ? 'Druck' : 'Drucke'} erfasst.`,
     recordFailed: 'Der Verbrauch konnte nicht erfasst werden.',
+    coveredByPlate:
+      'Seine Druckplatte hat schon erfasst, was der Slicer als Verbrauch angibt, deshalb zählt dieser Druckschritt weder zu Ausgaben noch zum Bestand.',
     undo: 'Rückgängig',
     undone: 'Verbrauch rückgängig gemacht.',
     undoFailed: 'Der Verbrauch konnte nicht rückgängig gemacht werden.',
