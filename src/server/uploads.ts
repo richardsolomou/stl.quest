@@ -27,7 +27,7 @@ import { appPath } from '../basePath'
 const WORKSPACE_METADATA_KEY = 'stlQuestWorkspaceId'
 const uploadRequests = new UploadRequestLimiter()
 type UploadContext = Awaited<ReturnType<Awaited<ReturnType<typeof app>>['workspace']>>
-const requestContexts = new WeakMap<object, UploadContext>()
+const requestContexts = new WeakMap<object, { context: UploadContext; cancelId?: string }>()
 type AppInstance = Awaited<ReturnType<typeof app>>
 const servers = new WeakMap<object, Map<string, Server>>()
 
@@ -74,6 +74,7 @@ function tusError(error: unknown): Error & { status_code: number; body: string }
 // tus answers a failure itself, so a 5xx would otherwise never reach the logs, and its raw message could name storage paths.
 function uploadFailure(_request: Request, error: Error | { status_code: number; body: string }) {
   const status = 'status_code' in error && typeof error.status_code === 'number' ? error.status_code : 500
+  if (status === 501) return { status_code: status, body: 'unsupported upload extension' }
   if (status < 500) return undefined
   logger.error(
     { err: error instanceof Error ? error : new Error(error.body.trim()), event: 'upload_failed', outcome: 'error', status },
@@ -137,6 +138,7 @@ function serverFor(instance: AppInstance, workspaceId: string) {
   const current = runtimeServers.get(workspaceId)
   if (current) return current
   const store = instance.uploadDatastore
+  store.extensions = store.extensions.filter((extension) => extension !== 'creation-defer-length')
   const server = new Server({
     path: appPath('/api/upload'),
     datastore: store,
@@ -147,18 +149,25 @@ function serverFor(instance: AppInstance, workspaceId: string) {
     onResponseError: uploadFailure,
     onIncomingRequest: async (request, uploadId) => {
       try {
-        const context = contextFor(request)
+        const scope = contextFor(request)
+        const { context } = scope
         if (request.method !== 'POST') {
+          if (request.method === 'DELETE') {
+            if (!(await context.repository.canCancelUpload(uploadId, context.identity.id)))
+              throw new Response('upload cannot be cancelled', { status: 409, statusText: 'upload cannot be cancelled' })
+            scope.cancelId = uploadId
+            return
+          }
           const upload = await store.getUpload(uploadId).catch(() => undefined)
           if (uploadWorkspaceId(upload?.metadata) !== context.workspace.id) {
             throw new Response('upload belongs to another workspace', { status: 409, statusText: 'workspace changed' })
           }
-          if (request.method === 'DELETE') {
-            await context.repository.releaseUploadSession(uploadId, context.identity.id)
-            return
-          }
-          await context.repository.createUploadSession(uploadId, context.identity.id, Date.now() + UPLOAD_TTL, 3)
-          if (upload?.size !== undefined && upload.offset === upload.size && upload.storage?.path) {
+          if (
+            !upload?.size ||
+            !(await context.repository.refreshUploadSession(uploadId, context.identity.id, Date.now() + UPLOAD_TTL, upload.size))
+          )
+            throw new Response('upload session expired', { status: 409, statusText: 'upload session expired' })
+          if (upload.offset === upload.size && upload.storage?.path) {
             await finalizeUpload(upload.id, upload.metadata, upload.storage.path, context)
           }
         }
@@ -168,27 +177,25 @@ function serverFor(instance: AppInstance, workspaceId: string) {
     },
     onUploadCreate: async (request, upload) => {
       try {
-        const context = contextFor(request)
+        const { context } = contextFor(request)
         metadataSchema.parse(upload.metadata ?? {})
-        await instance.staging.assertCapacity(upload.size ?? 0)
+        if (!upload.size) throw new Response('upload length required', { status: 400, statusText: 'upload length required' })
+        await instance.staging.assertCapacity(upload.size)
         const now = Date.now()
-        await context.repository.createUploadSession(upload.id, context.identity.id, now + UPLOAD_TTL, 3, now + UPLOAD_TTL - UPLOAD_IDLE)
         const managedQuota = storagePlans[await context.repository.managedStoragePlan()].quotaBytes
         const availableBytes = context.storage.adapter === 'managed' ? managedQuota : MAX_UPLOAD_BYTES
-        if ((upload.size ?? 0) > availableBytes) {
+        if (upload.size > availableBytes) {
           throw new Response('managed storage quota exceeded', { status: 413, statusText: 'managed storage quota exceeded' })
         }
+        await context.repository.createUploadSession(upload.id, context.identity.id, now + UPLOAD_TTL, 3, now + UPLOAD_TTL - UPLOAD_IDLE)
         if (
-          !(await context.repository.reserveUpload(upload.id, context.identity.id, upload.size ?? 0, Date.now() + UPLOAD_TTL, {
+          !(await context.repository.reserveUpload(upload.id, context.identity.id, upload.size, Date.now() + UPLOAD_TTL, {
             count: 3,
             bytes: availableBytes,
             managedBytes: context.storage.adapter === 'managed' ? availableBytes : undefined,
           }))
         ) {
-          if (
-            context.storage.adapter === 'managed' &&
-            (upload.size ?? 0) > (await context.repository.managedStorageRemaining(managedQuota))
-          ) {
+          if (context.storage.adapter === 'managed' && upload.size > (await context.repository.managedStorageRemaining(managedQuota))) {
             throw new Response('managed storage is full', { status: 413, statusText: 'managed storage is full' })
           }
           throw new Response('too many incomplete uploads', { status: 429, statusText: 'too many incomplete uploads' })
@@ -200,7 +207,7 @@ function serverFor(instance: AppInstance, workspaceId: string) {
     },
     onUploadFinish: async (request, upload) => {
       try {
-        const context = contextFor(request)
+        const { context } = contextFor(request)
         if (uploadWorkspaceId(upload.metadata) !== context.workspace.id) {
           throw new Response('upload belongs to another workspace', { status: 409, statusText: 'workspace changed' })
         }
@@ -231,9 +238,13 @@ export async function handleUpload(request: Request) {
     return Response.json({ error: 'storage migration is in progress — uploads are temporarily paused' }, { status: 423 })
   const release = uploadRequests.enter(`${context.workspace.id}:${context.identity.id}`)
   if (!release) return Response.json({ error: 'too many concurrent upload requests' }, { status: 429 })
-  requestContexts.set(request, context)
+  const scope: { context: UploadContext; cancelId?: string } = { context }
+  requestContexts.set(request, scope)
   try {
-    return await serverFor(instance, context.workspace.id).handleWeb(request)
+    const response = await serverFor(instance, context.workspace.id).handleWeb(request)
+    if ((response.ok || response.status === 404) && scope.cancelId)
+      await context.repository.releaseUploadSession(scope.cancelId, context.identity.id)
+    return response
   } finally {
     requestContexts.delete(request)
     release()

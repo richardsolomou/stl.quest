@@ -1,3 +1,4 @@
+import { readLimitedBody } from './readLimitedBody'
 import crypto from 'node:crypto'
 import { logger } from './logger'
 import { isSameOriginRequest } from './origins'
@@ -71,11 +72,18 @@ export function createRealtime(viewer: RealtimeViewerLookup, policy: RealtimePol
  */
 export async function realtimeTicket(request: Request, { viewer, policy, secret }: RealtimeTicketOptions, now = Date.now()) {
   if (!isSameOriginRequest(request)) return new Response('cross-origin mutation rejected', { status: 403 })
-  const body: unknown = await request.json().catch(() => ({}))
-  const channel = body && typeof body === 'object' && 'channel' in body ? body.channel : undefined
-  if (channel !== undefined && typeof channel !== 'string') return Response.json({ error: 'invalid channel' }, { status: 400 })
   const current = await viewer(request)
   if (!current) return Response.json({ error: 'unauthenticated' }, { status: 401 })
+  const bytes = await readLimitedBody(request, 4096)
+  if (!bytes) return new Response('ticket body too large', { status: 413 })
+  let body: unknown
+  try {
+    body = bytes.length ? JSON.parse(new TextDecoder().decode(bytes)) : {}
+  } catch {
+    return new Response('invalid ticket body', { status: 400 })
+  }
+  const channel = body && typeof body === 'object' && 'channel' in body ? body.channel : undefined
+  if (channel !== undefined && typeof channel !== 'string') return Response.json({ error: 'invalid channel' }, { status: 400 })
   const headers = { 'cache-control': 'no-store' }
   if (channel === undefined) {
     const channels = await policy.serverChannels(current)

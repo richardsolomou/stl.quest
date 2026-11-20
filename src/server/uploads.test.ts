@@ -122,6 +122,8 @@ describe('tus upload transport', () => {
     ])
     await (await instance.workspace(new Headers(headers))).assetQueue.idle()
 
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(Date.now() + 25 * 60 * 60 * 1000)
     const resumed = await handleUpload(new Request(`http://print.test${location}`, { method: 'HEAD', headers }))
     expect(resumed.status).toBe(200)
     expect(resumed.headers.get('upload-offset')).toBe(String(bytes.length))
@@ -308,6 +310,24 @@ describe('tus upload transport', () => {
     return { create, headers, handleUpload, locations }
   }
 
+  it('requires a declared length before creating a reservation', async () => {
+    const { headers, handleUpload, create } = await startUploads('length', 0)
+    const response = await handleUpload(
+      new Request('http://print.test/api/upload', {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'upload-defer-length': '1',
+          'upload-metadata': metadata({ filename: 'model.stl', name: 'Model', quantity: '1', requestedPrintType: 'resin' }),
+        },
+      }),
+    )
+    expect(response.status).toBe(501)
+    const supported = await handleUpload(new Request('http://print.test/api/upload', { method: 'OPTIONS', headers }))
+    expect(supported.headers.get('tus-extension')?.split(',')).not.toContain('creation-defer-length')
+    for (let index = 0; index < 3; index++) expect((await create()).status).toBe(201)
+  })
+
   it('explains why an upload over the unfinished-upload limit is rejected', async () => {
     const { create } = await startUploads('limit', 3)
     const rejected = await create()
@@ -319,6 +339,19 @@ describe('tus upload transport', () => {
     const cancelled = await handleUpload(new Request(`http://print.test${locations[0]}`, { method: 'DELETE', headers }))
     expect(cancelled.status).toBe(204)
     expect((await create()).status).toBe(201)
+  })
+
+  it('keeps the ownership record when cancellation needs to be retried', async () => {
+    const { headers, handleUpload, locations } = await startUploads('retry-cancel', 1)
+    const { app } = await import('./app')
+    const instance = await app()
+    const context = await instance.workspace(new Headers(headers))
+    const uploadId = locations[0]!.split('/').at(-1)!
+    vi.spyOn(instance.uploadDatastore, 'remove').mockRejectedValueOnce(new Error('storage unavailable'))
+    const cancel = () => handleUpload(new Request('http://print.test' + locations[0], { method: 'DELETE', headers }))
+    expect((await cancel()).status).toBe(500)
+    expect(await context.repository.canCancelUpload(uploadId, context.identity.id)).toBe(true)
+    expect((await cancel()).status).toBe(204)
   })
 
   it('frees unfinished-upload slots held by uploads that stopped making progress', async () => {

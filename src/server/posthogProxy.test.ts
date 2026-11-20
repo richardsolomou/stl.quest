@@ -49,6 +49,10 @@ function proxied(path: string, init: RequestInit = {}) {
 }
 
 describe('forwardToPostHog', () => {
+  it('limits buffered event batches without a declared length', async () => {
+    expect((await proxied('/t/e/', { method: 'POST', body: new Uint8Array(4 * 1024 * 1024 + 1) })).status).toBe(413)
+  })
+
   it('sends events to the ingestion host without the proxy path', async () => {
     await proxied('/t/e/?compression=gzip-js', { method: 'POST', body: 'payload' })
     expect(received.map(({ host, method, url, body }) => ({ host, method, url, body }))).toEqual([

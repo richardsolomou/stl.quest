@@ -110,14 +110,19 @@ describe('storage configuration', () => {
     })
   })
 
+  it.each([{ endpoint: 'https://other.example' }, { username: 'other' }])('requires fresh WebDAV credentials for %o', (change) => {
+    const current = { adapter: 'webdav' as const, endpoint: 'https://original.example', username: 'user', root: '', password: 'saved' }
+    expect(() => resolveStorageInput({ ...current, ...change, password: '' }, current)).toThrow()
+  })
+
   it('preserves an existing WebDAV password when credentials are omitted', () => {
     const current = { adapter: 'webdav' as const, endpoint: 'https://old.example.com', root: '', username: 'user', password: 'secret' }
 
     expect(
       resolveStorageInput(
-        { adapter: 'webdav', endpoint: 'https://new.example.com', root: '/models/', username: 'user', password: '' },
+        { adapter: 'webdav', endpoint: 'https://old.example.com', root: '/models/', username: 'user', password: '' },
         current,
       ),
-    ).toMatchObject({ endpoint: 'https://new.example.com', root: 'models', password: 'secret' })
+    ).toMatchObject({ endpoint: 'https://old.example.com', root: 'models', password: 'secret' })
   })
 })

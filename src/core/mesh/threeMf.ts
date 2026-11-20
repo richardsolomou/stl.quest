@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { unzipSync } from 'fflate'
+import { isModelPart, modelXml, readThreeMfArchive } from './threeMfArchive'
 import { XMLParser } from 'fast-xml-parser'
 import { InvalidMeshError } from './stl'
 
@@ -25,23 +25,29 @@ function stage<T>(name: string, run: () => T): T {
 }
 
 export function parseThreeMf(file: Uint8Array): Float32Array {
-  const archive = stage('unzip', () => unzipSync(file))
+  const archive = stage('unzip', () => readThreeMfArchive(file, isModelPart))
   const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '', parseAttributeValue: true })
-  const models = new Map<string, XmlNode>()
-  for (const name of Object.keys(archive).filter((entry) => /^3D\/.*\.model$/i.test(entry))) {
-    const parsed = stage('xml', () => parser.parse(new TextDecoder().decode(archive[name]))) as { model?: XmlNode }
-    if (parsed.model) models.set(normalizePartName(name), parsed.model)
+  const models = new Map<string, { model: XmlNode; objects: Map<string, XmlNode> }>()
+  for (const name of Object.keys(archive)) {
+    const parsed = stage('xml', () => parser.parse(modelXml(archive[name]))) as { model?: XmlNode }
+    if (parsed.model) {
+      const resources = parsed.model.resources as XmlNode | undefined
+      const objects = new Map(array(resources?.object as XmlNode | XmlNode[] | undefined).map((object) => [String(object.id), object]))
+      models.set(normalizePartName(name), { model: parsed.model, objects })
+    }
   }
   return stage('geometry', () => {
     const mainName = [...models.keys()].find((name) => name.toLowerCase() === '3d/3dmodel.model') ?? models.keys().next().value
     if (!mainName) throw new InvalidMeshError('3MF does not contain a model')
     const output: number[] = []
 
+    let visits = 0
+    let remainingVertices = 3_000_000
     const appendObject = (modelName: string, id: string, parent: THREE.Matrix4, stack = new Set<string>()) => {
-      const model = models.get(modelName)
-      if (!model) throw new InvalidMeshError('3MF references a missing model part')
-      const resources = model.resources as XmlNode | undefined
-      const objects = new Map(array(resources?.object as XmlNode | XmlNode[] | undefined).map((object) => [String(object.id), object]))
+      if (++visits > 65_536 || stack.size >= 128) throw new InvalidMeshError('3MF exceeds the component budget')
+      const part = models.get(modelName)
+      if (!part) throw new InvalidMeshError('3MF references a missing model part')
+      const { model, objects } = part
       const scale = unitScale(typeof model.unit === 'string' ? model.unit : 'millimeter')
       const objectKey = `${modelName}:${id}`
       if (stack.has(objectKey)) throw new InvalidMeshError('3MF contains recursive components')
@@ -49,7 +55,14 @@ export function parseThreeMf(file: Uint8Array): Float32Array {
       if (!object) throw new InvalidMeshError('3MF references a missing object')
       const nextStack = new Set(stack).add(objectKey)
       const mesh = object.mesh as XmlNode | undefined
-      if (mesh) appendMesh(mesh, parent, scale, output)
+      if (mesh) {
+        const vertices = array((mesh.vertices as XmlNode | undefined)?.vertex as XmlNode | XmlNode[] | undefined)
+        const triangles = array((mesh.triangles as XmlNode | undefined)?.triangle as XmlNode | XmlNode[] | undefined)
+        remainingVertices -= vertices.length
+        if (remainingVertices < 0 || output.length + triangles.length * 9 > 9_000_000)
+          throw new InvalidMeshError('3MF exceeds the geometry budget')
+        appendMesh(vertices, triangles, parent, scale, output)
+      }
       const components = object.components as XmlNode | undefined
       for (const component of array(components?.component as XmlNode | XmlNode[] | undefined)) {
         const componentPath = component['p:path'] ?? component.path
@@ -58,7 +71,7 @@ export function parseThreeMf(file: Uint8Array): Float32Array {
       }
     }
 
-    const model = models.get(mainName)!
+    const model = models.get(mainName)!.model
     const scale = unitScale(typeof model.unit === 'string' ? model.unit : 'millimeter')
     const build = model.build as XmlNode | undefined
     for (const item of array(build?.item as XmlNode | XmlNode[] | undefined)) {
@@ -75,13 +88,11 @@ function normalizePartName(name: string) {
   return name.replace(/^\/+/, '')
 }
 
-function appendMesh(mesh: XmlNode, matrix: THREE.Matrix4, scale: number, output: number[]) {
-  const verticesNode = mesh.vertices as XmlNode | undefined
-  const trianglesNode = mesh.triangles as XmlNode | undefined
-  const vertices = array(verticesNode?.vertex as XmlNode | XmlNode[] | undefined).map((vertex) =>
+function appendMesh(source: XmlNode[], triangles: XmlNode[], matrix: THREE.Matrix4, scale: number, output: number[]) {
+  const vertices = source.map((vertex) =>
     new THREE.Vector3(Number(vertex.x) * scale, Number(vertex.y) * scale, Number(vertex.z) * scale).applyMatrix4(matrix),
   )
-  for (const triangle of array(trianglesNode?.triangle as XmlNode | XmlNode[] | undefined)) {
+  for (const triangle of triangles) {
     for (const key of ['v1', 'v2', 'v3']) {
       const vertex = vertices[Number(triangle[key])]
       if (!vertex) throw new InvalidMeshError('3MF contains an invalid triangle')

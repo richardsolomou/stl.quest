@@ -1,3 +1,4 @@
+import { readLimitedBody } from './readLimitedBody'
 import { ingestPath, type PostHogEnvironment } from '../contracts/posthog'
 import { appPath } from '../basePath'
 
@@ -32,10 +33,12 @@ export async function forwardToPostHog(request: Request, environment: Pick<PostH
   const client = request.headers.get('cf-connecting-ip')
   if (client) headers.set('x-forwarded-for', client)
 
+  const body = request.method === 'GET' || request.method === 'HEAD' ? null : await readLimitedBody(request, 4 * 1024 * 1024)
+  if (body === undefined) return new Response('telemetry batch too large', { status: 413 })
   const response = await fetch(`${upstream}${path}${url.search}`, {
     method: request.method,
     headers,
-    body: request.method === 'GET' || request.method === 'HEAD' ? null : await request.arrayBuffer(),
+    body,
     redirect: 'manual',
   })
 

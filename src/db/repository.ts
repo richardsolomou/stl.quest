@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lt, lte, max, ne, or, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, notExists, lt, lte, max, ne, or, sql } from 'drizzle-orm'
 import { isDeepStrictEqual } from 'node:util'
 import type { AdminAccountDetails, AdminWorkspace } from '../core/admin'
 import type {
@@ -590,10 +590,13 @@ export class DrizzleRepository implements Repository {
           throw new Response('too many incomplete uploads', { status: 429, statusText: 'too many incomplete uploads' })
         }
         await tx
-          .delete(uploadSessions)
+          .update(uploadSessions)
+          .set({ expiresAt: Date.now(), bytes: 0 })
           .where(
             and(
               eq(uploadSessions.workspaceId, workspaceId),
+              eq(uploadSessions.finalizingBytes, 0),
+              lt(uploadSessions.expiresAt, idleBefore!),
               inArray(
                 uploadSessions.id,
                 idle.map(({ id }) => id),
@@ -1024,11 +1027,20 @@ export class DrizzleRepository implements Repository {
       if (!session) throw new Response('upload session not found', { status: 404 })
       if (session.finalizingBytes > 0) return session.finalizingBytes
       if (session.bytes <= 0) throw new Response('upload reservation is missing', { status: 409 })
-      await tx
+      const converted = await tx
         .update(uploadSessions)
         .set({ bytes: 0, finalizingBytes: session.bytes })
-        .where(and(eq(uploadSessions.workspaceId, workspaceId), eq(uploadSessions.id, uploadId)))
-        .run()
+        .where(
+          and(
+            eq(uploadSessions.workspaceId, workspaceId),
+            eq(uploadSessions.id, uploadId),
+            eq(uploadSessions.bytes, session.bytes),
+            gt(uploadSessions.expiresAt, Date.now()),
+          ),
+        )
+        .returning({ id: uploadSessions.id })
+        .get()
+      if (!converted) throw new Response('upload reservation expired', { status: 409 })
       await tx
         .update(managedStorageUsage)
         .set({ assetReservedBytes: sql`${managedStorageUsage.assetReservedBytes} + ${session.bytes}` })
@@ -1245,19 +1257,58 @@ export class DrizzleRepository implements Repository {
     ).map(({ id }) => id)
   }
 
-  async releaseUploadSession(uploadId: string, ownerId: string) {
+  async refreshUploadSession(uploadId: string, ownerId: string, expiresAt: number, size: number) {
     const workspaceId = await this.workspace()
-    await this.database
-      .delete(uploadSessions)
+    const session = await this.database
+      .update(uploadSessions)
+      .set({ expiresAt })
       .where(
         and(
           eq(uploadSessions.workspaceId, workspaceId),
           eq(uploadSessions.id, uploadId),
           eq(uploadSessions.ownerId, ownerId),
-          isNull(uploadSessions.completedRequestId),
-          eq(uploadSessions.finalizingBytes, 0),
+          or(
+            isNotNull(uploadSessions.completedRequestId),
+            eq(uploadSessions.finalizingBytes, size),
+            and(gt(uploadSessions.expiresAt, Date.now()), eq(uploadSessions.bytes, size)),
+          ),
         ),
       )
+      .returning({ id: uploadSessions.id })
+      .get()
+    return Boolean(session)
+  }
+
+  private async cancellableUpload(uploadId: string, ownerId: string) {
+    return and(
+      eq(uploadSessions.workspaceId, await this.workspace()),
+      eq(uploadSessions.id, uploadId),
+      eq(uploadSessions.ownerId, ownerId),
+      isNull(uploadSessions.completedRequestId),
+      eq(uploadSessions.finalizingBytes, 0),
+      notExists(
+        this.database
+          .select({ id: operations.id })
+          .from(operations)
+          .where(and(eq(operations.workspaceId, uploadSessions.workspaceId), eq(operations.uploadId, uploadSessions.id))),
+      ),
+    )
+  }
+
+  async canCancelUpload(uploadId: string, ownerId: string) {
+    return Boolean(
+      await this.database
+        .select({ id: uploadSessions.id })
+        .from(uploadSessions)
+        .where(await this.cancellableUpload(uploadId, ownerId))
+        .get(),
+    )
+  }
+
+  async releaseUploadSession(uploadId: string, ownerId: string) {
+    await this.database
+      .delete(uploadSessions)
+      .where(await this.cancellableUpload(uploadId, ownerId))
       .run()
   }
 

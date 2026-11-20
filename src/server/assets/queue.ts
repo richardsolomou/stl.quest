@@ -15,7 +15,7 @@ import { acquireWorkLease, type WorkLocker, WorkLeaseLost } from '../workLock'
 import { isRetryableStorageError } from '../../adapters/retryableError'
 import { isAssetMissing } from '../../adapters/missingFile'
 
-type WorkerConfig = { path: string; execArgv?: string[] }
+type WorkerConfig = { path: string; execArgv?: string[]; timeoutMs?: number }
 type AssetQueueOptions = {
   concurrency?: number
   workerConfig?: WorkerConfig
@@ -414,7 +414,13 @@ export class AssetGenerationQueue {
         transferList: [file.buffer as ArrayBuffer],
         execArgv: this.workerConfig!.execArgv,
       })
+      let failure: unknown
+      let result: GeneratedAssets | undefined
       let thumbnailWrite = Promise.resolve()
+      const deadline = setTimeout(() => {
+        failure ??= new InvalidMeshError('model processing exceeded the time limit')
+        void worker.terminate()
+      }, this.workerConfig!.timeoutMs ?? 120_000)
       worker.on(
         'message',
         (
@@ -423,14 +429,25 @@ export class AssetGenerationQueue {
             | ({ ok: true; stage: 'complete' } & GeneratedAssets)
             | { ok: false; message: string; invalidMesh?: boolean },
         ) => {
-          if (!reply.ok) return reject(reply.invalidMesh ? new InvalidMeshError(reply.message) : new Error(reply.message))
-          if (reply.stage === 'thumbnail') thumbnailWrite = thumbnailWrite.then(() => thumbnailReady(reply.thumbnailPng))
-          else void thumbnailWrite.then(() => resolve(reply), reject)
+          if (!reply.ok) failure ??= reply.invalidMesh ? new InvalidMeshError(reply.message) : new Error(reply.message)
+          else if (reply.stage === 'thumbnail') {
+            thumbnailWrite = thumbnailWrite
+              .then(() => thumbnailReady(reply.thumbnailPng))
+              .catch((error: unknown) => {
+                failure ??= error
+              })
+          } else result = reply
         },
       )
-      worker.once('error', reject)
+      worker.once('error', (error) => {
+        failure ??= error
+      })
       worker.once('exit', (code) => {
-        if (code !== 0) reject(new Error(`asset worker exited with code ${code}`))
+        clearTimeout(deadline)
+        void thumbnailWrite.then(() => {
+          if (failure || code !== 0 || !result) reject(failure ?? new Error(`asset worker exited without a result (code ${code})`))
+          else resolve(result)
+        })
       })
     })
   }

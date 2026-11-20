@@ -417,6 +417,8 @@ interface RepositoryShape {
   workspaceOwnerId(): string | undefined
   managedStorageEligible(ownerId: string, workspaceLimit: number): boolean
   uploadIdsOwnedBy(ownerId: string): string[]
+  refreshUploadSession(uploadId: string, ownerId: string, expiresAt: number, size: number): boolean
+  canCancelUpload(uploadId: string, ownerId: string): boolean
   releaseUploadSession(uploadId: string, ownerId: string): void
   deleteUploadSessions(ownerId: string): void
   getCompletedUpload(uploadId: string, ownerId: string): string | undefined

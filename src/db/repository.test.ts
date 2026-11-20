@@ -1892,7 +1892,14 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect(accepted.filter(Boolean)).toHaveLength(1)
   })
 
-  it('durably converts an expired upload reservation exactly once during finalization', async () => {
+  it('refuses to convert released bytes after upload expiry', async () => {
+    await repository.claimManagedStorage('owner', 3)
+    await repository.createUploadSession('expired-upload', 'owner', Date.now() + 60_000, 3)
+    await repository.reserveUpload('expired-upload', 'owner', 60, Date.now() - 1, { count: 3, bytes: 100, managedBytes: 100 })
+    await expect(repository.beginManagedUploadFinalize('expired-upload')).rejects.toMatchObject({ status: 409 })
+  })
+
+  it('keeps an already converted upload reservation through expiry', async () => {
     const expired = Date.now() - 1
     await repository.claimManagedStorage('owner', 3)
     await repository.createUploadSession('finalizing-upload', 'owner', expired, 3)
@@ -1901,9 +1908,8 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       bytes: 100,
       managedBytes: 100,
     })
-    await repository.database.update(uploadSessions).set({ expiresAt: expired }).where(eq(uploadSessions.id, 'finalizing-upload')).run()
-
     expect(await repository.beginManagedUploadFinalize('finalizing-upload')).toBe(60)
+    await repository.database.update(uploadSessions).set({ expiresAt: expired }).where(eq(uploadSessions.id, 'finalizing-upload')).run()
     expect(await repository.expireUploads(Date.now())).toEqual([])
     expect(await repository.activeUploadIds(Date.now())).toContain('finalizing-upload')
     expect(await repository.beginManagedUploadFinalize('finalizing-upload')).toBe(60)
@@ -2294,7 +2300,9 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       (await repository.database.select({ id: uploadSessions.id }).from(uploadSessions).where(eq(uploadSessions.ownerId, 'owner')).all())
         .map(({ id }) => id)
         .sort(),
-    ).toEqual(['active-upload', 'idle-upload-newer', 'next-upload'])
+    ).toEqual(['active-upload', 'idle-upload-newer', 'idle-upload-old', 'next-upload'])
+    expect(await repository.refreshUploadSession('idle-upload-old', 'owner', idleBefore, 1)).toBe(false)
+    expect(await repository.expireUploads(Date.now())).toEqual(['idle-upload-old'])
   })
 
   it('keeps rejecting new uploads while every unfinished upload is active', async () => {
@@ -2312,6 +2320,8 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const expires = Date.now() + 60_000
     await repository.createUploadSession('cancelled-upload', 'owner', expires, 1)
     await repository.reserveUpload('cancelled-upload', 'owner', 1, expires, { count: 1, bytes: 100 })
+    expect(await repository.refreshUploadSession('cancelled-upload', 'owner', expires, 2)).toBe(false)
+    expect(await repository.canCancelUpload('cancelled-upload', 'other')).toBe(false)
     await repository.releaseUploadSession('cancelled-upload', 'owner')
     expect(await repository.createUploadSession('next-upload', 'owner', expires, 1)).toEqual({ fresh: true })
   })

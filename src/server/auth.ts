@@ -27,7 +27,7 @@ import { copyRequest } from './copyRequest'
 import { hostedDeployment } from './hosted'
 import { stripeBillingPlugin } from './billing'
 import { OIDC_DISCOVERY_TIMEOUT_MS } from './integrations'
-import { publicOrigin, trustedOrigins } from './origins'
+import { additionalOrigins, publicOrigin, trustedOrigins } from './origins'
 import { requestLocale, serverMessages } from './locale'
 import { isLocale, messagesFor } from '../core/i18n'
 import { appPath, basePath } from '../basePath'
@@ -132,7 +132,7 @@ export function createAuth(
   const accountMutationQueues = new Map<string, PQueue>()
   const auth = options?.auth ?? { password: true, passwordReset: true, socialProviders: [] }
   const email = options?.email
-  const emails = email ? authEmails(email) : undefined
+  const emails = email && options?.baseURL ? authEmails(email) : undefined
   const providerOptions = (provider: (typeof auth.socialProviders)[number]) => {
     const config = options?.auth?.[provider]
     return config ? { ...config, enabled: true, disableImplicitSignUp: true } : undefined
@@ -158,6 +158,18 @@ export function createAuth(
   // Enforced here rather than with the provider's disableSignUp, which would also block the first account and invites.
   const signupOpen = async (context: { path?: string; params?: Record<string, string | undefined> } | null) =>
     !oidcAllowSignup && context?.path === '/callback/:id' && context.params?.id === 'oidc' ? await firstAccount() : await selfSignupOpen()
+  const organizations = organization({
+    creatorRole: 'owner',
+    teams: { enabled: false },
+    // Workspaces are created through repository.createWorkspace, which enforces the hosted
+    // ownership limit; the plugin's own endpoint would bypass it.
+    allowUserToCreateOrganization: false,
+    schema: {
+      organization: {
+        additionalFields: { personalOwnerId: { type: 'string', required: false, input: false } },
+      },
+    },
+  })
   const authInstance = betterAuth({
     database: drizzleAdapter(database, { provider: databaseProvider(database), schema }),
     secret,
@@ -183,8 +195,8 @@ export function createAuth(
         '/admin/set-user-password': { window: 60, max: 10 },
       },
     },
-    trustedOrigins,
-    disabledPaths: ['/change-email', '/unlink-account'],
+    trustedOrigins: options?.baseURL ? additionalOrigins() : trustedOrigins,
+    disabledPaths: ['/change-email', '/unlink-account', ...Object.values(organizations.endpoints).map((endpoint) => endpoint.path)],
     onAPIError: {
       onError: (error) => {
         if (!isAPIError(error) || error.status === 'INTERNAL_SERVER_ERROR') options?.onError?.(error)
@@ -218,7 +230,7 @@ export function createAuth(
         locale: { type: 'string', required: false, input: false },
       },
       changeEmail: {
-        enabled: true,
+        enabled: Boolean(emails),
         updateEmailWithoutVerification: false,
       },
     },
@@ -284,18 +296,7 @@ export function createAuth(
         allowImpersonatingAdmins: true,
         impersonationSessionDuration: 60 * 60,
       }),
-      organization({
-        creatorRole: 'owner',
-        teams: { enabled: false },
-        // Workspaces are created through repository.createWorkspace, which enforces the hosted
-        // ownership limit; the plugin's own endpoint would bypass it.
-        allowUserToCreateOrganization: false,
-        schema: {
-          organization: {
-            additionalFields: { personalOwnerId: { type: 'string', required: false, input: false } },
-          },
-        },
-      }),
+      organizations,
       twoFactor({ issuer: 'STL Quest', allowPasswordless: true }),
       ...(oidc ? [oidc] : []),
       ...(billing ? [billing] : []),

@@ -182,7 +182,7 @@ async function currentAuthCapabilities(instance: Awaited<ReturnType<typeof app>>
   const auth = resolveAuthAdapterConfig(await getStoredIntegrationConfig(settings))
   return {
     password: auth.password,
-    passwordReset: auth.password && instance.emailCapabilities.configured,
+    passwordReset: auth.password && instance.authCapabilities.emailLinks,
     socialProviders: auth.socialProviders,
     oidcName: auth.oidcName,
     selfSignup: (await resolveSelfSignupConfig(settings)).enabled,
@@ -382,7 +382,7 @@ export const sessionInfo = createServerFn({ method: 'GET' })
         auth: await currentAuthCapabilities(instance),
         hosted: hostedDeployment(),
         email: {
-          ...instance.emailCapabilities,
+          configured: instance.authCapabilities.emailLinks,
           workspaceConfigured: await workspaceEmailConfigured(instance.emailCapabilities.configured, context?.repository),
         },
         workflow,

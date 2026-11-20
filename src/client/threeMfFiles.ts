@@ -1,4 +1,5 @@
-import { strToU8, unzipSync, zipSync } from 'fflate'
+import { strToU8, zipSync } from 'fflate'
+import { isModelPart, modelXml as decodeModelXml, readThreeMfArchive } from '../core/mesh/threeMfArchive'
 import { XMLParser } from 'fast-xml-parser'
 
 const THREE_MF_MIME = 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml'
@@ -16,7 +17,10 @@ export function inspectThreeMfBytes(file: Uint8Array): Omit<ThreeMfInspection, '
 }
 
 export async function splitThreeMf(file: File, onProgress?: (completed: number, total: number) => void): Promise<SplitThreeMfPart[]> {
-  const { archive, modelName, modelXml, items, parsedItems, objects, objectNames } = readThreeMf(new Uint8Array(await file.arrayBuffer()))
+  const { archive, modelName, modelXml, items, parsedItems, objects, objectNames } = readThreeMf(
+    new Uint8Array(await file.arrayBuffer()),
+    true,
+  )
   if (items.length <= 1) return [{ file, quantity: 1 }]
   const groups = groupBuildItems(items, parsedItems, objects)
   const baseName = file.name.replace(/\.3mf$/i, '')
@@ -42,12 +46,12 @@ function yieldToBrowser() {
   return new Promise<void>((resolve) => setTimeout(resolve, 0))
 }
 
-function readThreeMf(file: Uint8Array) {
+function readThreeMf(file: Uint8Array, keepAllParts = false) {
   try {
-    const archive = unzipSync(file)
-    const modelName = Object.keys(archive).find((name) => /^3D\/.*\.model$/i.test(name))
+    const archive = readThreeMfArchive(file, keepAllParts ? () => true : isModelPart)
+    const modelName = Object.keys(archive).find(isModelPart)
     if (!modelName) throw new Error('3MF does not contain a model')
-    const modelXml = new TextDecoder().decode(archive[modelName])
+    const modelXml = decodeModelXml(archive[modelName])
     const parsed = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '', parseAttributeValue: false }).parse(modelXml) as {
       model?: XmlNode
     }
