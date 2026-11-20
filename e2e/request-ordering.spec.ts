@@ -323,9 +323,11 @@ async function dragCardToColumn(page: Page, sourceName: string, status: string) 
   await source.scrollIntoViewIfNeeded()
   await page.locator(`[data-status="${status}"].column-lane`).scrollIntoViewIfNeeded()
   const targetBox = await target.boundingBox()
+  const sourceBox = await source.boundingBox()
   expect(targetBox).not.toBeNull()
+  // Grabbed in the middle: a tall ticket's top can sit under its zone's sticky heading once the target lane scrolls into view.
   await source.dragTo(target, {
-    sourcePosition: { x: 32, y: 32 },
+    sourcePosition: { x: sourceBox!.width / 2, y: sourceBox!.height / 2 },
     targetPosition: { x: targetBox!.width / 2, y: targetBox!.height / 2 },
   })
 }

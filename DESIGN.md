@@ -364,7 +364,7 @@ The pass is flat steel with paper on it. Steel surfaces carry no shadow; depth c
 
 Corners are small and mechanical. The base radius is 0.375rem (`lg`): zones, printer stations, inputs, and dialogs. Buttons use 0.28rem (`md`). Paper is cut tighter at 3px (tickets and slips, with only the top corners rounded on the stage bar). Plates are 4px: requester initials and station-strip chips; zone count chips are 3px. Copy cells and zone markers are 2px squares. Circles are reserved for the storage gauge, notification dots, and the feedback button.
 
-A ticket is drawn from parts: a stage bar across its top (0.375rem thick, thickening to 0.625rem and turning note red when the age is hot), a rail-steel hanger tab above it on the wide pass, a mono header, the condensed name beside the model's thumbnail (the requester's plate as a badge on its corner, as on rows), and a dashed perforation rule at 20% ink before the mono meta strip. Dialogs carry a 6px ink top edge, the shell carried onto paper.
+A ticket is drawn from parts: a stage bar across its top (0.375rem thick, thickening to 0.625rem and turning note red when the age is hot), a rail-steel hanger tab above it on the wide pass, a mono header, the condensed name flowing around the model's thumbnail (5rem on the lead ticket, 3.5rem on the rest, the requester's plate as a badge on its corner as on rows), so a word too long to sit beside it drops below whole, and a dashed perforation rule at 20% ink before the mono meta strip. Dialogs carry a 6px ink top edge, the shell carried onto paper.
 
 ## Components
 
@@ -389,11 +389,11 @@ Each zone's heading is its stage's legend, count, and select-all in one. Inside 
 
 One request card renders five ways by zone, all sharing the paper material.
 
-- **Backlog row (queue):** no paper; transparent row on steel with a steel-rule divider, 2.5rem thumbnail, condensed name, meta line, mono count, notes in note red, copy cells. Hover is a 5% ink wash.
+- **Backlog row (queue):** no paper; transparent row on steel with a steel-rule divider, 3.5rem thumbnail, condensed name, meta line, mono count, notes in note red, copy cells. Hover is a 5% ink wash.
 - **Ticket (up next):** paper, 3px corners, stage bar, hanger tab, mono header (`#02`, age), uppercase condensed title, perforation, mono meta strip. 9.5 to 11rem wide.
 - **Lead ticket:** the first ticket on the rail, 13 to 16rem wide, display-size name, "FIRES NEXT" in its mono header, estimate badges, and the labelled primary advance in its lower right, which names the assigned printer.
-- **Job (printer station):** paper with a 3rem thumbnail and an outline advance button.
-- **Slip (finishing and ready):** compact paper with a 2rem thumbnail, condensed name, and mono count.
+- **Job (printer station):** paper with a 4rem thumbnail and an outline advance button.
+- **Slip (finishing and ready):** compact paper with a 3rem thumbnail, condensed name, and mono count.
 - **Drag and drop:** a dragged card drops to 40% and scales to 98.5%; a 4px stage-coloured bar marks the insertion edge (left/right on the rail, top/bottom in lists).
 
 ### Copy Cells
