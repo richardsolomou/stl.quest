@@ -1,4 +1,5 @@
 import {
+  consumablesOfKind,
   partCostPerHour,
   partCostPerPlate,
   wearPartsFor,
@@ -87,6 +88,13 @@ export const TYPICAL_RESIN_PRICE_PER_LITRE = 50
 export const TYPICAL_RESIN_DENSITY_GRAMS_PER_ML = 1.1
 export const TYPICAL_FILAMENT_PRICE_PER_KG = 25
 
+/**
+ * A printer without its own purchase price wears like a typical hobby machine: about 600 spread over 3,000 print hours,
+ * a common calculator default and the cautious end of the 2,000 to 10,000 hours makers and guides give.
+ */
+export const TYPICAL_PRINTER_PURCHASE_PRICE = 600
+export const TYPICAL_PRINTER_LIFESPAN_HOURS = 3_000
+
 /** A resin print is washed and cured even when no equipment is picked, so a typical station stands in for it. */
 export const TYPICAL_RESIN_FINISHING: EquipmentItem = {
   id: 'typical-wash-cure',
@@ -152,7 +160,8 @@ export function costPrint({ rates, printType, job, consumables, printer, materia
       : (materialMl / 1_000) * nonNegative(resin?.pricePerLitre ?? TYPICAL_RESIN_PRICE_PER_LITRE)
   const power = printingPower(printType, printer?.presetId, printer?.addOnPresetIds, printer?.powerWatts)
   const printElectricity = printHours * electricityPerHour(power.watts, pricePerKwh)
-  const printerWear = printHours * wearPerHour(printer?.purchasePrice, printer?.lifespanHours)
+  const machineWear = printerWear(printer)
+  const printerWearCost = printHours * machineWear.perHour
   const wearParts = wearPartsFor(consumables, printType, printer).map((part) => ({
     part,
     cost: plates * partCostPerPlate(part) + printHours * partCostPerHour(part),
@@ -172,7 +181,7 @@ export function costPrint({ rates, printType, job, consumables, printer, materia
   const production =
     materialCost +
     printElectricity +
-    printerWear +
+    printerWearCost +
     sum(wearParts.map(({ cost }) => cost)) +
     sum(equipmentCosts.map(({ electricity, supplies, wear }) => electricity + supplies + wear))
   const failureAllowance = production * (nonNegative(rates.failureAllowancePercent) / 100)
@@ -183,7 +192,13 @@ export function costPrint({ rates, printType, job, consumables, printer, materia
     materialMl,
     materialGrams,
     material: { cost: materialCost, typical: !material },
-    printing: { watts: power.watts, typical: power.typical, electricity: printElectricity, wear: printerWear },
+    printing: {
+      watts: power.watts,
+      typical: power.typical,
+      electricity: printElectricity,
+      wear: printerWearCost,
+      wearTypical: machineWear.typical,
+    },
     wearParts,
     equipment: equipmentCosts,
     failureAllowance,
@@ -230,7 +245,7 @@ function productionCost(cost: PrintCost) {
 /** What a printer costs per print minute at the workspace's electricity rate: its printing power and its wear. */
 export function printerCostPerMinute(rates: Pick<PriceCalculatorSettings, 'electricityPricePerKwh'>, printer: CostedPrinter) {
   const { watts } = printingPower(printer.printType, printer.presetId, printer.addOnPresetIds, printer.powerWatts)
-  return (electricityPerHour(watts, rates.electricityPricePerKwh) + wearPerHour(printer.purchasePrice, printer.lifespanHours)) / 60
+  return (electricityPerHour(watts, rates.electricityPricePerKwh) + printerWear(printer).perHour) / 60
 }
 
 /** What a piece of equipment costs per minute it runs at the workspace's electricity rate: its power and its wear. */
@@ -255,8 +270,8 @@ export type RequestPriceInput = {
 }
 
 /**
- * Prices every copy on its own plate with no hands-on time, on the printer given and a typical material; a partial
- * estimate prices nothing rather than understating it.
+ * Prices every copy on its own plate with no hands-on time, on the printer given and the material the calculator offers
+ * first; a partial estimate prices nothing rather than understating it.
  */
 export function priceRequest(
   { rates, consumables, printer }: Pick<PrintCostInput, 'rates' | 'consumables' | 'printer'>,
@@ -270,7 +285,8 @@ export function priceRequest(
     plates: request.quantity,
     handsOnMinutes: 0,
   }
-  return { job, result: costPrint({ rates, printType: request.printType, job, consumables, printer }) }
+  const material = consumablesOfKind(consumables, request.printType)[0]
+  return { job, result: costPrint({ rates, printType: request.printType, job, consumables, printer, material }) }
 }
 
 /** Prices a request on each active printer of its print type, so the operator can compare where to run it. */
@@ -292,6 +308,14 @@ function suppliedPrice(consumables: Consumable[], consumableId: string) {
 
 function electricityPerHour(watts: number, pricePerKwh: number) {
   return (nonNegative(watts) / 1_000) * nonNegative(pricePerKwh)
+}
+
+/** What a printer wears per print hour: its own price over its lifespan or a typical one, else a typical printer's wear. */
+export function printerWear(printer?: Pick<CostedPrinter, 'purchasePrice' | 'lifespanHours'>) {
+  const price = positive(printer?.purchasePrice)
+  const hours = positive(printer?.lifespanHours)
+  if (price === undefined) return { perHour: TYPICAL_PRINTER_PURCHASE_PRICE / TYPICAL_PRINTER_LIFESPAN_HOURS, typical: true }
+  return { perHour: price / (hours ?? TYPICAL_PRINTER_LIFESPAN_HOURS), typical: hours === undefined }
 }
 
 function wearPerHour(purchasePrice?: number, lifespanHours?: number) {

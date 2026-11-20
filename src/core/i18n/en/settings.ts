@@ -564,7 +564,8 @@ export const settings = {
       archive: 'Archive',
       remove: 'Remove',
       wear: 'Wear',
-      wearHint: 'What the printer cost and how many print hours it lasts, so quotes count its wear.',
+      wearTypical: (cost: string) =>
+        `Quotes count a typical ${cost} per print hour until you enter what this printer cost and how many print hours it lasts.`,
       purchasePrice: (symbol: string) => `Purchase price (${symbol})`,
       lifespanHours: 'Lifespan (print hours)',
       wearPerHour: (cost: string) => `Wears ${cost} per print hour.`,

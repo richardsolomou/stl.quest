@@ -66,7 +66,8 @@ export const calculator: typeof en = {
     equipmentWear: (name: string) => `${name} · Verschleiß`,
     typicalFinishing: 'Waschen und Aushärten',
     typical: 'typisch',
-    typicalNote: 'Typische Werte ersetzen alles, was nicht gewählt ist. Wählen Sie Drucker, Material und Geräte für ein genaueres Angebot.',
+    typicalNote:
+      'Typische Werte ersetzen alles, was nicht gewählt oder eingetragen ist. Wählen Sie Drucker, Material und Geräte und tragen Sie den Kaufpreis Ihrer Drucker ein, für ein genaueres Angebot.',
   },
   batch: {
     title: (count: number) => `Schätzung · ${count} ${count === 1 ? 'Druck' : 'Drucke'}`,

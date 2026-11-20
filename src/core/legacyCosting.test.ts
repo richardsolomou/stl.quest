@@ -99,6 +99,46 @@ describe('upgrading v1.52 costing settings', () => {
     expect(upgrade(v152Settings({ resinPricePerLitre: 32, resinDensityGramsPerMl: 1.2 }), [], library)?.consumables).toEqual(library)
   })
 
+  it('puts the material the setup priced with ahead of the library ones', () => {
+    const library: Consumable[] = [{ id: 'basic', kind: 'filament', name: 'Basic', pricePerKg: 25 }]
+    const consumables = upgrade(v152Settings({ filamentPricePerKg: 13 }), [mk4], library)?.consumables ?? []
+
+    expect(consumables.filter(({ kind }) => kind === 'filament').map(({ id }) => id)).toEqual(['legacy-filament', 'basic'])
+  })
+
+  it('puts the library material the setup linked first', () => {
+    const library: Consumable[] = [
+      { id: 'basic', kind: 'filament', name: 'Basic', pricePerKg: 25 },
+      { id: 'linked', kind: 'filament', name: 'Linked', pricePerKg: 13 },
+    ]
+    const consumables = upgrade(v152Settings({ filamentConsumableId: 'linked' }), [mk4], library)?.consumables ?? []
+
+    expect(consumables.map(({ id }) => id)).toEqual(['linked', 'basic'])
+  })
+
+  it('puts the library material at the setup price first', () => {
+    const library: Consumable[] = [
+      { id: 'clear', kind: 'resin', name: 'Clear', pricePerLitre: 40, densityGramsPerMl: 1.1 },
+      { id: 'grey', kind: 'resin', name: 'Grey', pricePerLitre: 32, densityGramsPerMl: 1.2 },
+    ]
+    const consumables = upgrade(v152Settings({ resinPricePerLitre: 32, resinDensityGramsPerMl: 1.2 }), [], library)?.consumables ?? []
+
+    expect(consumables.map(({ id }) => id)).toEqual(['grey', 'clear'])
+  })
+
+  it('puts first the material most of its printers priced with', () => {
+    const library: Consumable[] = [
+      { id: 'clear', kind: 'resin', name: 'Clear', pricePerLitre: 40, densityGramsPerMl: 1.1 },
+      { id: 'grey', kind: 'resin', name: 'Grey', pricePerLitre: 50, densityGramsPerMl: 1.1 },
+    ]
+    const own = { resinConsumableId: 'grey', resinPricePerLitre: 50 }
+    const consumables =
+      upgrade(v152Settings({ resinPricePerLitre: 63, printerCosts: { saturn: own, homemade: own } }), [saturn, homemade], library)
+        ?.consumables ?? []
+
+    expect(consumables[0].id).toBe('grey')
+  })
+
   it('names a material priced only on one printer after it', () => {
     const settings = v152Settings({ printerCosts: { saturn: { resinPricePerLitre: 80, resinDensityGramsPerMl: 1.1 } } })
 

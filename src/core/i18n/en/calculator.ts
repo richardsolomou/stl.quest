@@ -60,7 +60,8 @@ export const calculator = {
     equipmentWear: (name: string) => `${name} · wear`,
     typicalFinishing: 'Wash and cure',
     typical: 'typical',
-    typicalNote: 'Typical values stand in for anything not picked. Pick the printer, material, and equipment for a closer quote.',
+    typicalNote:
+      'Typical values stand in for anything not picked or set. Pick the printer, material, and equipment, and give your printers their purchase price, for a closer quote.',
   },
   batch: {
     title: (count: number) => `Estimate · ${count} ${count === 1 ? 'print' : 'prints'}`,

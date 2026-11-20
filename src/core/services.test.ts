@@ -2545,7 +2545,7 @@ describe('STLQuestService crash recovery', () => {
           consumableId: undefined,
           amount: 180,
           unit: 'minute',
-          unitPrice: expect.closeTo(0.0135 / 60, 9),
+          unitPrice: expect.closeTo((0.0135 + 0.2) / 60, 9),
           currency: 'EUR',
         },
         { printerId: slaPrinter.id, consumableId: resin.id, amount: 24, unit: 'ml', unitPrice: 0.04, currency: 'EUR' },

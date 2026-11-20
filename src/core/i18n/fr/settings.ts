@@ -575,7 +575,8 @@ export const settings: typeof en = {
       archive: 'Archiver',
       remove: 'Supprimer',
       wear: 'Usure',
-      wearHint: 'Ce que l’imprimante a coûté et combien d’heures d’impression elle dure, pour que les devis comptent son usure.',
+      wearTypical: (cost: string) =>
+        `Les devis comptent une usure typique de ${cost} par heure d’impression tant que vous n’indiquez pas le prix de cette imprimante et ses heures d’impression.`,
       purchasePrice: (symbol: string) => `Prix d’achat (${symbol})`,
       lifespanHours: 'Durée de vie (heures d’impression)',
       wearPerHour: (cost: string) => `Usure de ${cost} par heure d’impression.`,

@@ -51,7 +51,7 @@ export function CostBasisList({
             <Fragment key={key}>
               <BasisRow
                 label={printerName ?? copy.typicalPrinter}
-                typical={hour.typical}
+                typical={hour.typical || hour.wearTypical}
                 value={copy.perHour(rate(hour.total))}
                 details={
                   compact

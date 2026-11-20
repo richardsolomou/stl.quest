@@ -109,8 +109,23 @@ describe('printing cost', () => {
     expect(cost({ printer: reflex }).printing.wear).toBeCloseTo(2)
   })
 
-  it('counts no printer wear without a lifespan', () => {
-    expect(cost({ printer: { ...reflex, lifespanHours: undefined } }).printing.wear).toBe(0)
+  it('marks the printer wear from its own price and lifespan as not typical', () => {
+    expect(cost({ printer: reflex }).printing.wearTypical).toBe(false)
+  })
+
+  it('spreads a printer price without a lifespan over a typical lifespan', () => {
+    expect(cost({ printer: { ...reflex, lifespanHours: undefined } }).printing).toMatchObject({
+      wear: (2000 / 3000) * 10,
+      wearTypical: true,
+    })
+  })
+
+  it('counts typical wear for a printer without a purchase price', () => {
+    expect(cost({ printer: { ...reflex, purchasePrice: undefined } }).printing).toMatchObject({ wear: 2, wearTypical: true })
+  })
+
+  it('counts typical wear without a printer', () => {
+    expect(cost().printing).toMatchObject({ wear: 2, wearTypical: true })
   })
 
   it('costs a plate-rated wear part by plate', () => {
@@ -253,7 +268,13 @@ describe('cost basis', () => {
 
 describe('printer cost per minute', () => {
   it('uses the printing power given to a custom printer', () => {
-    expect(printerCostPerMinute(rates, { id: 'rig', printType: 'resin', powerWatts: 300 })).toBeCloseTo(0.001)
+    const perHour =
+      printerCostPerMinute(rates, { id: 'rig', printType: 'resin', powerWatts: 300, purchasePrice: 600, lifespanHours: 600 }) * 60
+    expect(perHour).toBeCloseTo(1.06)
+  })
+
+  it('counts typical wear for a printer without a purchase price', () => {
+    expect(printerCostPerMinute({ electricityPricePerKwh: 0 }, { id: 'rig', printType: 'resin' }) * 60).toBeCloseTo(0.2)
   })
 })
 
@@ -268,6 +289,14 @@ describe('request quotes', () => {
       plates: 2,
       handsOnMinutes: 0,
     })
+  })
+
+  it('prices a request in the first library material of its print type', () => {
+    expect(priceRequest({ rates, consumables: library }, request)?.result.material).toEqual({ cost: 12, typical: false })
+  })
+
+  it('prices a typical material when the library has none of its print type', () => {
+    expect(priceRequest({ rates, consumables: [pla] }, request)?.result.material).toEqual({ cost: 5, typical: true })
   })
 
   it('does not price a request missing its material estimate', () => {

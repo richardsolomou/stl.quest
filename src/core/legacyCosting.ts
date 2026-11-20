@@ -59,7 +59,8 @@ export function upgradeLegacyCosting({ priceCalculator, printers, consumables }:
     priceCalculator: Object.fromEntries(Object.entries(priceCalculator).filter(([field]) => !LEGACY_FIELDS.includes(field))),
     printers: printers.map((printer) => upgradePrinter(printer, legacy, costsOf(printer))),
     consumables: PRINT_TYPES.reduce(
-      (library, printType) => library.concat(legacyMaterials(printType, legacy, printers, library)),
+      (library, printType) =>
+        pricedFirst(printType, legacy, printers, library.concat(legacyMaterials(printType, legacy, printers, library))),
       consumables,
     ),
   }
@@ -96,6 +97,44 @@ function legacyMaterials(printType: PrintType, legacy: LegacySettings, printers:
     if (![...library, ...created].some((other) => other.id === id || samePrice(other, material))) created.push(material)
   }
   return created
+}
+
+/**
+ * Puts the material most of a print type's printers priced with ahead of the others of its kind, or the workspace
+ * setup's without printers, since a quote that picks none uses the first: the library one linked, else the one at its price.
+ */
+function pricedFirst(printType: PrintType, legacy: LegacySettings, printers: PrinterProfile[], library: Consumable[]): Consumable[] {
+  const ofKind = consumablesOfKind(library, printType)
+  const pricedWith = (costs: LegacyCosts) => {
+    const linked = printType === 'resin' ? costs.resinConsumableId : costs.filamentConsumableId
+    return ofKind.find(({ id }) => id === linked) ?? ofKind.find((material) => samePrice(material, setupMaterial(printType, costs)))
+  }
+  const fleet = printers.filter((printer) => !printer.archived && printer.printType === printType)
+  const used = (
+    fleet.length ? fleet.map((printer) => pricedWith({ ...legacy, ...legacy.printerCosts?.[printer.id] })) : [pricedWith(legacy)]
+  ).filter((material) => material !== undefined)
+  const first = used.reduce<Consumable | undefined>(
+    (most, material) => (most && count(used, most) >= count(used, material) ? most : material),
+    undefined,
+  )
+  return first ? [first, ...library.filter((material) => material !== first)] : library
+}
+
+/** The material a setup's prices describe, to find the library one that matches them. */
+function setupMaterial(printType: PrintType, costs: LegacyCosts): Consumable {
+  return printType === 'resin'
+    ? {
+        id: '',
+        kind: 'resin',
+        name: '',
+        pricePerLitre: costs.resinPricePerLitre ?? NaN,
+        densityGramsPerMl: positive(costs.resinDensityGramsPerMl) ? costs.resinDensityGramsPerMl : LEGACY_DEFAULT_RESIN_DENSITY,
+      }
+    : { id: '', kind: 'filament', name: '', pricePerKg: costs.filamentPricePerKg ?? NaN }
+}
+
+function count<Item>(items: Item[], item: Item) {
+  return items.filter((other) => other === item).length
 }
 
 function materialName(printType: PrintType) {

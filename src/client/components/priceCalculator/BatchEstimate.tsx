@@ -21,7 +21,7 @@ import { RatesLink } from './PricingSections'
 
 type Line = { request: PublicPrintRequest; printType: PrintType; printer?: PrinterProfile; cost: number; price: number }
 
-/** Prices each print on the printer it is assigned to, with typical material and finishing, and adds them up. */
+/** Prices each print on the printer it is assigned to, in the workspace's first material of its type, and adds them up. */
 function priceLines(requests: PublicPrintRequest[], rates: PriceCalculatorSettings, printers: PrinterProfile[], consumables: Consumable[]) {
   const priced: Line[] = []
   const unpriced: PublicPrintRequest[] = []

@@ -23,7 +23,7 @@ import {
   printingPower,
   type EquipmentPreset,
 } from '../../../core/equipmentPresets'
-import type { PriceCalculatorCurrency } from '../../../core/priceCalculator'
+import { printerWear, type PriceCalculatorCurrency } from '../../../core/priceCalculator'
 import { getPrinterPreset, type PrinterPreset } from '../../../core/printerPresets'
 import { normalizePrinterProfile, printerModelName, printerProfilesValidationError } from '../../../core/printers'
 import { PRINT_TYPES, type PrinterProfile } from '../../../core/types'
@@ -370,7 +370,7 @@ function PrinterWear({
 }) {
   const { t, locale } = useI18n()
   const copy = t.settings.printers.dialog
-  const perHour = draft.purchasePrice && draft.lifespanHours ? draft.purchasePrice / draft.lifespanHours : undefined
+  const wear = printerWear(draft)
   const set = (key: 'purchasePrice' | 'lifespanHours') => (value: number) =>
     onChange((current) => ({ ...current, [key]: value > 0 ? value : undefined }))
   return (
@@ -380,7 +380,7 @@ function PrinterWear({
           {copy.wear}
         </h3>
         <p className="text-sm text-muted-foreground">
-          {perHour === undefined ? copy.wearHint : copy.wearPerHour(formatMoney(perHour, currency, locale))}
+          {(wear.typical ? copy.wearTypical : copy.wearPerHour)(formatMoney(wear.perHour, currency, locale))}
         </p>
       </div>
       <div className="grid grid-cols-2 gap-2 sm:max-w-md">

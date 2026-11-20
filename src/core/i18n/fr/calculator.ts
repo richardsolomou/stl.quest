@@ -67,7 +67,7 @@ export const calculator: typeof en = {
     typicalFinishing: 'Lavage et polymérisation',
     typical: 'typique',
     typicalNote:
-      'Des valeurs typiques remplacent tout ce qui n’est pas choisi. Choisissez l’imprimante, la matière et l’équipement pour un devis plus précis.',
+      'Des valeurs typiques remplacent tout ce qui n’est pas choisi ou renseigné. Choisissez l’imprimante, la matière et l’équipement, et indiquez le prix d’achat de vos imprimantes, pour un devis plus précis.',
   },
   batch: {
     title: (count: number) => `Estimation · ${count} ${count === 1 ? 'impression' : 'impressions'}`,

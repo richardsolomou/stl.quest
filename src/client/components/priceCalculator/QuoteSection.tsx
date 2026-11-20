@@ -46,7 +46,8 @@ export function QuoteSection({
   const others = [...comparison].sort((a, b) => a.result.suggestedPrice - b.result.suggestedPrice)
   const cheapest = others[0]?.result.suggestedPrice
   const dearest = others.at(-1)?.result.suggestedPrice
-  const typical = result.material.typical || result.printing.typical || result.equipment.some((line) => line.typical)
+  const typical =
+    result.material.typical || result.printing.typical || result.printing.wearTypical || result.equipment.some((line) => line.typical)
   return (
     <div className="lg:sticky lg:top-7 lg:col-start-2 lg:row-start-1 lg:row-span-2">
       <Docket title={copy.title} className="bg-card">
@@ -92,7 +93,7 @@ export function QuoteSection({
                 typical={result.material.typical}
               />
               <CostRow label={copy.printElectricity} value={money(result.printing.electricity)} typical={result.printing.typical} />
-              {result.printing.wear > 0 && <CostRow label={copy.printerWear} value={money(result.printing.wear)} />}
+              <CostRow label={copy.printerWear} value={money(result.printing.wear)} typical={result.printing.wearTypical} />
               {result.wearParts.map(({ part, cost }) => cost > 0 && <CostRow key={part.id} label={part.name} value={money(cost)} />)}
               {result.equipment.map(({ item, typical: standIn, electricity, supplies, wear }) => {
                 const name = standIn ? copy.typicalFinishing : item.name

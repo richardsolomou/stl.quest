@@ -575,7 +575,8 @@ export const settings: typeof en = {
       archive: 'Archivieren',
       remove: 'Entfernen',
       wear: 'Verschleiß',
-      wearHint: 'Was der Drucker gekostet hat und wie viele Druckstunden er hält, damit Angebote seinen Verschleiß rechnen.',
+      wearTypical: (cost: string) =>
+        `Angebote rechnen typische ${cost} pro Druckstunde, bis Sie eintragen, was dieser Drucker gekostet hat und wie viele Druckstunden er hält.`,
       purchasePrice: (symbol: string) => `Kaufpreis (${symbol})`,
       lifespanHours: 'Lebensdauer (Druckstunden)',
       wearPerHour: (cost: string) => `Verschleiß ${cost} pro Druckstunde.`,
