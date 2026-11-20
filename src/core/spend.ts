@@ -145,6 +145,8 @@ export type ProfitSummary = {
   profit: number
   /** How many prints were counted. */
   charged: number
+  /** Whether any print has a charge in the workspace currency, whatever the period. */
+  recorded: boolean
   byPrint: Map<string, number>
 }
 
@@ -157,13 +159,16 @@ export function summariseProfit(prints: ChargedPrint[], period: SpendPeriod, cur
   const byPrint = new Map<string, number>()
   let earned = 0
   let spent = 0
+  let recorded = false
   for (const { requestId, charged, cost, finishedAt } of prints) {
-    if (charged.currency !== currency || finishedAt === undefined || finishedAt < period.from || finishedAt >= period.to) continue
+    if (charged.currency !== currency) continue
+    recorded = true
+    if (finishedAt === undefined || finishedAt < period.from || finishedAt >= period.to) continue
     earned += charged.amount
     spent += cost
     byPrint.set(requestId, charged.amount - cost)
   }
-  return { earned, spent, profit: earned - spent, charged: byPrint.size, byPrint }
+  return { earned, spent, profit: earned - spent, charged: byPrint.size, recorded, byPrint }
 }
 
 /** One recorded action on a print, such as moving it to Printing: who did it, when, and what it used. */

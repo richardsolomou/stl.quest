@@ -183,7 +183,7 @@ export function SpendOverview({
               )}
             >
               <Stat label={copy.totals.total} note={basis || undefined} className="col-span-2 lg:col-span-1">
-                <span className="text-5xl leading-none font-semibold">{money(summary.total)}</span>
+                <span className="text-[clamp(2rem,15cqw,3rem)] leading-none font-semibold">{money(summary.total)}</span>
               </Stat>
               {profit.charged > 0 && (
                 <>
@@ -213,7 +213,7 @@ export function SpendOverview({
                 {money(summary.outcomes.wasted)}
               </Stat>
             </dl>
-            {profit.charged === 0 && <p className="-mt-3 text-xs text-muted-foreground">{copy.totals.noCharges}</p>}
+            {profit.recorded && profit.charged === 0 && <p className="-mt-3 text-xs text-muted-foreground">{copy.totals.noCharges}</p>}
             {(summary.unpriced > 0 || summary.otherCurrencies.length > 0) && (
               <div className="-mt-3 flex flex-col gap-1 text-xs text-muted-foreground">
                 {summary.unpriced > 0 && (
@@ -347,9 +347,9 @@ function categoryHint(category: SpendCategory, copy: { printerHint: string; equi
 
 function Stat({ label, note, className, children }: { label: string; note?: string; className?: string; children: React.ReactNode }) {
   return (
-    <div className={cn('flex min-w-0 flex-col gap-2 bg-card px-4 py-4 sm:px-5', className)}>
+    <div className={cn('@container flex min-w-0 flex-col gap-2 bg-card px-4 py-4 sm:px-5', className)}>
       <dt className="font-heading text-xs font-bold tracking-[0.015em] text-muted-foreground uppercase">{label}</dt>
-      <dd className="text-2xl leading-none font-semibold">{children}</dd>
+      <dd className="text-[clamp(1rem,13cqw,1.5rem)] leading-none font-semibold [overflow-wrap:anywhere]">{children}</dd>
       {note && <dd className="text-xs text-muted-foreground">{note}</dd>}
     </div>
   )
