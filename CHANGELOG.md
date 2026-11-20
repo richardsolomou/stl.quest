@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.2
+
+### Patch Changes
+
+- 1d04075: Show bigger model thumbnails on every board card and widen the queue and the Finishing and Ready shelves, so that prints are easier to recognise at a glance.
+
 ## 2.0.1
 
 ### Patch Changes
