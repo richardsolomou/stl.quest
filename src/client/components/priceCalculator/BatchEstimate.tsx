@@ -4,7 +4,7 @@ import { ArrowLeft, Copy } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { Consumable } from '../../../core/consumables'
-import { costBasis, priceRequest, type PriceCalculatorSettings } from '../../../core/priceCalculator'
+import { costBasis, priceRequest, roundQuote, type PriceCalculatorSettings } from '../../../core/priceCalculator'
 import type { PrinterProfile, PrintType, PublicPrintRequest } from '../../../core/types'
 import { useI18n } from '../../i18n'
 import { requestsQuery } from '../../queries'
@@ -21,7 +21,7 @@ import { RatesLink } from './PricingSections'
 
 type Line = { request: PublicPrintRequest; printType: PrintType; printer?: PrinterProfile; cost: number; price: number }
 
-/** Prices each print on the printer it is assigned to, in the workspace's first material of its type, and adds them up. */
+/** Prices each print on the printer it is assigned to, in the workspace's first material of its type, rounded as listed so the totals add up. */
 function priceLines(requests: PublicPrintRequest[], rates: PriceCalculatorSettings, printers: PrinterProfile[], consumables: Consumable[]) {
   const priced: Line[] = []
   const unpriced: PublicPrintRequest[] = []
@@ -33,7 +33,8 @@ function priceLines(requests: PublicPrintRequest[], rates: PriceCalculatorSettin
         ? priceRequest({ rates, consumables, printer }, { ...estimate, printType: request.printType, quantity: request.quantity })
         : undefined
     if (quote && request.printType) {
-      priced.push({ request, printType: request.printType, printer, cost: quote.result.estimatedCost, price: quote.result.suggestedPrice })
+      const rounded = roundQuote(quote.result, rates.currency)
+      priced.push({ request, printType: request.printType, printer, cost: rounded.costToMake, price: rounded.suggestedPrice })
     } else unpriced.push(request)
   }
   return { priced, unpriced }

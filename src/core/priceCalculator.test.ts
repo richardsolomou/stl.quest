@@ -269,6 +269,17 @@ describe('rounded quote', () => {
   it('rounds to whole units in a currency without minor units', () => {
     expect(lines(quote(33.33, 'JPY')).every(Number.isInteger)).toBe(true)
   })
+
+  // Rounded one by one, these lines come to 20.14, a cent short of the exact cost.
+  it('adds up wear parts and equipment lines to the rounded cost to make', () => {
+    const rounded = roundQuote(cost({ material: grey, consumables: library, equipment: [wash], job: { ...job, handsOnMinutes: 7 } }), 'EUR')
+    const all = [
+      ...lines(rounded),
+      ...rounded.wearParts.map(({ cost: part }) => part),
+      ...rounded.equipment.flatMap(({ electricity, supplies, wear }) => [electricity, supplies, wear]),
+    ]
+    expect(total(all)).toBe(20.15)
+  })
 })
 
 describe('cost basis', () => {
