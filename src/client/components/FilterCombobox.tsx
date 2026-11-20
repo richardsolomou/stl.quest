@@ -9,6 +9,7 @@ import {
   ComboboxList,
 } from '@/components/ui/combobox'
 import { cn } from '@/lib/utils'
+import { matchesListSearch } from '../listSearch'
 
 type Option = { value: string; label: string }
 
@@ -50,7 +51,9 @@ export function FilterCombobox<T extends Option>({
     setQuery(label)
   }
   // The input shows the selected label until someone types, and reopening a chosen value should list every option.
-  const searched = search && query !== label ? search(query) : undefined
+  // Every word must appear, so "bambu pla" finds "Bambu Lab PLA Basic"; a caller's own search replaces this.
+  const searched =
+    query === label ? undefined : search ? search(query) : { options: options.filter((option) => matchesListSearch(query, [option.label])) }
 
   return (
     <Combobox

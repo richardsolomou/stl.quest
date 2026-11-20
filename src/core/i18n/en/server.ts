@@ -97,7 +97,15 @@ export const server = {
     invalidArchive: 'invalid archive',
     sourceModelNotFound: 'source STL not found',
     printerOrPrintType: 'choose a printer or print type, not both',
+    printTypeNotOffered: 'this workspace does not print that type',
     unknownPrinter: 'unknown printer',
     printerArchived: 'printer is archived',
+  },
+  usage: {
+    unknownConsumable: 'unknown consumable',
+    unknownEquipment: 'unknown equipment',
+    materialMismatch: 'this material does not suit the print type',
+    nothingToUndo: 'nothing to undo',
+    trackingOff: 'usage and stock tracking is off for this workspace',
   },
 }

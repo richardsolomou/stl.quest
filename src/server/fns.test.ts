@@ -46,30 +46,27 @@ describe('price calculator settings', () => {
   })
 
   it('reports a saved setup as saved', () => {
-    expect(storedPriceCalculatorSettings({ resinPricePerLitre: 80 })).toEqual({
-      settings: { ...DEFAULT_PRICE_CALCULATOR_SETTINGS, resinPricePerLitre: 80 },
+    expect(storedPriceCalculatorSettings({ labourCostPerHour: 20 })).toEqual({
+      settings: { ...DEFAULT_PRICE_CALCULATOR_SETTINGS, labourCostPerHour: 20 },
       saved: true,
     })
   })
 
-  it('gives a setup saved before per-printer costs no printer costs', () => {
-    expect(storedPriceCalculatorSettings({ resinPricePerLitre: 80 }).settings.printerCosts).toEqual({})
-  })
-
-  it('keeps a printer own costs when loading a saved setup', () => {
-    const costs = {
-      resinPricePerLitre: 160,
-      resinDensityGramsPerMl: 1.1,
-      filamentPricePerKg: 25,
-      equipmentCostPerHour: 2,
-      consumablesCostPerPlate: 1,
-      equipment: DEFAULT_PRICE_CALCULATOR_SETTINGS.resinEquipment,
+  it('keeps the business rates of a setup stored with material, equipment, and per-printer costs', () => {
+    const stored = {
+      labourCostPerHour: 20,
+      resinPricePerLitre: 80,
+      resinEquipment: { mode: 'custom', presetIds: [] },
+      printerCosts: { form4: { resinPricePerLitre: 160 } },
     }
-    expect(storedPriceCalculatorSettings({ printerCosts: { form4: costs } }).settings.printerCosts.form4?.resinPricePerLitre).toBe(160)
+    expect(storedPriceCalculatorSettings(stored).settings).toEqual({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, labourCostPerHour: 20 })
   })
 
   it('keeps euros for a setup saved before the currency setting existed', () => {
-    expect(storedPriceCalculatorSettings({ resinPricePerLitre: 80 }).settings.currency).toBe('EUR')
+    expect(storedPriceCalculatorSettings({ labourCostPerHour: 20 }).settings.currency).toBe('EUR')
+  })
+
+  it('keeps a saved currency', () => {
     expect(storedPriceCalculatorSettings({ currency: 'CAD' }).settings.currency).toBe('CAD')
   })
 })

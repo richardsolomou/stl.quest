@@ -13,6 +13,7 @@ import {
   type ManufacturerCatalogSource,
   type ManufacturerImage,
   type ManufacturerImageSource,
+  serializedPrinterIndex,
   writePresetImage,
 } from './printerCatalog'
 
@@ -23,6 +24,7 @@ const manufacturerImagesPath = path.join(root, 'catalogs/printers/manufacturer-i
 const manufacturerCatalogPath = path.join(root, 'catalogs/printers/manufacturer-printers.json')
 const imageSourcesPath = path.join(root, 'catalogs/printers/image-sources.json')
 const outputPath = path.join(root, 'catalogs/printers/catalog.generated.json')
+const indexPath = path.join(root, 'catalogs/printers/index.generated.json')
 const imagesRoot = path.join(root, 'public/printer-presets')
 const orcaImagesRoot = path.join(imagesRoot, 'orcaslicer')
 const update = process.argv.includes('--update')
@@ -75,6 +77,7 @@ async function synchronizeCatalog(sources: CatalogSource[]) {
     }
     validateCatalog(catalog.presets, catalogSources)
     writeFileSync(outputPath, `${JSON.stringify(catalog, null, 2)}\n`)
+    writeFileSync(indexPath, serializedPrinterIndex(catalog.presets))
     rmSync(orcaImagesRoot, { recursive: true, force: true })
     const referencedImages = new Set(catalog.presets.flatMap((preset) => (preset.image ? [preset.image.src] : [])))
     for (const [destination, sourceImage] of images) {
@@ -118,6 +121,9 @@ function validateCommittedCatalog(sources: CatalogSource[]) {
     if (!imageSourceIds.has(image.sourceId)) throw new Error(`Unknown image source ${image.sourceId} for ${image.presetId}`)
   }
   validateCatalog(catalog.presets, [...sources, ...manufacturerCatalog.sources])
+  if (!existsSync(indexPath) || readFileSync(indexPath, 'utf8') !== serializedPrinterIndex(catalog.presets)) {
+    throw new Error('catalogs/printers/index.generated.json does not match the catalog; run pnpm catalog:sync')
+  }
   const referencedImages = new Set(catalog.presets.flatMap((preset) => (preset.image ? [preset.image.src] : [])))
   for (const image of referencedImages) {
     if (!existsSync(path.join(root, 'public', image))) throw new Error(`Missing generated printer image ${image}`)

@@ -101,7 +101,15 @@ export const server: typeof en = {
     invalidArchive: 'ungültige Archivierung',
     sourceModelNotFound: 'Quell-STL nicht gefunden',
     printerOrPrintType: 'wählen Sie einen Drucker oder eine Druckart, nicht beides',
+    printTypeNotOffered: 'dieser Arbeitsbereich druckt diese Druckart nicht',
     unknownPrinter: 'unbekannter Drucker',
     printerArchived: 'der Drucker ist archiviert',
+  },
+  usage: {
+    unknownConsumable: 'unbekanntes Verbrauchsmaterial',
+    unknownEquipment: 'unbekanntes Gerät',
+    materialMismatch: 'dieses Material passt nicht zur Druckart',
+    nothingToUndo: 'nichts rückgängig zu machen',
+    trackingOff: 'Verbrauchs- und Bestandserfassung ist für diesen Arbeitsbereich aus',
   },
 }

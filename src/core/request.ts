@@ -1,5 +1,7 @@
 export const MIN_REQUEST_QUANTITY = 1
 export const MAX_REQUEST_QUANTITY = 50
+/** The most cards one bulk board action takes, so selecting a whole busy stage still goes through as one change. */
+export const MAX_BULK_CARDS = 1_000
 export const MAX_REQUEST_NAME_LENGTH = 120
 export const MAX_REQUEST_NOTES_LENGTH = 2_000
 export const MAX_REQUEST_SOURCE_URL_LENGTH = 500

@@ -1,15 +1,22 @@
+// Checks, without changing the board, that the demo instance offers everything the README loop acts on, and saves a
+// screenshot of each beat for inspection before recording.
 import { chromium } from '@playwright/test'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { config, signIn } from './config.ts'
+import { scene, shot, signIn, zone } from './config.ts'
 
 const out = process.env.OUT ?? fileURLToPath(new URL('../../../.capture/verify/', import.meta.url))
 
 fs.mkdirSync(out, { recursive: true })
 
 const browser = await chromium.launch()
-const context = await browser.newContext({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 2, colorScheme: 'dark' })
+const context = await browser.newContext({
+  viewport: { width: scene.width, height: scene.height },
+  deviceScaleFactor: 2,
+  colorScheme: 'dark',
+})
 const page = await context.newPage()
+page.setDefaultTimeout(8000)
 const failures: string[] = []
 page.on('console', (message) => {
   if (message.type() === 'error') failures.push('console: ' + message.text().slice(0, 200))
@@ -18,56 +25,31 @@ page.on('pageerror', (error) => failures.push('pageerror: ' + String(error).slic
 page.on('requestfailed', (request) => failures.push('requestfailed: ' + request.url().slice(0, 120)))
 
 await signIn(page)
+await page.screenshot({ path: `${out}/10-board.png` })
 
-// A request that has a compressed 3D preview: the viewer is the centrepiece of the video.
-await page.getByText('Nightbringer', { exact: true }).first().click()
-await page.waitForTimeout(4000)
-await page.screenshot({ path: `${out}/10-detail-viewer.png` })
-await page.keyboard.press('Escape')
-await page.waitForTimeout(800)
-
-// The deliberately over-sized model, to confirm the plate-fit warning renders.
-await page.getByPlaceholder(/search prints/i).fill('Void Dragon')
-await page.waitForTimeout(1500)
-await page.screenshot({ path: `${out}/11-search-voiddragon.png` })
-await page.getByText('Void Dragon', { exact: true }).first().click()
-await page.waitForTimeout(3500)
-await page.screenshot({ path: `${out}/12-fit-warning.png` })
-await page.keyboard.press('Escape')
-await page.waitForTimeout(500)
-await page.getByPlaceholder(/search prints/i).fill('')
-await page.waitForTimeout(1200)
-
-// Filters panel: requester facets and print-type filtering.
-await page
-  .getByRole('button', { name: /filters/i })
+// The first queued print, with the arrow that moves it up next showing on hover.
+await shot.queued(page).hover()
+await zone(page, 'todo')
+  .getByRole('button', { name: /^Move up next: / })
   .first()
-  .click()
-await page.waitForTimeout(1200)
-await page.screenshot({ path: `${out}/13-filters.png` })
+  .waitFor()
+await page.screenshot({ path: `${out}/11-queue-hover.png` })
+
+// The print that fires next offers a choice of printers, at least one of them idle.
+await shot.start(page).click()
+const idle = shot.idlePrinter(page)
+const printer = (await idle.locator('span').first().innerText()).trim()
+await page.waitForTimeout(400)
+await page.screenshot({ path: `${out}/12-start-menu.png` })
 await page.keyboard.press('Escape')
+await idle.waitFor({ state: 'hidden' })
+
+// That printer's station, which the loop scrolls to once the print starts.
+const station = shot.station(page, printer)
+await station.scrollIntoViewIfNeeded()
 await page.waitForTimeout(600)
+await page.screenshot({ path: `${out}/13-station.png` })
 
-// Printer fleet in settings.
-await page.goto(`${config.baseUrl}/settings/printers`, { waitUntil: 'domcontentloaded' })
-await page.waitForTimeout(2000)
-await page.screenshot({ path: `${out}/14-printers.png`, fullPage: true })
-
-await page.goto(`${config.baseUrl}/settings/members`, { waitUntil: 'domcontentloaded' })
-await page.waitForTimeout(2000)
-await page.screenshot({ path: `${out}/15-members.png`, fullPage: true })
-
-// Mobile.
-const mobile = await browser.newContext({
-  viewport: { width: 320, height: 720 },
-  deviceScaleFactor: 3,
-  isMobile: true,
-  hasTouch: true,
-  colorScheme: 'dark',
-})
-const small = await mobile.newPage()
-await signIn(small, 4_500)
-await small.screenshot({ path: `${out}/16-mobile.png` })
-
+console.log(`loop starts the next print on ${printer}`)
 console.log(failures.length ? 'ISSUES:\n' + [...new Set(failures)].join('\n') : 'no console/network errors')
 await browser.close()

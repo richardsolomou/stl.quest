@@ -4,6 +4,7 @@ import { useServerFn } from '@tanstack/react-start'
 import { usePostHog } from '@posthog/react'
 import { useDropzone } from 'react-dropzone'
 import { Link2, Upload } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { FieldError } from '@/components/ui/field'
@@ -14,8 +15,6 @@ import { DialogProblem } from './DialogProblem'
 import { Spinner } from '@/components/ui/spinner'
 import { renderRowThumbnail } from '../rowThumb'
 import { isIOS, isPhone } from '../device'
-import { availablePrintTypes } from '../fleet'
-import type { PrinterSummary } from '../../core/types'
 import { modelFormat } from '../../core/assetKeys'
 import { MAX_UPLOAD_BYTES } from '../../core/uploadLimits'
 import { DialogShell } from './DialogShell'
@@ -25,7 +24,7 @@ import { UploadRow } from './UploadRow'
 import { isUploadCancelled, uploadErrorMessage, uploadPrint, uploadRejection } from './uploadTransport'
 import { StorageUpgradeAction } from './StorageUpgradeAction'
 import type { UploadEntry as Entry } from './uploadTypes'
-import { useWorkspaceSlug } from '../workspace'
+import { useWorkspacePrintTypes, useWorkspaceSlug } from '../workspace'
 import { prepareUploadFiles, uploadOutcome, uploadValidationError } from '../uploadEntries'
 import { signalProductTourProgress } from '../productTour'
 import { splitThreeMf, type SplitThreeMfPart, type ThreeMfInspection } from '../threeMfFiles'
@@ -45,13 +44,11 @@ import { useI18n } from '../i18n'
 export function UploadForm({
   initialFiles,
   initialMode = 'upload',
-  printers,
   uploadsEnabled,
   onClose,
 }: {
   initialFiles?: File[]
   initialMode?: 'upload' | 'link'
-  printers: PrinterSummary[]
   uploadsEnabled: boolean
   onClose: () => void
 }) {
@@ -60,7 +57,7 @@ export function UploadForm({
   const posthog = usePostHog()
   const queryClient = useQueryClient()
   const callCreateLinkedRequest = useServerFn(createLinkedRequest)
-  const printTypes = availablePrintTypes(printers)
+  const printTypes = useWorkspacePrintTypes()
   const [mode, setMode] = useState<'upload' | 'link'>(initialFiles?.length ? 'upload' : uploadsEnabled ? initialMode : 'link')
   const [linkedValues, setLinkedValues] = useState<LinkedRequestValues>(() => linkedRequestValues(printTypes[0]))
   const [linkedValidation, setLinkedValidation] = useState('')
@@ -326,11 +323,16 @@ export function UploadForm({
           <form onSubmit={submit}>
             <Empty
               {...dropzone.getRootProps({
-                className: `mb-3 cursor-pointer border bg-background transition-colors [background-image:var(--grid)] [background-size:24px_24px] hover:border-primary ${dropzone.isDragActive ? 'border-primary' : ''}`,
+                className: cn(
+                  'mb-3 cursor-pointer gap-2 border-2 border-dashed border-foreground/25 bg-ticket text-ticket-foreground transition-colors hover:border-primary',
+                  entries.length === 0 && 'min-h-40',
+                  dropzone.isDragActive && 'border-primary bg-primary/5',
+                ),
               })}
             >
               <Input {...dropzone.getInputProps()} className="sr-only" />
-              <EmptyDescription>
+              {entries.length === 0 && inspectingFiles === 0 && <Upload className="size-7 text-ticket-muted" aria-hidden="true" />}
+              <EmptyDescription className="font-medium text-ticket-foreground">
                 {inspectingFiles > 0 ? (
                   <span className="inline-flex items-center gap-2">
                     <Spinner />

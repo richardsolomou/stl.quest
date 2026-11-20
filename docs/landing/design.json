@@ -1,293 +1,521 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-27T00:00:00.000Z",
+  "generatedAt": "2026-11-20T00:00:00.000Z",
   "title": "Design System: STL Quest website",
   "extensions": {
     "colorMeta": {
-      "shop-floor": {
-        "role": "neutral",
-        "displayName": "Shop Floor",
-        "canonical": "#15171c",
-        "tonalRamp": ["#21242c", "#3a3f4d", "#535b6e", "#6c7690", "#8d95a9", "#aeb4c2", "#cfd3db", "#f0f1f4"]
-      },
-      "bench": {
-        "role": "neutral",
-        "displayName": "Bench",
-        "canonical": "#1b1e24",
-        "tonalRamp": ["#21242c", "#3a404d", "#535c6e", "#6c7890", "#8d96a9", "#aeb5c2", "#cfd3db", "#f0f2f4"]
-      },
-      "recess": {
-        "role": "neutral",
-        "displayName": "Recess",
-        "canonical": "#23262e",
-        "tonalRamp": ["#21242b", "#3a3f4d", "#535b6e", "#6d768f", "#8d95a8", "#aeb4c2", "#cfd3db", "#f1f1f4"]
-      },
-      "raised": {
-        "role": "neutral",
-        "displayName": "Raised",
-        "canonical": "#2c303a",
-        "tonalRamp": ["#21242b", "#3a3f4d", "#535b6e", "#6c768f", "#8d95a9", "#aeb4c2", "#cfd3db", "#f0f2f4"]
-      },
-      "scribe-line": {
-        "role": "neutral",
-        "displayName": "Scribe Line",
-        "canonical": "#2b2f38",
-        "tonalRamp": ["#21242b", "#3b404c", "#545c6d", "#6d778e", "#8e96a8", "#afb4c1", "#d0d3db", "#f1f2f4"]
-      },
-      "bone": {
-        "role": "neutral",
-        "displayName": "Bone",
-        "canonical": "#e8e4d8",
-        "tonalRamp": ["#302b1c", "#554c32", "#796d48", "#9e8e5d", "#b5a881", "#cac1a6", "#e0dbca", "#f6f4ef"]
-      },
-      "graphite": {
-        "role": "neutral",
-        "displayName": "Graphite",
-        "canonical": "#92978f",
-        "tonalRamp": ["#262825", "#434641", "#60645d", "#7d8279", "#9a9f97", "#b7bbb5", "#d5d7d4", "#f2f3f2"]
-      },
-      "signal-amber": {
+      "thermal-red": {
         "role": "primary",
-        "displayName": "Signal Amber",
-        "canonical": "#e89a3c",
-        "tonalRamp": ["#442908", "#79480e", "#ad6814", "#e1871b", "#eaa24c", "#f0bd80", "#f6d8b4", "#fcf3e8"]
+        "displayName": "Thermal Red",
+        "canonical": "#cf3119",
+        "tonalRamp": ["#1e0100", "#490500", "#790e00", "#ad1901", "#dd4028", "#fe745c", "#feb6a7", "#fee9e5"]
       },
-      "blueprint-teal": {
+      "thermal-red-night": {
+        "role": "primary",
+        "displayName": "Thermal Red (night)",
+        "canonical": "#ff6447",
+        "tonalRamp": ["#1d0100", "#480700", "#771301", "#ab1f00", "#dc4326", "#fe7459", "#ffb6a6", "#ffe9e4"]
+      },
+      "thermal-ink": {
+        "role": "neutral",
+        "displayName": "Thermal Ink",
+        "canonical": "#17181a",
+        "tonalRamp": ["#0a0b0d", "#232426", "#3f4042", "#5c5e60", "#7f8083", "#a3a4a7", "#c9cacd", "#edeef1"]
+      },
+      "shell-ink-night": {
+        "role": "neutral",
+        "displayName": "Shell Ink Night",
+        "canonical": "#0b0c0d",
+        "tonalRamp": ["#0a0b0c", "#232425", "#3f4041", "#5c5e5f", "#7f8082", "#a3a5a6", "#c9cbcc", "#edeff0"]
+      },
+      "shell-bone": {
+        "role": "neutral",
+        "displayName": "Shell Bone",
+        "canonical": "#f2f1ec",
+        "tonalRamp": ["#0c0b08", "#252420", "#41403c", "#5e5e59", "#81807c", "#a6a5a0", "#cbcbc6", "#efeeea"]
+      },
+      "shell-graphite": {
+        "role": "neutral",
+        "displayName": "Shell Graphite",
+        "canonical": "#a9adb0",
+        "tonalRamp": ["#090c0e", "#212427", "#3d4043", "#5b5e61", "#7d8184", "#a1a5a8", "#c7cbce", "#ebeff2"]
+      },
+      "brushed-steel": {
+        "role": "neutral",
+        "displayName": "Brushed Steel",
+        "canonical": "#dcdfdd",
+        "tonalRamp": ["#0a0c0a", "#222523", "#3e403f", "#5c5e5d", "#7e817f", "#a2a5a3", "#c8cbc9", "#ecefed"]
+      },
+      "steel-plate": {
+        "role": "neutral",
+        "displayName": "Steel Plate",
+        "canonical": "#eef0ee",
+        "tonalRamp": ["#0a0c0a", "#232423", "#3f403f", "#5c5e5c", "#7f817f", "#a3a5a3", "#c9cbc9", "#edefed"]
+      },
+      "steel-recess": {
+        "role": "neutral",
+        "displayName": "Steel Recess",
+        "canonical": "#cdd1cf",
+        "tonalRamp": ["#090c0b", "#222523", "#3d413f", "#5b5e5d", "#7d817f", "#a2a6a4", "#c8ccca", "#ebf0ed"]
+      },
+      "steel-rule": {
+        "role": "neutral",
+        "displayName": "Steel Rule",
+        "canonical": "#b7bcba",
+        "tonalRamp": ["#090c0b", "#212523", "#3d413f", "#5a5f5d", "#7d8180", "#a1a6a4", "#c7ccca", "#ebf0ee"]
+      },
+      "steel-input": {
+        "role": "neutral",
+        "displayName": "Steel Input",
+        "canonical": "#9fa5a3",
+        "tonalRamp": ["#080c0b", "#202524", "#3c413f", "#5a5f5d", "#7c8280", "#a0a6a4", "#c6ccca", "#eaf0ee"]
+      },
+      "field-white": {
+        "role": "neutral",
+        "displayName": "Field White",
+        "canonical": "#fbfbfa",
+        "tonalRamp": ["#0b0b0b", "#242423", "#40403f", "#5e5e5d", "#80807f", "#a4a4a4", "#cacac9", "#eeeeed"]
+      },
+      "popover-paper": {
+        "role": "neutral",
+        "displayName": "Popover Paper",
+        "canonical": "#f6f7f5",
+        "tonalRamp": ["#0b0b0a", "#242423", "#3f403e", "#5d5e5c", "#80807f", "#a4a5a3", "#cacbc9", "#eeefed"]
+      },
+      "rail-steel": {
+        "role": "neutral",
+        "displayName": "Rail Steel",
+        "canonical": "#8d9391",
+        "tonalRamp": ["#080c0b", "#202524", "#3c413f", "#595f5d", "#7c8280", "#a0a6a4", "#c6ccca", "#eaf0ee"]
+      },
+      "worn-graphite": {
+        "role": "neutral",
+        "displayName": "Worn Graphite",
+        "canonical": "#4a4f53",
+        "tonalRamp": ["#080c0f", "#202528", "#3c4044", "#595e62", "#7c8185", "#a0a5aa", "#c5cbd0", "#e9eff4"]
+      },
+      "ticket-paper": {
+        "role": "neutral",
+        "displayName": "Ticket Paper",
+        "canonical": "#fbfaf5",
+        "tonalRamp": ["#0c0b08", "#252420", "#41403c", "#5e5e59", "#81807c", "#a6a5a0", "#cbcbc6", "#efeeea"]
+      },
+      "ticket-graphite": {
+        "role": "neutral",
+        "displayName": "Ticket Graphite",
+        "canonical": "#575b5e",
+        "tonalRamp": ["#090c0e", "#212527", "#3c4043", "#5a5e61", "#7d8184", "#a1a5a9", "#c7cbcf", "#eaeff3"]
+      },
+      "focus-blue": {
+        "role": "tertiary",
+        "displayName": "Focus Blue",
+        "canonical": "#1f5fd1",
+        "tonalRamp": ["#000827", "#001e59", "#003692", "#1354c5", "#397aee", "#70a3fe", "#aeccfe", "#e6effe"]
+      },
+      "night-steel": {
+        "role": "neutral",
+        "displayName": "Night Steel",
+        "canonical": "#131517",
+        "tonalRamp": ["#090b0d", "#222426", "#3e4042", "#5b5e60", "#7e8083", "#a2a5a8", "#c8cbce", "#eceff2"]
+      },
+      "night-plate": {
+        "role": "neutral",
+        "displayName": "Night Plate",
+        "canonical": "#1b1e21",
+        "tonalRamp": ["#090b0e", "#212427", "#3d4043", "#5a5e62", "#7d8184", "#a1a5a9", "#c7cbcf", "#ebeff3"]
+      },
+      "night-paper": {
+        "role": "neutral",
+        "displayName": "Night Paper",
+        "canonical": "#26292d",
+        "tonalRamp": ["#090b0f", "#212428", "#3d4044", "#5a5e62", "#7d8085", "#a1a5aa", "#c7cbd0", "#ebeff4"]
+      },
+      "night-bone": {
+        "role": "neutral",
+        "displayName": "Night Bone",
+        "canonical": "#ecebe5",
+        "tonalRamp": ["#0c0b08", "#252420", "#41403b", "#5f5e59", "#81807b", "#a6a59f", "#cccbc5", "#f0efe9"]
+      },
+      "night-graphite": {
+        "role": "neutral",
+        "displayName": "Night Graphite",
+        "canonical": "#a2a8ad",
+        "tonalRamp": ["#080c0f", "#202529", "#3b4045", "#595e63", "#7b8186", "#9fa5aa", "#c5cbd1", "#e9eff5"]
+      },
+      "night-rule": {
+        "role": "neutral",
+        "displayName": "Night Rule",
+        "canonical": "#33383d",
+        "tonalRamp": ["#080c10", "#202529", "#3b4045", "#595e64", "#7b8187", "#9fa5ab", "#c5cbd2", "#e9eff6"]
+      },
+      "night-rail": {
+        "role": "neutral",
+        "displayName": "Night Rail",
+        "canonical": "#5a6066",
+        "tonalRamp": ["#070c10", "#1f252a", "#3b4046", "#585e64", "#7b8187", "#9fa5ac", "#c5cbd2", "#e8eff6"]
+      },
+      "stage-queue": {
         "role": "secondary",
-        "displayName": "Blueprint Teal",
-        "canonical": "#4fa8b8",
-        "tonalRamp": ["#163237", "#275760", "#377d8a", "#48a3b3", "#70b8c5", "#9acdd6", "#c3e1e7", "#edf6f8"]
+        "displayName": "Queue",
+        "canonical": "#6c7175",
+        "tonalRamp": ["#080c0f", "#202528", "#3c4044", "#595e62", "#7c8185", "#a0a5aa", "#c6cbd0", "#eaeff4"]
       },
-      "cure-green": {
-        "role": "tertiary",
-        "displayName": "Cure Green",
-        "canonical": "#5cb86b",
-        "tonalRamp": ["#17351c", "#295e32", "#3b8647", "#4caf5c", "#73c280", "#9cd4a5", "#c5e6ca", "#edf7ef"]
+      "stage-up-next": {
+        "role": "secondary",
+        "displayName": "Up next",
+        "canonical": "#2360c4",
+        "tonalRamp": ["#000925", "#001f56", "#00388d", "#1a57ba", "#3f7ce3", "#6da4fe", "#adccfe", "#e6effe"]
       },
-      "fault-red": {
-        "role": "tertiary",
-        "displayName": "Fault Red",
-        "canonical": "#cc3131",
-        "tonalRamp": ["#3e0f0f", "#6d1a1a", "#9c2525", "#cb3131", "#d85d5d", "#e38c8c", "#efbbbb", "#faeaea"]
+      "stage-printing": {
+        "role": "secondary",
+        "displayName": "Printing",
+        "canonical": "#f0a40f",
+        "tonalRamp": ["#130900", "#331f00", "#573902", "#7e5401", "#ab7407", "#db9506", "#ffbd58", "#feebd2"]
+      },
+      "stage-finishing": {
+        "role": "secondary",
+        "displayName": "Finishing",
+        "canonical": "#7c4cc4",
+        "tonalRamp": ["#110028", "#30005c", "#50148f", "#6d3cb3", "#9061db", "#b38afe", "#d2beff", "#f0ebfe"]
+      },
+      "stage-ready": {
+        "role": "secondary",
+        "displayName": "Ready",
+        "canonical": "#1f7a43",
+        "tonalRamp": ["#001004", "#002d12", "#014d25", "#0f703a", "#3e945c", "#65ba7f", "#8ce1a4", "#c7ffd5"]
+      },
+      "stage-queue-night": {
+        "role": "secondary",
+        "displayName": "Queue (night)",
+        "canonical": "#858b90",
+        "tonalRamp": ["#080c0f", "#202529", "#3b4045", "#595e63", "#7b8186", "#9fa5ab", "#c5cbd1", "#e9eff5"]
+      },
+      "stage-up-next-night": {
+        "role": "secondary",
+        "displayName": "Up next (night)",
+        "canonical": "#5b8ff0",
+        "tonalRamp": ["#000728", "#001c5c", "#073690", "#2858b4", "#4a7cdc", "#71a3ff", "#afcbfe", "#e6efff"]
+      },
+      "stage-printing-night": {
+        "role": "secondary",
+        "displayName": "Printing (night)",
+        "canonical": "#f2ad25",
+        "tonalRamp": ["#120900", "#322001", "#563a01", "#7c5503", "#a87501", "#d79708", "#ffbd4c", "#ffeccf"]
+      },
+      "stage-finishing-night": {
+        "role": "secondary",
+        "displayName": "Finishing (night)",
+        "canonical": "#a57ee8",
+        "tonalRamp": ["#110027", "#30005c", "#4e2184", "#6c43a7", "#8e67cf", "#b38cf7", "#d3befe", "#f1ebff"]
+      },
+      "stage-ready-night": {
+        "role": "secondary",
+        "displayName": "Ready (night)",
+        "canonical": "#4cb873",
+        "tonalRamp": ["#001004", "#012d13", "#034d26", "#017139", "#249855", "#52be78", "#7be59d", "#c6ffd5"]
       }
     },
     "typographyMeta": {
       "display": {
         "displayName": "Display",
-        "purpose": "The one page headline, at 70px. Never repeated in a section."
+        "purpose": "The H1, once, on the lead ticket; 2.2rem, 3.6rem from 40rem, 4.25rem from 80rem."
+      },
+      "close": {
+        "displayName": "Close",
+        "purpose": "The closing band's head; 2.4rem rising to 3rem."
       },
       "headline": {
         "displayName": "Headline",
-        "purpose": "Section titles, parked in the left rail."
+        "purpose": "Spec-line titles in the margin column."
       },
-      "title": {
-        "displayName": "Title",
-        "purpose": "Card titles and capability names."
+      "ticket-title": {
+        "displayName": "Ticket title",
+        "purpose": "Names on hung tickets; 1.6rem on the hero docket."
+      },
+      "stage-label": {
+        "displayName": "Stage label",
+        "purpose": "Stage legend heads and ghost-slot jobs."
       },
       "lede": {
         "displayName": "Lede",
-        "purpose": "The paragraph under the headline and each section's opening line."
+        "purpose": "The hero paragraph, from 40rem."
       },
       "body": {
         "displayName": "Body",
-        "purpose": "Every other sentence."
+        "purpose": "Prose; legal text at 55ch."
       },
-      "figure": {
-        "displayName": "Figure",
-        "purpose": "Commands, provider names, the tour caption, the footer."
+      "purpose": {
+        "displayName": "Purpose",
+        "purpose": "Margin-column paragraphs and point descriptions."
+      },
+      "point-title": {
+        "displayName": "Point title",
+        "purpose": "Points, catalogue names, plan names."
+      },
+      "command": {
+        "displayName": "Command",
+        "purpose": "The Docker command on the ink plate."
+      },
+      "stub": {
+        "displayName": "Stub",
+        "purpose": "Ticket stubs, demo captions, the optional tag, count chips. Uppercase."
       }
     },
     "shadows": [
       {
-        "name": "in-layout",
-        "value": "none",
-        "purpose": "Everything in the document flow. Depth comes from the surface token and a hairline ring."
+        "name": "paper-hang",
+        "value": "0 1px 0 rgb(0 0 0 / 0.08), 0 10px 18px -12px rgb(0 0 0 / 0.5)",
+        "purpose": "Hung tickets and copy-ticket slips: the paper curls off the rail."
       },
       {
-        "name": "overlay",
-        "value": "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
-        "purpose": "The mobile navigation sheet, the only floating element on the site."
+        "name": "float",
+        "value": "0 25px 50px -12px rgb(0 0 0 / 0.25)",
+        "purpose": "The phone screenshot overlapping the board screenshot, and the narrow navigation sheet (with a 10% ink ring)."
       }
     ],
     "motion": [
       {
+        "name": "card-settle",
+        "value": "card-settle 420ms cubic-bezier(0.16, 1, 0.3, 1) backwards",
+        "purpose": "Hung tickets dropping onto the rail on load; the docket waits 90ms (--settle-delay). The copy-ticket slip replays it at 320ms on each move. Motion-safe only."
+      },
+      {
+        "name": "cell-stamp",
+        "value": "cell-stamp 320ms cubic-bezier(0.16, 1, 0.3, 1) both, 25ms stagger per copy",
+        "purpose": "Copy cells restamping in their new stage colour. Motion-safe only."
+      },
+      {
         "name": "scroll",
-        "value": "scroll-behavior: smooth",
-        "purpose": "In-page anchors, disabled under prefers-reduced-motion."
+        "value": "scroll-behavior: smooth; scroll-padding-top: 1rem",
+        "purpose": "In-page anchors; auto under prefers-reduced-motion."
       },
       {
         "name": "state",
         "value": "transition-all, Tailwind default easing",
-        "purpose": "Button hover and focus."
+        "purpose": "Button and link hover and focus."
       }
     ],
     "breakpoints": [
       {
-        "name": "stack",
-        "value": "621px"
+        "name": "sm",
+        "value": "40rem (640px)"
       },
       {
-        "name": "rail",
-        "value": "821px"
+        "name": "md",
+        "value": "48rem (768px)"
       },
       {
-        "name": "cards-two-up",
-        "value": "1088px"
+        "name": "lg",
+        "value": "64rem (1024px)"
       },
       {
-        "name": "measure",
-        "value": "1040px"
+        "name": "xl",
+        "value": "80rem (1280px)"
       }
     ],
-    "stageSpectrum": [
+    "stages": [
       {
-        "stage": "Queue",
-        "token": "graphite",
-        "value": "#92978f"
+        "id": "todo",
+        "label": "Queue",
+        "token": "stage-queue",
+        "value": "#6c7175",
+        "night": "#858b90"
       },
       {
-        "stage": "Up next",
-        "token": "blueprint-teal",
-        "value": "#4fa8b8"
+        "id": "up_next",
+        "label": "Up next",
+        "token": "stage-up-next",
+        "value": "#2360c4",
+        "night": "#5b8ff0"
       },
       {
-        "stage": "Printing",
-        "token": "signal-amber",
-        "value": "#e89a3c"
+        "id": "in_progress",
+        "label": "Printing",
+        "token": "stage-printing",
+        "value": "#f0a40f",
+        "night": "#f2ad25"
       },
       {
-        "stage": "Ready",
-        "token": "cure-green",
-        "value": "#5cb86b"
+        "id": "post_processing",
+        "label": "Finishing",
+        "token": "stage-finishing",
+        "value": "#7c4cc4",
+        "night": "#a57ee8"
+      },
+      {
+        "id": "done",
+        "label": "Ready",
+        "token": "stage-ready",
+        "value": "#1f7a43",
+        "night": "#4cb873"
       }
-    ]
+    ],
+    "themes": {
+      "light": ":root (color-scheme: light)",
+      "dark": ":root[data-theme='dark'] (color-scheme: dark)",
+      "ink": ".on-shell scope for the command plate and closing band"
+    }
   },
   "components": [
     {
-      "name": "Primary Button",
+      "name": "Commit Button",
       "kind": "button",
-      "refersTo": "button-primary",
-      "description": "The one action the page is arguing for.",
-      "html": "<a class=\"ds-btn-primary\" href=\"#\">Run it on your own server</a>",
-      "css": ".ds-btn-primary { display:inline-flex; align-items:center; justify-content:center; gap:6.75px; height:49.5px; padding:0 18px; border:1px solid transparent; border-radius:4px; background:#e89a3c; color:#15171c; font-family:'IBM Plex Sans',system-ui,sans-serif; font-size:15.75px; font-weight:500; text-decoration:none; cursor:pointer; transition:background-color 150ms, transform 100ms; } .ds-btn-primary:hover { background:rgb(232 154 60 / 0.8); } .ds-btn-primary:focus-visible { outline:none; border-color:#e89a3c; box-shadow:0 0 0 3px rgb(232 154 60 / 0.5); } .ds-btn-primary:active { transform:translateY(1px); }"
+      "refersTo": "button-commit",
+      "description": "Create a free workspace: the one solid red per view.",
+      "html": "<a class=\"ds-btn-commit\" href=\"#\">Create a free workspace</a>",
+      "css": ".ds-btn-commit { display:inline-flex; align-items:center; justify-content:center; gap:0.375rem; border:1px solid transparent; border-radius:0.28125rem; font-family:var(--face-sans,'IBM Plex Sans',system-ui,sans-serif); font-size:0.875rem; font-weight:600; white-space:nowrap; text-decoration:none; cursor:pointer; transition:all 150ms; height:2.75rem; padding:0 1rem; background:var(--primary,#cf3119); color:var(--primary-foreground,#fff); } .ds-btn-commit:hover { background:color-mix(in oklch, var(--primary,#cf3119), var(--foreground,#17181a) 14%); } .ds-btn-commit:focus-visible { outline:none; border-color:var(--ring,#1f5fd1); box-shadow:0 0 0 3px color-mix(in srgb, var(--ring,#1f5fd1) 50%, transparent); } .ds-btn-commit:active { transform:translateY(1px); }"
     },
     {
       "name": "Outline Button",
       "kind": "button",
       "refersTo": "button-outline",
-      "description": "Every secondary path, including the masthead call to action.",
-      "html": "<a class=\"ds-btn-outline\" href=\"#\">Or use the hosted version</a>",
-      "css": ".ds-btn-outline { display:inline-flex; align-items:center; justify-content:center; gap:6.75px; height:49.5px; padding:0 18px; border:1px solid #2b2f38; border-radius:4px; background:#15171c; color:#e8e4d8; font-family:'IBM Plex Sans',system-ui,sans-serif; font-size:15.75px; font-weight:500; text-decoration:none; cursor:pointer; transition:background-color 150ms, transform 100ms; } .ds-btn-outline:hover { background:#23262e; } .ds-btn-outline:focus-visible { outline:none; border-color:#e89a3c; box-shadow:0 0 0 3px rgb(232 154 60 / 0.5); } .ds-btn-outline:active { transform:translateY(1px); }"
+      "description": "Every secondary path, including the site bar copy of the commit.",
+      "html": "<a class=\"ds-btn-outline\" href=\"#\">Self-hosting guide</a>",
+      "css": ".ds-btn-outline { display:inline-flex; align-items:center; justify-content:center; gap:0.375rem; border:1px solid transparent; border-radius:0.28125rem; font-family:var(--face-sans,'IBM Plex Sans',system-ui,sans-serif); font-size:0.875rem; font-weight:600; white-space:nowrap; text-decoration:none; cursor:pointer; transition:all 150ms; height:2rem; padding:0 0.625rem; background:var(--field,#fbfbfa); border-color:var(--input,#9fa5a3); color:var(--foreground,#17181a); } .ds-btn-outline:hover { background:var(--muted,#cdd1cf); } .ds-btn-outline:focus-visible { outline:none; border-color:var(--ring,#1f5fd1); box-shadow:0 0 0 3px color-mix(in srgb, var(--ring,#1f5fd1) 50%, transparent); } .ds-btn-outline:active { transform:translateY(1px); }"
     },
     {
-      "name": "Run-it Card",
+      "name": "Hung Ticket",
       "kind": "card",
-      "refersTo": "card-surface",
-      "description": "One way to run STL Quest: a uniform mark, an Oswald title, a sentence, and one action.",
-      "html": "<article class=\"ds-card\"><div class=\"ds-card-head\"><span class=\"ds-card-mark\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\"/><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/></svg></span><h3 class=\"ds-card-title\">Run it yourself</h3></div><p class=\"ds-card-body\">One Docker container. Keep everything on your own hardware.</p></article>",
-      "css": ".ds-card { display:flex; flex-direction:column; border-radius:4px; background:#1b1e24; color:#e8e4d8; padding:22.5px; box-shadow:0 0 0 1px rgb(232 228 216 / 0.1); } .ds-card-head { display:flex; align-items:center; gap:13.5px; } .ds-card-mark { display:grid; place-items:center; width:31.5px; height:31.5px; border-radius:9999px; background:#23262e; color:#92978f; } .ds-card-title { margin:0; font-family:'Oswald',system-ui,sans-serif; font-size:22.5px; font-weight:500; letter-spacing:0.025em; } .ds-card-body { margin:18px 0 0; color:#92978f; font-family:'IBM Plex Sans',system-ui,sans-serif; font-size:18px; line-height:1.5; }"
+      "refersTo": "hung-ticket",
+      "description": "Paper on its own stretch of rail, with an Up next stage bar, hanger tab, perforation, and mono stub.",
+      "html": "<article class=\"ds-ticket\"><div class=\"ds-ticket-paper\"><span class=\"ds-ticket-bar\"></span><span class=\"ds-ticket-hanger\"></span><h2 class=\"ds-ticket-title\">Hosted at stl.quest</h2><p class=\"ds-ticket-text\">Storage for model files, shared across the workspaces you own.</p><hr class=\"ds-perf\"><p class=\"ds-stub\">Free · AGPL-3.0</p></div></article>",
+      "css": ".ds-ticket { position:relative; padding-top:1rem; max-width:24rem; } .ds-ticket::before { content:''; position:absolute; left:-0.75rem; right:-0.75rem; top:0; height:0.375rem; background:color-mix(in srgb, var(--rail,#8d9391) 70%, transparent); } .ds-ticket-paper { position:relative; border-radius:3px; background:var(--ticket,#fbfaf5); color:var(--ticket-foreground,#17181a); padding:1.5rem 1.5rem 1.25rem; box-shadow:0 1px 0 rgb(0 0 0 / 0.08), 0 10px 18px -12px rgb(0 0 0 / 0.5); } .ds-ticket-bar { position:absolute; inset:0 0 auto 0; height:0.375rem; border-radius:3px 3px 0 0; background:var(--stage-up_next,#2360c4); } .ds-ticket-hanger { position:absolute; top:-1rem; left:50%; width:2rem; height:1rem; transform:translateX(-50%); border-radius:3px; border:1px solid color-mix(in srgb, var(--foreground,#17181a) 25%, transparent); background:var(--rail,#8d9391); } .ds-ticket-title { margin:0; font-family:var(--face-heading,'Oswald',system-ui,sans-serif); font-weight:700; font-size:1.4rem; line-height:1; text-transform:uppercase; } .ds-ticket-text { margin:0.75rem 0 0; font-size:0.95rem; line-height:1.625; color:var(--ticket-muted,#575b5e); } .ds-perf { margin:1.25rem 0 0; border:0; border-top:1px dashed color-mix(in srgb, var(--ticket-foreground,#17181a) 25%, transparent); } .ds-stub { margin:1rem 0 0; font-family:var(--face-mono,'IBM Plex Mono',monospace); font-size:11px; text-transform:uppercase; color:var(--ticket-muted,#575b5e); }"
     },
     {
-      "name": "Capability Mark",
-      "kind": "chip",
-      "refersTo": "capability-mark",
-      "description": "Four marks coloured in board order, so the row teaches the sequence.",
-      "html": "<div class=\"ds-caps\"><span class=\"ds-cap ds-cap-queue\"></span><span class=\"ds-cap ds-cap-next\"></span><span class=\"ds-cap ds-cap-printing\"></span><span class=\"ds-cap ds-cap-ready\"></span></div>",
-      "css": ".ds-caps { display:flex; gap:13.5px; } .ds-cap { display:grid; place-items:center; width:31.5px; height:31.5px; border-radius:9999px; } .ds-cap-queue { background:rgb(146 151 143 / 0.1); color:#92978f; box-shadow:inset 0 0 0 8px currentColor; } .ds-cap-next { background:rgb(79 168 184 / 0.1); color:#4fa8b8; box-shadow:inset 0 0 0 8px currentColor; } .ds-cap-printing { background:rgb(232 154 60 / 0.1); color:#e89a3c; box-shadow:inset 0 0 0 8px currentColor; } .ds-cap-ready { background:rgb(92 184 107 / 0.1); color:#5cb86b; box-shadow:inset 0 0 0 8px currentColor; }"
-    },
-    {
-      "name": "Provider Chip",
-      "kind": "chip",
-      "refersTo": "provider-chip",
-      "description": "One supported storage service. Uniform across the set, because nothing distinguishes them that a colour could honestly encode.",
-      "html": "<ul class=\"ds-chips\"><li class=\"ds-chip\">S3-compatible</li><li class=\"ds-chip\">Dropbox</li><li class=\"ds-chip\">WebDAV</li></ul>",
-      "css": ".ds-chips { display:flex; flex-wrap:wrap; gap:6.75px; list-style:none; margin:0; padding:0; } .ds-chip { border:1px solid #2b2f38; border-radius:2.4px; background:#1b1e24; color:#92978f; padding:4.5px 9px; font-family:'IBM Plex Mono',monospace; font-size:13.5px; }"
-    },
-    {
-      "name": "Masthead Rule",
+      "name": "Command Plate",
       "kind": "custom",
-      "refersTo": "card-surface",
-      "description": "The site's one dashed blueprint rule: chrome above, the page it governs below.",
-      "html": "<div class=\"ds-masthead\"><span class=\"ds-wordmark\">STL QUEST</span></div>",
-      "css": ".ds-masthead { display:flex; align-items:center; height:72px; border-bottom:2px dashed rgb(79 168 184 / 0.25); } .ds-wordmark { font-family:'Oswald',system-ui,sans-serif; font-size:22.5px; font-weight:500; letter-spacing:0.03em; text-transform:uppercase; color:#e8e4d8; }"
+      "refersTo": "command-plate",
+      "description": "The Docker command on shell ink with a ghost copy button.",
+      "html": "<div class=\"ds-cmd\"><pre>docker run -d \\\n  -p 30455:3000 \\\n  ghcr.io/richardsolomou/stl.quest:latest</pre><button class=\"ds-cmd-copy\" aria-label=\"Copy the Docker command\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect width=\"14\" height=\"14\" x=\"8\" y=\"8\" rx=\"2\"/><path d=\"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2\"/></svg></button></div>",
+      "css": ".ds-cmd { position:relative; border-radius:0.28125rem; background:var(--shell,#17181a); color:var(--shell-foreground,#f2f1ec); } .ds-cmd pre { margin:0; padding:0.75rem; overflow-x:auto; font-family:var(--face-mono,'IBM Plex Mono',monospace); font-size:0.75rem; line-height:1.625; } .ds-cmd-copy { position:absolute; top:0.375rem; right:0.375rem; width:2rem; height:2rem; display:inline-flex; align-items:center; justify-content:center; border:1px solid transparent; border-radius:0.28125rem; background:transparent; color:inherit; cursor:pointer; } .ds-cmd-copy:hover { background:#2a2d31; } .ds-cmd-copy:focus-visible { outline:none; box-shadow:0 0 0 3px color-mix(in srgb, var(--ring,#1f5fd1) 50%, transparent); }"
+    },
+    {
+      "name": "Copy Ticket Stage",
+      "kind": "custom",
+      "refersTo": "copy-cell",
+      "description": "One stage of the copy ticket: swatch, label, count chip, and a paper slip of copy cells.",
+      "html": "<div class=\"ds-copy\"><p class=\"ds-copy-label\"><span class=\"ds-sw\"></span>Up next<span class=\"ds-count\">1</span></p><div class=\"ds-slip\"><span class=\"ds-slip-head\"><b>Chess set</b><span>×1 of 6</span></span><span class=\"ds-cells\"><i class=\"ds-c ds-done\"></i><i class=\"ds-c ds-up\"></i><i class=\"ds-c ds-q\"></i><i class=\"ds-c ds-q\"></i></span></div></div>",
+      "css": ".ds-copy { max-width:12rem; } .ds-copy-label { display:flex; align-items:center; gap:0.5rem; margin:0 0 0.5rem; font-family:var(--face-heading,'Oswald',sans-serif); font-weight:700; font-size:0.875rem; line-height:1; letter-spacing:0.015em; text-transform:uppercase; } .ds-sw { width:0.625rem; height:0.625rem; border-radius:2px; background:var(--stage-up_next,#2360c4); } .ds-count { border-radius:3px; background:var(--stage-up_next,#2360c4); color:var(--stage-up_next-foreground,#fff); padding:0.125rem 0.375rem; font-family:var(--face-mono,monospace); font-size:11px; letter-spacing:normal; } .ds-slip { display:flex; flex-direction:column; gap:0.5rem; min-height:4.25rem; justify-content:space-between; border-radius:3px; background:var(--ticket,#fbfaf5); color:var(--ticket-foreground,#17181a); padding:0.5rem 0.625rem; box-shadow:0 1px 0 rgb(0 0 0 / 0.08), 0 10px 18px -12px rgb(0 0 0 / 0.5); } .ds-slip-head { display:flex; justify-content:space-between; gap:0.5rem; font-size:0.95rem; } .ds-slip-head span { font-family:var(--face-mono,monospace); font-size:11px; color:var(--ticket-muted,#575b5e); } .ds-cells { display:flex; gap:3px; } .ds-c { width:0.5rem; height:0.5rem; border-radius:2px; } .ds-done { background:var(--stage-done,#1f7a43); opacity:0.35; } .ds-up { background:var(--stage-up_next,#2360c4); animation:ds-stamp 320ms cubic-bezier(0.16,1,0.3,1) both; } .ds-q { background:var(--stage-todo,#6c7175); opacity:0.35; } @keyframes ds-stamp { from { transform:scale(1.8); opacity:0; } to { transform:scale(1); opacity:1; } } @media (prefers-reduced-motion: reduce) { .ds-up { animation:none; } }"
+    },
+    {
+      "name": "Stage Legend",
+      "kind": "custom",
+      "refersTo": "stage-legend",
+      "description": "A stage under a 6px bar in its colour, in board order.",
+      "html": "<ol class=\"ds-legend\"><li style=\"--s:#6c7175\"><h3>Queue</h3><p>Requests wait in a fair order.</p></li><li style=\"--s:#2360c4\"><h3>Up next</h3><p>Tickets hang in firing order.</p></li><li style=\"--s:#f0a40f\"><h3>Printing</h3><p>Grouped by printer.</p></li><li style=\"--s:#7c4cc4\"><h3>Finishing</h3><p>Washing, curing, supports.</p></li><li style=\"--s:#1f7a43\"><h3>Ready</h3><p>Grouped by who is collecting.</p></li></ol>",
+      "css": ".ds-legend { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:1.5rem 0.75rem; margin:0; padding:0; list-style:none; } .ds-legend li { border-top:6px solid var(--s); padding-top:0.75rem; } .ds-legend h3 { margin:0; font-family:var(--face-heading,'Oswald',sans-serif); font-weight:700; font-size:1.1rem; line-height:1; text-transform:uppercase; } .ds-legend p { margin:0.5rem 0 0; font-size:0.9rem; line-height:1.625; color:var(--muted-foreground,#4a4f53); }"
+    },
+    {
+      "name": "Ghost Slot",
+      "kind": "card",
+      "refersTo": "ghost-slot",
+      "description": "A job the product leaves to other tools, drawn as an empty dashed slot.",
+      "html": "<div class=\"ds-ghost\"><h3>Slicing</h3><p>Your slicer keeps orientation, supports, infill, and material use.</p></div>",
+      "css": ".ds-ghost { max-width:14rem; border:1px dashed color-mix(in srgb, var(--foreground,#17181a) 30%, transparent); border-radius:3px; padding:0.75rem 1rem; color:var(--muted-foreground,#4a4f53); } .ds-ghost h3 { margin:0; font-family:var(--face-heading,'Oswald',sans-serif); font-weight:700; font-size:1.125rem; line-height:1; text-transform:uppercase; } .ds-ghost p { margin:0.5rem 0 0; font-size:0.9rem; line-height:1.625; }"
+    },
+    {
+      "name": "Spec Chip",
+      "kind": "chip",
+      "refersTo": "spec-chip",
+      "description": "A storage provider or model format; uniform across the set.",
+      "html": "<ul class=\"ds-chips\"><li>S3-compatible</li><li>WebDAV</li><li>STL</li><li>3MF</li></ul>",
+      "css": ".ds-chips { display:flex; flex-wrap:wrap; gap:0.375rem; margin:0; padding:0; list-style:none; } .ds-chips li { border:1px solid var(--border,#b7bcba); border-radius:3px; background:var(--card,#eef0ee); padding:0.25rem 0.5rem; font-family:var(--face-mono,'IBM Plex Mono',monospace); font-size:0.75rem; }"
+    },
+    {
+      "name": "Site Bar",
+      "kind": "nav",
+      "refersTo": "site-bar",
+      "description": "The app bar seen from outside: brand, section links, and an outline commit.",
+      "html": "<header class=\"ds-bar\"><span class=\"ds-brand\">STL Quest</span><nav><a href=\"#\">How it works</a><a href=\"#\">Costs</a><a href=\"#\">Run it</a><a href=\"#\">Sign in</a><a class=\"ds-bar-cta\" href=\"#\">Create a free workspace</a></nav></header>",
+      "css": ".ds-bar { display:flex; align-items:center; gap:1rem; height:3.25rem; padding:0 1rem; border-bottom:1px solid var(--border,#b7bcba); background:var(--background,#dcdfdd); } .ds-brand { font-family:var(--face-heading,'Oswald',sans-serif); font-weight:700; font-size:1.125rem; letter-spacing:0.02em; text-transform:uppercase; } .ds-bar nav { margin-left:auto; display:flex; align-items:center; gap:0.25rem; } .ds-bar a { display:inline-flex; align-items:center; height:2.25rem; padding:0 0.625rem; border-radius:0.28125rem; font-size:0.875rem; font-weight:600; color:var(--muted-foreground,#4a4f53); text-decoration:none; transition:color 150ms; } .ds-bar a:hover { color:var(--foreground,#17181a); } .ds-bar a:focus-visible { outline:none; box-shadow:0 0 0 3px color-mix(in srgb, var(--ring,#1f5fd1) 50%, transparent); } .ds-bar a.ds-bar-cta { height:2rem; margin-left:0.5rem; border:1px solid var(--input,#9fa5a3); background:var(--field,#fbfbfa); color:var(--foreground,#17181a); } .ds-bar a.ds-bar-cta:hover { background:var(--muted,#cdd1cf); }"
+    },
+    {
+      "name": "Closing Band",
+      "kind": "custom",
+      "refersTo": "closing-band",
+      "description": "Shell ink edge to edge under a rail-steel edge, with the red commit and an outline.",
+      "html": "<section class=\"ds-close\"><h2>One printer or a whole farm</h2><div><a class=\"ds-close-red\" href=\"#\">Create a free workspace</a><a class=\"ds-close-out\" href=\"#\">Run it yourself</a></div></section>",
+      "css": ".ds-close { background:var(--shell,#17181a); color:var(--shell-foreground,#f2f1ec); border-top:0.375rem solid var(--rail,#8d9391); padding:3.5rem 1.5rem; } .ds-close h2 { margin:0 0 1.5rem; font-family:var(--face-heading,'Oswald',sans-serif); font-weight:700; font-size:2.4rem; line-height:0.95; text-transform:uppercase; } .ds-close div { display:flex; gap:0.75rem; flex-wrap:wrap; } .ds-close a { display:inline-flex; align-items:center; height:2.75rem; padding:0 1rem; border-radius:0.28125rem; font-size:0.875rem; font-weight:600; text-decoration:none; } .ds-close-red { background:var(--primary,#cf3119); color:var(--primary-foreground,#fff); } .ds-close-red:hover { background:color-mix(in oklch, var(--primary,#cf3119), #17181a 14%); } .ds-close-out { border:1px solid #4a4f55; background:#1f2225; color:inherit; } .ds-close-out:hover { background:#2a2d31; } .ds-close a:focus-visible { outline:none; box-shadow:0 0 0 3px color-mix(in srgb, var(--ring,#1f5fd1) 50%, transparent); }"
     }
   ],
   "narrative": {
-    "northStar": "The Shop Floor Traveler, seen from the door",
-    "overview": "The application is a workshop: a dark floor, travelling cards, blueprint linework, one amber that means act here. This site is that same room viewed from the entrance. It borrows the application's palette, type, and corner language exactly, and adds nothing of its own.\n\nWhat the site does differently is scale and pace. The application is dense because an operator reads fourteen jobs at once; the landing page is open because a stranger reads one idea at a time. Density is not the signature here. Restraint is.",
+    "northStar": "The pass, seen from the counter",
+    "overview": "The hosted landing pages (`/`, `/home`, `/terms`, `/privacy`) do not have a marketing world of their own. They stand on the application's pass: brushed steel by day and night steel after dark, paper tickets hung from a steel rail, black thermal ink, red as the second ink, and five stage colours that own whole regions. The decision is deliberate. The site is a surface of one product whose name, palette, and type are not the website's to reinterpret (`docs/landing/PRODUCT.md`, Brand Commitments); a visitor who signs up should land in the world they were just shown; and real screenshots only read as evidence when the page around them speaks the same language as the pixels inside them. A separate landing palette would make every screenshot look like a quotation from somewhere else.\n\nLike the application, the pages follow the visitor's light or dark scheme. Every colour comes from `src/theme.css` through `src/styles.css`, swapped by `:root[data-theme='dark']`; nothing locks `color-scheme` and the head carries no `theme-color` meta. What the landing adds is scale and argument, not material: the same tokens spent on fewer, larger elements. The offer is hung as tickets on a rail; every claim after that is a spec-sheet line with its name in a margin column and the running board as evidence beside it; what the product refuses is drawn as empty slots.\n\nThe page reads top to bottom as one pass: the rail of offers, the board, the copy ticket the visitor can move, catalogues, quotes, usage, how to run it, what it leaves to other tools, and an ink band to close. Product facts come from `src/core` (stages and their order, plans, model formats, storage providers), never restated in prose.",
     "keyCharacteristics": [
-      "The application's palette and type, unchanged, at landing-page scale.",
-      "Tonal layering over shadow; a card is a lighter surface with a hairline ring.",
-      "One accent, spent on the single action the page most wants.",
-      "A near-square 4px corner everywhere.",
-      "Colour is used to teach the workflow, never to decorate a list.",
-      "Real product imagery instead of illustration."
+      "The application's Pass tokens, unchanged, in both schemes.",
+      "A hung-ticket rail as the hero, not a split hero over icon cards.",
+      "One solid red per view, on Create a free workspace.",
+      "Stage colours as flat fills, in board order, sourced from `data-stage`.",
+      "Spec-sheet lines: a 15rem margin column beside the evidence.",
+      "Real screenshots of the running app in the visitor's theme.",
+      "Mono only for what a machine prints or reads."
     ],
     "rules": [
       {
-        "name": "The One Voice Rule",
-        "body": "Signal Amber marks the single action the page most wants and nothing else. The masthead call to action is an outline button so the hero owns the only accent above the fold.",
+        "name": "The One Red Rule",
+        "body": "A view carries at most one solid Thermal Red control, and it is always Create a free workspace. The site bar's copy of that action is an outline so the hero ticket keeps the only red above the fold; the hosted ticket's copy is an outline because the hero's red is still in reach.",
         "section": "colors"
       },
       {
-        "name": "The Stage Spectrum Rule",
-        "body": "The four capability marks run graphite, teal, amber, green, in board order. The colour is teaching the workflow, so it may not be reordered for visual balance.",
+        "name": "The Stage Owns the Region Rule",
+        "body": "A stage colour is a flat fill read from `data-stage`, in board order, and only where it means that stage. Never a gradient, a tint for decoration, or a sixth hue.",
         "section": "colors"
       },
       {
-        "name": "The No Decorative Hue Rule",
-        "body": "A colour appears only when it means something. A list of storage providers is a list, not a spectrum.",
+        "name": "The No Marketing Palette Rule",
+        "body": "The landing pages introduce no colour the application does not have. A new need is met from `src/theme.css` or not at all.",
         "section": "colors"
-      },
-      {
-        "name": "The One Headline Rule",
-        "body": "Display size appears once per page.",
-        "section": "typography"
       },
       {
         "name": "The Machine Voice Rule",
-        "body": "Monospace is for what a machine would print or accept, never to make prose look technical.",
+        "body": "Mono is for what a machine prints or reads: the command, plan sizes and prices, counts, captions, ticket stubs, storage and format names, and the footer colophon. Never for prose, and never to make a sentence look technical.",
+        "section": "typography"
+      },
+      {
+        "name": "The No Eyebrow Rule",
+        "body": "Nothing sits above a heading. A stub or caption belongs at the foot of the thing it labels, as a ticket's does.",
         "section": "typography"
       },
       {
         "name": "The One Column Rule",
-        "body": "Every band shares the same 1040px measure. Nothing breaks the column except the product tour.",
+        "body": "Every band shares the one measure. Only the closing band's ink runs edge to edge, and its content still sits in the column.",
         "section": "layout"
       },
       {
-        "name": "The Rail Rule",
-        "body": "A section heading belongs in the left rail on wide viewports.",
+        "name": "The Margin Column Rule",
+        "body": "A spec line's name and purpose sit in the 15rem margin beside the evidence on wide screens, never as a title stacked over a full-width slab.",
         "section": "layout"
       },
       {
-        "name": "The Position Decides Rule",
-        "body": "A shadow is earned by floating. The only floating element is the mobile navigation.",
+        "name": "The Paper Lifts Rule",
+        "body": "Only paper casts a resting shadow. Steel plates, screenshot frames, the bar, and the closing band are flat.",
         "section": "elevation"
       },
       {
-        "name": "The Dashed Rule Rule",
-        "body": "The dashed blueprint rule separates a region from the content it governs, never two peers. There is one such boundary and therefore one dashed rule.",
+        "name": "The Dashed Means Absent Rule",
+        "body": "A dashed outline is a perforation or an empty slot. Never draw a solid thing with dashes.",
         "section": "shapes"
       }
     ],
     "dos": [
-      "Do take colour, type, and corner language from the application unchanged.",
-      "Do keep Signal Amber to one element per view.",
-      "Do colour the capability marks in board order, because the order is information.",
-      "Do set commands, service names, and captions in IBM Plex Mono.",
-      "Do put section headings in the left rail above 821px.",
-      "Do lead with self-hosting; the hosted service is the convenience path.",
-      "Do review against pnpm build output, since the font preload plugin only runs on build."
+      "Do take every colour, face, radius, and keyframe from `src/theme.css` and `src/styles.css`; follow the visitor's scheme.",
+      "Do keep Thermal Red to Create a free workspace, once per view; every other action is an outline.",
+      "Do apply stage colour through `data-stage`, in board order, from `workflow` in `src/core`.",
+      "Do hang offers as tickets on the rail, and set every later section as a spec line with its name in the 15rem margin.",
+      "Do show the product with real screenshots in both themes through `Shot`, captioned as demo data.",
+      "Do draw what the product will not do as ghost slots from `OUTSIDE_THE_PRODUCT`.",
+      "Do read stages, plans, model formats, and storage providers from `src/core`.",
+      "Do keep landing faces on `font-display: optional` with their preloads in `landingHead`."
     ],
     "donts": [
-      "Don't introduce a colour the application does not have, or a stock palette hue that means nothing.",
-      "Don't colour a list to make it look lively.",
-      "Don't use Blueprint Teal as a fill, a button, or body text.",
-      "Don't draw a second dashed rule.",
-      "Don't add a resting shadow to anything that scrolls with the page.",
-      "Don't repeat display size in a section.",
-      "Don't add a testimonial, logo wall, metric strip, or star count; none of that evidence exists.",
-      "Don't put an eyebrow above the headline."
+      "Don't introduce a marketing palette, a gradient, or any colour the application lacks.",
+      "Don't lock `color-scheme` or add a `theme-color` meta.",
+      "Don't put a second solid red in a view, or use red for anything but the commit.",
+      "Don't set prose in mono or put an eyebrow or kicker above a heading.",
+      "Don't shadow steel, plates, or screenshot frames; only paper and floating layers lift.",
+      "Don't colour a set of equivalent items such as storage providers.",
+      "Don't add testimonials, logos, metrics, or star counts; none exist.",
+      "Don't use a split hero over a row of equal icon cards."
     ]
   }
 }

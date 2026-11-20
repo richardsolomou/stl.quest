@@ -21,7 +21,7 @@ test('authenticates and receives realtime updates through an HTTPS proxy', async
   await page.getByRole('button', { name: 'Create super admin' }).click()
   await page.getByRole('button', { name: 'Use this folder' }).click()
   await page.getByRole('button', { name: 'Skip for now' }).click()
-  await expect(page.getByRole('button', { name: 'Add a print' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Board filters' }).getByRole('button', { name: 'Add a print' })).toBeVisible()
 
   await page.context().clearCookies()
   await page.reload()
@@ -37,7 +37,7 @@ test('authenticates and receives realtime updates through an HTTPS proxy', async
   await signIn(observer)
   await realtimeConnection
 
-  await page.getByRole('button', { name: 'Add a print' }).click()
+  await page.getByRole('region', { name: 'Board filters' }).getByRole('button', { name: 'Add a print' }).click()
   await page.getByRole('button', { name: 'Upload files' }).click()
   await page
     .locator('input[type=file]')
@@ -77,5 +77,5 @@ async function signIn(page: Page) {
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password').fill(password)
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('button', { name: 'Add a print' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Board filters' }).getByRole('button', { name: 'Add a print' })).toBeVisible()
 }

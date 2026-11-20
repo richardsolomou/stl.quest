@@ -47,12 +47,8 @@ import { storagePlans } from '../core/plans'
 import { billingAvailable } from './billing'
 import { workflow } from '../core/workflow'
 import { CONSUMABLES_SETTING, consumablesOfKind, type Consumable } from '../core/consumables'
-import {
-  DEFAULT_PRICE_CALCULATOR_SETTINGS,
-  PRICE_CALCULATOR_SETTING,
-  prunePrinterCosts,
-  type PriceCalculatorSettings,
-} from '../core/priceCalculator'
+import { EQUIPMENT_SETTING, type EquipmentItem } from '../core/equipment'
+import { DEFAULT_PRICE_CALCULATOR_SETTINGS, PRICE_CALCULATOR_SETTING } from '../core/priceCalculator'
 import {
   cloudStorageProviderName,
   oidcDisplayName,
@@ -65,6 +61,8 @@ import {
 } from '../core/auth'
 import type { BoardConfig, PrinterProfile, Repository, Role, StorageMigration, Telemetry } from '../core/types'
 import { printerProfileChanges, PRINTERS_SETTING, storedPrinterProfiles } from '../core/printers'
+import { PRINT_TYPE_SETTING, storedPrintTypeChoice, workspacePrintTypes } from '../core/printTypes'
+import { storedUsageTracking, USAGE_TRACKING_SETTING } from '../core/usageTracking'
 import { applyOnboardingProgressOperation, recordOnboardingTask } from '../core/onboarding'
 import { memberRequestVisibility, visiblePeople, withMemberRequestVisibility } from '../core/visibility'
 import {
@@ -85,6 +83,8 @@ import {
   removeAdminWorkspaceMemberSchema,
   archiveRequestsSchema,
   boardSettingsSchema,
+  printTypeChoiceSchema,
+  usageTrackingSchema,
   beginProviderInviteSchema,
   changeOwnEmailSchema,
   createInviteSchema,
@@ -100,6 +100,10 @@ import {
   memberRequestVisibilitySchema,
   moveCopiesSchema,
   moveCopiesBatchSchema,
+  recordStepUsageSchema,
+  recordStockMovementSchema,
+  undoUsageSchema,
+  usageFiltersSchema,
   movePrintGroupSchema,
   workspaceNameConfirmationSchema,
   workspaceNameSchema,
@@ -108,6 +112,7 @@ import {
   reorderPrintGroupItemSchema,
   printerProfilesSchema,
   consumablesSchema,
+  equipmentSchema,
   reorderRequestSchema,
   requestFiltersSchema,
   repeatRequestSchema,
@@ -200,8 +205,11 @@ async function resolvedOnboardingProgress(
   if (!isAdmin) return progress
   if ((await storedPrinterProfiles(workspaceRepository)).some(({ archived }) => !archived))
     progress = applyOnboardingProgressOperation(progress, { operation: 'complete', task: 'printers' })
-  if (await storageConfigured(workspaceRepository))
-    progress = applyOnboardingProgressOperation(progress, { operation: 'complete', task: 'storage' })
+  const consumables = (await workspaceRepository.getSetting<Consumable[]>(CONSUMABLES_SETTING)) ?? []
+  if (consumables.some(({ kind }) => kind === 'resin' || kind === 'filament'))
+    progress = applyOnboardingProgressOperation(progress, { operation: 'complete', task: 'stock' })
+  if (await storedUsageTracking(workspaceRepository))
+    progress = applyOnboardingProgressOperation(progress, { operation: 'complete', task: 'tracking' })
   return progress
 }
 
@@ -305,6 +313,7 @@ export const sessionInfo = createServerFn({ method: 'GET' })
       const context = authenticated ? await instance.workspace(getRequestHeaders(), data.workspaceSlug) : undefined
       const printers = context ? (await storedPrinterProfiles(context.repository)).filter(({ archived }) => !archived) : []
       const printersConfigured = context ? (await context.repository.getSetting<PrinterProfile[]>(PRINTERS_SETTING)) !== undefined : false
+      const printTypeChoice = context ? await storedPrintTypeChoice(context.repository) : 'automatic'
       const workspaceOwnerId = context ? await context.repository.workspaceOwnerId() : undefined
       const managedStorageEligible =
         context && workspaceOwnerId
@@ -377,6 +386,9 @@ export const sessionInfo = createServerFn({ method: 'GET' })
           (await instance.repository.countOwnedWorkspaces(authenticated.id)) < HOSTED_OWNED_WORKSPACE_LIMIT,
         printersConfigured,
         printers,
+        printTypeChoice,
+        printTypes: workspacePrintTypes(printTypeChoice, printers),
+        usageTracking: context ? await storedUsageTracking(context.repository) : false,
         telemetryEnabled: (await resolveTelemetryConfig(deploymentSettings(instance.repository))).enabled,
         ownRequestsOnly: context ? await memberSeesOnlyOwnRequests(context.repository, context.identity) : false,
         auth: await currentAuthCapabilities(instance),
@@ -1141,8 +1153,37 @@ export const saveConsumables = createServerFn({ method: 'POST' })
         resin_count: consumablesOfKind(data.consumables, 'resin').length,
         filament_count: consumablesOfKind(data.consumables, 'filament').length,
         part_count: consumablesOfKind(data.consumables, 'part').length,
+        supply_count: consumablesOfKind(data.consumables, 'supply').length,
       })
       return { consumables: data.consumables }
+    }),
+  )
+
+// Read by admins only, like consumables: the steps that ask which equipment a print used are admin board moves.
+export const getEquipment = createServerFn({ method: 'GET' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const instance = await app()
+      const context = await workspaceAdmin(instance, data.workspaceSlug)
+      return { equipment: (await context.repository.getSetting<EquipmentItem[]>(EQUIPMENT_SETTING)) ?? [] }
+    }),
+  )
+
+export const saveEquipment = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(equipmentSchema))
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      const context = await workspaceAdmin(instance, data.workspaceSlug)
+      await context.repository.setSetting(EQUIPMENT_SETTING, data.equipment)
+      context.events.publish('settings.changed')
+      instance.telemetry.capture(context.identity.id, 'equipment_saved', {
+        equipment_count: data.equipment.filter((item) => !item.archived).length,
+        catalogue_count: data.equipment.filter((item) => !item.archived && item.presetId).length,
+        with_supplies_count: data.equipment.filter((item) => !item.archived && item.supplies.length).length,
+      })
+      return { equipment: data.equipment }
     }),
   )
 
@@ -1152,11 +1193,11 @@ export const getPriceCalculatorSettings = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      return storedPriceCalculatorSettings(await context.repository.getSetting<Partial<PriceCalculatorSettings>>(PRICE_CALCULATOR_SETTING))
+      return storedPriceCalculatorSettings(await context.repository.getSetting<object>(PRICE_CALCULATOR_SETTING))
     }),
   )
 
-export function storedPriceCalculatorSettings(stored: Partial<PriceCalculatorSettings> | undefined) {
+export function storedPriceCalculatorSettings(stored: object | undefined) {
   const settings = priceCalculatorSettingsSchema.safeParse({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, ...stored })
   return { settings: settings.success ? settings.data : DEFAULT_PRICE_CALCULATOR_SETTINGS, saved: stored !== undefined }
 }
@@ -1167,16 +1208,12 @@ export const savePriceCalculatorSettings = createServerFn({ method: 'POST' })
     mutationRpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      const { workspaceSlug: _, ...edited } = data
-      const settings = prunePrinterCosts(edited, await storedPrinterProfiles(context.repository))
+      const { workspaceSlug: _, ...settings } = data
       await context.repository.setSetting(PRICE_CALCULATOR_SETTING, settings)
       context.events.publish('settings.changed')
       instance.telemetry.capture(context.identity.id, 'price_calculator_settings_saved', {
         currency: settings.currency,
-        resin_preset: Boolean(settings.resinPresetId),
         electricity_preset: Boolean(settings.electricityCountryCode),
-        equipment_preset_count: settings.resinEquipment.presetIds.length + settings.filamentEquipment.presetIds.length,
-        printer_cost_count: Object.keys(settings.printerCosts).length,
       })
       return settings
     }),
@@ -1405,6 +1442,34 @@ export const updateBoardSettings = createServerFn({ method: 'POST' })
       // Sweep straight away so newly eligible prints leave the board without waiting for the hourly round.
       if (data.autoArchiveDays) await context.sweepAutoArchive()
       return config
+    }),
+  )
+
+export const updatePrintTypeChoice = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(printTypeChoiceSchema))
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      const context = await workspaceAdmin(instance, data.workspaceSlug)
+      await context.repository.setSetting(PRINT_TYPE_SETTING, data.choice)
+      // Every member's upload form and board narrow to the new types on their next session refetch.
+      context.events.publish('settings.changed')
+      instance.telemetry.capture(context.identity.id, 'print_types_chosen', { choice: data.choice })
+      return { choice: data.choice }
+    }),
+  )
+
+export const updateUsageTracking = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(usageTrackingSchema))
+  .handler(async ({ data }) =>
+    mutationRpc(async () => {
+      const instance = await app()
+      const context = await workspaceAdmin(instance, data.workspaceSlug)
+      await context.repository.setSetting(USAGE_TRACKING_SETTING, data.enabled)
+      // Every admin's board starts or stops asking what each step used on their next session refetch.
+      context.events.publish('settings.changed')
+      instance.telemetry.capture(context.identity.id, 'usage_tracking_changed', { enabled: data.enabled, source: data.source })
+      return { enabled: data.enabled }
     }),
   )
 
@@ -1732,7 +1797,6 @@ export const updateStorageSettings = createServerFn({ method: 'POST' })
           adapter: config.adapter,
           configuration_kind: storageConfigurationKind(alreadyConfigured, context.storage, config),
         })
-        await recordOnboardingTask(instance.repository, context.identity.id, 'storage', context.workspace.id).catch(() => undefined)
         const storage = await maskStorage(config)
         // Publish before reset so current streams refetch and reconnect to the replacement bus.
         context.events.publish('storage.changed')
@@ -1748,6 +1812,54 @@ export const moveCopies = createServerFn({ method: 'POST' })
     const { workspaceSlug, ...input } = data
     return workspaceMutation(workspaceSlug, (context) => context.service.moveCopies(input, context.identity))
   })
+
+export const recordStepUsage = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(recordStepUsageSchema))
+  .handler(async ({ data }) => {
+    const { workspaceSlug, ...input } = data
+    return workspaceMutation(workspaceSlug, (context) => context.service.recordStepUsage(input, context.identity))
+  })
+
+export const recordStockMovement = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(recordStockMovementSchema))
+  .handler(async ({ data }) => {
+    const { workspaceSlug, ...input } = data
+    return workspaceMutation(workspaceSlug, (context) => context.service.recordStockMovement(input, context.identity))
+  })
+
+export const undoUsage = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(undoUsageSchema))
+  .handler(async ({ data }) =>
+    workspaceMutation(data.workspaceSlug, (context) => context.service.undoUsage(data.transactionId, context.identity)),
+  )
+
+export const listUsage = createServerFn({ method: 'GET' })
+  .validator(inWorkspace(usageFiltersSchema))
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const { workspaceSlug, ...filters } = data
+      const context = await workspaceContext(await app(), workspaceSlug)
+      return { events: await context.service.listUsage(filters, context.identity) }
+    }),
+  )
+
+export const getStockLevels = createServerFn({ method: 'GET' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const context = await workspaceContext(await app(), data.workspaceSlug)
+      return { stock: await context.service.stockLevels(context.identity) }
+    }),
+  )
+
+export const getUsagePrefills = createServerFn({ method: 'GET' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const context = await workspaceContext(await app(), data.workspaceSlug)
+      return await context.service.usagePrefills(context.identity)
+    }),
+  )
 
 export const createLinkedRequest = createServerFn({ method: 'POST' })
   .validator(inWorkspace(createLinkedRequestSchema))

@@ -28,7 +28,7 @@ function MenuContent({
         <MenuPrimitive.Popup
           data-slot="menu-content"
           className={cn(
-            'z-50 max-h-(--available-height) min-w-40 origin-(--transform-origin) overflow-y-auto overscroll-contain rounded-lg bg-popover p-1 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-hidden duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
+            'z-50 max-h-(--available-height) min-w-40 origin-(--transform-origin) overflow-y-auto overscroll-contain rounded-lg bg-popover p-1 text-[0.8rem] text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-hidden duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
             className,
           )}
           {...props}
@@ -54,6 +54,19 @@ function MenuGroupLabel({ className, ...props }: MenuPrimitive.GroupLabel.Props)
   )
 }
 
+function MenuItem({ className, ...props }: MenuPrimitive.Item.Props) {
+  return (
+    <MenuPrimitive.Item
+      data-slot="menu-item"
+      className={cn(
+        'flex h-8 w-full cursor-default items-center justify-start gap-2 rounded-md px-2 text-left outline-none select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground [&_svg]:size-4 [&_svg]:shrink-0',
+        className,
+      )}
+      {...props}
+    />
+  )
+}
+
 function MenuRadioGroup({ ...props }: MenuPrimitive.RadioGroup.Props) {
   return <MenuPrimitive.RadioGroup data-slot="menu-radio-group" {...props} />
 }
@@ -71,4 +84,4 @@ function MenuRadioItem({ className, ...props }: MenuPrimitive.RadioItem.Props) {
   )
 }
 
-export { Menu, MenuTrigger, MenuContent, MenuGroup, MenuGroupLabel, MenuRadioGroup, MenuRadioItem }
+export { Menu, MenuTrigger, MenuContent, MenuGroup, MenuGroupLabel, MenuItem, MenuRadioGroup, MenuRadioItem }

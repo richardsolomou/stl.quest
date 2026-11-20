@@ -1,47 +1,72 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { Trash2 } from 'lucide-react'
+import { ChevronRight, Plus, Search } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Spinner } from '@/components/ui/spinner'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
+import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu'
 import {
+  consumablePrice,
   consumablesOfKind,
   partCostPerHour,
   partCostPerPlate,
+  wearPartGroups,
+  withConsumablePrice,
   type Consumable,
-  type FilamentConsumable,
-  type PartConsumable,
-  type ResinConsumable,
+  type WearPartGroup,
 } from '../../../core/consumables'
-import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from '../../../core/priceCalculator'
-import { getResinPreset, RESIN_PRESETS } from '../../../core/resinPresets'
-import { PRINT_TYPES } from '../../../core/types'
+import { filamentFromPreset, type FilamentPreset } from '../../../core/filamentPresets'
+import { genericPartPresets, partPresetsForPrinter, type PartPreset } from '../../../core/partPresets'
+import { findPreset } from '../../../core/presets'
+import { DEFAULT_PRICE_CALCULATOR_SETTINGS, TYPICAL_RESIN_DENSITY_GRAMS_PER_ML } from '../../../core/priceCalculator'
+import { getPrinterPreset } from '../../../core/printerPresets'
+import { printTypeCopy } from '../../../core/printTypes'
+import { resinFromPreset, type ResinPreset } from '../../../core/resinPresets'
+import { partFromPreset, type PartSuggestion } from '../../../core/stock'
+import { PRINT_TYPES, type PrintType } from '../../../core/types'
+import type { StockLevel } from '../../../core/usage'
 import { saveConsumables } from '../../../server/fns'
 import { useI18n } from '../../i18n'
-import { consumablesQuery, priceCalculatorSettingsQuery } from '../../queries'
-import { useWorkspaceSlug } from '../../workspace'
-import { FilterCombobox } from '../FilterCombobox'
-import { NumberInput } from '../priceCalculator/fields'
-import { currencySymbol, formatMoney } from '../priceCalculator/format'
+import { createId } from '../../id'
+import { matchesListSearch, showsListSearch } from '../../listSearch'
+import { catalogueQuery, consumablesQuery, priceCalculatorSettingsQuery, printersQuery, stockQuery } from '../../queries'
+import { signalProductTourProgress } from '../../productTour'
+import { useUsageTracking, useWorkspacePrintTypes, useWorkspaceSlug } from '../../workspace'
+import { UsageTrackingInvite } from '../UsageTracking'
+import { currencySymbol, formatMoney, formatNumber } from '../priceCalculator/format'
 import { QueryState } from '../QueryState'
-import { PageHeader, SettingsActions, SettingsPage, SettingsSection } from './SettingsLayout'
-import { UnsavedChangesGuard } from './UnsavedChangesGuard'
+import { AlsoPrints } from './AlsoPrints'
+import { ConsumableDialog } from './ConsumableDialog'
+import { ConsumableIcon } from './ConsumableIcon'
+import { materialFacts, MaterialPicker, PartPicker } from './ConsumablePicker'
+import { StockSummary } from './ConsumableStock'
+import { VirtualList } from './VirtualList'
+import { PrinterPresetImage } from './PrinterPresetImage'
+import { PageHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { SupplyNeeds } from './SupplyNeeds'
 
-const resinOptions = RESIN_PRESETS.map((preset) => ({ value: preset.id, label: `${preset.brand} ${preset.name}` }))
+type LabelledGroup = WearPartGroup & { label: string }
+type Picking = { kind: PrintType } | { kind: 'part'; group: LabelledGroup }
 
 export function ConsumablesPane() {
   const workspaceSlug = useWorkspaceSlug()
   const copy = useI18n().t.settings.consumables
+  const printTypes = useWorkspacePrintTypes()
   const query = useQuery(consumablesQuery(workspaceSlug))
-  if (!query.data) {
+  const saved = query.data?.consumables
+  // The library's rows say what the catalogue knows of them, so the page waits for the catalogues its items come from.
+  const usesResins = Boolean(saved?.some((item) => item.kind === 'resin' && item.resinPresetId))
+  const usesFilaments = Boolean(saved?.some((item) => item.kind === 'filament' && item.filamentPresetId))
+  const resins = useQuery({ ...catalogueQuery('resins'), enabled: usesResins })
+  const filaments = useQuery({ ...catalogueQuery('filaments'), enabled: usesFilaments })
+  const parts = useQuery(catalogueQuery('parts'))
+  if (!saved || (usesResins && resins.isPending) || (usesFilaments && filaments.isPending) || parts.isPending) {
     return (
       <SettingsPage>
-        <PageHeader title={copy.title} description={copy.description} />
+        <PageHeader title={copy.title} description={copy.description[printTypeCopy(printTypes)]} />
         <QueryState
-          loading={query.isPending}
+          loading={!query.error}
           error={query.error}
           loadingLabel={copy.loading}
           errorTitle={copy.loadError}
@@ -50,9 +75,10 @@ export function ConsumablesPane() {
       </SettingsPage>
     )
   }
-  return <LoadedConsumablesPane workspaceSlug={workspaceSlug} saved={query.data.consumables} />
+  return <LoadedConsumablesPane workspaceSlug={workspaceSlug} saved={saved} />
 }
 
+/** The library as rows that open one dialog per consumable, each stored straight away from it, as printers are. */
 function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string; saved: Consumable[] }) {
   const { t, locale } = useI18n()
   const copy = t.settings.consumables
@@ -60,80 +86,296 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
     useQuery(priceCalculatorSettingsQuery(workspaceSlug)).data?.settings.currency ?? DEFAULT_PRICE_CALCULATOR_SETTINGS.currency
   const symbol = currencySymbol(currency, locale)
   const money = (value: number) => formatMoney(value, currency, locale)
-  const [draft, setDraft] = useState(saved)
-  useEffect(() => setDraft(saved), [saved])
+  const profiles = useQuery(printersQuery(workspaceSlug)).data?.profiles
+  const printers = useMemo(() => profiles ?? [], [profiles])
+  const printTypes = useWorkspacePrintTypes()
+  const tracking = useUsageTracking()
+  const stock = useQuery({ ...stockQuery(workspaceSlug), enabled: tracking }).data?.stock
+  const levels = useMemo(() => stock ?? [], [stock])
   const callSave = useServerFn(saveConsumables)
   const queryClient = useQueryClient()
+  const queryKey = consumablesQuery(workspaceSlug).queryKey
   const mutation = useMutation({
-    mutationFn: callSave,
-    onSuccess: (stored) => queryClient.setQueryData(consumablesQuery(workspaceSlug).queryKey, stored),
+    mutationFn: (consumables: Consumable[]) => callSave({ data: { workspaceSlug, consumables } }),
+    onSuccess: (result) => queryClient.setQueryData(queryKey, result),
   })
-  const dirty = JSON.stringify(draft) !== JSON.stringify(saved)
-  const valid = draft.every(validConsumable)
-  const update = (next: Consumable) => setDraft((current) => current.map((item) => (item.id === next.id ? next : item)))
-  const remove = (id: string) => setDraft((current) => current.filter((item) => item.id !== id))
-  const add = (item: Consumable) => setDraft((current) => [...current, item])
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
-    mutation.mutate({ data: { workspaceSlug, consumables: draft } })
+  // The cache rather than this render's list, so a save never drops a change another admin made meanwhile.
+  const latest = () => queryClient.getQueryData(queryKey)?.consumables ?? saved
+  const persist = (consumables: Consumable[]) => mutation.mutateAsync(consumables)
+  // A new item scrolls into view once it is stored, so it is found where it landed when its dialog closes.
+  const [added, setAdded] = useState<string>()
+  const saveItem = async (item: Consumable) => {
+    const list = latest()
+    const isNew = !list.some(({ id }) => id === item.id)
+    await persist(isNew ? [...list, item] : list.map((other) => (other.id === item.id ? item : other)))
+    if (isNew) setAdded(item.id)
+    if (isNew && (item.kind === 'resin' || item.kind === 'filament')) signalProductTourProgress('stock')
   }
+  // A new item is kept here, not in the list, until its dialog has what it needs and stores it.
+  const [editing, setEditing] = useState<Consumable | null>(null)
+  const [picking, setPicking] = useState<Picking | null>(null)
+  // Read from the cache the page filled, or fetched once a picker for a catalogue not yet shown opens.
+  const resins = useQuery({ ...catalogueQuery('resins'), enabled: picking?.kind === 'resin' }).data
+  const filaments = useQuery({ ...catalogueQuery('filaments'), enabled: picking?.kind === 'filament' }).data
+  const partCatalogue = useQuery(catalogueQuery('parts')).data
+  // Removes the item as stored, which its dialog's last save may have changed since it opened.
+  const remove = (removedId: string) => {
+    setEditing(null)
+    const list = latest()
+    const index = list.findIndex(({ id }) => id === removedId)
+    const removed = list[index]
+    if (!removed) return
+    const failed = () => void toast.error(copy.notSaved)
+    persist(list.filter(({ id }) => id !== removed.id)).then(
+      () =>
+        toast(copy.removed(removed.name), {
+          action: {
+            label: copy.undo,
+            onClick: () => {
+              const now = latest()
+              if (!now.some(({ id }) => id === removed.id)) persist([...now.slice(0, index), removed, ...now.slice(index)]).catch(failed)
+            },
+          },
+        }),
+      failed,
+    )
+  }
+
+  const addMaterial = (kind: PrintType) => setPicking({ kind })
+  const addSupply = () => setEditing({ id: createId(), kind: 'supply', name: '', unit: 'ml', price: Number.NaN })
+  const addCustomPart = (group: WearPartGroup) =>
+    setEditing({
+      id: createId(),
+      kind: 'part',
+      name: '',
+      printType: group.printType,
+      ...(group.printerPresetId && { printerPresetId: group.printerPresetId }),
+      ...(group.printerId && { printerId: group.printerId }),
+      price: Number.NaN,
+      lifespan: Number.NaN,
+      lifespanUnit: group.printType === 'resin' ? 'plates' : 'hours',
+    })
+  const addPart = (group: LabelledGroup) =>
+    !partCatalogue || partPresets(partCatalogue, group).length ? setPicking({ kind: 'part', group }) : addCustomPart(group)
+  // The catalogue knows no prices, so a part from it opens unpriced, with its list price as a hint.
+  const addPresetPart = (suggestion: Pick<PartSuggestion, 'preset' | 'printerPresetId'> & { printerId?: string }) =>
+    setEditing(withConsumablePrice(partFromPreset(createId(), suggestion), Number.NaN))
+
+  const [search, setSearch] = useState('')
+  const found = (item: Consumable) => matchesListSearch(search, [item.name])
+  const partGroupLabel = (group: WearPartGroup) => {
+    if (group.printerId) return printers.find(({ id }) => id === group.printerId)?.name ?? copy.parts.removedPrinter
+    if (!group.printerPresetId) return copy.parts.every[group.printType]
+    const preset = getPrinterPreset(group.printerPresetId)
+    return preset ? `${preset.brand} ${preset.model}` : group.printerPresetId
+  }
+  const allPartGroups = wearPartGroups(saved, printers, printTypes).map((group) => ({ ...group, label: partGroupLabel(group) }))
+  const typePartGroups = allPartGroups.filter((group) => group.printerPresetId === undefined && group.printerId === undefined)
+  // Searching for a model shows its whole group, so a part can be added to it as well as found in it.
+  const partGroups = allPartGroups.flatMap((group) => {
+    const parts = matchesListSearch(search, [group.label]) ? group.parts : group.parts.filter(found)
+    return parts.length || matchesListSearch(search, [group.label]) ? [{ ...group, parts }] : []
+  })
+  const partCount = consumablesOfKind(saved, 'part').length
+  const noMatches = search.trim() !== '' && !saved.some((item) => item.kind !== 'part' && found(item)) && partGroups.length === 0
+  // A material the workspace neither prints nor stocks folds to one invitation line instead of an empty section.
+  const materials = {
+    resin: { items: consumablesOfKind(saved, 'resin'), addLabel: copy.resins.add },
+    filament: { items: consumablesOfKind(saved, 'filament'), addLabel: copy.filaments.add },
+  }
+  const shows = (printType: PrintType) => printTypes.includes(printType) || materials[printType].items.length > 0
+  const rows = (items: Consumable[]) =>
+    items.length > 0 && (
+      <VirtualList
+        items={items}
+        getKey={({ id }) => id}
+        scrollToKey={added}
+        renderItem={(consumable) => (
+          <ConsumableRow
+            consumable={consumable}
+            preset={
+              consumable.kind === 'resin'
+                ? findPreset(resins, consumable.resinPresetId)
+                : consumable.kind === 'filament'
+                  ? findPreset(filaments, consumable.filamentPresetId)
+                  : undefined
+            }
+            level={levels.find(({ consumableId }) => consumableId === consumable.id)}
+            money={money}
+            onOpen={() => setEditing(consumable)}
+          />
+        )}
+      />
+    )
+  const supplies = consumablesOfKind(saved, 'supply')
+
   return (
-    <SettingsPage>
-      <UnsavedChangesGuard dirty={dirty} />
-      <PageHeader title={copy.title} description={copy.description} />
-      <form className="flex flex-col gap-6" onSubmit={submit}>
-        <ConsumableSection
-          title={copy.resins.title}
-          description={copy.resins.description}
-          empty={copy.resins.empty}
-          addLabel={copy.resins.add}
-          onAdd={() => add({ id: crypto.randomUUID(), kind: 'resin', name: '', pricePerLitre: 50, densityGramsPerMl: 1.1 })}
-        >
-          {consumablesOfKind(draft, 'resin').map((resin) => (
-            <ResinRow key={resin.id} resin={resin} symbol={symbol} onChange={update} onRemove={() => remove(resin.id)} />
-          ))}
-        </ConsumableSection>
-        <ConsumableSection
-          title={copy.filaments.title}
-          description={copy.filaments.description}
-          empty={copy.filaments.empty}
-          addLabel={copy.filaments.add}
-          onAdd={() => add({ id: crypto.randomUUID(), kind: 'filament', name: '', pricePerKg: 25 })}
-        >
-          {consumablesOfKind(draft, 'filament').map((filament) => (
-            <FilamentRow key={filament.id} filament={filament} symbol={symbol} onChange={update} onRemove={() => remove(filament.id)} />
-          ))}
-        </ConsumableSection>
-        <ConsumableSection
-          title={copy.parts.title}
-          description={copy.parts.description}
-          empty={copy.parts.empty}
-          addLabel={copy.parts.add}
-          onAdd={() =>
-            add({ id: crypto.randomUUID(), kind: 'part', name: '', printType: 'resin', price: 0, lifespan: 100, lifespanUnit: 'plates' })
-          }
-        >
-          {consumablesOfKind(draft, 'part').map((part) => (
-            <PartRow key={part.id} part={part} symbol={symbol} money={money} onChange={update} onRemove={() => remove(part.id)} />
-          ))}
-        </ConsumableSection>
-        <SettingsActions>
-          <Button type="submit" disabled={!dirty || !valid || mutation.isPending}>
-            {mutation.isPending && <Spinner />} {copy.save}
+    <SettingsPage data-saving={mutation.isPending}>
+      <PageHeader
+        title={copy.title}
+        description={copy.description[printTypeCopy(printTypes)]}
+        actions={
+          <Menu>
+            <MenuTrigger render={<Button type="button" data-onboarding="consumables-add" />}>
+              <Plus /> {copy.add}
+            </MenuTrigger>
+            <MenuContent align="end" className="w-auto">
+              {shows('resin') && <MenuItem onClick={() => addMaterial('resin')}>{copy.resins.add}</MenuItem>}
+              {shows('filament') && <MenuItem onClick={() => addMaterial('filament')}>{copy.filaments.add}</MenuItem>}
+              <MenuItem onClick={addSupply}>{copy.supplies.add}</MenuItem>
+              {typePartGroups.map((group) => (
+                <MenuItem key={group.printType} onClick={() => addPart(group)}>
+                  {typePartGroups.length === 1 ? copy.parts.addWearPart : copy.parts.addTypeWearPart[group.printType]}
+                </MenuItem>
+              ))}
+            </MenuContent>
+          </Menu>
+        }
+      />
+      {tracking ? (
+        <SupplyNeeds
+          workspaceSlug={workspaceSlug}
+          consumables={saved}
+          levels={levels}
+          printers={printers}
+          printTypes={printTypes}
+          onAddMaterial={addMaterial}
+          onAddPart={addPresetPart}
+        />
+      ) : (
+        <UsageTrackingInvite source="consumables" line={t.settings.board.tracking.invite.consumables} />
+      )}
+      {showsListSearch(saved.length) && (
+        <InputGroup className="max-w-sm bg-field">
+          <InputGroupAddon>
+            <Search aria-hidden="true" />
+          </InputGroupAddon>
+          <InputGroupInput
+            aria-label={copy.search}
+            placeholder={copy.search}
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </InputGroup>
+      )}
+      {noMatches && <p className="text-sm text-muted-foreground">{copy.noMatches(search.trim())}</p>}
+      {PRINT_TYPES.filter(shows).map((printType) => {
+        const section = printType === 'resin' ? copy.resins : copy.filaments
+        return (
+          <ConsumableSection
+            key={printType}
+            count={materials[printType].items.length}
+            title={section.title}
+            description={section.description}
+            empty={section.empty}
+            addLabel={section.add}
+            onAdd={() => addMaterial(printType)}
+          >
+            {rows(materials[printType].items.filter(found))}
+          </ConsumableSection>
+        )
+      })}
+      {PRINT_TYPES.filter((printType) => !shows(printType)).map((printType) => (
+        <AlsoPrints key={printType} printType={printType}>
+          <Button type="button" variant="link" size="sm" onClick={() => addMaterial(printType)}>
+            {materials[printType].addLabel}
           </Button>
-          {dirty && (
-            <Button type="button" variant="ghost" disabled={mutation.isPending} onClick={() => setDraft(saved)}>
-              {copy.discard}
-            </Button>
-          )}
-          {mutation.error != null && <FieldError>{copy.saveError}</FieldError>}
-        </SettingsActions>
-      </form>
+        </AlsoPrints>
+      ))}
+      <ConsumableSection
+        count={supplies.length}
+        title={copy.supplies.title}
+        description={copy.supplies.description[printTypeCopy(printTypes)]}
+        empty={copy.supplies.empty}
+        addLabel={copy.supplies.add}
+        onAdd={addSupply}
+      >
+        {rows(supplies.filter(found))}
+      </ConsumableSection>
+      <SettingsSection
+        layout="stacked"
+        title={partCount ? `${copy.parts.title} · ${partCount}` : copy.parts.title}
+        description={copy.parts.description}
+      >
+        <div className="grid gap-4">
+          {partGroups.map((group) => (
+            <PartGroup key={group.printerId ?? group.printerPresetId ?? group.printType} group={group} onAdd={() => addPart(group)}>
+              {rows(group.parts)}
+            </PartGroup>
+          ))}
+        </div>
+      </SettingsSection>
+
+      {picking?.kind === 'resin' && (
+        <MaterialPicker
+          kind="resin"
+          presets={resins}
+          added={presetIds(materials.resin.items.map(({ resinPresetId }) => resinPresetId))}
+          onSelect={(preset) => setEditing(resinFromPreset(createId(), preset))}
+          onCustom={(name = '') =>
+            setEditing({
+              id: createId(),
+              kind: 'resin',
+              name,
+              pricePerLitre: Number.NaN,
+              densityGramsPerMl: TYPICAL_RESIN_DENSITY_GRAMS_PER_ML,
+            })
+          }
+          onClose={() => setPicking(null)}
+        />
+      )}
+      {picking?.kind === 'filament' && (
+        <MaterialPicker
+          kind="filament"
+          presets={filaments}
+          added={presetIds(materials.filament.items.map(({ filamentPresetId }) => filamentPresetId))}
+          onSelect={(preset) => setEditing(filamentFromPreset(createId(), preset))}
+          onCustom={(name = '') => setEditing({ id: createId(), kind: 'filament', name, pricePerKg: Number.NaN })}
+          onClose={() => setPicking(null)}
+        />
+      )}
+      {picking?.kind === 'part' && (
+        <PartPicker
+          title={copy.parts.addTo(picking.group.label)}
+          presets={partCatalogue && partPresets(partCatalogue, picking.group)}
+          had={presetIds(picking.group.parts.map(({ partPresetId }) => partPresetId))}
+          onSelect={(preset) =>
+            addPresetPart({ preset, printerPresetId: picking.group.printerPresetId, printerId: picking.group.printerId })
+          }
+          onCustom={() => addCustomPart(picking.group)}
+          onClose={() => setPicking(null)}
+        />
+      )}
+      {editing && (
+        <ConsumableDialog
+          key={editing.id}
+          consumable={editing}
+          isNew={!saved.some(({ id }) => id === editing.id)}
+          workspaceSlug={workspaceSlug}
+          level={levels.find(({ consumableId }) => consumableId === editing.id)}
+          printers={printers}
+          symbol={symbol}
+          money={money}
+          onSave={saveItem}
+          onRemove={() => remove(editing.id)}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </SettingsPage>
   )
 }
 
+/** The catalogue parts a wear-part group can add: its model's own, or those every printer of its type takes. */
+function partPresets(parts: readonly PartPreset[], group: WearPartGroup) {
+  return group.printerPresetId ? partPresetsForPrinter(parts, group.printerPresetId) : genericPartPresets(parts, group.printType)
+}
+
+function presetIds(ids: (string | undefined)[]) {
+  return new Set(ids.filter((id): id is string => id !== undefined))
+}
+
 function ConsumableSection({
+  count,
   title,
   description,
   empty,
@@ -141,233 +383,120 @@ function ConsumableSection({
   onAdd,
   children,
 }: {
+  /** Items of this kind before any search narrows them, so a filtered-out section is not mistaken for an empty one. */
+  count: number
   title: string
   description: string
   empty: string
   addLabel: string
   onAdd: () => void
-  children: ReactNode[]
+  children: ReactNode
 }) {
   return (
-    <SettingsSection title={title} description={description}>
-      {children.length ? <div className="grid gap-3">{children}</div> : <p className="text-sm text-muted-foreground">{empty}</p>}
-      <div>
+    <SettingsSection
+      layout="stacked"
+      title={count ? `${title} · ${count}` : title}
+      description={description}
+      action={
         <Button type="button" variant="outline" size="sm" onClick={onAdd}>
-          {addLabel}
+          <Plus /> <span className="max-sm:sr-only">{addLabel}</span>
         </Button>
-      </div>
+      }
+    >
+      {children}
+      {count === 0 && <p className="text-sm text-muted-foreground">{empty}</p>}
     </SettingsSection>
   )
 }
 
-function Row({ name, children, onRemove }: { name: string; children: ReactNode; onRemove: () => void }) {
-  const copy = useI18n().t.settings.consumables
+/** The parts that belong to every printer of a print type, one printer model, or one custom printer, which a part added here joins. */
+function PartGroup({ group, onAdd, children }: { group: LabelledGroup; onAdd: () => void; children: ReactNode }) {
+  const copy = useI18n().t.settings.consumables.parts
+  const preset = getPrinterPreset(group.printerPresetId)
+  const leftFleet = (group.printerPresetId !== undefined || group.printerId !== undefined) && group.printers === 0
   return (
-    <div className="relative grid min-w-0 gap-3 rounded-md border border-border/70 p-3 sm:grid-cols-2">
-      {children}
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        className="absolute top-2 right-2"
-        aria-label={copy.remove(name)}
-        onClick={onRemove}
-      >
-        <Trash2 />
-      </Button>
-    </div>
+    <section aria-label={group.label} className="grid min-w-0 gap-1.5">
+      <div className="flex min-w-0 items-center gap-3">
+        <PrinterPresetImage printer={preset ?? { printType: group.printType }} className="size-9" />
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-sm font-semibold">{group.label}</h3>
+          <p className="truncate text-xs text-muted-foreground">
+            {leftFleet ? copy.leftFleet : group.printerId ? copy.customPrinter : copy.printers(group.printers)}
+          </p>
+        </div>
+        <Button type="button" variant="ghost" size="sm" aria-label={copy.addTo(group.label)} onClick={onAdd}>
+          <Plus /> <span className="max-sm:sr-only">{copy.add}</span>
+        </Button>
+      </div>
+      {children && <div className="min-w-0 sm:pl-12">{children}</div>}
+    </section>
   )
 }
 
-function NameField({ id, value, onChange }: { id: string; value: string; onChange: (name: string) => void }) {
-  const copy = useI18n().t.settings.consumables
-  return (
-    <Field className="sm:col-span-2">
-      <FieldLabel htmlFor={`${id}-name`}>{copy.name}</FieldLabel>
-      <Input id={`${id}-name`} value={value} maxLength={120} required onChange={(event) => onChange(event.target.value)} />
-    </Field>
-  )
-}
-
-function AmountField({
-  id,
-  label,
-  value,
-  min,
-  description,
-  onChange,
-}: {
-  id: string
-  label: string
-  value: number
-  min: number
-  description?: string
-  onChange: (value: number) => void
-}) {
-  return (
-    <Field>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <NumberInput id={id} value={value} min={min} step="any" required onChange={onChange} />
-      {description && <FieldDescription>{description}</FieldDescription>}
-    </Field>
-  )
-}
-
-function ResinRow({
-  resin,
-  symbol,
-  onChange,
-  onRemove,
-}: {
-  resin: ResinConsumable
-  symbol: string
-  onChange: (resin: ResinConsumable) => void
-  onRemove: () => void
-}) {
-  const copy = useI18n().t.settings.consumables.resins
-  return (
-    <Row name={resin.name} onRemove={onRemove}>
-      <NameField id={resin.id} value={resin.name} onChange={(name) => onChange({ ...resin, name })} />
-      <Field className="sm:col-span-2">
-        <FieldLabel htmlFor={`${resin.id}-preset`}>{copy.preset}</FieldLabel>
-        <FilterCombobox
-          id={`${resin.id}-preset`}
-          value={resin.resinPresetId}
-          options={resinOptions}
-          placeholder={copy.presetSearch}
-          emptyLabel={copy.presetEmpty}
-          onChange={(resinPresetId) => {
-            const preset = getResinPreset(resinPresetId)
-            onChange({
-              ...resin,
-              resinPresetId: preset?.id,
-              name: resin.name || (preset ? `${preset.brand} ${preset.name}` : ''),
-              densityGramsPerMl: preset?.densityGramsPerMl ?? resin.densityGramsPerMl,
-            })
-          }}
-        />
-      </Field>
-      <AmountField
-        id={`${resin.id}-price`}
-        label={copy.price(symbol)}
-        value={resin.pricePerLitre}
-        min={0.01}
-        onChange={(pricePerLitre) => onChange({ ...resin, pricePerLitre })}
-      />
-      <AmountField
-        id={`${resin.id}-density`}
-        label={copy.density}
-        value={resin.densityGramsPerMl}
-        min={0.01}
-        onChange={(densityGramsPerMl) => onChange({ ...resin, densityGramsPerMl })}
-      />
-    </Row>
-  )
-}
-
-function FilamentRow({
-  filament,
-  symbol,
-  onChange,
-  onRemove,
-}: {
-  filament: FilamentConsumable
-  symbol: string
-  onChange: (filament: FilamentConsumable) => void
-  onRemove: () => void
-}) {
-  const copy = useI18n().t.settings.consumables.filaments
-  return (
-    <Row name={filament.name} onRemove={onRemove}>
-      <NameField id={filament.id} value={filament.name} onChange={(name) => onChange({ ...filament, name })} />
-      <AmountField
-        id={`${filament.id}-price`}
-        label={copy.price(symbol)}
-        value={filament.pricePerKg}
-        min={0.01}
-        onChange={(pricePerKg) => onChange({ ...filament, pricePerKg })}
-      />
-    </Row>
-  )
-}
-
-function PartRow({
-  part,
-  symbol,
+/** One consumable as a line: what it is, what the catalogue says of it, its stock and price; it opens its dialog. */
+function ConsumableRow({
+  consumable,
+  preset,
+  level,
   money,
-  onChange,
-  onRemove,
+  onOpen,
 }: {
-  part: PartConsumable
-  symbol: string
+  consumable: Consumable
+  /** The catalogue product a resin or filament is. */
+  preset?: ResinPreset | FilamentPreset
+  level?: StockLevel
   money: (value: number) => string
-  onChange: (part: PartConsumable) => void
-  onRemove: () => void
+  onOpen: () => void
 }) {
-  const { t } = useI18n()
-  const copy = t.settings.consumables.parts
-  const printTypes = PRINT_TYPES.map((value) => ({ value, label: t.calculator.job[value] }))
-  const units = (['plates', 'hours'] as const).map((value) => ({ value, label: copy.units[value] }))
-  const cost = part.lifespanUnit === 'plates' ? copy.perPlate(money(partCostPerPlate(part))) : copy.perHour(money(partCostPerHour(part)))
-  return (
-    <Row name={part.name} onRemove={onRemove}>
-      <NameField id={part.id} value={part.name} onChange={(name) => onChange({ ...part, name })} />
-      <Field>
-        <FieldLabel htmlFor={`${part.id}-print-type`}>{copy.printType}</FieldLabel>
-        <Select items={printTypes} value={part.printType} onValueChange={(printType) => printType && onChange({ ...part, printType })}>
-          <SelectTrigger className="w-full" id={`${part.id}-print-type`}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {printTypes.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Field>
-      <AmountField
-        id={`${part.id}-price`}
-        label={copy.price(symbol)}
-        value={part.price}
-        min={0}
-        onChange={(price) => onChange({ ...part, price })}
-      />
-      <AmountField
-        id={`${part.id}-lifespan`}
-        label={copy.lifespan}
-        value={part.lifespan}
-        min={1}
-        description={cost}
-        onChange={(lifespan) => onChange({ ...part, lifespan })}
-      />
-      <Field>
-        <FieldLabel htmlFor={`${part.id}-unit`}>{copy.lifespanUnit}</FieldLabel>
-        <Select
-          items={units}
-          value={part.lifespanUnit}
-          onValueChange={(lifespanUnit) => lifespanUnit && onChange({ ...part, lifespanUnit })}
-        >
-          <SelectTrigger className="w-full" id={`${part.id}-unit`}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {units.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Field>
-    </Row>
+  const { t, locale } = useI18n()
+  const copy = t.settings.consumables
+  const facts = rowFacts(consumable)
+  const price = consumablePrice(consumable)
+  const priced =
+    consumable.kind === 'resin'
+      ? `${money(price)}/L`
+      : consumable.kind === 'filament'
+        ? `${money(price)}/kg`
+        : consumable.kind === 'supply'
+          ? `${money(price)}${copy.supplies.perUnit[consumable.unit]}`
+          : money(price)
+  const figures = (
+    <>
+      <StockSummary consumable={consumable} level={level} />
+      <span className="@sm:min-w-24 @sm:text-right">{priced}</span>
+    </>
   )
-}
 
-function validConsumable(consumable: Consumable) {
-  if (!consumable.name.trim()) return false
-  if (consumable.kind === 'resin') return consumable.pricePerLitre > 0 && consumable.densityGramsPerMl > 0
-  if (consumable.kind === 'filament') return consumable.pricePerKg > 0
-  return consumable.price >= 0 && consumable.lifespan > 0
+  function rowFacts(item: Consumable) {
+    if (item.kind === 'resin') {
+      return preset ? materialFacts(preset, locale) : `${formatNumber(item.densityGramsPerMl, locale)} g/mL`
+    }
+    if (item.kind === 'filament') {
+      return preset ? materialFacts(preset, locale) : item.colour?.name
+    }
+    if (item.kind === 'supply') return copy.supplies.units[item.unit]
+    const cost =
+      item.lifespanUnit === 'plates' ? copy.parts.perPlate(money(partCostPerPlate(item))) : copy.parts.perHour(money(partCostPerHour(item)))
+    return [copy.parts.lasts(formatNumber(item.lifespan, locale), copy.parts.units[item.lifespanUnit]), cost].join(' · ')
+  }
+
+  return (
+    <button
+      type="button"
+      aria-label={copy.edit(consumable.name)}
+      className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none focus-visible:ring-inset"
+      onClick={onOpen}
+    >
+      <ConsumableIcon consumable={consumable} />
+      <span className="min-w-0 flex-1">
+        <span className="block font-medium @max-sm:line-clamp-2 @sm:truncate">{consumable.name}</span>
+        {facts && <span className="block truncate text-xs text-muted-foreground">{facts}</span>}
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-xs text-muted-foreground *:whitespace-nowrap @sm:hidden">
+          {figures}
+        </span>
+      </span>
+      <span className="flex shrink-0 items-center gap-4 font-mono text-xs text-muted-foreground @max-sm:hidden">{figures}</span>
+      <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+    </button>
+  )
 }

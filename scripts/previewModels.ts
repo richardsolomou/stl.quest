@@ -11,8 +11,8 @@ const shapes = {
 
 export type PreviewShape = keyof typeof shapes
 
-export function previewModelStl(shape: PreviewShape): Uint8Array {
-  const geometry = shapes[shape]()
+export function previewModelStl(shape: PreviewShape, scale = 1): Uint8Array {
+  const geometry = shapes[shape]().scale(scale, scale, scale)
   try {
     const position = geometry.getAttribute('position')
     const index = geometry.getIndex()

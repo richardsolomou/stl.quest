@@ -17,11 +17,11 @@ describe('onboarding tasks', () => {
   })
 
   it('only awards points for completed applicable tasks', () => {
-    expect(onboardingPoints(['upload', 'move', 'storage'], ['upload', 'sort', 'storage'])).toBe(30)
+    expect(onboardingPoints(['upload', 'move', 'printers'], ['upload', 'inspect', 'printers'])).toBe(40)
   })
 
   it('versions announcements without changing persistent task IDs', () => {
-    expect(onboardingQuestVersion(onboardingQuests[0])).toBe('upload:1')
+    expect(onboardingQuestVersion(onboardingQuests.find((quest) => quest.id === 'upload')!)).toBe('upload:1')
   })
 
   it('applies skip, restore, completion, and celebration consistently', () => {
@@ -37,31 +37,36 @@ describe('onboarding tasks', () => {
     })
   })
 
-  it('reveals queue quests only when work exists and unlocks actions after a move', () => {
-    const progress: OnboardingProgress = { completedTasks: ['upload'], skippedTasks: [], celebratedTasks: [] }
-    const admin = applicableOnboardingQuests(true)
+  it('leads an admin through setup, a first print, and inviting people, with tracking last', () => {
+    const progress: OnboardingProgress = { completedTasks: [], skippedTasks: [], celebratedTasks: [] }
 
-    expect(availableOnboardingQuests(admin, progress, false).map((quest) => quest.id)).toEqual([
-      'upload',
+    expect(availableOnboardingQuests(applicableOnboardingQuests(true), progress, false).map((quest) => quest.id)).toEqual([
       'printers',
-      'storage',
-      'visibility',
-      'invite',
-    ])
-    expect(availableOnboardingQuests(admin, progress, true).map((quest) => quest.id)).toEqual([
+      'stock',
       'upload',
-      'move',
+      'invite',
+      'tracking',
+    ])
+  })
+
+  it('offers an admin the first print through the board once work exists', () => {
+    const progress: OnboardingProgress = { completedTasks: [], skippedTasks: [], celebratedTasks: [] }
+
+    expect(availableOnboardingQuests(applicableOnboardingQuests(true), progress, true).map((quest) => quest.id)).toContain('move')
+  })
+
+  it('keeps tracking in its own optional section', () => {
+    expect(onboardingQuests.find((quest) => quest.id === 'tracking')?.section).toBe('optional')
+  })
+
+  it('gives a requester only their own steps', () => {
+    const progress: OnboardingProgress = { completedTasks: ['upload', 'inspect'], skippedTasks: [], celebratedTasks: [] }
+
+    expect(availableOnboardingQuests(applicableOnboardingQuests(false), progress, true).map((quest) => quest.id)).toEqual([
+      'upload',
       'inspect',
-      'sort',
-      'filter',
-      'printers',
-      'storage',
-      'visibility',
-      'invite',
+      'download',
     ])
-
-    progress.completedTasks.push('move')
-    expect(availableOnboardingQuests(admin, progress, true).map((quest) => quest.id)).toContain('actions')
   })
 
   it('records successful actions and restores a previously skipped quest', async () => {
@@ -99,6 +104,8 @@ describe('onboarding tasks', () => {
   it('requires workspace context for workspace-scoped progress', async () => {
     const repository = { getUserOnboarding: vi.fn(), saveUserOnboarding: vi.fn() }
 
-    await expect(recordOnboardingTask(repository, 'maker', 'storage')).rejects.toThrow('workspace is required for onboarding task storage')
+    await expect(recordOnboardingTask(repository, 'maker', 'printers')).rejects.toThrow(
+      'workspace is required for onboarding task printers',
+    )
   })
 })

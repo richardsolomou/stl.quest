@@ -12,6 +12,7 @@ export const requests: typeof en = {
     downloadAllCopies: 'Alle Kopien herunterladen',
     downloadCopies: (count) => (count === 1 ? `${count} Kopie herunterladen` : `${count} Kopien herunterladen`),
     printAgain: 'Erneut drucken…',
+    estimate: 'Preis schätzen',
     move: 'Verschieben',
     archive: 'Archivieren',
   },
@@ -74,6 +75,8 @@ export const requests: typeof en = {
   details: {
     anyCompatiblePrinter: 'Beliebiger kompatibler Drucker',
     decideLater: 'Später entscheiden',
+    submittedAgo: (age: string) => `Vor ${age} eingereicht`,
+    copyCount: (count: number) => `${count} ${count === 1 ? 'Exemplar' : 'Exemplare'}`,
     openSourceLink: 'Quelllink öffnen',
     linkOnly: 'Nur Link – es ist keine Modelldatei gespeichert.',
   },
@@ -97,10 +100,10 @@ export const requests: typeof en = {
   cost: {
     label: 'Geschätzte Kosten',
     suggested: (price, quantity) => (quantity > 1 ? `${price} empfohlen für alle ${quantity} Kopien` : `${price} empfohlen`),
-    hint: 'Basierend auf Ihrer gespeicherten Rechnereinrichtung, mit einer Druckplatte pro Kopie und ohne manuelle Arbeitszeit.',
+    hint: 'Aus Ihren Preissätzen und dem zugewiesenen Drucker, mit typischem Material und typischer Nachbearbeitung, einer Druckplatte pro Kopie und ohne manuelle Arbeitszeit.',
     openCalculator: 'Im Rechner öffnen',
     onPrinter: (printer: string) => `auf ${printer}`,
-    onEachPrinter: 'Auf jedem Drucker',
+    compare: (count: number, range: string) => `${range} auf ${count} Druckern`,
   },
   repeat: {
     title: 'Erneut drucken',
@@ -234,9 +237,15 @@ export const requests: typeof en = {
     filtersLabel: 'Archivfilter',
     filtersDescription: 'Kombinieren Sie beliebige Felder, um das Archiv einzugrenzen.',
     noMatchesTitle: 'Keine Treffer',
-    emptyTitle: 'Das Archiv ist leer',
+    emptyTitle: 'Noch nichts archiviert',
     noMatches: 'Keine archivierten Drucke entsprechen diesen Filtern.',
-    empty: 'Noch nichts archiviert. Klicken Sie mit der rechten Maustaste auf einen Druck auf dem Board und wählen Sie Archivieren.',
+    empty:
+      'Archivierte, abgeholte Drucke warten hier abseits des Boards, bis Sie sie wieder brauchen. Klicken Sie mit der rechten Maustaste auf einen Druck auf dem Board und wählen Sie Archivieren.',
+    autoArchive: {
+      before: 'Oder lassen Sie ',
+      link: 'die automatische Archivierung in den allgemeinen Einstellungen',
+      after: ' Drucke eine festgelegte Anzahl von Tagen nach „Fertig“ abräumen.',
+    },
     loading: 'Archiv wird geladen…',
     loadFailed: 'Das Archiv konnte nicht geladen werden',
     restoring: 'Wird zurück auf das Board verschoben…',

@@ -1,270 +1,397 @@
 ---
 name: STL Quest website
-description: The landing surface for STL Quest, built from the application's own palette and type.
+description: The hosted landing pages, set on the application's own pass at marketing scale.
 colors:
-  shop-floor: '#15171c'
-  bench: '#1b1e24'
-  recess: '#23262e'
-  raised: '#2c303a'
-  scribe-line: '#2b2f38'
-  bone: '#e8e4d8'
-  graphite: '#92978f'
-  signal-amber: '#e89a3c'
-  blueprint-teal: '#4fa8b8'
-  cure-green: '#5cb86b'
-  fault-red: '#cc3131'
+  thermal-red: '#cf3119'
+  thermal-red-night: '#ff6447'
+  thermal-ink: '#17181a'
+  shell-ink-night: '#0b0c0d'
+  shell-bone: '#f2f1ec'
+  shell-graphite: '#a9adb0'
+  brushed-steel: '#dcdfdd'
+  steel-plate: '#eef0ee'
+  steel-recess: '#cdd1cf'
+  steel-rule: '#b7bcba'
+  steel-input: '#9fa5a3'
+  field-white: '#fbfbfa'
+  popover-paper: '#f6f7f5'
+  rail-steel: '#8d9391'
+  worn-graphite: '#4a4f53'
+  ticket-paper: '#fbfaf5'
+  ticket-graphite: '#575b5e'
+  focus-blue: '#1f5fd1'
+  night-steel: '#131517'
+  night-plate: '#1b1e21'
+  night-paper: '#26292d'
+  night-bone: '#ecebe5'
+  night-graphite: '#a2a8ad'
+  night-rule: '#33383d'
+  night-rail: '#5a6066'
+  stage-queue: '#6c7175'
+  stage-up-next: '#2360c4'
+  stage-printing: '#f0a40f'
+  stage-finishing: '#7c4cc4'
+  stage-ready: '#1f7a43'
+  stage-queue-night: '#858b90'
+  stage-up-next-night: '#5b8ff0'
+  stage-printing-night: '#f2ad25'
+  stage-finishing-night: '#a57ee8'
+  stage-ready-night: '#4cb873'
 typography:
   display:
-    fontFamily: 'Oswald, system-ui, sans-serif'
-    fontSize: 'clamp(2.5rem, 6vw, 70px)'
-    fontWeight: 500
-    lineHeight: 1.04
-    letterSpacing: '-0.02em'
+    fontFamily: "'Oswald', system-ui, sans-serif"
+    fontSize: '4.25rem'
+    fontWeight: 700
+    lineHeight: 0.95
+    letterSpacing: '-0.01em'
   headline:
-    fontFamily: 'Oswald, system-ui, sans-serif'
-    fontSize: '1.875rem'
-    fontWeight: 500
-    lineHeight: 1.2
+    fontFamily: "'Oswald', system-ui, sans-serif"
+    fontSize: '2rem'
+    fontWeight: 700
+    lineHeight: 1
     letterSpacing: 'normal'
-  title:
-    fontFamily: 'Oswald, system-ui, sans-serif'
+  close:
+    fontFamily: "'Oswald', system-ui, sans-serif"
+    fontSize: '3rem'
+    fontWeight: 700
+    lineHeight: 0.95
+    letterSpacing: 'normal'
+  ticket-title:
+    fontFamily: "'Oswald', system-ui, sans-serif"
+    fontSize: '1.4rem'
+    fontWeight: 700
+    lineHeight: 1
+    letterSpacing: 'normal'
+  stage-label:
+    fontFamily: "'Oswald', system-ui, sans-serif"
+    fontSize: '1.1rem'
+    fontWeight: 700
+    lineHeight: 1
+    letterSpacing: 'normal'
+  lede:
+    fontFamily: "'IBM Plex Sans', system-ui, sans-serif"
     fontSize: '1.25rem'
-    fontWeight: 500
-    lineHeight: 1.3
-    letterSpacing: '0.025em'
+    fontWeight: 400
+    lineHeight: 1.5
+    letterSpacing: 'normal'
   body:
-    fontFamily: 'IBM Plex Sans, system-ui, sans-serif'
+    fontFamily: "'IBM Plex Sans', system-ui, sans-serif"
     fontSize: '1rem'
     fontWeight: 400
     lineHeight: 1.5
     letterSpacing: 'normal'
-  lede:
-    fontFamily: 'IBM Plex Sans, system-ui, sans-serif'
-    fontSize: '1.25rem'
+  purpose:
+    fontFamily: "'IBM Plex Sans', system-ui, sans-serif"
+    fontSize: '0.95rem'
+    fontWeight: 400
+    lineHeight: 1.625
+    letterSpacing: 'normal'
+  point-title:
+    fontFamily: "'IBM Plex Sans', system-ui, sans-serif"
+    fontSize: '1rem'
+    fontWeight: 600
+    lineHeight: 1.5
+    letterSpacing: 'normal'
+  command:
+    fontFamily: "'IBM Plex Mono', ui-monospace, monospace"
+    fontSize: '0.75rem'
+    fontWeight: 400
+    lineHeight: 1.625
+    letterSpacing: 'normal'
+  stub:
+    fontFamily: "'IBM Plex Mono', ui-monospace, monospace"
+    fontSize: '11px'
     fontWeight: 400
     lineHeight: 1.5
     letterSpacing: 'normal'
-  figure:
-    fontFamily: 'IBM Plex Mono, monospace'
-    fontSize: '0.75rem'
-    fontWeight: 400
-    lineHeight: 1.6
-    letterSpacing: 'normal'
 rounded:
-  sm: '2.4px'
-  md: '3.2px'
-  lg: '4px'
-  xl: '5.6px'
+  cell: '2px'
+  paper: '3px'
+  control: '0.28125rem'
+  plate: '0.375rem'
+  phone: '1.4rem'
 spacing:
-  hair: '4.5px'
-  tight: '9px'
-  base: '18px'
-  section: '45px'
+  column: 'min(72rem, calc(100% - 2rem))'
+  margin-column: '15rem'
+  bar: '3.25rem'
+  section: '5rem'
+  section-narrow: '3.5rem'
+  spec-gutter: '3rem'
+  ticket-pad: '1.5rem'
+  rail: '0.375rem'
 components:
-  button-primary:
-    backgroundColor: '{colors.signal-amber}'
-    textColor: '{colors.shop-floor}'
-    rounded: '{rounded.lg}'
-    padding: '0 18px'
-    height: '49.5px'
-  button-primary-hover:
-    backgroundColor: '#eda85a'
-    textColor: '{colors.shop-floor}'
+  button-commit:
+    backgroundColor: '{colors.thermal-red}'
+    textColor: '#ffffff'
+    rounded: '{rounded.control}'
+    padding: '0 1rem'
+    height: '2.75rem'
+  button-commit-hover:
+    backgroundColor: 'color-mix(in oklch, #cf3119, #17181a 14%)'
+  button-commit-night:
+    backgroundColor: '{colors.thermal-red-night}'
+    textColor: '{colors.thermal-ink}'
   button-outline:
-    backgroundColor: '{colors.shop-floor}'
-    textColor: '{colors.bone}'
-    rounded: '{rounded.lg}'
-    padding: '0 18px'
-    height: '49.5px'
-  card-surface:
-    backgroundColor: '{colors.bench}'
-    textColor: '{colors.bone}'
-    rounded: '{rounded.lg}'
-    padding: '22.5px'
-  capability-mark:
-    backgroundColor: '{colors.recess}'
-    textColor: '{colors.graphite}'
-    rounded: '{rounded.xl}'
-    size: '31.5px'
-  provider-chip:
-    backgroundColor: '{colors.bench}'
-    textColor: '{colors.graphite}'
-    rounded: '{rounded.sm}'
-    padding: '4.5px 9px'
-    typography: '{typography.figure}'
+    backgroundColor: '{colors.field-white}'
+    textColor: '{colors.thermal-ink}'
+    rounded: '{rounded.control}'
+    padding: '0 0.625rem'
+    height: '2rem'
+  button-outline-hover:
+    backgroundColor: '{colors.steel-recess}'
+  hung-ticket:
+    backgroundColor: '{colors.ticket-paper}'
+    textColor: '{colors.thermal-ink}'
+    rounded: '{rounded.paper}'
+    padding: '1.5rem 1.5rem 1.25rem'
+  hung-ticket-night:
+    backgroundColor: '{colors.night-paper}'
+    textColor: '{colors.night-bone}'
+  command-plate:
+    backgroundColor: '{colors.thermal-ink}'
+    textColor: '{colors.shell-bone}'
+    typography: '{typography.command}'
+    rounded: '{rounded.control}'
+    padding: '0.75rem'
+  steel-plate:
+    backgroundColor: '{colors.steel-plate}'
+    textColor: '{colors.thermal-ink}'
+    rounded: '{rounded.plate}'
+    padding: '1.25rem'
+  copy-cell:
+    backgroundColor: '{colors.stage-up-next}'
+    rounded: '{rounded.cell}'
+    size: '0.5rem'
+  stage-count-chip:
+    backgroundColor: '{colors.stage-up-next}'
+    textColor: '#ffffff'
+    typography: '{typography.stub}'
+    rounded: '{rounded.paper}'
+    padding: '0.125rem 0.375rem'
+  spec-chip:
+    backgroundColor: '{colors.steel-plate}'
+    textColor: '{colors.thermal-ink}'
+    rounded: '{rounded.paper}'
+    padding: '0.25rem 0.5rem'
+  ghost-slot:
+    backgroundColor: 'transparent'
+    textColor: '{colors.worn-graphite}'
+    rounded: '{rounded.paper}'
+    padding: '0.75rem 1rem'
+  site-bar:
+    backgroundColor: '{colors.brushed-steel}'
+    textColor: '{colors.worn-graphite}'
+    height: '{spacing.bar}'
+  closing-band:
+    backgroundColor: '{colors.thermal-ink}'
+    textColor: '{colors.shell-bone}'
+    padding: '5rem 0'
 ---
 
 <!-- markdownlint-disable MD024 MD036 MD025 -->
 <!-- The DESIGN.md spec requires the bolded North Star line (MD036), a "Named Rules" heading per section (MD024),
-     and a `title` typography role whose key markdownlint mistakes for a front-matter document title (MD025). -->
+     and typography role keys that markdownlint can mistake for a front-matter document title (MD025). -->
 
 # Design System: STL Quest website
 
 ## Overview
 
-**Creative North Star: "The Shop Floor Traveler, seen from the door"**
+**Creative North Star: "The pass, seen from the counter"**
 
-The application is a workshop: a dark floor, travelling cards, blueprint linework, one amber that means _act here_. This site is that same room viewed from the entrance. It borrows the application's palette, type, and corner language exactly, and adds nothing of its own, because a visitor who signs up should recognise the product they were shown.
+The hosted landing pages (`/`, `/home`, `/terms`, `/privacy`) do not have a marketing world of their own. They stand on the application's pass: brushed steel by day and night steel after dark, paper tickets hung from a steel rail, black thermal ink, red as the second ink, and five stage colours that own whole regions. The decision is deliberate. The site is a surface of one product whose name, palette, and type are not the website's to reinterpret (`docs/landing/PRODUCT.md`, Brand Commitments); a visitor who signs up should land in the world they were just shown; and real screenshots only read as evidence when the page around them speaks the same language as the pixels inside them. A separate landing palette would make every screenshot look like a quotation from somewhere else.
 
-What the site does differently is scale and pace. The application is dense because an operator reads fourteen jobs at once; the landing page is open because a stranger reads one idea at a time. So the same tokens are spent on fewer, larger elements: a 70px Oswald headline where the app uses 24px, a 1040px measure with real air between sections, and one screenshot doing the work of a paragraph. Density is not the signature here. Restraint is.
+Like the application, the pages follow the visitor's light or dark scheme. Every colour comes from `src/theme.css` through `src/styles.css`, swapped by `:root[data-theme='dark']`; nothing locks `color-scheme` and the head carries no `theme-color` meta. What the landing adds is scale and argument, not material: the same tokens spent on fewer, larger elements. The offer is hung as tickets on a rail; every claim after that is a spec-sheet line with its name in a margin column and the running board as evidence beside it; what the product refuses is drawn as empty slots.
 
-The page is an argument in four moves: what this is, watch it work, what happens to your files, and how to run it. Nothing decorative sits between those moves. The one piece of ornament in the whole site is the dashed blueprint rule under the masthead, and it earns its place by being the same rule the application draws beside its app rail.
+The page reads top to bottom as one pass: the rail of offers, the board, the copy ticket the visitor can move, catalogues, quotes, usage, how to run it, what it leaves to other tools, and an ink band to close. Product facts come from `src/core` (stages and their order, plans, model formats, storage providers), never restated in prose.
 
 **Key Characteristics:**
 
-- The application's palette and type, unchanged, at landing-page scale.
-- Tonal layering over shadow; a card is a lighter surface with a hairline ring.
-- One accent, spent on the single action the page most wants.
-- A near-square 4px corner everywhere.
-- Colour is used to teach the workflow, never to decorate a list.
-- Real product imagery instead of illustration.
+- The application's Pass tokens, unchanged, in both schemes.
+- A hung-ticket rail as the hero, not a split hero over icon cards.
+- One solid red per view, on Create a free workspace.
+- Stage colours as flat fills, in board order, sourced from `data-stage`.
+- Spec-sheet lines: a 15rem margin column beside the evidence.
+- Real screenshots of the running app in the visitor's theme.
+- Mono only for what a machine prints or reads.
 
 ## Colors
 
-The application's palette, shared from `src/theme.css` rather than copied. Two of its colours do real work here; the rest are surface and text.
+The application's palette, read live from `src/theme.css`; this file names the values the landing pages actually render. Each light token has a night counterpart under `data-theme='dark'`.
 
 ### Primary
 
-- **Signal Amber** (`{colors.signal-amber}`): The action the page is arguing for, plus the `Printing` stage in the capability row. Above the fold it appears exactly once. A second amber in the same view means one of them is wrong.
+- **Thermal Red** (`{colors.thermal-red}`, night `{colors.thermal-red-night}`): The commit ink. On the landing pages it fills exactly one control per view: Create a free workspace in the hero ticket and in the closing band. Every other path, including the same action in the site bar and the hosted ticket, is an outline button.
 
 ### Secondary
 
-- **Blueprint Teal** (`{colors.blueprint-teal}`): Linework and the `Up next` stage. On this site it appears in exactly two roles: the dashed rule under the masthead, and one capability mark. It never fills a button and never carries body text.
+- **Stage colours** (Queue `{colors.stage-queue}`, Up next `{colors.stage-up-next}`, Printing `{colors.stage-printing}`, Finishing `{colors.stage-finishing}`, Ready `{colors.stage-ready}`; night variants alongside): The five stages in production order, applied through `[data-stage]` so the hero's stage cells, the lead ticket's bar, the legend bars, the copy ticket's cells and count chips all share one source. The Up next blue also tints text selection.
 
 ### Tertiary
 
-- **Cure Green** (`{colors.cure-green}`): The `Ready` stage in the capability row, and the confirmation tick when the Docker command is copied. Both mean the same thing: this finished.
-- **Fault Red** (`{colors.fault-red}`): Only the failure state of that same copy button.
+- **Focus Blue** (`{colors.focus-blue}`): Focus rings only (3px at 50%). Never a fill.
 
 ### Neutral
 
-- **Shop Floor** (`{colors.shop-floor}`): The page.
-- **Bench** (`{colors.bench}`): Cards, provider chips, and the mobile navigation sheet.
-- **Recess** (`{colors.recess}`): Capability and card marks, and the hover fill on ghost controls.
-- **Scribe Line** (`{colors.scribe-line}`): Section rules, card outlines, chip borders.
-- **Bone** (`{colors.bone}`): Headings and any text the visitor must not miss.
-- **Graphite** (`{colors.graphite}`): Body copy, the figure caption, the footer, and the `Queue` stage. The muted voice, and the one most of the page is written in.
+- **Brushed Steel** (`{colors.brushed-steel}`; night `{colors.night-steel}`): The page ground and the site bar.
+- **Steel Plate** (`{colors.steel-plate}`; night `{colors.night-plate}`): Evidence plates: the copy-ticket frame, the catalogue list, spec chips.
+- **Steel Recess** (`{colors.steel-recess}`): Hover fill for outline and ghost controls.
+- **Steel Rule** (`{colors.steel-rule}`; night `{colors.night-rule}`): Section rules between spec lines, plate and screenshot outlines, point dividers.
+- **Steel Input** (`{colors.steel-input}`) and **Field White** (`{colors.field-white}`): The outline button's stroke and fill.
+- **Popover Paper** (`{colors.popover-paper}`): The narrow-width navigation sheet.
+- **Rail Steel** (`{colors.rail-steel}`; night `{colors.night-rail}`): The rail strip tickets hang from (at 70%), the hanger tab, and the closing band's top edge.
+- **Thermal Ink** (`{colors.thermal-ink}`; night `{colors.night-bone}` as text): Headings and body. As the shell (`{colors.thermal-ink}`, night `{colors.shell-ink-night}`) it is the command plate, the docket's ink bar, the phone bezel, and the closing band, with Shell Bone (`{colors.shell-bone}`) and Shell Graphite (`{colors.shell-graphite}`) text inside `.on-shell`.
+- **Worn Graphite** (`{colors.worn-graphite}`; night `{colors.night-graphite}`): Purpose paragraphs, captions, the footer, ghost slots.
+- **Ticket Paper** (`{colors.ticket-paper}`; night `{colors.night-paper}`) and **Ticket Graphite** (`{colors.ticket-graphite}`): Hung tickets and the copy ticket's paper slips, with their muted text.
 
 ### Named Rules
 
-**The One Voice Rule.** Signal Amber marks the single action the page most wants and nothing else. The masthead's call to action is deliberately an outline button so the hero owns the only accent above the fold.
+**The One Red Rule.** A view carries at most one solid Thermal Red control, and it is always Create a free workspace. The site bar's copy of that action is an outline so the hero ticket keeps the only red above the fold; the hosted ticket's copy is an outline because the hero's red is still in reach.
 
-**The Stage Spectrum Rule.** The four capability marks are coloured graphite, teal, amber, green, in that order, because that is the order a request moves through the board: queue, up next, printing, ready. The colour is teaching the workflow, so it may not be reordered or reassigned for visual balance.
+**The Stage Owns the Region Rule.** A stage colour is a flat fill read from `data-stage`, in board order, and only where it means that stage. Never a gradient, a tint for decoration, or a sixth hue.
 
-**The No Decorative Hue Rule.** A colour appears on this page only when it means something. A list of storage providers is a list, not a spectrum: those chips are uniform, because nothing distinguishes Dropbox from Box that a colour could honestly encode.
+**The No Marketing Palette Rule.** The landing pages introduce no colour the application does not have. A new need is met from `src/theme.css` or not at all.
 
 ## Typography
 
-**Display Font:** Oswald (with `system-ui, sans-serif`)
-**Body Font:** IBM Plex Sans (with `system-ui, sans-serif`)
-**Mono Font:** IBM Plex Mono (with `monospace`)
+**Display Font:** Oswald 700 (with `system-ui, sans-serif`), through `--face-heading`
+**Body Font:** IBM Plex Sans 400 and 600 (with `system-ui, sans-serif`), through `--face-sans`
+**Label/Mono Font:** IBM Plex Mono 400 (with `ui-monospace, monospace`), through `--face-mono`
 
-**Character:** Three families, three jobs. Oswald is condensed and vertical, and at 70px it is the page's whole personality: a workshop sign, not a startup headline. IBM Plex Sans carries every sentence. IBM Plex Mono carries the things a machine would say — the Docker command, the storage provider names, the figure caption, the footer — which is what makes the page read as written by someone who runs servers.
+**Character:** Condensed uppercase Oswald is the ticket name and the section head: a printed order, not a startup headline. Plex Sans carries every sentence; Plex Mono carries only what a machine prints or reads. These are the faces that ship; the root `DESIGN.md` frontmatter still names Archivo and Martian Mono, which no longer match the `--face-*` tokens.
 
-The application's serif (Zilla Slab) is deliberately absent. It exists there to make a print's name read as a proper noun, and this site never shows one.
-
-The root is 18px, matching the application, so every rem here is 12.5% larger than a default Tailwind scale suggests.
+The root is 18px (`src/styles.css`), so every rem here is 18px and numbers are tabular throughout. `landing.css`, loaded only by the landing routes, redeclares the four faces above the fold with `font-display: optional`, and `landingHead` preloads them, trading a small chance of fallback for no layout shift.
 
 ### Hierarchy
 
-- **Display** (Oswald 500, 70px/1.04, tight tracking): The single page headline. One per page, never repeated in a section.
-- **Headline** (Oswald 500, 33.75px): Section titles, set in the left rail rather than above the content.
-- **Title** (Oswald 500, 22.5px, +0.025em): Card titles and capability names.
-- **Lede** (IBM Plex Sans 400, 22.5px): The one paragraph under the headline and the opening line of a section. Capped at `max-w-xl` so it never runs the full 1040px.
-- **Body** (IBM Plex Sans 400, 18px/1.5): Every other sentence.
-- **Figure** (IBM Plex Mono 400, 13.5px): The Docker command, provider chips, the tour caption, the footer.
+- **Display** (Oswald 700, 2.2rem → 3.6rem at 40rem → `{typography.display}` at 80rem, 0.95, -0.01em, uppercase, balanced): The H1, once, on the lead ticket.
+- **Close** (Oswald 700, 2.4rem → 3rem at 40rem, 0.95, uppercase): The closing band's head. Legal pages use 2.6rem for their H1.
+- **Headline** (Oswald 700, 2rem, 1, uppercase, balanced): Spec-line titles in the margin column.
+- **Ticket title** (Oswald 700, 1.4rem, uppercase; 1.6rem on the hero docket): Names on hung tickets.
+- **Stage label** (Oswald 700, 1.1rem, uppercase): Stage legend heads; ghost-slot jobs at 1.125rem; legal section heads at 1.25rem. The copy ticket's stage labels are 0.875rem tracked 0.015em, as on the board.
+- **Lede** (Plex Sans 400, 1.25rem from 40rem, max 34rem): The hero paragraph. The closing band's line is 1.125rem.
+- **Body** (Plex Sans 400, 1rem/1.5): Prose; legal text runs at 55ch, about 73 characters a line.
+- **Purpose** (Plex Sans 400, 0.95rem/1.625): Margin-column paragraphs and point descriptions; stage notes at 0.9rem.
+- **Point title** (Plex Sans 600, 1rem): Points, catalogue names, plan names.
+- **Command** (Plex Mono 400, 0.75rem/1.625): The Docker command.
+- **Stub** (Plex Mono 400, 11px, uppercase): Ticket stubs (Free · AGPL-3.0, SQLite or PostgreSQL), demo captions, the optional tag, the legal effective date, stage count chips. Plan figures are 0.8rem mono; spec chips 0.75rem mono; the footer 0.75rem mono uppercase.
 
 ### Named Rules
 
-**The One Headline Rule.** Display size appears once per page. A section that wants it is competing with the argument, not supporting it.
+**The Machine Voice Rule.** Mono is for what a machine prints or reads: the command, plan sizes and prices, counts, captions, ticket stubs, storage and format names, and the footer colophon. Never for prose, and never to make a sentence look technical.
 
-**The Machine Voice Rule.** Monospace is for what a machine would print or accept: commands, service names, the mechanical caption under the tour. It is never used to make prose look technical.
+**The No Eyebrow Rule.** Nothing sits above a heading. A stub or caption belongs at the foot of the thing it labels, as a ticket's does.
 
 ## Layout
 
-A single 1040px column, `w-[min(1040px,calc(100%-48px))]`, holding every band from masthead to footer, so the page has one left edge the eye can follow the whole way down.
+One measure for every band: `{spacing.column}`, so the page keeps a single left edge from bar to footer. The site bar is `{spacing.bar}` tall over a hairline rule; below 64rem its links fold into a sheet.
 
-Above 821px each section becomes a two-track grid, `[210px_1fr]`, with the section heading parked in the left rail beside its content rather than stacked above it. This is the site's one structural idea and it is what keeps a four-section page from reading as four stacked slabs. Below 821px the rail collapses and headings sit above their content.
+The hero is the rail: from 64rem a two-track grid (1.55fr and 1fr, 1.5rem apart) holds the lead ticket and the ink docket side by side, each hanging from its own stretch of rail so together they read as one. Below 64rem they stack.
 
-Sections are separated by a solid 1px rule in Scribe Line and 45px of vertical space. Cards sit on an asymmetric two-column grid, `[1.3fr_1fr]`, with the wider track holding the Docker command, which sets the minimum width the whole layout has to respect. That grid only engages at 1088px, below which the command would not fit a half-width card.
+Every section after it is a **spec line**: a top rule in Steel Rule, `{spacing.section-narrow}` of vertical padding rising to `{spacing.section}` at 40rem, and from 64rem a grid of `{spacing.margin-column}` and the evidence, `{spacing.spec-gutter}` apart. The margin column holds the headline, the purpose, and any tag; the evidence column holds a plate, points, or a screenshot. Legal pages use the same margin column beside a 55ch body, with the header sticky from 64rem.
+
+Evidence inside a line pairs a list with a 22rem screenshot from 48rem or 80rem; the stage legend runs five across from 64rem (two from 40rem); ghost slots run five across from 80rem, the last spanning both columns between 40rem and 80rem. Breakpoints are Tailwind's rem media queries, which resolve against the browser's 16px default: 40rem (640px), 48rem (768px), 64rem (1024px), 80rem (1280px).
 
 ### Named Rules
 
-**The One Column Rule.** Every band shares the same 1040px measure and the same 24px gutter. Nothing breaks the column except the product tour, which is allowed to run wider because it is the evidence.
+**The One Column Rule.** Every band shares the one measure. Only the closing band's ink runs edge to edge, and its content still sits in the column.
 
-**The Rail Rule.** A section heading belongs in the left rail on wide viewports. It is a label on the band, not a title above it.
+**The Margin Column Rule.** A spec line's name and purpose sit in the 15rem margin beside the evidence on wide screens, never as a title stacked over a full-width slab.
 
 ## Elevation & Depth
 
-Flat. Depth is four tonal steps from Shop Floor to Raised, plus a `ring-1` at 10% of the foreground colour to scribe a card's edge. There is no resting shadow anywhere on the page.
+Flat steel, lifted paper. The ground, plates, rules, and bands carry no shadow; depth is tonal (steel, plate, paper) plus hairline rules. Paper hangs: a hung ticket and each copy-ticket slip carry the board's paper hang. The only other shadows belong to things that float over the page.
 
 ### Shadow Vocabulary
 
-- **In-layout** (no shadow): Everything in the document flow, including all four run-it cards.
-- **Overlay** (`shadow-xl`): The mobile navigation sheet only, which floats over the page and needs to detach from it.
+- **Paper hang** (`box-shadow: 0 1px 0 rgb(0 0 0 / 0.08), 0 10px 18px -12px rgb(0 0 0 / 0.5)`): Hung tickets and copy-ticket slips, as if the paper curls off the rail.
+- **Float** (`box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25)`): The phone screenshot overlapping the board screenshot, and the narrow navigation sheet (with a 10% ink ring).
 
 ### Named Rules
 
-**The Position Decides Rule.** A shadow is earned by floating, not by mattering. The only element on this site that floats is the mobile navigation.
+**The Paper Lifts Rule.** Only paper casts a resting shadow. Steel plates, screenshot frames, the bar, and the closing band are flat.
 
 ## Shapes
 
-A 4px base radius, scaled down to 2.4px on chips and up to 5.6px on the small circular marks, which at 31.5px read as full circles. Nothing is soft: the intent is cut stock, matching the application.
+Small, mechanical corners from the app's scale (`--radius` 0.375rem). Plates and screenshot frames use `{rounded.plate}`; buttons and the command plate `{rounded.control}`; paper, chips, ghost slots, and count chips are cut at `{rounded.paper}`; copy cells and stage swatches are `{rounded.cell}` squares. The phone capture sits in a `{rounded.phone}` bezel of 5px shell ink, the one soft corner, because it is a device.
 
-Borders come in two weights. A **solid 1px rule** in Scribe Line separates peers — section from section, capability from capability, and the outline of a card. A **dashed 2px rule** in Blueprint Teal at 25% appears exactly once, under the masthead, where it separates the site chrome from the page it governs. That is the same job it does in the application beside the app rail and under the board header.
+A ticket is drawn from parts: a rail strip (`{spacing.rail}`, rail steel at 70%) overhanging the paper by 0.75rem each side, a 2rem by 1rem rail-steel hanger tab, a `{spacing.rail}` bar across the paper's top (the Up next stage for an offer, shell ink for a docket), and a dashed perforation at 25% ink between what a ticket is and what it carries. Dashes mean "not here yet" or "torn here": perforations, ghost slots (30% ink), the optional tag (40% ink), and the copy ticket's empty stages (25% ink).
 
 ### Named Rules
 
-**The Dashed Rule Rule.** The dashed blueprint rule separates a region from the content it governs, never two peers. On this site there is one such boundary and therefore one dashed rule. A second would make the first meaningless.
+**The Dashed Means Absent Rule.** A dashed outline is a perforation or an empty slot. Never draw a solid thing with dashes.
 
 ## Components
 
 ### Buttons
 
-- **Shape:** Near-square (4px). Large size is 49.5px tall with 18px of horizontal padding.
-- **Primary:** Signal Amber fill, Shop Floor text, hovering to 80% opacity.
-- **Outline:** Scribe Line stroke on the page colour, hovering to Recess. Carries the masthead call to action and every secondary path.
-- **Focus:** A 3px ring at 50% of Signal Amber. Never suppressed.
-- **Active:** A 1px downward translate, the page's only press affordance.
-- Links that look like buttons use `ButtonLink`, a styled anchor, because the Base UI button forces button semantics onto whatever it renders.
+The app's `Button` and `ButtonLink` (`src/components/ui/button.tsx`), unchanged. Links that look like buttons are `ButtonLink`, because Base UI's button forces button semantics on what it renders.
 
-### Cards
+- **Shape:** `{rounded.control}`, Plex Sans 600 at 0.875rem.
+- **Commit (default):** Thermal Red, white text (thermal ink at night), `xl` size (2.75rem, 1rem padding) for the hero and close. Hover mixes 14% ink into the red.
+- **Outline:** Field White on a Steel Input stroke, hover to Steel Recess. Every secondary path: site bar action, hosted ticket, guides, catalogue links, Move a copy on, Run it yourself.
+- **Ghost:** The copy icon on the command plate and the menu toggle.
+- **Focus / Active:** 3px Focus Blue ring at 50%; a 1px press translate.
 
-- **Corner Style:** 4px, on Bench, with a `ring-1` at 10% foreground instead of a border.
-- **Internal Padding:** 22.5px.
-- **Header:** A 31.5px circular mark in Recess beside an Oswald title. The mark is uniform across all four run-it cards; the amber inside a card belongs to its action, not its icon.
+### Hung Ticket (signature)
 
-### Chips
+Paper on its own stretch of rail (`HungTicket`, `Ticket.tsx`). The lead ticket carries the Up next bar, the H1, lede, five stage swatches, a perforation, the Free · AGPL-3.0 stub, and the red commit. The ink docket carries a shell-ink bar, Run it yourself, the command plate, a perforation, and outline links to the self-hosting guide, TrueNAS, and Unraid. Tickets settle onto the rail with `card-settle` (420ms, `cubic-bezier(0.16, 1, 0.3, 1)`), the docket 90ms after the lead, motion-safe only. The same pair returns under Run it your way: an ink docket for your own server, an Up next ticket for hosted plans from `storagePlans`.
 
-- **Provider chip:** Bench fill, Scribe Line border, Graphite mono text, 2.4px corner. Uniform across all seven providers.
+### Command Plate
 
-### Capability Mark
+An `.on-shell` ink plate holding the Docker command in Command mono with a ghost copy button. The copy result swaps the icon to a success tick or a destructive alert, and the button's label says which, for two seconds.
 
-A 31.5px circle carrying a 15.75px icon, tinted at 10% of its own colour. The four marks run graphite, teal, amber, green in board order. This is the only place on the site where colour varies across a set, and it varies because the sequence is the point.
+### Copy Ticket (signature interaction)
 
-### Product Tour (signature component)
+`CopyDemo.tsx`: one request for six copies spread across the five stages on a steel plate. Each stage shows a stage swatch, Oswald label, and mono count chip, then a paper slip with the print name, ×n of 6, and the app's `CopyCells`. Move a copy on advances the copy nearest done; the landing slip replays `card-settle` (320ms) and its cells restamp with `cell-stamp` (320ms, 25ms stagger). Empty stages are dashed slots reading No copies here. A polite live region announces each move. Reduced motion turns off settle and stamp.
 
-The page's central evidence: a real recording of the application in a frame with browser-chrome dots, an expand control, and a play/pause control. It autoplays muted and looped, but only after checking `prefers-reduced-motion`, and a refused play leaves the poster up rather than an empty frame. A mono caption underneath names the stages left to right. It is allowed to break the 1040px column; nothing else is.
+### Stage Legend
+
+Five columns in board order, each under a 6px top bar in its stage colour, an Oswald stage label, and a purpose note keyed by stage ID.
+
+### Themed Screenshot
+
+`Shot.tsx` renders both captures into the markup; `landing.css` hides the other theme's with `display: none`, so its lazy image is never fetched. Wide captures add a 1200px `srcset` copy. Frames are a `{rounded.plate}` Steel Rule outline, flat. Images are `public/landing-{board,phone,quote,filament,spend}-{light,dark}.webp` (board also `-1200`): real screenshots of the running application in the demo print-farm workspace (`scripts/seedPowerUser.ts`), captured 2026-11-20 with Chrome DevTools at 2x and converted with cwebp. `public/social-card.png` is a crop of the light board capture. Each carries alt text describing what it shows.
+
+### Demo Caption
+
+A mono 11px uppercase `figcaption` in Worn Graphite under each screenshot, naming it as demo data (A demo print farm · 27 printers · on desktop and phone).
+
+### Ghost Slot
+
+What the product leaves to other tools, drawn as empty slots: a dashed 30% ink outline with no fill, the job in a muted Oswald label, and who does it instead. The list is `OUTSIDE_THE_PRODUCT` in `site.ts`, which `llms.txt` also reads.
+
+### Spec Chip
+
+Storage providers and model formats as uniform mono chips on Steel Plate with a Steel Rule outline. Uniform because the items are equivalent; colour would invent a distinction.
+
+### Navigation
+
+The site bar is the app's bar seen from outside: the `Brand` lockup, section links in Plex Sans 600 Worn Graphite turning to ink on hover, GitHub, Sign in, and an outline Create a free workspace. Below 64rem the links fold into a Popover Paper sheet with the float shadow, closed by Escape or the scrim. A skip link precedes it.
+
+### Closing Band
+
+An `.on-shell` band of shell ink edge to edge, topped by a `{spacing.rail}` rail-steel edge: the close head, one line, the red commit, and an outline Run it yourself back to the docket.
 
 ## Do's and Don'ts
 
-### Do
+### Do:
 
-- **Do** take colour, type, and corner language from the application unchanged.
-- **Do** keep Signal Amber to one element per view, and make the masthead call to action an outline so the hero keeps the accent.
-- **Do** colour the capability marks in board order, because the order is information.
-- **Do** set commands, service names, and captions in IBM Plex Mono.
-- **Do** put section headings in the left rail above 821px.
-- **Do** lead with self-hosting; the hosted service is the convenience path, not the headline.
-- **Do** review against `pnpm build` output, since the font preload plugin only runs on build.
+- **Do** take every colour, face, radius, and keyframe from `src/theme.css` and `src/styles.css`; follow the visitor's scheme.
+- **Do** keep Thermal Red to Create a free workspace, once per view; every other action is an outline.
+- **Do** apply stage colour through `data-stage`, in board order, from `workflow` in `src/core`.
+- **Do** hang offers as tickets on the rail, and set every later section as a spec line with its name in the 15rem margin.
+- **Do** show the product with real screenshots in both themes through `Shot`, captioned as demo data.
+- **Do** draw what the product will not do as ghost slots from `OUTSIDE_THE_PRODUCT`.
+- **Do** read stages, plans, model formats, and storage providers from `src/core`.
+- **Do** keep landing faces on `font-display: optional` with their preloads in `landingHead`.
 
-### Don't
+### Don't:
 
-- **Don't** introduce a colour the application does not have, or a stock palette hue that means nothing.
-- **Don't** colour a list to make it look lively; uniform chips are the correct answer for a set of equivalent things.
-- **Don't** use Blueprint Teal as a fill, a button, or body text.
-- **Don't** draw a second dashed rule.
-- **Don't** add a resting shadow to anything that scrolls with the page.
-- **Don't** repeat display size in a section, or let a second headline compete with the hero.
-- **Don't** add a testimonial, logo wall, metric strip, or star count; none of that evidence exists.
-- **Don't** put an eyebrow above the headline.
+- **Don't** introduce a marketing palette, a gradient, or any colour the application lacks.
+- **Don't** lock `color-scheme` or add a `theme-color` meta.
+- **Don't** put a second solid red in a view, or use red for anything but the commit.
+- **Don't** set prose in mono or put an eyebrow or kicker above a heading.
+- **Don't** shadow steel, plates, or screenshot frames; only paper and floating layers lift.
+- **Don't** colour a set of equivalent items such as storage providers.
+- **Don't** add testimonials, logos, metrics, or star counts; none exist.
+- **Don't** use a split hero over a row of equal icon cards.

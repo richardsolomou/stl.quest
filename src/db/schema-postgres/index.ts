@@ -24,6 +24,7 @@ import {
   requests,
   requestStatuses,
   uploadSessions,
+  usageEvents,
 } from './production'
 import { assetMigrations, deploymentSettings, invites, settings } from './settings'
 
@@ -56,6 +57,7 @@ export const schema = {
   subscription,
   twoFactor,
   uploadSessions,
+  usageEvents,
   user,
   userOnboarding,
   verification,

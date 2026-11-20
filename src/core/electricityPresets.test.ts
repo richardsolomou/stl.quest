@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { ELECTRICITY_PRICE_PRESETS, getElectricityPricePreset } from './electricityPresets'
+import catalog from '../../catalogs/electricity/catalog.generated.json'
+import { getElectricityPricePreset, type ElectricityPricePreset } from './electricityPresets'
+
+const ELECTRICITY_PRICE_PRESETS: ElectricityPricePreset[] = catalog.presets
 
 describe('electricity price presets', () => {
   it('keeps unique country codes with positive prices', () => {
@@ -8,10 +11,14 @@ describe('electricity price presets', () => {
   })
 
   it('includes the latest Cyprus household average', () => {
-    expect(getElectricityPricePreset('CY')).toMatchObject({ countryName: 'Cyprus', eurPerKwh: 0.2774, period: '2025-S2' })
+    expect(getElectricityPricePreset(ELECTRICITY_PRICE_PRESETS, 'CY')).toMatchObject({
+      countryName: 'Cyprus',
+      eurPerKwh: 0.2774,
+      period: '2025-S2',
+    })
   })
 
   it('includes non-European household averages', () => {
-    expect(getElectricityPricePreset('US')).toMatchObject({ countryName: 'United States', period: '2025' })
+    expect(getElectricityPricePreset(ELECTRICITY_PRICE_PRESETS, 'US')).toMatchObject({ countryName: 'United States', period: '2025' })
   })
 })

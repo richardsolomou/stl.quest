@@ -1,28 +1,28 @@
-import { useEffect, useRef, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useServerFn } from '@tanstack/react-start'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { consumablesOfKind, type Consumable } from '../../core/consumables'
+import { servesPrintType, type EquipmentItem } from '../../core/equipment'
 import {
-  calculatePrintPrice,
-  printerCostSettings,
-  removePrinterCosts,
-  selectPriceCalculatorPrintType,
-  withConsumables,
-  withPrinterCostSettings,
+  costBasis,
+  costPrint,
+  TYPICAL_JOBS,
+  TYPICAL_RESIN_DENSITY_GRAMS_PER_ML,
   type PriceCalculatorJob,
   type PriceCalculatorSettings,
 } from '../../core/priceCalculator'
-import { getPrinterPreset } from '../../core/printerPresets'
-import type { PrinterProfile } from '../../core/types'
-import { savePriceCalculatorSettings } from '../../server/fns'
+import type { PrinterProfile, PrintType } from '../../core/types'
 import type { calculatorPrefill } from '../calculatorSearch'
+import { requestPrintTypeChoices } from '../fleet'
 import { useI18n } from '../i18n'
-import { consumablesQuery, priceCalculatorSettingsQuery, printersQuery } from '../queries'
-import type { Consumable } from '../../core/consumables'
+import { consumablesQuery, equipmentQuery, priceCalculatorSettingsQuery, printersQuery } from '../queries'
+import { useWorkspacePrintTypes } from '../workspace'
 import { QueryState } from './QueryState'
+import { BatchEstimate } from './priceCalculator/BatchEstimate'
+import { CalculatorTabs } from './priceCalculator/CalculatorTabs'
+import { JobPickers, type JobMaterial } from './priceCalculator/JobPickers'
 import { JobSection } from './priceCalculator/JobSection'
-import { QuoteSection, type PriceMode } from './priceCalculator/QuoteSection'
-import { SetupForm } from './priceCalculator/SetupForm'
-import type { SetupMode } from './priceCalculator/fields'
+import { QuoteSection } from './priceCalculator/QuoteSection'
+import { RatesLink } from './priceCalculator/PricingSections'
 import { PageHeader, SettingsPage } from './settings/SettingsLayout'
 
 const emptyJob: PriceCalculatorJob = {
@@ -35,11 +35,20 @@ const emptyJob: PriceCalculatorJob = {
 
 type Prefill = ReturnType<typeof calculatorPrefill>
 
-export function PriceCalculator({ workspaceSlug, prefill }: { workspaceSlug: string; prefill?: Prefill }) {
+export function PriceCalculator({
+  workspaceSlug,
+  prefill,
+  requestIds,
+}: {
+  workspaceSlug: string
+  prefill?: Prefill
+  requestIds: string[]
+}) {
   const { t } = useI18n()
   const query = useQuery(priceCalculatorSettingsQuery(workspaceSlug))
   const printers = useQuery(printersQuery(workspaceSlug)).data?.profiles.filter((printer) => !printer.archived) ?? []
   const consumables = useQuery(consumablesQuery(workspaceSlug)).data?.consumables ?? []
+  const equipment = useQuery(equipmentQuery(workspaceSlug)).data?.equipment.filter((item) => !item.archived) ?? []
   if (!query.data) {
     return (
       <SettingsPage>
@@ -54,154 +63,118 @@ export function PriceCalculator({ workspaceSlug, prefill }: { workspaceSlug: str
       </SettingsPage>
     )
   }
+  if (requestIds.length > 0) {
+    return (
+      <BatchEstimate
+        requestIds={requestIds}
+        settings={query.data.settings}
+        saved={query.data.saved}
+        printers={printers}
+        consumables={consumables}
+      />
+    )
+  }
   return (
     <LoadedPriceCalculator
-      workspaceSlug={workspaceSlug}
-      savedSettings={query.data.settings}
+      rates={query.data.settings}
       saved={query.data.saved}
       printers={printers}
       consumables={consumables}
+      equipment={equipment}
       prefill={prefill}
     />
   )
 }
 
+// Undefined picks the first of the print type; null is nothing picked, which prices with typical values.
+type Choice = string | null | undefined
+
+function picked<Item extends { id: string }>(items: Item[], id: Choice) {
+  return id === null ? undefined : (items.find((item) => item.id === id) ?? (id === undefined ? items[0] : undefined))
+}
+
 function LoadedPriceCalculator({
-  workspaceSlug,
-  savedSettings,
+  rates,
   saved,
   printers,
   consumables,
+  equipment,
   prefill,
 }: {
-  workspaceSlug: string
-  savedSettings: PriceCalculatorSettings
+  rates: PriceCalculatorSettings
   saved: boolean
   printers: PrinterProfile[]
   consumables: Consumable[]
+  equipment: EquipmentItem[]
   prefill?: Prefill
 }) {
   const { t } = useI18n()
-  const [settings, setSettings] = useState(() =>
-    prefill ? selectPriceCalculatorPrintType(savedSettings, prefill.printType) : savedSettings,
-  )
+  // A print being priced keeps its own type even when the workspace no longer prints it.
+  const printTypes = requestPrintTypeChoices(useWorkspacePrintTypes(), prefill?.printType)
+  const [printType, setPrintType] = useState<PrintType>(prefill?.printType ?? printTypes[0])
   const [job, setJob] = useState(() => (prefill ? { ...emptyJob, ...prefill.job } : emptyJob))
-  // Undefined opens the first printer of the print type; null is the workspace setup chosen explicitly.
-  const [printerId, setPrinterId] = useState<string | null | undefined>(prefill?.printerId)
-  const syncedSettings = useRef(savedSettings)
-  const [priceMode, setPriceMode] = useState<PriceMode>('standard')
-  const [setupOpen, setSetupOpen] = useState(!saved)
-  const [resinMode, setResinMode] = useState<SetupMode>(savedSettings.resinPresetId ? 'preset' : 'custom')
-  const [electricityMode, setElectricityMode] = useState<SetupMode>(savedSettings.electricityCountryCode ? 'preset' : 'custom')
-  const callSave = useServerFn(savePriceCalculatorSettings)
-  const queryClient = useQueryClient()
-  const mutation = useMutation({
-    mutationFn: callSave,
-    onSuccess: (stored) => {
-      setSettings(stored)
-      setSetupOpen(false)
-      queryClient.setQueryData(priceCalculatorSettingsQuery(workspaceSlug).queryKey, { settings: stored, saved: true })
-    },
-  })
-  // Only a later save resyncs, so a prefilled print type survives the first render.
-  useEffect(() => {
-    if (syncedSettings.current === savedSettings) return
-    syncedSettings.current = savedSettings
-    setSettings(savedSettings)
-    setResinMode(savedSettings.resinPresetId ? 'preset' : 'custom')
-    setElectricityMode(savedSettings.electricityCountryCode ? 'preset' : 'custom')
-  }, [savedSettings])
-
-  const choices = printers.filter((printer) => printer.printType === settings.printType)
-  const printer =
-    printerId === null
-      ? undefined
-      : (choices.find((choice) => choice.id === printerId) ?? (printerId === undefined ? choices[0] : undefined))
-  const ownCosts = printer !== undefined && settings.printerCosts[printer.id] !== undefined
-  // The form and quote see the selected printer's view; edits are split back into its own costs and the shared setup.
-  const scoped = printer ? printerCostSettings(settings, printer) : settings
-  const result = calculatePrintPrice(withConsumables(scoped, consumables), job)
-  const comparison = choices.map((choice) => ({
-    printer: choice,
-    result: calculatePrintPrice(withConsumables(printerCostSettings(settings, choice), consumables), job),
-  }))
-  const syncResinMode = (next: PriceCalculatorSettings) => setResinMode(next.resinPresetId ? 'preset' : 'custom')
+  const [printerId, setPrinterId] = useState<Choice>(prefill?.printerId)
+  const [materialId, setMaterialId] = useState<Choice>()
+  const [equipmentIds, setEquipmentIds] = useState<string[]>([])
+  const choices = printers.filter((printer) => printer.printType === printType)
+  const printer = picked(choices, printerId)
+  const materials: JobMaterial[] = consumablesOfKind(consumables, printType)
+  const material = picked(materials, materialId)
+  const usable = equipment.filter((item) => servesPrintType(item, printType))
+  const chosenEquipment = usable.filter((item) => equipmentIds.includes(item.id))
+  const picks = { rates, printType, consumables, material, equipment: chosenEquipment }
+  const cost = (on?: PrinterProfile) => costPrint({ ...picks, job, printer: on })
+  const result = cost(printer)
+  const basis = costBasis({ ...picks, printer })
+  const comparison = choices.map((choice) => ({ printer: choice, result: cost(choice) }))
   const selectPrinter = (id: string | undefined) => setPrinterId(id ?? null)
-  // The resin preset toggle follows whichever setup is shown, including the default printer once the fleet loads.
-  const [resinModeScope, setResinModeScope] = useState(printer?.id)
-  if (resinModeScope !== printer?.id) {
-    setResinModeScope(printer?.id)
-    syncResinMode(scoped)
-  }
-  const followWorkspaceSetup = () => {
-    if (!printer) return
-    const next = removePrinterCosts(settings, printer.id)
-    setSettings(next)
-    syncResinMode(printerCostSettings(next, printer))
-  }
-  // The job's print type is remembered on save but is a job choice, so switching it alone is not an unsaved setup change.
-  // A never-saved setup is the defaults, and saving is how the operator accepts them.
-  const setupDirty = !saved || JSON.stringify({ ...settings, printType: savedSettings.printType }) !== JSON.stringify(savedSettings)
-  const selectPrintType = (printType: PriceCalculatorSettings['printType']) => {
-    setSettings((current) => selectPriceCalculatorPrintType(current, printType))
+  const selectPrintType = (next: PrintType) => {
+    setPrintType(next)
     setPrinterId(undefined)
-    setJob((current) => ({ ...current, materialAmount: 0, materialUnit: printType === 'resin' ? 'ml' : 'g' }))
+    setMaterialId(undefined)
+    setEquipmentIds([])
+    setJob((current) => ({ ...current, materialAmount: 0, materialUnit: next === 'resin' ? 'ml' : 'g' }))
   }
 
   return (
     <SettingsPage>
-      <PageHeader title={t.calculator.title} description={t.calculator.description} />
-      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(19rem,0.8fr)]">
-        <JobSection
-          settings={scoped}
-          job={job}
-          result={result}
+      <PageHeader title={t.calculator.title} description={t.calculator.description} actions={<CalculatorTabs active="quote" />} />
+      {/* Phones read setup, quote, then job; wide screens keep the quote sticky beside both. The 1fr row takes the quote's extra height, so the job stays under the setup. */}
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(19rem,0.8fr)] lg:grid-rows-[auto_1fr]">
+        <JobPickers
+          printType={printType}
+          printTypes={printTypes}
+          currency={rates.currency}
           printers={choices}
-          printerId={printer?.id}
-          onJobChange={setJob}
+          printer={printer}
+          materials={materials}
+          material={material}
+          equipment={usable}
+          chosenEquipment={chosenEquipment}
           onPrintTypeChange={selectPrintType}
           onPrinterChange={selectPrinter}
+          onMaterialChange={(id) => setMaterialId(id ?? null)}
+          onEquipmentChange={setEquipmentIds}
         />
         <QuoteSection
-          settings={scoped}
+          rates={rates}
+          printType={printType}
           job={job}
           result={result}
-          mode={priceMode}
+          basis={basis}
           comparison={comparison}
-          printerId={printer?.id}
-          onModeChange={setPriceMode}
+          printer={printer}
+          materialName={material?.name}
           onPrinterChange={selectPrinter}
+          onTryTypicalJob={() => setJob(TYPICAL_JOBS[printType])}
+          rateLink={<RatesLink settings={rates} saved={saved} />}
         />
-        <SetupForm
-          settings={scoped}
-          consumables={consumables}
-          scope={
-            printer && {
-              printerName: printer.name,
-              printerFixed: Boolean(getPrinterPreset(printer.presetId)),
-              ownCosts,
-              onUseWorkspaceSetup: followWorkspaceSetup,
-            }
-          }
-          resinMode={resinMode}
-          electricityMode={electricityMode}
-          dirty={setupDirty}
-          saving={mutation.isPending}
-          error={mutation.error}
-          open={setupOpen}
-          onOpenChange={setSetupOpen}
-          onSettingsChange={(edited) => setSettings((current) => (printer ? withPrinterCostSettings(current, printer, edited) : edited))}
-          onResinModeChange={setResinMode}
-          onElectricityModeChange={setElectricityMode}
-          onSave={() => mutation.mutate({ data: { workspaceSlug, ...settings } })}
-          onDiscard={() => {
-            // Discarding keeps the job's print type, which lives in the same settings object.
-            const restored = selectPriceCalculatorPrintType(savedSettings, settings.printType)
-            setSettings(restored)
-            syncResinMode(printer ? printerCostSettings(restored, printer) : restored)
-            setElectricityMode(savedSettings.electricityCountryCode ? 'preset' : 'custom')
-            mutation.reset()
-          }}
+        <JobSection
+          printType={printType}
+          job={job}
+          result={result}
+          density={material?.kind === 'resin' ? material.densityGramsPerMl : TYPICAL_RESIN_DENSITY_GRAMS_PER_ML}
+          onJobChange={setJob}
         />
       </div>
     </SettingsPage>

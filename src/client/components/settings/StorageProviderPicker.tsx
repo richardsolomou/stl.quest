@@ -95,14 +95,14 @@ export function StorageProviderPicker({
         <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
       </div>
       {inUse && (
-        <div className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/5 p-3 max-sm:flex-col max-sm:items-stretch sm:p-4">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <div className="flex items-start gap-3 rounded-lg border border-success/40 bg-success/5 p-3 max-sm:flex-col max-sm:items-stretch sm:p-4">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-success/15 text-success">
             <Check className="size-5" aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium">{t.picker.setUp}</span>
-              <Badge>{t.picker.inUse}</Badge>
+              <Badge variant="success">{t.picker.inUse}</Badge>
             </div>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               {inUse.adapter === 'managed' ? (
@@ -120,7 +120,7 @@ export function StorageProviderPicker({
             )}
             {onKeepCurrent && (
               <div className="mt-3">
-                <Button type="button" disabled={preparing} onClick={onKeepCurrent}>
+                <Button type="button" variant={currentActionLabel ? 'outline' : 'default'} disabled={preparing} onClick={onKeepCurrent}>
                   {currentActionLabel ?? t.picker.keepAndContinue}
                 </Button>
               </div>
@@ -129,14 +129,14 @@ export function StorageProviderPicker({
         </div>
       )}
       {!inUse && serverFolder && (
-        <div className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/5 p-3 max-sm:flex-col sm:p-4 max-sm:items-stretch">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <div className="flex items-start gap-3 rounded-lg border border-border bg-card p-3 max-sm:flex-col sm:p-4 max-sm:items-stretch">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">
             <Folder className="size-5" aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium">{t.picker.serverDisk}</span>
-              <Badge>{t.picker.recommended}</Badge>
+              <Badge variant="outline">{t.picker.recommended}</Badge>
             </div>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               {t.picker.serverDiskBody.before}
@@ -156,14 +156,14 @@ export function StorageProviderPicker({
         </div>
       )}
       {(!inUse || inUse.adapter !== 'managed') && managedStorage && (
-        <div className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/5 p-3 max-sm:flex-col sm:p-4 max-sm:items-stretch">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <div className="flex items-start gap-3 rounded-lg border border-border bg-card p-3 max-sm:flex-col sm:p-4 max-sm:items-stretch">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">
             <Cloud className="size-5" aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium">{t.picker.included}</span>
-              <Badge>{t.picker.recommended}</Badge>
+              <Badge variant="outline">{t.picker.recommended}</Badge>
             </div>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               {settings ? t.picker.includedSettings : includedStorageOnboardingCopy(managedStoragePlan, messages, locale)}
@@ -209,7 +209,7 @@ export function StorageProviderPicker({
               <span className="flex flex-wrap items-center gap-2">
                 <span className="font-medium">{option.label}</span>
               </span>
-              <span className="mt-0.5 block text-sm leading-relaxed text-muted-foreground">{option.requires}</span>
+              <span className="mt-0.5 block text-sm leading-relaxed [overflow-wrap:anywhere] text-muted-foreground">{option.requires}</span>
             </span>
             <ChevronRight className="size-4 shrink-0 text-muted-foreground max-sm:hidden" aria-hidden="true" />
           </button>

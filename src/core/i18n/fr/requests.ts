@@ -12,6 +12,7 @@ export const requests: typeof en = {
     downloadAllCopies: 'Télécharger toutes les copies',
     downloadCopies: (count) => (count <= 1 ? `Télécharger ${count} copie` : `Télécharger ${count} copies`),
     printAgain: 'Imprimer à nouveau…',
+    estimate: 'Estimer le prix',
     move: 'Déplacer',
     archive: 'Archiver',
   },
@@ -74,6 +75,8 @@ export const requests: typeof en = {
   details: {
     anyCompatiblePrinter: 'Toute imprimante compatible',
     decideLater: 'À décider plus tard',
+    submittedAgo: (age: string) => `Soumise il y a ${age}`,
+    copyCount: (count: number) => `${count} ${count === 1 ? 'copie' : 'copies'}`,
     openSourceLink: 'Ouvrir le lien source',
     linkOnly: 'Lien uniquement — aucun fichier de modèle n’est stocké.',
   },
@@ -97,10 +100,10 @@ export const requests: typeof en = {
   cost: {
     label: 'Coût estimé',
     suggested: (price, quantity) => (quantity > 1 ? `${price} suggéré pour l’ensemble des ${quantity} copies` : `${price} suggéré`),
-    hint: 'D’après votre configuration enregistrée du calculateur, en supposant un plateau par copie et aucun temps de manipulation.',
+    hint: 'D’après vos tarifs et l’imprimante attribuée, avec une matière et une finition typiques, un plateau par copie et aucun temps de manipulation.',
     openCalculator: 'Ouvrir dans le calculateur',
     onPrinter: (printer: string) => `sur ${printer}`,
-    onEachPrinter: 'Sur chaque imprimante',
+    compare: (count: number, range: string) => `${range} sur ${count} imprimantes`,
   },
   repeat: {
     title: 'Imprimer à nouveau',
@@ -231,9 +234,15 @@ export const requests: typeof en = {
     filtersLabel: 'Filtres des archives',
     filtersDescription: 'Combinez des champs pour affiner les archives.',
     noMatchesTitle: 'Aucun résultat',
-    emptyTitle: 'Les archives sont vides',
+    emptyTitle: 'Rien d’archivé pour l’instant',
     noMatches: 'Aucune impression archivée ne correspond à ces filtres.',
-    empty: 'Rien n’est encore archivé. Faites un clic droit sur une impression du tableau et choisissez Archiver.',
+    empty:
+      'Les impressions récupérées que vous archivez attendent ici, hors du tableau, jusqu’à ce que vous en ayez de nouveau besoin. Faites un clic droit sur une impression du tableau et choisissez Archiver.',
+    autoArchive: {
+      before: 'Ou laissez ',
+      link: 'l’archivage automatique des paramètres généraux',
+      after: ' retirer les impressions un nombre de jours défini après leur passage à Prêt.',
+    },
     loading: 'Chargement des archives…',
     loadFailed: 'Impossible de charger les archives',
     restoring: 'Remise sur le tableau…',

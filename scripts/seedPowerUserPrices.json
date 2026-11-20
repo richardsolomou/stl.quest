@@ -1,0 +1,376 @@
+{
+  "about": "List prices the power seed (scripts/seedPowerUser.ts) charges, keyed by catalogue ID. Each was read from the store page in `url` on `checked`: the manufacturer's EU store in EUR including VAT where it has one, otherwise an authorised EU reseller or the US store. Black Friday sales were running on 2026-11-20, so these are regular prices, or Bambu Lab's 30-day lowest price where it shows no regular one. USD prices are converted at `usdPerEur`. Lifespans in hours are STL Quest assumptions: no manufacturer publishes one. Wear parts not listed under `parts` take the parts catalogue's own list price (catalogs/parts).",
+  "checked": "2026-11-20",
+  "usdPerEur": {
+    "rate": 1.0992,
+    "url": "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml",
+    "checked": "2026-11-19"
+  },
+  "printers": {
+    "resin-formlabs-form-4": {
+      "amount": 3176.25,
+      "currency": "EUR",
+      "lifespanHours": 10000,
+      "url": "https://formlabs.com/eu/store/printers/form-4/",
+      "note": "Basic package, NL VAT."
+    },
+    "resin-elegoo-saturn-4-ultra-16k": {
+      "amount": 648,
+      "currency": "EUR",
+      "lifespanHours": 5000,
+      "url": "https://eu.elegoo.com/products/saturn-4-ultra-16k-10inch-monochrome-lcd-resin-3d-printer"
+    },
+    "resin-elegoo-mars-5-ultra": {
+      "amount": 362,
+      "currency": "EUR",
+      "lifespanHours": 5000,
+      "url": "https://eu.elegoo.com/products/mars-5-ultra-9k-7inch-monochrome-lcd-resin-3d-printer"
+    },
+    "resin-phrozen-sonic-mighty-revo": {
+      "amount": 880.6,
+      "currency": "EUR",
+      "lifespanHours": 5000,
+      "url": "https://eu.phrozen3d.com/products/sonic-mighty-revo"
+    },
+    "resin-anycubic-photon-mono-m7-pro": {
+      "amount": 669,
+      "currency": "EUR",
+      "lifespanHours": 5000,
+      "url": "https://eu.anycubic3d.com/products/photon-mono-m7-pro"
+    },
+    "resin-heygears-reflex-rs-turbo": {
+      "amount": 1199,
+      "currency": "EUR",
+      "lifespanHours": 8000,
+      "url": "https://www.makermondo.com/ultracraft-reflex-rs-turbo.html",
+      "note": "HeyGears sells in the EU only through partners; MakerMondo is one."
+    },
+    "filament-bambu-lab-p1s": {
+      "amount": 529,
+      "currency": "EUR",
+      "lifespanHours": 10000,
+      "url": "https://eu.store.bambulab.com/products/p1s",
+      "note": "AMS Combo, 30-day lowest price."
+    },
+    "filament-bambu-lab-h2d": {
+      "amount": 1549,
+      "currency": "EUR",
+      "lifespanHours": 10000,
+      "url": "https://eu.store.bambulab.com/products/h2d",
+      "note": "30-day lowest price."
+    },
+    "filament-prusa-core-one": {
+      "amount": 1349,
+      "currency": "EUR",
+      "lifespanHours": 10000,
+      "url": "https://www.prusa3d.com/product/prusa-core-one/",
+      "note": "Assembled."
+    },
+    "filament-prusa-xl-5t": {
+      "amount": 3999,
+      "currency": "EUR",
+      "lifespanHours": 10000,
+      "url": "https://www.prusa3d.com/product/original-prusa-xl-5-toolhead-3d-printer/"
+    },
+    "filament-creality-k1c": {
+      "amount": 559,
+      "currency": "USD",
+      "lifespanHours": 10000,
+      "url": "https://store.creality.com/products/k1c-3d-printer",
+      "note": "Not on Creality's EU store."
+    },
+    "filament-voron-2-4-350": {
+      "amount": 1549.99,
+      "currency": "EUR",
+      "lifespanHours": 10000,
+      "url": "https://www.3djake.de/ldo-motors/voron-24-350-bausatz-revd",
+      "note": "LDO RevD kit; Voron has no store of its own."
+    },
+    "filament-qidi-x-plus-4": {
+      "amount": 799,
+      "currency": "EUR",
+      "lifespanHours": 10000,
+      "url": "https://eu.qidi3d.com/products/plus4-3d-printer",
+      "note": "Discontinued; last regular price."
+    },
+    "filament-bambu-lab-x1-carbon": {
+      "lifespanHours": 10000,
+      "url": "https://eu.store.bambulab.com/products/x1-carbon",
+      "note": "Discontinued in March 2026 and no longer listed; the Wayback Machine excludes the page, so no purchase price is set."
+    }
+  },
+  "addOns": {
+    "accessory-heygears-pulsing-release-module": {
+      "amount": 839,
+      "currency": "EUR",
+      "url": "https://www.makermondo.com/ultracraft-reflex-rs-rs-turbo-pulsing-release-modu.html",
+      "note": "Module and tank; added to the printer's purchase price."
+    }
+  },
+  "equipment": {
+    "postprocess-formlabs-form-wash-v2": {
+      "amount": 821.59,
+      "currency": "EUR",
+      "lifespanHours": 5000,
+      "url": "https://formlabs.com/eu/store/post-processing/form-wash/"
+    },
+    "postprocess-formlabs-form-cure-v2": {
+      "amount": 1208.79,
+      "currency": "EUR",
+      "lifespanHours": 5000,
+      "url": "https://formlabs.com/eu/store/post-processing/form-cure/"
+    },
+    "postprocess-elegoo-mercury-plus-v3": {
+      "amount": 211,
+      "currency": "EUR",
+      "lifespanHours": 3000,
+      "url": "https://eu.elegoo.com/products/elegoo-wash-and-cure-station-3-0-for-resin-3d-printers"
+    },
+    "postprocess-uniformation-w230": {
+      "amount": 259.99,
+      "currency": "EUR",
+      "lifespanHours": 3000,
+      "url": "https://www.3djake.de/uniformation/ultra-sonic-resin-cleaner-w230",
+      "note": "7 L ultrasonic resin cleaner."
+    },
+    "accessory-sunlu-filadryer-s4": {
+      "amount": 129.99,
+      "currency": "EUR",
+      "lifespanHours": 5000,
+      "url": "https://store.sunlu.com/products/sunlu-filadryer-s4"
+    }
+  },
+  "resins": {
+    "resin-formlabs-grey-v5": {
+      "amount": 119.79,
+      "currency": "EUR",
+      "packAmount": 1000,
+      "packUnit": "ml",
+      "url": "https://formlabs.com/eu/products/grey-resin/"
+    },
+    "resin-formlabs-clear-v5": {
+      "amount": 119.79,
+      "currency": "EUR",
+      "packAmount": 1000,
+      "packUnit": "ml",
+      "url": "https://formlabs.com/eu/products/clear-resin/"
+    },
+    "resin-formlabs-black-v5": {
+      "amount": 119.79,
+      "currency": "EUR",
+      "packAmount": 1000,
+      "packUnit": "ml",
+      "url": "https://formlabs.com/eu/products/black-resin/"
+    },
+    "resin-formlabs-tough-2000-v2": {
+      "amount": 211.75,
+      "currency": "EUR",
+      "packAmount": 1000,
+      "packUnit": "ml",
+      "url": "https://formlabs.com/eu/products/tough-2000-resin/"
+    },
+    "resin-prusament-resin-model-rich-black": {
+      "amount": 69,
+      "currency": "EUR",
+      "packAmount": 1000,
+      "packUnit": "g",
+      "url": "https://www.prusa3d.com/product/prusament-resin-model-rich-black-1kg/"
+    },
+    "resin-prusament-resin-model-anthracite-grey": {
+      "amount": 73.99,
+      "currency": "EUR",
+      "packAmount": 1000,
+      "packUnit": "g",
+      "url": "https://www.prusa3d.com/product/prusament-resin-model-anthracite-grey-1kg-2/",
+      "note": "Sold as Resin Model+."
+    },
+    "resin-esun-standard-resin-black": {
+      "amount": 28.99,
+      "currency": "EUR",
+      "packAmount": 1000,
+      "packUnit": "g",
+      "url": "https://esun3dstoreeu.com/products/s200-standard-resin",
+      "note": "Sold as S200 Standard Resin."
+    },
+    "resin-siraya-tech-fast-grey": {
+      "amount": 39.99,
+      "currency": "USD",
+      "packAmount": 1000,
+      "packUnit": "g",
+      "url": "https://siraya.tech/products/fast-abs-like",
+      "note": "Ships from Siraya's EU warehouse but is priced in USD."
+    },
+    "resin-siraya-tech-blu-clear-v2": {
+      "amount": 49.99,
+      "currency": "USD",
+      "packAmount": 1000,
+      "packUnit": "g",
+      "url": "https://siraya.tech/products/blu-tough-resin-by-siraya"
+    },
+    "resin-siraya-tech-tenacious": {
+      "amount": 65,
+      "currency": "USD",
+      "packAmount": 1000,
+      "packUnit": "g",
+      "url": "https://siraya.tech/products/tenacious-resin-flexible-resin"
+    },
+    "resin-heygears-pab10": {
+      "amount": 23.99,
+      "currency": "USD",
+      "packAmount": 1000,
+      "packUnit": "g",
+      "url": "https://store.heygears.com/products/modeling-pab10-standard-modeling-resin",
+      "note": "US store; HeyGears has no EU store."
+    }
+  },
+  "filaments": {
+    "filament-bambu-lab-pla": {
+      "amount": 16.99,
+      "currency": "EUR",
+      "packAmount": 1000,
+      "url": "https://eu.store.bambulab.com/products/pla-basic-filament",
+      "note": "PLA Basic refill."
+    },
+    "filament-bambu-lab-matte-pla": {
+      "amount": 16.99,
+      "currency": "EUR",
+      "packAmount": 1000,
+      "url": "https://eu.store.bambulab.com/products/pla-matte",
+      "note": "Refill."
+    },
+    "filament-bambu-lab-petg": {
+      "amount": 15.99,
+      "currency": "EUR",
+      "packAmount": 1000,
+      "url": "https://eu.store.bambulab.com/products/petg-basic",
+      "note": "PETG Basic refill."
+    },
+    "filament-bambu-lab-pla-cf": {
+      "amount": 26.99,
+      "currency": "EUR",
+      "packAmount": 1000,
+      "url": "https://eu.store.bambulab.com/products/pla-cf",
+      "note": "Refill."
+    },
+    "filament-bambu-lab-pa6-cf": {
+      "amount": 49.79,
+      "currency": "EUR",
+      "packAmount": 1000,
+      "url": "https://eu.store.bambulab.com/products/pa6-cf"
+    },
+    "filament-bambu-lab-hf-tpu-95a": {
+      "amount": 20.99,
+      "currency": "EUR",
+      "packAmount": 1000,
+      "url": "https://eu.store.bambulab.com/products/tpu-95a-hf"
+    },
+    "filament-bambu-lab-support-for-pla-petg": {
+      "amount": 22.19,
+      "currency": "EUR",
+      "packAmount": 500,
+      "url": "https://eu.store.bambulab.com/products/support-for-pla-petg"
+    },
+    "filament-prusament-pla": {
+      "amount": 32.99,
+      "currency": "EUR",
+      "packAmount": 1000,
+      "url": "https://www.prusa3d.com/category/prusament-pla/"
+    },
+    "filament-prusament-petg": {
+      "amount": 32.99,
+      "currency": "EUR",
+      "packAmount": 1000,
+      "url": "https://www.prusa3d.com/category/prusament-petg/"
+    },
+    "filament-prusament-asa": {
+      "amount": 30.99,
+      "currency": "EUR",
+      "packAmount": 800,
+      "url": "https://www.prusa3d.com/category/prusament-asa/"
+    },
+    "filament-polymaker-polylite-pla": {
+      "amount": 29.95,
+      "currency": "EUR",
+      "packAmount": 1000,
+      "url": "https://shop.polymaker.com/en-eu/products/polylite-pla"
+    },
+    "filament-polymaker-polylite-asa": {
+      "amount": 24.99,
+      "currency": "EUR",
+      "packAmount": 1000,
+      "url": "https://shop.polymaker.com/en-eu/products/asa",
+      "note": "Now sold as Polymaker ASA."
+    },
+    "filament-esun-pla": {
+      "amount": 24.99,
+      "currency": "EUR",
+      "packAmount": 1000,
+      "url": "https://esun3dstoreeu.com/products/pla-pro"
+    },
+    "filament-overture-high-speed-tpu-95a": {
+      "amount": 25.99,
+      "currency": "EUR",
+      "packAmount": 1000,
+      "url": "https://overture3d.com/en-eu/products/overture-high-speed-tpu-3d-printer-filament-1-75mm"
+    }
+  },
+  "supplies": {
+    "ipa": {
+      "amount": 32,
+      "currency": "EUR",
+      "packAmount": 5000,
+      "url": "https://www.obi.de/p/2191094174895/hoefer-chemie-isopropanol-99-9-5l",
+      "note": "Höfer Chemie isopropanol 99.9%, 5 L."
+    },
+    "gloves": {
+      "amount": 11.99,
+      "currency": "EUR",
+      "packAmount": 100,
+      "url": "https://www.prusa3d.com/product/disposable-nitrile-gloves-100-pcs/"
+    },
+    "desiccant": {
+      "amount": 4.99,
+      "currency": "EUR",
+      "packAmount": 1,
+      "url": "https://eu.store.bambulab.com/products/silicone-desiccant"
+    }
+  },
+  "parts": {
+    "part-formlabs-form-4-resin-tank": {
+      "amount": 143.99,
+      "currency": "EUR",
+      "packAmount": 1,
+      "url": "https://formlabs.com/eu/products/form-4-resin-tank/"
+    },
+    "part-elegoo-pfa-film-saturn": {
+      "amount": 27.99,
+      "currency": "EUR",
+      "packAmount": 5,
+      "url": "https://eu.elegoo.com/products/elegoo-pfa-release-liner-for-saturn-2-3d-printer"
+    },
+    "part-elegoo-lcd-saturn-4-ultra-16k": {
+      "amount": 129.99,
+      "currency": "EUR",
+      "packAmount": 1,
+      "url": "https://eu.elegoo.com/products/lcd-screen-for-saturn-4-ultra-16k"
+    },
+    "part-elegoo-fep-film-mars-4-5": {
+      "amount": 22.99,
+      "currency": "EUR",
+      "packAmount": 5,
+      "url": "https://eu.elegoo.com/products/fep-film-for-mars-4-5-pcs"
+    },
+    "part-anycubic-nfep-film-photon-mono-m7-pro": {
+      "amount": 29.99,
+      "currency": "EUR",
+      "packAmount": 5,
+      "url": "https://eu.anycubic3d.com/products/fep-film"
+    },
+    "part-phrozen-pfa-film-mighty": {
+      "amount": 21.42,
+      "currency": "EUR",
+      "packAmount": 1,
+      "url": "https://eu.phrozen3d.com/products/nfep-film-mighty"
+    }
+  }
+}

@@ -1,43 +1,145 @@
+/* The pass by day: brushed-steel ground, paper tickets, black thermal ink. Red is the second thermal ink: the one commit
+   action, a note the operator must act on, and an age that has gone hot. Each stage owns a flat colour, in production order. */
 :root {
+  color-scheme: light;
+  --radius: 0.375rem;
+  --face-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --face-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --face-heading: 'Oswald', system-ui, sans-serif;
+  --face-name: var(--face-sans);
+  --heading-stretch: normal;
+  --name-stretch: normal;
+  --name-tracking: normal;
+  --mono-stretch: normal;
+
+  --background: #dcdfdd;
+  --foreground: #17181a;
+  --card: #eef0ee;
+  --card-foreground: #17181a;
+  --popover: #f6f7f5;
+  --popover-foreground: #17181a;
+  --primary: #cf3119;
+  --primary-foreground: #ffffff;
+  --secondary: #cdd1cf;
+  --secondary-foreground: #17181a;
+  --muted: #cdd1cf;
+  --muted-foreground: #4a4f53;
+  --accent: #c3c8c6;
+  --accent-foreground: #17181a;
+  --destructive: #a8221a;
+  --success: #1f7a43;
+  --border: #b7bcba;
+  --input: #9fa5a3;
+  --field: #fbfbfa;
+  --field-hover: #ffffff;
+  --ring: #1f5fd1;
+  /* The steel rail tickets hang from, and the hairline that separates a region from what it governs. */
+  --rail: #8d9391;
+  --shell: #17181a;
+  --shell-foreground: #f2f1ec;
+  --shell-muted: #a9adb0;
+  --shell-accent: #2a2c30;
+
+  --ticket: #fbfaf5;
+  --ticket-foreground: #17181a;
+  --ticket-muted: #575b5e;
+  --ticket-note: #b72a14;
+  /* A note or an overdue age set on the ground; paper surfaces swap in `--ticket-note`. */
+  --note: #ab2713;
+  /* The plate a model render or preview sits on, a step off the paper so the grey render reads in either theme. */
+  --thumb: #e8e7e1;
+
+  --stage-todo: #6c7175;
+  --stage-todo-foreground: #ffffff;
+  --stage-up_next: #2360c4;
+  --stage-up_next-foreground: #ffffff;
+  --stage-in_progress: #f0a40f;
+  --stage-in_progress-foreground: #17181a;
+  --stage-post_processing: #7c4cc4;
+  --stage-post_processing-foreground: #ffffff;
+  --stage-done: #1f7a43;
+  --stage-done-foreground: #ffffff;
+  --stage-tint: 22%;
+
+  /* Tag dots. User-chosen hue names, tuned to one lightness and chroma so twelve tags read as one set on paper. */
+  --tag-rose: #c9566a;
+  --tag-orange: #c46a2c;
+  --tag-amber: #b07d14;
+  --tag-lime: #6c8a1f;
+  --tag-green: #2f8a4c;
+  --tag-teal: #188577;
+  --tag-cyan: #12809a;
+  --tag-sky: #2c78b8;
+  --tag-blue: #4864c9;
+  --tag-indigo: #6658c4;
+  --tag-violet: #8a52b8;
+  --tag-fuchsia: #b04a92;
+
+  /* Requester plates: white initials on a fixed set of inks, all clear of the stage colours' hues. */
+  --requester-1: #34557e;
+  --requester-2: #4a4f8c;
+  --requester-3: #5f4a86;
+  --requester-4: #74427a;
+  --requester-5: #84405f;
+  --requester-6: #4d6470;
+  --requester-7: #3f5e57;
+  --requester-8: #6a5345;
+
+  /* Chart series in fixed order, validated together for colour-blind separation on the card surface in each theme. */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+}
+
+/* The same pass at night: dark steel, tickets on charcoal paper so a wall of them does not glare, inks lifted to keep contrast. */
+:root[data-theme='dark'] {
   color-scheme: dark;
-  --radius: 0.25rem;
-  --grid:
-    repeating-linear-gradient(0deg, transparent 0 23px, rgb(79 168 184 / 0.07) 23px 24px),
-    repeating-linear-gradient(90deg, transparent 0 23px, rgb(79 168 184 / 0.07) 23px 24px);
-  --background: #15171c;
-  --foreground: #e8e4d8;
-  --card: #1b1e24;
-  --card-foreground: #e8e4d8;
-  --popover: #1b1e24;
-  --popover-foreground: #e8e4d8;
-  --primary: #e89a3c;
-  --primary-foreground: #15171c;
-  --secondary: #23262e;
-  --secondary-foreground: #e8e4d8;
-  --muted: #23262e;
-  --muted-foreground: #92978f;
-  --accent: #2c303a;
-  --accent-foreground: #e8e4d8;
-  --destructive: #cc3131;
-  --success: #5cb86b;
-  --border: #2b2f38;
-  --input: #2b2f38;
-  --field: rgb(0 0 0 / 0.1);
-  --field-hover: rgb(0 0 0 / 0.15);
-  --ring: #e89a3c;
-  --chart-2: #6fae6a;
-  --chart-4: #c9a227;
+  --background: #131517;
+  --foreground: #ecebe5;
+  --card: #1b1e21;
+  --card-foreground: #ecebe5;
+  --popover: #202327;
+  --popover-foreground: #ecebe5;
+  --primary: #ff6447;
+  --primary-foreground: #17181a;
+  --secondary: #272b2f;
+  --secondary-foreground: #ecebe5;
+  --muted: #272b2f;
+  --muted-foreground: #a2a8ad;
+  --accent: #2f3439;
+  --accent-foreground: #ecebe5;
+  --destructive: #ff7a68;
+  --success: #5cc27f;
+  --border: #33383d;
+  --input: #50575e;
+  --field: #2c3035;
+  --field-hover: #33373c;
+  --ring: #6ea0ff;
+  --rail: #5a6066;
+  --shell: #0b0c0d;
+  --shell-foreground: #ecebe5;
+  --shell-muted: #959a9f;
+  --shell-accent: #1f2225;
 
-  /* Ticket surface request cards render on — a touch lighter than the floor, same cool neutral family as the rest of the app. */
-  --ticket: #262a33;
-  --ticket-foreground: #e8e4d8;
-  --ticket-muted: #92978f;
-  /* Blueprint linework — secondary accent for dividers, info states, station rails. */
-  --blueprint: #4fa8b8;
-  --blueprint-foreground: #0d2226;
+  --ticket: #26292d;
+  --ticket-foreground: #ecebe5;
+  --ticket-muted: #a2a8ad;
+  --ticket-note: #ff8a75;
+  --note: #ff8a75;
+  --thumb: #303439;
 
-  /* Tag dots. User-chosen hue names, tuned to one lightness and chroma (OKLCH 0.72 / 0.11) so twelve
-     tags read as one set on the ticket surface instead of twelve unrelated stock swatches. */
+  --stage-todo: #858b90;
+  --stage-todo-foreground: #0b0c0d;
+  --stage-up_next: #5b8ff0;
+  --stage-up_next-foreground: #0b0c0d;
+  --stage-in_progress: #f2ad25;
+  --stage-in_progress-foreground: #0b0c0d;
+  --stage-post_processing: #a57ee8;
+  --stage-post_processing-foreground: #0b0c0d;
+  --stage-done: #4cb873;
+  --stage-done-foreground: #0b0c0d;
+  --stage-tint: 18%;
+
   --tag-rose: #e1878e;
   --tag-orange: #da915f;
   --tag-amber: #cd9a50;
@@ -51,68 +153,35 @@
   --tag-violet: #b593dc;
   --tag-fuchsia: #d389ba;
 
-  /* Requester inks for avatar initials and requester chips: one cool band, so a person never reads as a stage colour. */
-  --requester-1: #7fa6d9;
-  --requester-2: #8f9ee0;
-  --requester-3: #a394dd;
-  --requester-4: #b98fd4;
-  --requester-5: #cf8cc4;
-  --requester-6: #dd8aa8;
-  --requester-7: #9fb0c4;
-  --requester-8: #c0a9bd;
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
 }
 
-/* The same workshop in daylight: warm paper surfaces, and amber, teal, green, and requester inks darkened until text in
-   them passes WCAG AA on the floor. Tag dots keep the dark theme's hues, which still read as one set on a light ticket.
-   Pages that declare a dark-only colour scheme, such as the landing pages, keep the dark tokens. */
-:root[data-theme='light']:not(:has(> head > meta[name='color-scheme'][content='dark'])) {
-  color-scheme: light;
-  --grid:
-    repeating-linear-gradient(0deg, transparent 0 23px, rgb(42 117 132 / 0.08) 23px 24px),
-    repeating-linear-gradient(90deg, transparent 0 23px, rgb(42 117 132 / 0.08) 23px 24px);
-  --background: #f3f1ea;
-  --foreground: #1d2026;
-  --card: #fbfaf6;
-  --card-foreground: #1d2026;
-  --popover: #fbfaf6;
-  --popover-foreground: #1d2026;
-  --primary: #a65a0c;
-  --primary-foreground: #ffffff;
-  --secondary: #e8e5dc;
-  --secondary-foreground: #1d2026;
-  --muted: #e8e5dc;
-  --muted-foreground: #5d625b;
-  --accent: #dfdcd2;
-  --accent-foreground: #1d2026;
-  --destructive: #b42323;
-  --success: #2f7d3c;
-  --border: #d8d3c6;
-  --input: #cfcabd;
-  --field: #fffefb;
-  --field-hover: #ece9e0;
-  --ring: #a65a0c;
-  --chart-2: #2f7d3c;
-  --chart-4: #a88412;
-  --ticket: #fdfcf9;
-  --ticket-foreground: #1d2026;
-  --ticket-muted: #5d625b;
-  --blueprint: #2a7584;
-  --blueprint-foreground: #ffffff;
-  --requester-1: #4c6482;
-  --requester-2: #576089;
-  --requester-3: #655c89;
-  --requester-4: #735983;
-  --requester-5: #7e5578;
-  --requester-6: #875466;
-  --requester-7: #59636e;
-  --requester-8: #6c5f6a;
+/* Controls set into ink, such as the selection bar, read as the night pass in either theme. */
+.on-shell {
+  --background: var(--shell);
+  --foreground: var(--shell-foreground);
+  --card: #24272b;
+  --muted: #2a2d31;
+  --muted-foreground: var(--shell-muted);
+  --secondary: #2a2d31;
+  --secondary-foreground: var(--shell-foreground);
+  --accent: #33373c;
+  --accent-foreground: var(--shell-foreground);
+  --border: #3a3e43;
+  --input: #4a4f55;
+  --field: #1f2225;
+  --field-hover: #272a2e;
+  --destructive: #ff7a68;
+  color: var(--foreground);
 }
 
 @theme inline {
-  --font-heading: 'Oswald', system-ui, sans-serif;
-  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
-  --font-serif: 'Zilla Slab', ui-serif, serif;
-  --font-mono: 'IBM Plex Mono', monospace;
+  --font-heading: var(--face-heading);
+  --font-sans: var(--face-sans);
+  --font-serif: var(--face-name);
+  --font-mono: var(--face-mono);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-field: var(--field);
@@ -137,10 +206,19 @@
   --color-ticket: var(--ticket);
   --color-ticket-foreground: var(--ticket-foreground);
   --color-ticket-muted: var(--ticket-muted);
-  --color-blueprint: var(--blueprint);
-  --color-blueprint-foreground: var(--blueprint-foreground);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
+  --color-ticket-note: var(--ticket-note);
+  --color-note: var(--note);
+  --color-thumb: var(--thumb, var(--background));
+  --color-rail: var(--rail);
+  --color-shell: var(--shell);
+  --color-shell-foreground: var(--shell-foreground);
+  --color-shell-muted: var(--shell-muted);
+  --color-shell-accent: var(--shell-accent);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: calc(var(--radius) * 0.75);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.4);
   --radius-2xl: calc(var(--radius) * 1.8);

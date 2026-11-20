@@ -1,14 +1,14 @@
 /*
- * Loaded only by the public landing pages. These faces use `font-display: optional` so the
- * server-rendered page never reflows when a face with different metrics arrives; the landing
- * routes preload them (see landingHead), which is what wins them the short window `optional` allows.
+ * Loaded only by the public landing pages. The faces they set above the fold are redeclared here with `font-display:
+ * optional` so the server-rendered page never reflows when a face with different metrics arrives; landingHead preloads
+ * them, which is what wins them the short window `optional` allows.
  */
 @font-face {
   font-family: 'Oswald';
   font-style: normal;
-  font-weight: 500;
+  font-weight: 700;
   font-display: optional;
-  src: url('@fontsource/oswald/files/oswald-latin-500-normal.woff2') format('woff2');
+  src: url('@fontsource/oswald/files/oswald-latin-700-normal.woff2') format('woff2');
 }
 
 @font-face {
@@ -22,9 +22,9 @@
 @font-face {
   font-family: 'IBM Plex Sans';
   font-style: normal;
-  font-weight: 500;
+  font-weight: 600;
   font-display: optional;
-  src: url('@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-500-normal.woff2') format('woff2');
+  src: url('@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-600-normal.woff2') format('woff2');
 }
 
 @font-face {
@@ -37,6 +37,7 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 1rem;
 }
 
 body {
@@ -49,19 +50,14 @@ a {
   cursor: pointer;
 }
 
+/* Each screenshot ships in both themes; the hidden one is never rendered, so its lazy image is never fetched. */
+:root[data-theme='dark'] .shot-light,
+:root:not([data-theme='dark']) .shot-dark {
+  display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
   }
-}
-
-.product-tour-frame:fullscreen {
-  display: flex;
-  flex-direction: column;
-}
-
-.product-tour-frame:fullscreen video {
-  min-height: 0;
-  flex: 1;
-  object-fit: contain;
 }

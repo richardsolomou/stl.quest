@@ -1,5 +1,5 @@
 import { DEFAULT_LOCALE, type Locale, type Messages } from './i18n'
-import type { PrintType, PublicPrintRequest } from './types'
+import type { PrintRequest, PrintType, PublicPrintRequest } from './types'
 
 const FILAMENT_DENSITY_G_PER_CM3 = 1.24
 const FILAMENT_INFILL_FRACTION = 0.15
@@ -57,6 +57,46 @@ function filamentMinutes(material?: number, heightMm?: number) {
   const layerMinutes = positive(heightMm) ? (heightMm / FILAMENT_LAYER_HEIGHT_MM) * (FILAMENT_MINIMUM_LAYER_SECONDS / 60) : undefined
   const printingMinutes = Math.max(extrusionMinutes ?? 0, layerMinutes ?? 0)
   return printingMinutes ? FILAMENT_STARTUP_MINUTES + printingMinutes : undefined
+}
+
+/** The automatic estimate a listed print carries, in the print type it resolves to. */
+export function automaticEstimateFields(
+  request: Pick<PrintRequest, 'modelDimensions' | 'modelVolumeMm3' | 'modelSurfaceAreaMm2'>,
+  printType?: PrintType,
+) {
+  const estimate = automaticPrintEstimate({
+    printType,
+    modelVolumeMm3: request.modelVolumeMm3,
+    modelSurfaceAreaMm2: request.modelSurfaceAreaMm2,
+    modelHeightMm: request.modelDimensions?.heightMm,
+  })
+  return {
+    automaticEstimatedMaterial: estimate?.material,
+    automaticEstimatedPrintMinutes: estimate?.minutes,
+    estimatedMaterialUnit: estimate?.materialUnit,
+  }
+}
+
+/** A print's estimate per copy: the admin's adjustments where set, otherwise the automatic estimate. */
+export function requestPrintEstimate(
+  request: Pick<
+    PublicPrintRequest,
+    | 'printType'
+    | 'automaticEstimatedMaterial'
+    | 'automaticEstimatedPrintMinutes'
+    | 'estimatedMaterialUnit'
+    | 'estimatedMaterialOverride'
+    | 'estimatedPrintMinutesOverride'
+  >,
+) {
+  if (!request.printType) return undefined
+  return {
+    material: request.estimatedMaterialOverride ?? request.automaticEstimatedMaterial,
+    materialUnit: request.estimatedMaterialUnit ?? (request.printType === 'resin' ? 'ml' : 'g'),
+    minutes: request.estimatedPrintMinutesOverride ?? request.automaticEstimatedPrintMinutes,
+    materialAdjusted: request.estimatedMaterialOverride !== undefined,
+    minutesAdjusted: request.estimatedPrintMinutesOverride !== undefined,
+  }
 }
 
 /** The geometry a fresh or replaced model still owes, so the missing estimate reads as pending rather than absent. */

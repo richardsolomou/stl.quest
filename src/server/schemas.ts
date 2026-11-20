@@ -5,6 +5,7 @@ import { MAX_AUTO_ARCHIVE_DAYS } from '../core/autoArchive'
 import {
   MAX_REQUEST_NAME_LENGTH,
   MAX_REQUEST_NOTES_LENGTH,
+  MAX_BULK_CARDS,
   MAX_REQUEST_QUANTITY,
   MAX_REQUEST_SOURCE_URL_LENGTH,
   MIN_REQUEST_QUANTITY,
@@ -16,11 +17,17 @@ import { MAX_USER_NAME_LENGTH, normalizeEmail } from '../core/identity'
 import { MAX_PRINT_GROUP_NAME_LENGTH } from '../core/printGroups'
 import { PRINT_TYPES, printGroupColors, REQUEST_SORTS } from '../core/types'
 import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
-import { MAX_CONSUMABLES } from '../core/consumables'
-import { PRICE_CALCULATOR_CURRENCIES } from '../core/priceCalculator'
+import { MAX_CONSUMABLES, SUPPLY_UNITS } from '../core/consumables'
+import { isPrinterAddOn } from '../core/equipmentPresets'
+import { EQUIPMENT_KINDS, EQUIPMENT_STAGES, MAX_EQUIPMENT } from '../core/equipment'
+import { PRINT_TYPE_CHOICES } from '../core/printTypes'
+import { USAGE_TRACKING_SOURCES } from '../core/usageTracking'
+import { PRICE_CALCULATOR_CURRENCIES, PRICE_CALCULATOR_MAXIMUMS } from '../core/priceCalculator'
+import { MAX_USAGE_LIST, USAGE_OUTCOMES, type StepUsageInput, type StockMovementInput, type UsageFilters } from '../core/usage'
 import {
   emailTemplateKinds,
   MAX_EMAIL_LOGO_BYTES,
+  MAX_EMAIL_ADDRESS_LENGTH,
   MAX_EMAIL_SENDER_NAME_LENGTH,
   emailTemplatePlaceholderCount,
   MAX_EMAIL_TEMPLATE_HTML_LENGTH,
@@ -74,55 +81,22 @@ export const acceptInviteSchema = z.object({
 
 export const telemetrySettingsSchema = z.object({ enabled: z.boolean() })
 export const selfSignupSettingsSchema = z.object({ enabled: z.boolean() })
-const MAX_PRINTER_PROFILES = 50
-const priceCalculatorEquipmentSchema = z.object({
-  mode: z.enum(['preset', 'custom']),
-  presetIds: z.array(z.string().trim().min(1).max(200)).max(50),
-  printPowerWatts: z.number().nonnegative().max(100_000),
-  washPowerWatts: z.number().nonnegative().max(100_000),
-  washMinutesPerPlate: z.number().nonnegative().max(100_000),
-  dryPowerWatts: z.number().nonnegative().max(100_000),
-  dryMinutesPerPlate: z.number().nonnegative().max(100_000),
-  curePowerWatts: z.number().nonnegative().max(100_000),
-  cureMinutesPerPlate: z.number().nonnegative().max(100_000),
-  partIds: z.array(z.string().trim().min(1).max(200)).max(MAX_CONSUMABLES).default([]),
-})
-const consumableIdSchema = z.string().trim().min(1).max(200).optional()
-const printerCostsSchema = z.object({
-  resinPresetId: z.string().trim().min(1).max(200).optional(),
-  resinConsumableId: consumableIdSchema,
-  filamentConsumableId: consumableIdSchema,
-  resinPricePerLitre: z.number().positive().max(100_000),
-  resinDensityGramsPerMl: z.number().positive().max(100),
-  filamentPricePerKg: z.number().positive().max(100_000),
-  equipmentCostPerHour: z.number().nonnegative().max(100_000),
-  consumablesCostPerPlate: z.number().nonnegative().max(100_000),
-  equipment: priceCalculatorEquipmentSchema,
-})
+const MAX_PRINTER_PROFILES = 500
+// A stripping object, never strict: settings stored by older releases carry extra fields and must still load.
 export const priceCalculatorSettingsSchema = z.object({
   currency: z.enum(PRICE_CALCULATOR_CURRENCIES),
-  printType: z.enum(PRINT_TYPES),
-  resinPresetId: z.string().trim().min(1).max(200).optional(),
-  resinConsumableId: consumableIdSchema,
-  filamentConsumableId: consumableIdSchema,
-  resinPricePerLitre: z.number().positive().max(100_000),
-  resinDensityGramsPerMl: z.number().positive().max(100),
-  filamentPricePerKg: z.number().positive().max(100_000),
   electricityCountryCode: z.string().trim().min(1).max(20).optional(),
-  electricityPricePerKwh: z.number().nonnegative().max(1_000),
-  resinEquipment: priceCalculatorEquipmentSchema,
-  filamentEquipment: priceCalculatorEquipmentSchema,
-  equipmentCostPerHour: z.number().nonnegative().max(100_000),
-  consumablesCostPerPlate: z.number().nonnegative().max(100_000),
-  labourCostPerHour: z.number().nonnegative().max(100_000),
-  failureAllowancePercent: z.number().nonnegative().max(100),
-  standardMarginPercent: z.number().nonnegative().max(95),
-  printerCosts: z
-    .record(z.string().trim().min(1).max(200), printerCostsSchema)
-    .refine((costs) => Object.keys(costs).length <= MAX_PRINTER_PROFILES)
-    .default({}),
+  electricityPricePerKwh: z.number().nonnegative().max(PRICE_CALCULATOR_MAXIMUMS.electricityPricePerKwh),
+  labourCostPerHour: z.number().nonnegative().max(PRICE_CALCULATOR_MAXIMUMS.labourCostPerHour),
+  failureAllowancePercent: z.number().nonnegative().max(PRICE_CALCULATOR_MAXIMUMS.failureAllowancePercent),
+  standardMarginPercent: z.number().nonnegative().max(PRICE_CALCULATOR_MAXIMUMS.standardMarginPercent),
 })
-const consumableBaseSchema = { id: z.string().trim().min(1).max(200), name: z.string().trim().min(1).max(120) }
+const consumableBaseSchema = {
+  id: z.string().trim().min(1).max(200),
+  name: z.string().trim().min(1).max(120),
+  minimumStock: z.number().positive().max(10_000_000).optional(),
+  packSize: z.number().positive().max(10_000_000).optional(),
+}
 export const consumablesSchema = z
   .object({
     consumables: z
@@ -135,7 +109,18 @@ export const consumablesSchema = z
             pricePerLitre: z.number().positive().max(100_000),
             densityGramsPerMl: z.number().positive().max(100),
           }),
-          z.object({ ...consumableBaseSchema, kind: z.literal('filament'), pricePerKg: z.number().positive().max(100_000) }),
+          z.object({
+            ...consumableBaseSchema,
+            kind: z.literal('filament'),
+            filamentPresetId: z.string().trim().min(1).max(200).optional(),
+            colour: z
+              .object({
+                name: z.string().trim().min(1).max(60),
+                hex: z.string().regex(/^#[0-9a-f]{6}$/i),
+              })
+              .optional(),
+            pricePerKg: z.number().positive().max(100_000),
+          }),
           z.object({
             ...consumableBaseSchema,
             kind: z.literal('part'),
@@ -143,6 +128,15 @@ export const consumablesSchema = z
             price: z.number().nonnegative().max(1_000_000),
             lifespan: z.number().positive().max(10_000_000),
             lifespanUnit: z.enum(['plates', 'hours']),
+            printerPresetId: z.string().trim().min(1).max(200).optional(),
+            printerId: z.string().trim().min(1).max(200).optional(),
+            partPresetId: z.string().trim().min(1).max(200).optional(),
+          }),
+          z.object({
+            ...consumableBaseSchema,
+            kind: z.literal('supply'),
+            unit: z.enum(SUPPLY_UNITS),
+            price: z.number().nonnegative().max(1_000_000),
           }),
         ]),
       )
@@ -154,6 +148,46 @@ export const consumablesSchema = z
       if (ids.has(consumable.id))
         context.addIssue({ code: 'custom', path: ['consumables', index, 'id'], message: 'consumable IDs must be unique' })
       ids.add(consumable.id)
+    }
+  })
+export const equipmentSchema = z
+  .object({
+    equipment: z
+      .array(
+        z.object({
+          id: z.string().trim().min(1).max(200),
+          name: z.string().trim().min(1).max(120),
+          presetId: z.string().trim().min(1).max(200).optional(),
+          kind: z.enum(EQUIPMENT_KINDS),
+          stage: z.enum(EQUIPMENT_STAGES),
+          printType: z.enum(PRINT_TYPES).optional(),
+          powerWatts: z.number().nonnegative().max(100_000),
+          minutesPerUse: z.number().nonnegative().max(10_080),
+          supplies: z
+            .array(z.object({ consumableId: z.string().trim().min(1).max(200), amountPerUse: z.number().positive().max(1_000_000) }))
+            .max(MAX_CONSUMABLES),
+          purchasePrice: z.number().nonnegative().max(10_000_000).optional(),
+          lifespanHours: z.number().positive().max(10_000_000).optional(),
+          archived: z.boolean().optional(),
+        }),
+      )
+      .max(MAX_EQUIPMENT),
+  })
+  .superRefine(({ equipment }, context) => {
+    const ids = new Set<string>()
+    for (const [index, item] of equipment.entries()) {
+      if (ids.has(item.id)) context.addIssue({ code: 'custom', path: ['equipment', index, 'id'], message: 'equipment IDs must be unique' })
+      ids.add(item.id)
+      const supplied = new Set<string>()
+      for (const [supplyIndex, supply] of item.supplies.entries()) {
+        if (supplied.has(supply.consumableId))
+          context.addIssue({
+            code: 'custom',
+            path: ['equipment', index, 'supplies', supplyIndex, 'consumableId'],
+            message: 'each supply is listed once',
+          })
+        supplied.add(supply.consumableId)
+      }
     }
   })
 export const emailLogoSchema = z.object({
@@ -169,7 +203,7 @@ export const emailSenderSchema = z.object({
     .trim()
     .max(MAX_EMAIL_SENDER_NAME_LENGTH)
     .regex(/^[^\r\n]*$/),
-  replyTo: z.union([z.literal(''), z.email().max(254).transform(normalizeEmail)]),
+  replyTo: z.union([z.literal(''), z.email().max(MAX_EMAIL_ADDRESS_LENGTH).transform(normalizeEmail)]),
 })
 export const emailTemplateSchema = z.object({
   kind: z.enum(emailTemplateKinds.map((kind) => kind.id) as [EmailTemplateKind, ...EmailTemplateKind[]]),
@@ -202,6 +236,10 @@ export const boardSettingsSchema = z
   })
   .refine((value) => value.privateRequests !== undefined || value.autoArchiveDays !== undefined)
 
+export const printTypeChoiceSchema = z.object({ choice: z.enum(PRINT_TYPE_CHOICES) })
+
+export const usageTrackingSchema = z.object({ enabled: z.boolean(), source: z.enum(USAGE_TRACKING_SOURCES) })
+
 export const memberRequestVisibilitySchema = z.object({
   userId: z.string().min(1),
   visibility: z.enum(['default', 'own', 'all']),
@@ -215,6 +253,14 @@ const printerProfileBaseSchema = z.object({
   heightMm: z.number().positive().max(10_000).optional(),
   name: z.string().trim().min(1).max(100),
   printType: z.enum(PRINT_TYPES),
+  purchasePrice: z.number().positive().max(10_000_000).optional(),
+  lifespanHours: z.number().positive().max(10_000_000).optional(),
+  powerWatts: z.number().positive().max(100_000).optional(),
+  addOnPresetIds: z
+    .array(id.refine(isPrinterAddOn, 'not a printer add-on'))
+    .max(20)
+    .refine((ids) => new Set(ids).size === ids.length, 'add-ons must be unique')
+    .optional(),
   archived: z.boolean().optional(),
   used: z.boolean().optional(),
 })
@@ -398,14 +444,42 @@ export const moveCopiesSchema = z.object({
 })
 
 export const moveCopiesBatchSchema = z.object({
-  moves: z.array(moveCopiesSchema).min(1).max(100),
+  moves: z.array(moveCopiesSchema).min(1).max(MAX_BULK_CARDS),
 })
+
+const settingsItemId = z.string().trim().min(1).max(200)
+const usageAmount = z.number().positive().max(1_000_000)
+export const recordStepUsageSchema = z.object({
+  requestId: id,
+  stage: z.enum(['printing', 'finishing']),
+  copies: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY),
+  printerId: settingsItemId.optional(),
+  consumableId: settingsItemId.optional(),
+  equipmentIds: z.array(settingsItemId).max(MAX_EQUIPMENT).optional(),
+  outcome: z.enum(USAGE_OUTCOMES).optional(),
+}) satisfies z.ZodType<StepUsageInput>
+export const recordStockMovementSchema = z.discriminatedUnion('kind', [
+  z.object({ consumableId: settingsItemId, kind: z.enum(['restock', 'waste']), amount: usageAmount }),
+  z.object({ consumableId: settingsItemId, kind: z.literal('replace'), amount: usageAmount, printerId: settingsItemId.optional() }),
+  z.object({ consumableId: settingsItemId, kind: z.literal('correction'), counted: z.number().min(0).max(1_000_000) }),
+]) satisfies z.ZodType<StockMovementInput>
+export const undoUsageSchema = z.object({ transactionId: id })
+export const usageFiltersSchema = z.object({
+  requestId: id.optional(),
+  consumableId: settingsItemId.optional(),
+  printerId: settingsItemId.optional(),
+  equipmentId: settingsItemId.optional(),
+  from: z.number().int().nonnegative().optional(),
+  to: z.number().int().nonnegative().optional(),
+  includeUndone: z.boolean().optional(),
+  limit: z.number().int().min(1).max(MAX_USAGE_LIST).optional(),
+}) satisfies z.ZodType<UsageFilters>
 
 export const createPrintGroupSchema = z.object({
   name: printGroupName.optional(),
   parentId: id.optional(),
   status: statusId,
-  items: z.array(z.object({ requestId: id, count: z.number().int().min(1) })).max(100),
+  items: z.array(z.object({ requestId: id, count: z.number().int().min(1) })).max(MAX_BULK_CARDS),
 })
 
 export const movePrintGroupSchema = z.object({ id, from: statusId, to: statusId })
@@ -422,7 +496,7 @@ export const updatePrintCopyTagsSchema = z.object({
   items: z
     .array(z.object({ requestId: id, status: statusId, count: z.number().int().min(1) }))
     .min(1)
-    .max(100),
+    .max(MAX_BULK_CARDS),
 })
 export const deletePrintGroupSchema = z.object({ id })
 export const reorderPrintGroupItemSchema = z.object({
@@ -437,10 +511,10 @@ export const deleteRequestsSchema = z.object({
   deletions: z
     .array(z.object({ id, status: statusId, count: z.number().int().min(1), tagIds: z.array(id).max(100).optional() }))
     .min(1)
-    .max(100),
+    .max(MAX_BULK_CARDS),
 })
 
-export const archiveRequestsSchema = z.object({ ids: z.array(id).min(1).max(100) })
+export const archiveRequestsSchema = z.object({ ids: z.array(id).min(1).max(MAX_BULK_CARDS) })
 
 export const reorderRequestSchema = z.object({
   id,

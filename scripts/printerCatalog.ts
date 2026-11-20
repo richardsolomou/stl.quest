@@ -34,6 +34,21 @@ export type GeneratedPrinterPreset = {
   source: { id: string; url: string }
 }
 
+/** The committed index the app reads: what it shows of each printer, without the provenance only the full catalogue needs. */
+export function serializedPrinterIndex(presets: GeneratedPrinterPreset[]) {
+  const index = presets.map(({ id, brand, model, printType, widthMm, depthMm, heightMm, image }) => ({
+    id,
+    brand,
+    model,
+    printType,
+    widthMm,
+    depthMm,
+    heightMm,
+    ...(image && { image: image.src }),
+  }))
+  return `${JSON.stringify({ presets: index }, null, 2)}\n`
+}
+
 type ImageSourceBase = {
   id: string
   brand: string

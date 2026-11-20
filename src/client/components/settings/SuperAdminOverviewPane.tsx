@@ -125,7 +125,7 @@ function HostedStorageValue({ accounts }: { accounts: Account[] }) {
         <ValueStat label={copy.dataStored} value={formatBytes(storedBytes, locale)} detail={copy.dataStoredDetail} />
       </div>
       <div>
-        <h4 className="mb-3 font-heading text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">{copy.planMix}</h4>
+        <h4 className="mb-3 font-heading text-[11px] font-semibold tracking-[0.015em] text-muted-foreground uppercase">{copy.planMix}</h4>
         <div className="grid gap-3 sm:grid-cols-3">
           {plans.map((plan) => {
             const planAccounts = customerAccounts.filter((account) => (account.plan ?? 'free') === plan)
@@ -150,7 +150,7 @@ function HostedStorageValue({ accounts }: { accounts: Account[] }) {
 function ValueStat({ label, value, detail }: { label: string; value: string | number; detail: string }) {
   return (
     <div className="min-w-0 bg-card px-5 py-4">
-      <p className="font-heading text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">{label}</p>
+      <p className="font-heading text-[11px] font-semibold tracking-[0.015em] text-muted-foreground uppercase">{label}</p>
       <p className="mt-2 font-mono text-2xl leading-none">{value}</p>
       <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{detail}</p>
     </div>
@@ -160,7 +160,7 @@ function ValueStat({ label, value, detail }: { label: string; value: string | nu
 function SummaryCard({ label, value, detail }: { label: string; value: string | number; detail: string }) {
   return (
     <div className="rounded-sm border-2 border-border/70 bg-card/40 p-4">
-      <p className="font-heading text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">{label}</p>
+      <p className="font-heading text-[11px] font-semibold tracking-[0.015em] text-muted-foreground uppercase">{label}</p>
       <p className="mt-2 font-mono text-3xl leading-none">{value}</p>
       <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{detail}</p>
     </div>

@@ -1,5 +1,6 @@
-import catalog from '../../catalogs/printers/catalog.generated.json'
+import index from '../../catalogs/printers/index.generated.json'
 
+/** A catalogue printer as the app knows it, from the generated index; the full catalogue keeps where each fact came from. */
 export type PrinterPreset = {
   id: string
   brand: string
@@ -8,12 +9,11 @@ export type PrinterPreset = {
   widthMm: number
   depthMm: number
   heightMm: number
-  filamentDiameterMm?: number
-  image?: { src: string; sourceId: string; sourceUrl: string }
-  source: { id: string; url: string }
+  /** The local picture's path under the public folder. */
+  image?: string
 }
 
-export const PRINTER_PRESETS = catalog.presets as PrinterPreset[]
+export const PRINTER_PRESETS = index.presets as PrinterPreset[]
 
 export const CLOSEST_PRINTER_PRESET_LIMIT = 12
 

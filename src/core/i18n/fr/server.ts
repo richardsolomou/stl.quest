@@ -101,7 +101,15 @@ export const server: typeof en = {
     invalidArchive: 'archivage invalide',
     sourceModelNotFound: 'STL source introuvable',
     printerOrPrintType: 'choisissez une imprimante ou un type d’impression, pas les deux',
+    printTypeNotOffered: 'cet espace de travail n’imprime pas ce type',
     unknownPrinter: 'imprimante inconnue',
     printerArchived: 'l’imprimante est archivée',
+  },
+  usage: {
+    unknownConsumable: 'consommable inconnu',
+    unknownEquipment: 'équipement inconnu',
+    materialMismatch: 'ce matériau ne convient pas à ce type d’impression',
+    nothingToUndo: 'rien à annuler',
+    trackingOff: 'le suivi de la consommation et du stock est désactivé pour cet espace de travail',
   },
 }

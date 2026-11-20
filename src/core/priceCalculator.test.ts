@@ -1,387 +1,305 @@
 import { describe, expect, it } from 'vitest'
+import type { Consumable, FilamentConsumable, ResinConsumable } from './consumables'
+import type { EquipmentItem } from './equipment'
 import {
-  applyEquipmentPresets,
-  calculatePrintPrice,
+  costBasis,
+  costPrint,
   DEFAULT_PRICE_CALCULATOR_SETTINGS,
-  equipmentSettingsFor,
   priceRequest,
   priceRequestOnPrinters,
-  printerCostSettings,
-  prunePrinterCosts,
-  removePrinterCosts,
-  withPrinterCostSettings,
-  selectEquipmentMode,
+  printerCostPerMinute,
   selectPriceCalculatorCurrency,
-  selectPriceCalculatorPrintType,
-  updateEquipmentSettings,
-  withConsumables,
+  validPriceCalculatorSettings,
+  type PriceCalculatorJob,
+  type PrintCostInput,
 } from './priceCalculator'
-import type { Consumable } from './consumables'
 
-const settings = {
-  ...DEFAULT_PRICE_CALCULATOR_SETTINGS,
-  resinPricePerLitre: 70,
-  resinDensityGramsPerMl: 1.25,
-  electricityCountryCode: 'CY',
-  electricityPricePerKwh: 0.2774,
-  resinEquipment: {
-    mode: 'preset' as const,
-    presetIds: ['resin-heygears-reflex-rs-turbo', 'accessory-heygears-pulsing-release-module', 'postprocess-elegoo-mercury-plus-v3'],
-    printPowerWatts: 205,
-    washPowerWatts: 60,
-    washMinutesPerPlate: 5,
-    dryPowerWatts: 0,
-    dryMinutesPerPlate: 0,
-    curePowerWatts: 60,
-    cureMinutesPerPlate: 15,
-    partIds: [],
+const rates = { ...DEFAULT_PRICE_CALCULATOR_SETTINGS, electricityPricePerKwh: 0.2, failureAllowancePercent: 10, standardMarginPercent: 25 }
+const job: PriceCalculatorJob = { materialAmount: 100, materialUnit: 'ml', printHours: 10, plates: 2, handsOnMinutes: 0 }
+const grey: ResinConsumable = { id: 'grey', kind: 'resin', name: 'Grey', pricePerLitre: 120, densityGramsPerMl: 1.2 }
+const pla: FilamentConsumable = { id: 'pla', kind: 'filament', name: 'PLA', pricePerKg: 18 }
+const library: Consumable[] = [
+  grey,
+  pla,
+  { id: 'tank', kind: 'part', name: 'Tank', printType: 'resin', price: 60, lifespan: 200, lifespanUnit: 'plates' },
+  { id: 'screen', kind: 'part', name: 'Screen', printType: 'resin', price: 120, lifespan: 2000, lifespanUnit: 'hours' },
+  {
+    id: 'form4-tank',
+    kind: 'part',
+    name: 'Form 4 tank',
+    printType: 'resin',
+    price: 100,
+    lifespan: 100,
+    lifespanUnit: 'plates',
+    printerPresetId: 'resin-formlabs-form-4',
   },
-  equipmentCostPerHour: 1.15,
-  consumablesCostPerPlate: 0.5,
+  { id: 'ipa', kind: 'supply', name: 'IPA', unit: 'ml', price: 10 },
+]
+const wash: EquipmentItem = {
+  id: 'wash',
+  name: 'Wash',
+  kind: 'wash',
+  stage: 'finishing',
+  printType: 'resin',
+  powerWatts: 120,
+  minutesPerUse: 30,
+  supplies: [{ consumableId: 'ipa', amountPerUse: 50 }],
+  purchasePrice: 300,
+  lifespanHours: 1000,
+}
+const reflex = {
+  id: 'reflex',
+  printType: 'resin' as const,
+  presetId: 'resin-heygears-reflex-rs-turbo',
+  addOnPresetIds: ['accessory-heygears-pulsing-release-module'],
+  purchasePrice: 2000,
+  lifespanHours: 10_000,
 }
 
-describe('print price calculator', () => {
-  it('starts resin estimates with the resin printer fallback power', () => {
-    expect(DEFAULT_PRICE_CALCULATOR_SETTINGS.resinEquipment.printPowerWatts).toBe(100)
+function cost(input: Partial<PrintCostInput> = {}) {
+  return costPrint({ rates, printType: 'resin', job, consumables: [], ...input })
+}
+
+describe('material cost', () => {
+  it('prices resin from the picked consumable', () => {
+    expect(cost({ material: grey }).material.cost).toBe(12)
   })
 
-  it('itemizes a sliced resin job', () => {
-    const result = calculatePrintPrice(settings, {
-      materialAmount: 108.43,
+  it('prices resin at a typical price when none is picked', () => {
+    expect(cost().material.cost).toBe(5)
+  })
+
+  it('marks a material nobody picked as typical', () => {
+    expect(cost().material.typical).toBe(true)
+  })
+
+  it('converts sliced grams with the picked resin density', () => {
+    expect(cost({ material: grey, job: { ...job, materialAmount: 120, materialUnit: 'g' } }).materialMl).toBeCloseTo(100)
+  })
+
+  it('prices filament by sliced weight', () => {
+    expect(
+      cost({ printType: 'filament', material: pla, job: { ...job, materialAmount: 200, materialUnit: 'g' } }).material.cost,
+    ).toBeCloseTo(3.6)
+  })
+
+  it('prices filament at a typical price when none is picked', () => {
+    expect(cost({ printType: 'filament', job: { ...job, materialAmount: 200, materialUnit: 'g' } }).material.cost).toBeCloseTo(5)
+  })
+})
+
+describe('printing cost', () => {
+  it('adds an add-on module to the printer model power', () => {
+    expect(cost({ printer: reflex }).printing.watts).toBe(205)
+  })
+
+  it('prices printing electricity by hours and power', () => {
+    expect(cost({ printer: reflex }).printing.electricity).toBeCloseTo(0.41)
+  })
+
+  it('uses typical power without a printer', () => {
+    expect(cost().printing).toMatchObject({ watts: 100, typical: true })
+  })
+
+  it('uses the printing power given to a custom printer', () => {
+    expect(cost({ printer: { id: 'rig', printType: 'resin', powerWatts: 300 } }).printing).toMatchObject({ watts: 300, typical: false })
+  })
+
+  it('spreads the printer price across its lifespan hours', () => {
+    expect(cost({ printer: reflex }).printing.wear).toBeCloseTo(2)
+  })
+
+  it('counts no printer wear without a lifespan', () => {
+    expect(cost({ printer: { ...reflex, lifespanHours: undefined } }).printing.wear).toBe(0)
+  })
+
+  it('costs a plate-rated wear part by plate', () => {
+    expect(cost({ consumables: library }).wearParts.find(({ part }) => part.id === 'tank')?.cost).toBeCloseTo(0.6)
+  })
+
+  it('costs an hour-rated wear part by print hour', () => {
+    expect(cost({ consumables: library }).wearParts.find(({ part }) => part.id === 'screen')?.cost).toBeCloseTo(0.6)
+  })
+
+  it('adds a model wear part on a printer of that model', () => {
+    expect(
+      cost({ consumables: library, printer: { id: 'form4', printType: 'resin', presetId: 'resin-formlabs-form-4' } }).wearParts.map(
+        ({ part }) => part.id,
+      ),
+    ).toEqual(['tank', 'screen', 'form4-tank'])
+  })
+
+  it('leaves a model wear part off other printers', () => {
+    expect(cost({ consumables: library, printer: reflex }).wearParts.map(({ part }) => part.id)).toEqual(['tank', 'screen'])
+  })
+})
+
+describe('equipment cost', () => {
+  it('prices equipment electricity once per plate', () => {
+    expect(cost({ equipment: [wash] }).equipment[0].electricity).toBeCloseTo(0.024)
+  })
+
+  it('prices supplies from the library by the unit used', () => {
+    expect(cost({ equipment: [wash], consumables: library }).equipment[0].supplies).toBeCloseTo(1)
+  })
+
+  it('prices a wear part used as a supply by the plate', () => {
+    const basket: Consumable = {
+      id: 'basket',
+      kind: 'part',
+      name: 'Basket',
+      printType: 'resin',
+      price: 20,
+      lifespan: 500,
+      lifespanUnit: 'plates',
+    }
+    const item = { ...wash, supplies: [{ consumableId: 'basket', amountPerUse: 1 }] }
+    expect(cost({ equipment: [item], consumables: [basket] }).equipment[0].supplies).toBeCloseTo(0.08)
+  })
+
+  it('prices a supply missing from the library at nothing', () => {
+    expect(cost({ equipment: [wash] }).equipment[0].supplies).toBe(0)
+  })
+
+  it('spreads the equipment price across its running hours', () => {
+    expect(cost({ equipment: [wash] }).equipment[0].wear).toBeCloseTo(0.3)
+  })
+
+  it('stands in a typical wash and cure for a resin print without equipment', () => {
+    expect(cost().equipment[0].typical).toBe(true)
+  })
+
+  it('stands in nothing for a filament print without equipment', () => {
+    expect(cost({ printType: 'filament' }).equipment).toEqual([])
+  })
+})
+
+describe('quote totals', () => {
+  const materialOnly = { ...job, printHours: 0, plates: 0 }
+
+  it('adds the failure allowance to production', () => {
+    expect(cost({ material: grey, job: materialOnly }).failureAllowance).toBeCloseTo(1.2)
+  })
+
+  it('keeps labour out of the estimated cost', () => {
+    expect(cost({ material: grey, job: { ...materialOnly, handsOnMinutes: 60 } }).estimatedCost).toBeCloseTo(13.2)
+  })
+
+  it('prices labour by the hour', () => {
+    expect(cost({ job: { ...materialOnly, handsOnMinutes: 30 } }).labour).toBe(7.5)
+  })
+
+  it('puts the margin on cost and labour', () => {
+    expect(cost({ material: grey, job: { ...materialOnly, handsOnMinutes: 60 } }).suggestedPrice).toBeCloseTo(37.6)
+  })
+
+  it('caps the margin so a price always exists', () => {
+    expect(cost({ material: grey, job: materialOnly, rates: { ...rates, standardMarginPercent: 100 } }).suggestedPrice).toBeCloseTo(264)
+  })
+})
+
+describe('cost basis', () => {
+  const basis = (input: Partial<PrintCostInput> = {}) => costBasis({ rates, printType: 'resin', consumables: library, ...input })
+
+  it('prices a print hour as the printer power, its wear, and its hourly parts', () => {
+    expect(basis({ printer: reflex }).hour.total).toBeCloseTo(0.301)
+  })
+
+  it('lists only the parts that wear by the hour per print hour', () => {
+    expect(basis().hour.parts.map(({ part }) => part.id)).toEqual(['screen'])
+  })
+
+  it('prices a plate as its plate-rated parts and one use of each piece of equipment', () => {
+    expect(basis({ equipment: [wash] }).plate.total).toBeCloseTo(0.962)
+  })
+
+  it('lists only the parts that wear by the plate per plate', () => {
+    expect(basis().plate.parts.map(({ part }) => part.id)).toEqual(['tank'])
+  })
+
+  it('stands in a typical wash and cure on a resin plate without equipment', () => {
+    expect(basis().plate.equipment[0].typical).toBe(true)
+  })
+
+  it('prices resin per millilitre', () => {
+    expect(basis({ material: grey }).material).toMatchObject({ unit: 'ml', cost: 0.12, typical: false })
+  })
+
+  it('prices filament per gram', () => {
+    expect(basis({ printType: 'filament', material: pla }).material.cost).toBeCloseTo(0.018)
+  })
+
+  it('marks a material nobody picked as typical', () => {
+    expect(basis().material.typical).toBe(true)
+  })
+
+  it('prices a whole pack from the pack size', () => {
+    expect(basis({ material: { ...grey, packSize: 500 } }).material.pack).toEqual({ size: 500, cost: 60 })
+  })
+
+  it('prices no pack without a pack size', () => {
+    expect(basis({ material: grey }).material.pack).toBeUndefined()
+  })
+
+  it('weights to the production cost of a quote', () => {
+    const input = { material: grey, printer: reflex, equipment: [wash] }
+    const { hour, plate, material } = basis(input)
+    const quote = cost({ ...input, consumables: library })
+    expect(job.printHours * hour.total + job.plates * plate.total + job.materialAmount * material.cost).toBeCloseTo(
+      quote.estimatedCost - quote.failureAllowance,
+    )
+  })
+})
+
+describe('printer cost per minute', () => {
+  it('uses the printing power given to a custom printer', () => {
+    expect(printerCostPerMinute(rates, { id: 'rig', printType: 'resin', powerWatts: 300 })).toBeCloseTo(0.001)
+  })
+})
+
+describe('request quotes', () => {
+  const request = { printType: 'resin' as const, material: 50, materialUnit: 'ml' as const, minutes: 90, quantity: 2 }
+
+  it('prices every copy on its own plate', () => {
+    expect(priceRequest({ rates, consumables: [] }, request)?.job).toEqual({
+      materialAmount: 100,
       materialUnit: 'ml',
-      printHours: 5,
+      printHours: 3,
       plates: 2,
       handsOnMinutes: 0,
     })
-
-    expect(result.materialMl).toBe(108.43)
-    expect(result.materialGrams).toBeCloseTo(135.5375)
-    expect(result.material).toBeCloseTo(7.5901)
-    expect(result.printElectricity).toBeCloseTo(0.284335, 6)
-    expect(result.washElectricity).toBeCloseTo(0.002774, 6)
-    expect(result.dryElectricity).toBe(0)
-    expect(result.cureElectricity).toBeCloseTo(0.008322, 6)
-    expect(result.equipment).toBe(5.75)
-    expect(result.consumables).toBe(1)
-    expect(result.estimatedCost).toBeCloseTo(16.0990841)
-    expect(result.standardPrice).toBeCloseTo(21.4654455)
-  })
-
-  it('converts sliced grams using the configured resin density', () => {
-    const result = calculatePrintPrice(settings, {
-      materialAmount: 135.5375,
-      materialUnit: 'g',
-      printHours: 5,
-      plates: 2,
-      handsOnMinutes: 12,
-    })
-
-    expect(result.materialMl).toBeCloseTo(108.43)
-  })
-
-  it('prices FDM material by sliced filament weight without resin washing or curing', () => {
-    const result = calculatePrintPrice(
-      { ...settings, printType: 'filament', filamentPricePerKg: 25 },
-      {
-        materialAmount: 120,
-        materialUnit: 'g',
-        printHours: 2,
-        plates: 1,
-        handsOnMinutes: 0,
-      },
-    )
-
-    expect(result.materialGrams).toBe(120)
-    expect(result.material).toBe(3)
-    expect(result.washElectricity).toBe(0)
-    expect(result.dryElectricity).toBe(0)
-    expect(result.cureElectricity).toBe(0)
-  })
-
-  it('includes optional filament drying electricity', () => {
-    const result = calculatePrintPrice(
-      {
-        ...settings,
-        printType: 'filament',
-        filamentEquipment: { ...settings.filamentEquipment, dryPowerWatts: 145, dryMinutesPerPlate: 240 },
-      },
-      { materialAmount: 100, materialUnit: 'g', printHours: 1, plates: 1, handsOnMinutes: 0 },
-    )
-
-    expect(result.dryElectricity).toBeCloseTo(0.160892)
-  })
-
-  it('keeps labour out of the cost quote', () => {
-    const result = calculatePrintPrice(settings, {
-      materialAmount: 1,
-      materialUnit: 'ml',
-      printHours: 0,
-      plates: 0,
-      handsOnMinutes: 60,
-    })
-
-    expect(result.labour).toBe(15)
-    expect(result.estimatedCost).toBeCloseTo(0.077)
-    expect(result.standardPrice).toBeCloseTo(20.1026667)
-  })
-
-  it('applies equipment presets to the active print type', () => {
-    const result = applyEquipmentPresets({ ...settings, printType: 'filament' }, [
-      'filament-bambu-lab-p1s',
-      'accessory-bambu-lab-ams-2-pro',
-    ])
-
-    expect(equipmentSettingsFor(result).presetIds).toEqual(['filament-bambu-lab-p1s', 'accessory-bambu-lab-ams-2-pro'])
-    expect(result.resinEquipment).toEqual(settings.resinEquipment)
-    expect(result.filamentEquipment).toMatchObject({
-      printPowerWatts: 1000,
-      washPowerWatts: 0,
-      dryPowerWatts: 96,
-      curePowerWatts: 0,
-    })
-  })
-
-  it('drops the euro electricity preset for another currency without converting any amount', () => {
-    const pounds = selectPriceCalculatorCurrency(settings, 'GBP')
-
-    expect(pounds).toEqual({ ...settings, currency: 'GBP', electricityCountryCode: undefined })
-    expect(selectPriceCalculatorCurrency(pounds, 'EUR')).toMatchObject({ currency: 'EUR', electricityPricePerKwh: 0.2774 })
-    expect(selectPriceCalculatorCurrency(settings, 'EUR')).toEqual(settings)
-  })
-
-  it('restores each print type equipment selection when switching tabs', () => {
-    const filament = selectPriceCalculatorPrintType(
-      {
-        ...settings,
-        filamentEquipment: {
-          ...settings.filamentEquipment,
-          presetIds: ['filament-bambu-lab-p1s', 'accessory-bambu-lab-ams-2-pro'],
-          printPowerWatts: 1000,
-          dryPowerWatts: 96,
-        },
-      },
-      'filament',
-    )
-    const resin = selectPriceCalculatorPrintType(filament, 'resin')
-
-    expect(equipmentSettingsFor(filament)).toMatchObject({ printPowerWatts: 1000, dryPowerWatts: 96 })
-    expect(equipmentSettingsFor(resin)).toMatchObject({ printPowerWatts: 205, washPowerWatts: 60, curePowerWatts: 60 })
-  })
-
-  it('preserves separate custom equipment values across print types', () => {
-    const customFilament = updateEquipmentSettings(selectPriceCalculatorPrintType(settings, 'filament'), {
-      ...settings.filamentEquipment,
-      mode: 'custom',
-      printPowerWatts: 321,
-      dryPowerWatts: 45,
-    })
-
-    expect(equipmentSettingsFor(selectPriceCalculatorPrintType(customFilament, 'resin'))).toBe(settings.resinEquipment)
-    expect(equipmentSettingsFor(selectPriceCalculatorPrintType(customFilament, 'filament'))).toMatchObject({
-      mode: 'custom',
-      printPowerWatts: 321,
-      dryPowerWatts: 45,
-    })
-  })
-
-  it('restores preset power after using custom equipment values', () => {
-    const custom = updateEquipmentSettings(settings, {
-      ...settings.resinEquipment,
-      mode: 'custom',
-      printPowerWatts: 321,
-      washPowerWatts: 42,
-    })
-
-    expect(equipmentSettingsFor(selectEquipmentMode(custom, 'preset'))).toMatchObject({
-      mode: 'preset',
-      printPowerWatts: 205,
-      washPowerWatts: 60,
-      curePowerWatts: 60,
-    })
-  })
-
-  it('prices a request as one job covering every copy', () => {
-    const quote = priceRequest(settings, { printType: 'resin', material: 10, materialUnit: 'ml', minutes: 90, quantity: 3 })
-
-    expect(quote?.job).toEqual({ materialAmount: 30, materialUnit: 'ml', printHours: 4.5, plates: 3, handsOnMinutes: 0 })
-  })
-
-  it('scales plate costs with the number of copies', () => {
-    const request = { printType: 'resin' as const, material: 10, materialUnit: 'ml' as const, minutes: 90 }
-    const one = priceRequest(settings, { ...request, quantity: 1 })!.result
-    const three = priceRequest(settings, { ...request, quantity: 3 })!.result
-
-    expect([three.consumables, three.washElectricity, three.cureElectricity]).toEqual([
-      one.consumables * 3,
-      one.washElectricity * 3,
-      one.cureElectricity * 3,
-    ])
-  })
-
-  it('prices a request with the setup for its own print type', () => {
-    const quote = priceRequest(settings, { printType: 'filament', material: 120, materialUnit: 'g', minutes: 120, quantity: 1 })
-
-    expect(quote?.result.material).toBe(3)
   })
 
   it('does not price a request missing its material estimate', () => {
-    expect(priceRequest(settings, { printType: 'resin', materialUnit: 'ml', minutes: 90, quantity: 1 })).toBeUndefined()
+    expect(priceRequest({ rates, consumables: [] }, { ...request, material: undefined })).toBeUndefined()
   })
 
   it('does not price a request missing its time estimate', () => {
-    expect(priceRequest(settings, { printType: 'resin', material: 10, materialUnit: 'ml', quantity: 1 })).toBeUndefined()
+    expect(priceRequest({ rates, consumables: [] }, { ...request, minutes: undefined })).toBeUndefined()
+  })
+
+  it('compares the active printers of the request print type', () => {
+    const printers = [reflex, { ...reflex, id: 'old', archived: true }, { id: 'p1s', printType: 'filament' as const }]
+    expect(priceRequestOnPrinters(rates, printers, request, []).map(({ printer }) => printer.id)).toEqual(['reflex'])
   })
 })
 
-describe('per-printer costs', () => {
-  const saturn = { id: 'saturn', name: 'Saturn', printType: 'resin' as const, presetId: 'resin-elegoo-saturn-4-ultra' }
-  const form4 = { id: 'form4', name: 'Form 4', printType: 'resin' as const, presetId: 'resin-formlabs-form-4' }
-  const bambu = { id: 'bambu', name: 'P1S', printType: 'filament' as const }
-  const withForm4 = withPrinterCostSettings(settings, form4, { ...printerCostSettings(settings, form4), resinPricePerLitre: 160 })
-
-  it('uses the workspace setup for a printer without its own costs', () => {
-    expect(printerCostSettings(settings, saturn).resinPricePerLitre).toBe(70)
-  })
-
-  it('uses the printer type of a printer without its own costs', () => {
-    expect(printerCostSettings(settings, bambu).printType).toBe('filament')
-  })
-
-  it('uses a printer own material price', () => {
-    expect(printerCostSettings(withForm4, form4).resinPricePerLitre).toBe(160)
-  })
-
-  it('keeps other printers on the workspace material price', () => {
-    expect(printerCostSettings(withForm4, saturn).resinPricePerLitre).toBe(70)
-  })
-
-  it('leaves the workspace material price alone when editing a printer', () => {
-    expect(withForm4.resinPricePerLitre).toBe(70)
-  })
-
-  it('shares labour edits made while a printer is selected', () => {
-    const edited = withPrinterCostSettings(withForm4, form4, { ...printerCostSettings(withForm4, form4), labourCostPerHour: 30 })
-    expect(printerCostSettings(edited, saturn).labourCostPerHour).toBe(30)
-  })
-
-  it('prices a printer without its own costs with its own rated power', () => {
-    expect(printerCostSettings(settings, saturn).resinEquipment.printPowerWatts).toBe(144 + 25)
-  })
-
-  it('keeps workspace accessories on a printer without its own costs', () => {
-    expect(printerCostSettings(settings, saturn).resinEquipment.presetIds).toContain('postprocess-elegoo-mercury-plus-v3')
-  })
-
-  it('keeps entered power for a printer when the setup uses custom equipment', () => {
-    const custom = updateEquipmentSettings(settings, { ...settings.resinEquipment, mode: 'custom', printPowerWatts: 321 })
-    expect(printerCostSettings(custom, saturn).resinEquipment.printPowerWatts).toBe(321)
-  })
-
-  it('gives a printer its own costs when its material changes', () => {
-    const edited = withPrinterCostSettings(settings, saturn, { ...printerCostSettings(settings, saturn), resinPricePerLitre: 90 })
-    expect(edited.printerCosts.saturn?.resinPricePerLitre).toBe(90)
-  })
-
-  it('keeps a printer on the workspace setup when only shared costs change', () => {
-    const edited = withPrinterCostSettings(settings, saturn, { ...printerCostSettings(settings, saturn), labourCostPerHour: 30 })
-    expect(edited.printerCosts.saturn).toBeUndefined()
-  })
-
-  it('returns a printer to the workspace setup when its own costs are removed', () => {
-    expect(printerCostSettings(removePrinterCosts(withForm4, 'form4'), form4).resinPricePerLitre).toBe(70)
-  })
-
-  it('drops costs for printers that no longer exist', () => {
-    expect(Object.keys(prunePrinterCosts(withForm4, [saturn]).printerCosts)).toEqual([])
-  })
-
-  it('keeps costs for printers that still exist', () => {
-    expect(Object.keys(prunePrinterCosts(withForm4, [form4]).printerCosts)).toEqual(['form4'])
-  })
-
-  it('prices a request on every active printer of its print type', () => {
-    const quotes = priceRequestOnPrinters(
-      withForm4,
-      [saturn, form4, bambu, { ...saturn, id: 'old', archived: true }],
-      {
-        printType: 'resin',
-        material: 100,
-        materialUnit: 'ml',
-        minutes: 60,
-        quantity: 1,
-      },
-      [],
-    )
-    expect(quotes.map(({ printer }) => printer.id)).toEqual(['saturn', 'form4'])
-  })
-
-  it('prices a request on each printer with that printer costs', () => {
-    const quotes = priceRequestOnPrinters(
-      withForm4,
-      [saturn, form4],
-      {
-        printType: 'resin',
-        material: 100,
-        materialUnit: 'ml',
-        minutes: 60,
-        quantity: 1,
-      },
-      [],
-    )
-    expect(quotes.map(({ quote }) => quote?.result.material)).toEqual([7, 16])
+describe('currency', () => {
+  it('drops the euro electricity preset for another currency without converting', () => {
+    expect(selectPriceCalculatorCurrency({ ...rates, electricityCountryCode: 'CY' }, 'USD')).toEqual({ ...rates, currency: 'USD' })
   })
 })
 
-describe('consumables in quotes', () => {
-  const library: Consumable[] = [
-    { id: 'grey', kind: 'resin', name: 'Grey', pricePerLitre: 120, densityGramsPerMl: 1.2 },
-    { id: 'pla', kind: 'filament', name: 'PLA', pricePerKg: 18 },
-    { id: 'tank', kind: 'part', name: 'Tank', printType: 'resin', price: 60, lifespan: 200, lifespanUnit: 'plates' },
-    { id: 'screen', kind: 'part', name: 'Screen', printType: 'resin', price: 120, lifespan: 2000, lifespanUnit: 'hours' },
-  ]
-  const withGrey = { ...settings, resinConsumableId: 'grey' }
-
-  it('prices resin from the chosen consumable', () => {
-    expect(withConsumables(withGrey, library).resinPricePerLitre).toBe(120)
+describe('rate limits', () => {
+  it('accepts the default rates', () => {
+    expect(validPriceCalculatorSettings(DEFAULT_PRICE_CALCULATOR_SETTINGS)).toBe(true)
   })
 
-  it('uses the chosen resin density', () => {
-    expect(withConsumables(withGrey, library).resinDensityGramsPerMl).toBe(1.2)
+  it('rejects a margin above its maximum', () => {
+    expect(validPriceCalculatorSettings({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, standardMarginPercent: 96 })).toBe(false)
   })
 
-  it('prices filament from the chosen consumable', () => {
-    expect(withConsumables({ ...settings, filamentConsumableId: 'pla' }, library).filamentPricePerKg).toBe(18)
-  })
-
-  it('keeps the entered resin price when the chosen consumable no longer exists', () => {
-    expect(withConsumables({ ...settings, resinConsumableId: 'gone' }, library).resinPricePerLitre).toBe(70)
-  })
-
-  it('adds plate-rated wear parts to the consumables per plate', () => {
-    const parts = updateEquipmentSettings(settings, { ...settings.resinEquipment, partIds: ['tank'] })
-    expect(withConsumables(parts, library).consumablesCostPerPlate).toBe(0.8)
-  })
-
-  it('adds hour-rated wear parts to the equipment wear per hour', () => {
-    const parts = updateEquipmentSettings(settings, { ...settings.resinEquipment, partIds: ['screen'] })
-    expect(withConsumables(parts, library).equipmentCostPerHour).toBeCloseTo(1.21)
-  })
-
-  it('compares printers with their consumables', () => {
-    const form4 = { id: 'form4', printType: 'resin' as const }
-    const own = withPrinterCostSettings(settings, form4, { ...printerCostSettings(settings, form4), resinConsumableId: 'grey' })
-    const [quote] = priceRequestOnPrinters(
-      own,
-      [form4],
-      { printType: 'resin', material: 100, materialUnit: 'ml', minutes: 60, quantity: 1 },
-      library,
-    )
-    expect(quote?.quote?.result.material).toBe(12)
-  })
-
-  it('keeps a printer own resin when pricing it', () => {
-    const form4 = { id: 'form4', printType: 'resin' as const }
-    const own = withPrinterCostSettings(settings, form4, { ...printerCostSettings(settings, form4), resinConsumableId: 'grey' })
-    expect(withConsumables(printerCostSettings(own, form4), library).resinPricePerLitre).toBe(120)
+  it('rejects a negative rate', () => {
+    expect(validPriceCalculatorSettings({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, labourCostPerHour: -1 })).toBe(false)
   })
 })

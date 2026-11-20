@@ -18,7 +18,7 @@ test('serves the whole application under a base path', async ({ page, browser, b
   await page.getByRole('button', { name: 'Create super admin' }).click()
   await page.getByRole('button', { name: 'Use this folder' }).click()
   await page.getByRole('button', { name: 'Skip for now' }).click()
-  await expect(page.getByRole('button', { name: 'Add a print' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Board filters' }).getByRole('button', { name: 'Add a print' })).toBeVisible()
 
   const observerContext = await browser.newContext({ baseURL })
   const observer = await observerContext.newPage()
@@ -31,10 +31,10 @@ test('serves the whole application under a base path', async ({ page, browser, b
   await observer.getByLabel('Email').fill(email)
   await observer.getByLabel('Password').fill(password)
   await observer.getByRole('button', { name: 'Sign in' }).click()
-  await expect(observer.getByRole('button', { name: 'Add a print' })).toBeVisible()
+  await expect(observer.getByRole('region', { name: 'Board filters' }).getByRole('button', { name: 'Add a print' })).toBeVisible()
   await realtimeConnection
 
-  await page.getByRole('button', { name: 'Add a print' }).click()
+  await page.getByRole('region', { name: 'Board filters' }).getByRole('button', { name: 'Add a print' }).click()
   await page.getByRole('button', { name: 'Upload files' }).click()
   await page
     .locator('input[type=file]')

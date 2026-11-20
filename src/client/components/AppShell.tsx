@@ -4,11 +4,11 @@ import { useEffect, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { sessionQuery } from '../queries'
 import { useEscape } from '../useEscape'
-import { AppRail, MobileNav, type AppView } from './AppRail'
+import { AppBar, MobileNav, type AppView } from './AppBar'
 import { ProductTour } from './ProductTour'
 
 /**
- * Every signed-in page: the rail on wide screens, a bottom bar on phones, and one content column.
+ * Every signed-in page: the bar across the top, its destinations moving to a bottom bar on phones, and one content column.
  * `fill` hands the whole area to a page that manages its own scrolling, such as the board. `contained` keeps the
  * padded column but holds it to the viewport, for a page whose list scrolls inside it, such as the archive.
  */
@@ -34,8 +34,8 @@ export function AppShell({
   }, [identity, navigate])
   if (!identity) return null
   return (
-    <div className="relative flex h-dvh max-sm:flex-col">
-      <AppRail active={active} identity={identity} navigationEnabled={hydrated} />
+    <div className="relative flex h-dvh flex-col">
+      <AppBar active={active} identity={identity} navigationEnabled={hydrated} />
       <main className={cn('relative flex min-h-0 min-w-0 flex-1 flex-col', !fill && 'app-scrollbar overflow-y-auto overscroll-none')}>
         {fill ? (
           children

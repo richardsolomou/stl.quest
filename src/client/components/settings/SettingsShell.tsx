@@ -7,8 +7,7 @@ import { cn } from '@/lib/utils'
 import { useI18n } from '../../i18n'
 import { sessionQuery } from '../../queries'
 import { AppShell } from '../AppShell'
-import { settingsSections, type SettingsSection } from '../SettingsPanes'
-import { superAdminSections, type SuperAdminSection } from '../SuperAdminPanes'
+import { settingsSectionGroups, superAdminSections, type SettingsSection, type SuperAdminSection } from '../../settingsSections'
 
 export type SettingsLocation =
   | { kind: 'workspace'; section: SettingsSection }
@@ -45,12 +44,14 @@ function useNavGroups(): NavGroup[] {
   const nav = t.shell.settingsNav
   const groups: NavGroup[] = []
   if (identity?.role === 'admin') {
-    groups.push({
-      id: 'workspace',
-      label: nav.workspace,
-      detail: session.workspace?.name,
-      items: settingsSections.map((section) => ({ location: { kind: 'workspace', section }, label: t.settings.sections[section] })),
-    })
+    for (const group of settingsSectionGroups) {
+      groups.push({
+        id: group.id,
+        label: nav[group.id],
+        detail: group.id === 'workspace' ? session.workspace?.name : undefined,
+        items: group.sections.map((section) => ({ location: { kind: 'workspace', section }, label: t.settings.sections[section] })),
+      })
+    }
   }
   groups.push({
     id: 'you',
@@ -77,7 +78,7 @@ function NavList({ groups, current, onNavigate }: { groups: NavGroup[]; current:
       {groups.map((group) => (
         <div key={group.id} className="flex flex-col gap-0.5">
           <div className="px-3 pb-1.5">
-            <p className="font-heading text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">{group.label}</p>
+            <p className="font-heading text-[11px] font-semibold tracking-[0.015em] text-muted-foreground uppercase">{group.label}</p>
             {group.detail && <p className="ph-no-capture mt-1 truncate text-xs text-foreground">{group.detail}</p>}
           </div>
           {group.items.map((item) => {
@@ -90,7 +91,7 @@ function NavList({ groups, current, onNavigate }: { groups: NavGroup[]; current:
                 aria-current={active ? 'page' : undefined}
                 className={cn(
                   'rounded-sm px-3 py-1.5 text-sm text-muted-foreground no-underline transition-colors hover:bg-muted hover:text-foreground',
-                  active && 'bg-primary/10 font-medium text-primary hover:bg-primary/10 hover:text-primary',
+                  active && 'bg-card font-semibold text-foreground shadow-[inset_3px_0_0_var(--primary)] hover:bg-card',
                 )}
               >
                 {item.label}
@@ -120,7 +121,7 @@ function SettingsFrame({ current, children }: { current: SettingsLocation; child
   const currentItem = currentGroup?.items.find((item) => sameLocation(item.location, current))
   return (
     <div className="grid items-start gap-x-8 gap-y-5 md:grid-cols-[13rem_minmax(0,1fr)]">
-      <nav className="sticky top-0 border-r-2 border-dashed border-blueprint/25 pr-3 max-md:hidden" aria-label={t.shell.settingsNav.label}>
+      <nav className="sticky top-0 border-r border-border pr-3 max-md:hidden" aria-label={t.shell.settingsNav.label}>
         <NavList groups={groups} current={current} />
       </nav>
       <Popover open={open} onOpenChange={setOpen}>
@@ -133,7 +134,7 @@ function SettingsFrame({ current, children }: { current: SettingsLocation; child
             />
           }
         >
-          <span className="font-heading text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
+          <span className="font-heading text-[11px] font-semibold tracking-[0.015em] text-muted-foreground uppercase">
             {currentGroup?.label}
           </span>
           <span className="min-w-0 flex-1 truncate font-medium">{currentItem?.label}</span>

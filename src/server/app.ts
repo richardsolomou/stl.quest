@@ -18,6 +18,7 @@ import { resolveAuthAdapterConfig } from '../adapters/auth'
 import { buildEmailDelivery, resolveSmtpConfig, type EmailDelivery } from '../adapters/email'
 import { cloudStorageProviderName, isCloudStorageConfig, isCloudStorageProvider } from '../core/auth'
 import { errorMessage } from '../core/error'
+import { upgradeLegacyCostingSettings } from '../core/legacyCosting'
 import { STLQuestService } from '../core/services'
 import { normalizeBoardConfig, seesOnlyOwnRequests } from '../core/visibility'
 import { workflow } from '../core/workflow'
@@ -259,7 +260,12 @@ async function createApp() {
           logger.warn({ err: error, event: 'distributed_coordination_failed' }, 'distributed coordination failed'),
         )
       : undefined
-    repository = await withWorkLease(distributedRuntime?.workLocker, 'database-migrations', async () => await DrizzleRepository.open())
+    repository = await withWorkLease(distributedRuntime?.workLocker, 'database-migrations', async () => {
+      const opened = await DrizzleRepository.open()
+      // Settings JSON has no schema migrations, so costing stored by v1.51 and v1.52 is reshaped here before anything reads it.
+      for (const workspace of await opened.listWorkspaces()) await upgradeLegacyCostingSettings(await opened.scoped(workspace.id))
+      return opened
+    })
     if (process.env.NODE_ENV === 'test' && (await repository.listWorkspaces()).length === 0) {
       await repository.database
         .insert(organization)

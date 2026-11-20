@@ -24,6 +24,8 @@ export const shell: typeof en = {
     label: 'Einstellungsbereiche',
     choose: 'Einstellungsbereich wählen',
     workspace: 'Arbeitsbereich',
+    production: 'Produktion',
+    connections: 'Verbindungen',
     you: 'Persönlich',
     server: 'Server',
     product: 'STL Quest',
@@ -53,7 +55,9 @@ export const shell: typeof en = {
       `${resolved} von ${total} Quests erledigt · ${points} von ${totalPoints} XP erhalten`,
     summary: (completed, skipped) => `${completed} abgeschlossen · ${skipped} übersprungen`,
     reviewQuests: 'Quests ansehen',
-    rowComplete: 'Abgeschlossen · Ansehen',
+    rowComplete: 'Erledigt',
+    showResolved: (count: number) => `${count} erledigte anzeigen`,
+    hideResolved: 'Erledigte ausblenden',
     rowSkipped: 'Übersprungen',
     rowPoints: (points, isNew) => `${isNew ? 'Neu · ' : ''}${points} XP`,
     restore: (title) => `${title} wiederherstellen`,
@@ -66,18 +70,37 @@ export const shell: typeof en = {
   onboarding: {
     sections: {
       'getting-started': 'Erste Schritte',
-      'managing-queue': 'Die Warteschlange verwalten',
-      'workspace-setup': 'Ihren Arbeitsbereich konfigurieren',
+      optional: 'Optional',
     },
     quests: {
+      printers: {
+        title: 'Ihre Drucker hinzufügen',
+        description:
+          'Fügen Sie jeden Drucker hinzu, damit Drucke einem passenden Gerät zugeordnet werden und Angebote seine Betriebskosten nutzen.',
+      },
+      stock: {
+        resin: {
+          title: 'Ihre Harze hinzufügen',
+          description: 'Optional. Fügen Sie die Harze hinzu, mit denen Sie drucken, und was Sie zahlen, damit Angebote Ihre Preise nutzen.',
+        },
+        filament: {
+          title: 'Ihre Filamente hinzufügen',
+          description:
+            'Optional. Fügen Sie die Filamente hinzu, mit denen Sie drucken, und was Sie zahlen, damit Angebote Ihre Preise nutzen.',
+        },
+        both: {
+          title: 'Ihre Materialien hinzufügen',
+          description:
+            'Optional. Fügen Sie die Harze und Filamente hinzu, mit denen Sie drucken, und was Sie zahlen, damit Angebote Ihre Preise nutzen.',
+        },
+      },
       upload: {
         title: 'Ihren ersten Druck hinzufügen',
-        description:
-          'Laden Sie ein Modell hoch oder speichern Sie einen Quelllink, sobald Sie Aufträge in die Warteschlange stellen möchten.',
+        description: 'Laden Sie ein Modell hoch oder speichern Sie einen Link, um Aufträge in die Warteschlange zu stellen.',
       },
       move: {
-        title: 'Aufträge durch die Warteschlange bewegen',
-        description: 'Ziehen Sie eine Druckkarte zwischen Spalten, um ihre Phase zu ändern.',
+        title: 'Einen Druck bis „Fertig“ bringen',
+        description: 'Ziehen Sie eine Druckkarte aus der Warteschlange über „Im Druck“ und „Nachbearbeitung“ bis „Fertig“.',
       },
       inspect: {
         title: 'Einen Druck ansehen',
@@ -87,34 +110,14 @@ export const shell: typeof en = {
         title: 'Ein Modell herunterladen',
         description: 'Laden Sie eine STL-Datei über eine Druckkarte oder deren Detailansicht herunter.',
       },
-      actions: {
-        title: 'Druckaktionen entdecken',
-        description: 'Verwenden Sie eine Aktion einer Druckkarte, um Aufträge auszuwählen, zu gruppieren, zu verschieben oder zu löschen.',
-      },
-      sort: {
-        title: 'Ansicht der Warteschlange wählen',
-        description: 'Sortieren Sie nach Priorität der anfragenden Person, Einreichungszeit, Name oder letzter Aktivität.',
-      },
-      filter: {
-        title: 'Aufträge mit Filtern finden',
-        description:
-          'Wenden Sie einen Filter an, um die Warteschlange nach Druckart, anfragender Person, Datum, Dateien oder einem anderen nützlichen Feld einzugrenzen.',
-      },
-      printers: {
-        title: 'Ihren Druckerpark zusammenstellen',
-        description: 'Fügen Sie ein Druckerprofil hinzu und speichern Sie es, damit Anfragen kompatiblen Geräten zugeordnet werden können.',
-      },
-      storage: {
-        title: 'Modellspeicher ansehen',
-        description: 'Prüfen Sie den aktiven Speicheranbieter und die Möglichkeiten, Modelle später zu verschieben.',
-      },
-      visibility: {
-        title: 'Sichtbarkeit der Anfragen wählen',
-        description: 'Legen Sie fest, ob Anfragende die gemeinsame Warteschlange oder nur ihre eigenen Aufträge sehen.',
-      },
       invite: {
-        title: 'Eine Person aus dem Team einladen',
+        title: 'Ihr Team einladen',
         description: 'Erstellen Sie eine einmalige Einladung für eine anfragende Person oder einen weiteren Administrator.',
+      },
+      tracking: {
+        title: 'Verbrauch und Bestand erfassen',
+        description:
+          'Optional. Geben Sie an, was jeder Druck verbraucht hat, und Bestände, Nachkäufe, Verschleiß und Ausgaben zählen sich selbst. Hier einschalten.',
       },
     },
   },

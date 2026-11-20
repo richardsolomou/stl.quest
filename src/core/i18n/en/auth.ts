@@ -1,4 +1,5 @@
 export const auth = {
+  tagline: 'The print queue, from request to pickup.',
   passwordTooShort: (min: number) => `Use at least ${min} characters`,
   signIn: 'Sign in',
   createAccount: 'Create account',

@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, notExists, lt, lte, max, ne, or, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, notExists, lt, lte, max, ne, or, sql } from 'drizzle-orm'
 import { isDeepStrictEqual } from 'node:util'
 import type { AdminAccountDetails, AdminWorkspace } from '../core/admin'
 import type {
@@ -60,6 +60,7 @@ import {
   session as authSession,
   settings,
   uploadSessions,
+  usageEvents,
   managedStorageAccounts,
   managedStorageUsage,
   managedStorageEntitlements,
@@ -72,7 +73,16 @@ import { notificationPreferences, type NotificationKind } from '../core/notifica
 import { messagesFor, type Messages } from '../core/i18n'
 import { isLocale, type Locale } from '../core/i18n/locales'
 import { normalizeOnboardingTasks, onboardingTaskScope, type OnboardingProgress } from '../core/onboarding'
-import { mapAssetGenerationJob, mapInvite, mapRequest, mapUserIdentity, parseOperationPayload, type RequestRow } from './repository/mappers'
+import {
+  mapAssetGenerationJob,
+  mapInvite,
+  mapRequest,
+  mapUsageEvent,
+  mapUserIdentity,
+  parseOperationPayload,
+  type RequestRow,
+} from './repository/mappers'
+import { MAX_USAGE_LIST, type UsageEvent, type UsageFilters } from '../core/usage'
 import { requestConditions, requestOrderBy, requestSelection, type RequestFilterOptions } from './repository/requestQuery'
 
 type DatabaseTransaction = Parameters<Parameters<STLQuestDatabase['transaction']>[0]>[0]
@@ -2460,6 +2470,67 @@ export class DrizzleRepository implements Repository {
       await this.releaseManagedStorageWith(tx)
       await this.setSettingsWith(tx, values, deleteKeys)
     })
+  }
+
+  async appendUsageEvents(events: UsageEvent[]) {
+    if (events.length === 0) return
+    const workspaceId = await this.workspace()
+    await this.database.transaction(async (tx) => {
+      await tx
+        .insert(usageEvents)
+        .values(events.map((event) => ({ ...event, workspaceId })))
+        .run()
+    })
+  }
+
+  async listUsage(filters: UsageFilters) {
+    const workspaceId = await this.workspace()
+    const rows = await this.database
+      .select()
+      .from(usageEvents)
+      .where(
+        and(
+          eq(usageEvents.workspaceId, workspaceId),
+          filters.requestId === undefined ? undefined : eq(usageEvents.requestId, filters.requestId),
+          filters.consumableId === undefined ? undefined : eq(usageEvents.consumableId, filters.consumableId),
+          filters.printerId === undefined ? undefined : eq(usageEvents.printerId, filters.printerId),
+          filters.equipmentId === undefined ? undefined : eq(usageEvents.equipmentId, filters.equipmentId),
+          filters.from === undefined ? undefined : gte(usageEvents.createdAt, filters.from),
+          filters.to === undefined ? undefined : lt(usageEvents.createdAt, filters.to),
+          filters.includeUndone ? undefined : isNull(usageEvents.undoneAt),
+        ),
+      )
+      .orderBy(desc(usageEvents.createdAt), desc(usageEvents.id))
+      .limit(Math.min(filters.limit ?? MAX_USAGE_LIST, MAX_USAGE_LIST))
+      .all()
+    return rows.map(mapUsageEvent)
+  }
+
+  async stockTotals() {
+    const workspaceId = await this.workspace()
+    const rows = await this.database
+      .select({
+        consumableId: usageEvents.consumableId,
+        kind: usageEvents.kind,
+        unit: usageEvents.unit,
+        amount: sql<number>`coalesce(sum(${usageEvents.amount}), 0)`.mapWith(Number),
+      })
+      .from(usageEvents)
+      .where(and(eq(usageEvents.workspaceId, workspaceId), isNotNull(usageEvents.consumableId), isNull(usageEvents.undoneAt)))
+      .groupBy(usageEvents.consumableId, usageEvents.kind, usageEvents.unit)
+      .all()
+    return rows.flatMap(({ consumableId, ...total }) => (consumableId ? [{ consumableId, ...total }] : []))
+  }
+
+  async undoUsageTransaction(transactionId: string, undoneAt: number) {
+    const workspaceId = await this.workspace()
+    return (
+      await this.database
+        .update(usageEvents)
+        .set({ undoneAt })
+        .where(and(eq(usageEvents.workspaceId, workspaceId), eq(usageEvents.transactionId, transactionId), isNull(usageEvents.undoneAt)))
+        .run()
+    ).changes
   }
 
   async replacePrinterProfiles(profiles: PrinterProfile[]) {

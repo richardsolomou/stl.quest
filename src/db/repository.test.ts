@@ -11,6 +11,7 @@ import { databasePath } from './paths'
 import { createDatabase, rawDatabase } from './connection'
 import type { AccountRole, PrinterProfile, WorkspaceRole } from '../core/types'
 import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
+import type { UsageEvent } from '../core/usage'
 import {
   account,
   assetGenerationJobs,
@@ -562,14 +563,14 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
 
   it('persists onboarding progress per user', async () => {
     await repository.saveUserOnboarding('maker', {
-      completedTasks: ['upload', 'filter'],
-      skippedTasks: ['sort'],
+      completedTasks: ['upload', 'inspect'],
+      skippedTasks: ['download'],
       celebratedTasks: ['upload'],
     })
 
     await expect(repository.getUserOnboarding('maker')).resolves.toEqual({
-      completedTasks: ['upload', 'filter'],
-      skippedTasks: ['sort'],
+      completedTasks: ['upload', 'inspect'],
+      skippedTasks: ['download'],
       celebratedTasks: ['upload'],
     })
   })
@@ -579,13 +580,13 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const secondWorkspace = await repository.createWorkspace({ id: 'maker' }, 'Second workspace')
     await repository.saveUserOnboarding(
       'maker',
-      { completedTasks: ['upload', 'printers'], skippedTasks: ['storage'], celebratedTasks: ['upload', 'printers'] },
+      { completedTasks: ['upload', 'printers'], skippedTasks: ['stock'], celebratedTasks: ['upload', 'printers'] },
       firstWorkspace.id,
     )
 
     await expect(repository.getUserOnboarding('maker', firstWorkspace.id)).resolves.toEqual({
       completedTasks: ['upload', 'printers'],
-      skippedTasks: ['storage'],
+      skippedTasks: ['stock'],
       celebratedTasks: ['upload', 'printers'],
     })
     await expect(repository.getUserOnboarding('maker', secondWorkspace.id)).resolves.toEqual({
@@ -620,6 +621,76 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       undefined,
       { enabled: false },
     ])
+  })
+
+  function usageEvent(overrides: Partial<UsageEvent> = {}): UsageEvent {
+    return {
+      id: crypto.randomUUID(),
+      transactionId: 'transaction',
+      stage: 'stock',
+      kind: 'restock',
+      consumableId: 'ipa',
+      amount: 1_000,
+      unit: 'ml',
+      createdAt: 1_000,
+      ...overrides,
+    }
+  }
+
+  it('lists usage newest first with only the requested filters', async () => {
+    await repository.appendUsageEvents([
+      usageEvent({ id: 'old', requestId: 'print', createdAt: 1_000 }),
+      usageEvent({ id: 'new', requestId: 'print', createdAt: 2_000 }),
+      usageEvent({ id: 'other', requestId: 'other-print', createdAt: 3_000 }),
+    ])
+
+    expect((await repository.listUsage({ requestId: 'print' })).map((event) => event.id)).toEqual(['new', 'old'])
+  })
+
+  it('lists usage within a time range', async () => {
+    await repository.appendUsageEvents([
+      usageEvent({ id: 'before', createdAt: 999 }),
+      usageEvent({ id: 'inside', createdAt: 1_000 }),
+      usageEvent({ id: 'after', createdAt: 2_000 }),
+    ])
+
+    expect((await repository.listUsage({ from: 1_000, to: 2_000 })).map((event) => event.id)).toEqual(['inside'])
+  })
+
+  it('sums live stock per consumable, kind, and unit', async () => {
+    await repository.appendUsageEvents([
+      usageEvent({ id: 'first', transactionId: 'first' }),
+      usageEvent({ id: 'second', transactionId: 'second', amount: 500 }),
+      usageEvent({ id: 'used', transactionId: 'used', kind: 'use', amount: 40 }),
+    ])
+    await repository.undoUsageTransaction('second', 2_000)
+
+    expect(await repository.stockTotals()).toEqual(
+      expect.arrayContaining([
+        { consumableId: 'ipa', kind: 'restock', unit: 'ml', amount: 1_000 },
+        { consumableId: 'ipa', kind: 'use', unit: 'ml', amount: 40 },
+      ]),
+    )
+  })
+
+  it('undoes every live event of a transaction once', async () => {
+    await repository.appendUsageEvents([usageEvent({ id: 'printer' }), usageEvent({ id: 'material' })])
+
+    expect([
+      await repository.undoUsageTransaction('transaction', 2_000),
+      await repository.undoUsageTransaction('transaction', 3_000),
+    ]).toEqual([2, 0])
+  })
+
+  it('keeps usage within its workspace', async () => {
+    const secondary = await repository.scoped((await repository.createWorkspace({ id: 'owner' }, 'Second farm')).id)
+    await repository.appendUsageEvents([usageEvent()])
+
+    expect([
+      await secondary.listUsage({}),
+      await secondary.stockTotals(),
+      await secondary.undoUsageTransaction('transaction', 2_000),
+    ]).toEqual([[], [], 0])
   })
 
   it('journals asset migrations per workspace', async () => {
@@ -1589,7 +1660,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 35 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 36 })
     await migrated.close()
   })
 

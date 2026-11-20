@@ -20,8 +20,8 @@ describe('landingHead', () => {
     expect(meta('/terms', 'og:title')?.content).toBe('Terms of Service — STL Quest')
   })
 
-  it('keeps the dark design for visitors who chose the light theme', () => {
-    expect(meta('/', 'color-scheme')?.content).toBe('dark')
+  it("follows the visitor's colour scheme like the application", () => {
+    expect(meta('/', 'color-scheme')).toBeUndefined()
   })
 
   it('lets search engines index the page the application otherwise hides', () => {

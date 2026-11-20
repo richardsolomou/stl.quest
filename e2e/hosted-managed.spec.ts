@@ -14,11 +14,11 @@ test.beforeAll(async () => {
 test('shares included storage across three hosted workspaces and enforces the ownership limit', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light' })
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'A home for your 3D-print requests.' })).toBeVisible()
-  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(21, 23, 28)')
-  await page.getByRole('main').getByRole('link', { name: 'Or use the hosted version' }).click()
+  await expect(page.getByRole('heading', { name: 'The 3D-print queue you run yourself' })).toBeVisible()
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(220, 223, 221)')
+  await page.getByRole('main').getByRole('link', { name: 'Create a free workspace' }).first().click()
   await expect(page).toHaveURL('/sign-in?signup=true')
-  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(243, 241, 234)')
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(220, 223, 221)')
   await page.emulateMedia({ colorScheme: 'dark' })
   await page.getByRole('button', { name: 'Set up STL Quest' }).click()
   await page.getByLabel('Name').fill('Hosted Owner')
@@ -167,7 +167,7 @@ async function screenshot(page: Page, name: string, fullPage = false) {
 }
 
 async function upload(page: Page, name: string) {
-  await page.getByRole('button', { name: 'Add a print' }).click()
+  await page.getByRole('region', { name: 'Board filters' }).getByRole('button', { name: 'Add a print' }).click()
   await expect(page.getByRole('dialog', { name: 'Add a print' })).toBeVisible()
   await page.getByRole('button', { name: 'Upload files' }).click()
   await page.locator('input[type=file]').setInputFiles({ name: `${name}.stl`, mimeType: 'model/stl', buffer: boxStl(name, 10, 10, 10) })
@@ -179,5 +179,7 @@ async function upload(page: Page, name: string) {
 async function switchWorkspace(page: Page, name: string) {
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await page.getByRole('button', { name }).click()
-  await expect(page.getByRole('button', { name: 'Add a print' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('region', { name: 'Board filters' }).getByRole('button', { name: 'Add a print' })).toBeVisible({
+    timeout: 30_000,
+  })
 }

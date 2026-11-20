@@ -10,7 +10,11 @@ import { DrizzleRepository } from '../db/repository'
 import { organization, requests, requestStatuses, user } from '../db/schema'
 import type { EventBus, Identity, Notifier, PrinterProfile, Telemetry } from './types'
 import { STLQuestService } from './services'
+import { CONSUMABLES_SETTING, type Consumable } from './consumables'
+import { EQUIPMENT_SETTING, type EquipmentItem } from './equipment'
 import { seesOnlyOwnRequests } from './visibility'
+import { PRINT_TYPE_SETTING } from './printTypes'
+import { USAGE_TRACKING_SETTING } from './usageTracking'
 
 const capture = vi.fn(async () => undefined)
 const telemetry: Telemetry = { capture, exception: async () => undefined }
@@ -635,6 +639,7 @@ describe('STLQuestService crash recovery', () => {
 
   it('exposes configured printer assignments and rejects unknown printers', async () => {
     await repository.setSetting('printers', [slaPrinter])
+    await repository.setSetting(PRINT_TYPE_SETTING, 'both')
     const id = await repository.createRequest({
       name: 'Assigned',
       fileName: 'assigned.stl',
@@ -651,6 +656,34 @@ describe('STLQuestService crash recovery', () => {
     await expect(service.update(id, { printerId: null }, requester)).rejects.toThrow(expect.objectContaining({ status: 403 }))
     expect(await service.update(id, { requestedPrintType: 'filament' }, requester)).toEqual({ printTypeChanged: true })
     expect(await repository.getRequest(id)).toMatchObject({ printerId: undefined, requestedPrintType: 'filament' })
+  })
+
+  it('rejects a new print of a type the workspace does not print', async () => {
+    await repository.setSetting('printers', [slaPrinter])
+    await expect(
+      service.createLinkedRequest(
+        { name: 'Bracket', quantity: 1, sourceUrl: 'https://makerworld.com/models/bracket', requestedPrintType: 'filament' },
+        requester,
+      ),
+    ).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('rejects changing a print to a type the workspace does not print', async () => {
+    await repository.setSetting(PRINT_TYPE_SETTING, 'resin')
+    const id = await service.createLinkedRequest(
+      { name: 'Bracket', quantity: 1, sourceUrl: 'https://makerworld.com/models/bracket', requestedPrintType: 'resin' },
+      requester,
+    )
+    await expect(service.update(id, { requestedPrintType: 'filament' }, requester)).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('keeps a print of a type the workspace no longer prints editable', async () => {
+    const id = await service.createLinkedRequest(
+      { name: 'Bracket', quantity: 1, sourceUrl: 'https://makerworld.com/models/bracket', requestedPrintType: 'filament' },
+      requester,
+    )
+    await repository.setSetting(PRINT_TYPE_SETTING, 'resin')
+    expect(await service.update(id, { name: 'Bracket v2', requestedPrintType: 'filament' }, admin)).toEqual({ printTypeChanged: false })
   })
 
   it('validates assignment-first request targets', async () => {
@@ -737,6 +770,15 @@ describe('STLQuestService crash recovery', () => {
     expect(await repository.getRequest(id)).toMatchObject({ counts: { done: 1 }, archivedAt: undefined })
     expect((await service.listRequests(admin)).requests.map(({ id: restoredId }) => restoredId)).toEqual([id])
     expect(capture).toHaveBeenCalledWith(admin.id, 'request_unarchived', { print_type: undefined, copy_count: 1 })
+  })
+
+  it('archives a selection of more than a hundred prints at once', async () => {
+    const ids = await Promise.all(Array.from({ length: 101 }, () => request()))
+    await Promise.all(ids.map((id) => service.moveCopies({ id, from: 'todo', to: 'done', count: 1 }, admin)))
+
+    await service.archiveRequests(ids, admin)
+
+    expect((await service.listRequests(admin, false, { archived: true })).requests).toHaveLength(101)
   })
 
   describe('automatic archiving', () => {
@@ -2410,6 +2452,302 @@ describe('STLQuestService crash recovery', () => {
 
     expect(await repository.listOperations()).toHaveLength(0)
     expect(await repository.getRequest(id)).toMatchObject({ counts: { todo: 0, in_progress: 1 } })
+  })
+
+  describe('usage log', () => {
+    const resin: Consumable = { id: 'grey', kind: 'resin', name: 'Grey', pricePerLitre: 40, densityGramsPerMl: 1.1 }
+    const filament: Consumable = { id: 'pla', kind: 'filament', name: 'PLA', pricePerKg: 20 }
+    const ipa: Consumable = { id: 'ipa', kind: 'supply', name: 'IPA', unit: 'ml', price: 10, minimumStock: 500 }
+    const wash: EquipmentItem = {
+      id: 'wash',
+      name: 'Wash station',
+      kind: 'wash',
+      stage: 'finishing',
+      powerWatts: 50,
+      minutesPerUse: 10,
+      supplies: [{ consumableId: ipa.id, amountPerUse: 20 }],
+    }
+
+    async function estimatedPrint() {
+      const id = await request()
+      await repository.updateRequest(id, { printerId: slaPrinter.id, estimatedMaterialOverride: 12, estimatedPrintMinutesOverride: 90 })
+      return id
+    }
+
+    beforeEach(async () => {
+      await repository.setSettings({
+        printers: [slaPrinter],
+        [CONSUMABLES_SETTING]: [resin, filament, ipa],
+        [EQUIPMENT_SETTING]: [wash],
+        [USAGE_TRACKING_SETTING]: true,
+      })
+    })
+
+    describe('while tracking is off', () => {
+      beforeEach(async () => {
+        await repository.setSetting(USAGE_TRACKING_SETTING, false)
+      })
+
+      it('refuses to record a step', async () => {
+        const requestId = await estimatedPrint()
+
+        await expect(service.recordStepUsage({ requestId, stage: 'finishing', copies: 1 }, admin)).rejects.toMatchObject({ status: 409 })
+      })
+
+      it('refuses to record a stock movement', async () => {
+        await expect(service.recordStockMovement({ consumableId: ipa.id, kind: 'restock', amount: 1_000 }, admin)).rejects.toMatchObject({
+          status: 409,
+        })
+      })
+
+      it('refuses to undo usage', async () => {
+        await expect(service.undoUsage('any', admin)).rejects.toMatchObject({ status: 409 })
+      })
+
+      it('hides the log', async () => {
+        await expect(service.listUsage({}, admin)).rejects.toMatchObject({ status: 409 })
+      })
+
+      it('hides stock levels', async () => {
+        await expect(service.stockLevels(admin)).rejects.toMatchObject({ status: 409 })
+      })
+
+      it('keeps the log for when it is turned back on', async () => {
+        await repository.setSetting(USAGE_TRACKING_SETTING, true)
+        await service.recordStockMovement({ consumableId: ipa.id, kind: 'restock', amount: 1_000 }, admin)
+        await repository.setSetting(USAGE_TRACKING_SETTING, false)
+        await repository.setSetting(USAGE_TRACKING_SETTING, true)
+
+        expect(await service.listUsage({}, admin)).toHaveLength(1)
+      })
+    })
+
+    it('records the printer time and material for every copy at the price it was used at', async () => {
+      const requestId = await estimatedPrint()
+
+      const { events } = await service.recordStepUsage(
+        { requestId, stage: 'printing', copies: 2, printerId: slaPrinter.id, consumableId: resin.id },
+        admin,
+      )
+
+      expect(
+        events.map(({ printerId, consumableId, amount, unit, unitPrice, currency }) => ({
+          printerId,
+          consumableId,
+          amount,
+          unit,
+          unitPrice,
+          currency,
+        })),
+      ).toEqual([
+        {
+          printerId: slaPrinter.id,
+          consumableId: undefined,
+          amount: 180,
+          unit: 'minute',
+          unitPrice: expect.closeTo(0.0135 / 60, 9),
+          currency: 'EUR',
+        },
+        { printerId: slaPrinter.id, consumableId: resin.id, amount: 24, unit: 'ml', unitPrice: 0.04, currency: 'EUR' },
+      ])
+    })
+
+    it('records each piece of equipment and its supplies once per copy', async () => {
+      const requestId = await estimatedPrint()
+
+      const { events } = await service.recordStepUsage({ requestId, stage: 'finishing', copies: 3, equipmentIds: [wash.id] }, admin)
+
+      expect(events.map(({ equipmentId, consumableId, amount, unit }) => ({ equipmentId, consumableId, amount, unit }))).toEqual([
+        { equipmentId: wash.id, consumableId: undefined, amount: 30, unit: 'minute' },
+        { equipmentId: wash.id, consumableId: ipa.id, amount: 60, unit: 'ml' },
+      ])
+    })
+
+    it("records a printer model's wear parts by the plate", async () => {
+      const tank: Consumable = {
+        id: 'tank',
+        kind: 'part',
+        name: 'Tank',
+        printType: 'resin',
+        price: 190,
+        lifespan: 190,
+        lifespanUnit: 'plates',
+      }
+      await repository.setSetting(CONSUMABLES_SETTING, [resin, tank])
+      const requestId = await estimatedPrint()
+
+      const { events } = await service.recordStepUsage({ requestId, stage: 'printing', copies: 3, printerId: slaPrinter.id }, admin)
+
+      expect(events.find((event) => event.consumableId === tank.id)).toMatchObject({ amount: 3, unit: 'plate', unitPrice: 1 })
+    })
+
+    it('prices equipment time by its power and wear', async () => {
+      await repository.setSetting(EQUIPMENT_SETTING, [{ ...wash, powerWatts: 1_000, purchasePrice: 600, lifespanHours: 1_000 }])
+      const requestId = await estimatedPrint()
+
+      const { events } = await service.recordStepUsage({ requestId, stage: 'finishing', copies: 1, equipmentIds: [wash.id] }, admin)
+
+      expect(events[0].unitPrice).toBeCloseTo((0.135 + 0.6) / 60, 9)
+    })
+
+    it('prices supplies the way the calculator quotes them', async () => {
+      const basket: Consumable = {
+        id: 'basket',
+        kind: 'part',
+        name: 'Basket',
+        printType: 'resin',
+        price: 50,
+        lifespan: 100,
+        lifespanUnit: 'plates',
+      }
+      await repository.setSettings({
+        [CONSUMABLES_SETTING]: [basket],
+        [EQUIPMENT_SETTING]: [{ ...wash, supplies: [{ consumableId: basket.id, amountPerUse: 1 }] }],
+      })
+      const requestId = await estimatedPrint()
+
+      const { events } = await service.recordStepUsage({ requestId, stage: 'finishing', copies: 2, equipmentIds: [wash.id] }, admin)
+
+      expect(events.find((event) => event.consumableId === basket.id)).toMatchObject({ amount: 2, unit: 'plate', unitPrice: 0.5 })
+    })
+
+    it('prefills the printer, material, and finishing set last used', async () => {
+      const requestId = await estimatedPrint()
+      await service.recordStepUsage({ requestId, stage: 'printing', copies: 1, printerId: slaPrinter.id, consumableId: resin.id }, admin)
+      await service.recordStepUsage({ requestId, stage: 'finishing', copies: 1, equipmentIds: [wash.id] }, admin)
+
+      expect(await service.usagePrefills(admin)).toEqual({
+        printers: { resin: slaPrinter.id },
+        materials: { [slaPrinter.id]: resin.id },
+        finishing: { resin: [wash.id] },
+      })
+    })
+
+    it('records the printer with no minutes when the print has no time estimate', async () => {
+      const requestId = await request()
+
+      const { events } = await service.recordStepUsage({ requestId, stage: 'printing', copies: 1, printerId: slaPrinter.id }, admin)
+
+      expect(events.map(({ printerId, amount }) => ({ printerId, amount }))).toEqual([{ printerId: slaPrinter.id, amount: 0 }])
+    })
+
+    it('takes a replaced part off the shelf', async () => {
+      const tank: Consumable = {
+        id: 'tank',
+        kind: 'part',
+        name: 'Tank',
+        printType: 'resin',
+        price: 60,
+        lifespan: 190,
+        lifespanUnit: 'plates',
+      }
+      await repository.setSetting(CONSUMABLES_SETTING, [tank])
+      await service.recordStockMovement({ consumableId: tank.id, kind: 'restock', amount: 2 }, admin)
+
+      await service.recordStockMovement({ consumableId: tank.id, kind: 'replace', amount: 1, printerId: slaPrinter.id }, admin)
+
+      expect((await service.stockLevels(admin))[0].onHand).toBe(1)
+    })
+
+    it('shares one transaction across the events a step records', async () => {
+      const requestId = await estimatedPrint()
+
+      const { transactionId, events } = await service.recordStepUsage(
+        { requestId, stage: 'printing', copies: 1, printerId: slaPrinter.id, consumableId: resin.id },
+        admin,
+      )
+
+      expect(new Set(events.map((event) => event.transactionId))).toEqual(new Set([transactionId]))
+    })
+
+    it('rejects a material that does not suit the print type', async () => {
+      const requestId = await estimatedPrint()
+
+      await expect(
+        service.recordStepUsage({ requestId, stage: 'printing', copies: 1, printerId: slaPrinter.id, consumableId: filament.id }, admin),
+      ).rejects.toMatchObject({ status: 400 })
+    })
+
+    it('rejects unknown equipment', async () => {
+      const requestId = await estimatedPrint()
+
+      await expect(
+        service.recordStepUsage({ requestId, stage: 'finishing', copies: 1, equipmentIds: ['missing'] }, admin),
+      ).rejects.toMatchObject({ status: 400 })
+    })
+
+    it('lets only admins record usage', async () => {
+      const requestId = await estimatedPrint()
+
+      await expect(service.recordStepUsage({ requestId, stage: 'finishing', copies: 1 }, requester)).rejects.toMatchObject({
+        status: 403,
+      })
+    })
+
+    it('publishes recorded usage so boards refresh', async () => {
+      const publish = vi.fn()
+      const scopedService = new STLQuestService(repository, assets, staging, { publish }, telemetry, { remove: removeTusUpload })
+
+      await scopedService.recordStockMovement({ consumableId: ipa.id, kind: 'restock', amount: 1_000 }, admin)
+
+      expect(publish).toHaveBeenCalledWith('usage.recorded')
+    })
+
+    it('counts stock down by what the steps used', async () => {
+      const requestId = await estimatedPrint()
+      await service.recordStockMovement({ consumableId: ipa.id, kind: 'restock', amount: 1_000 }, admin)
+
+      await service.recordStepUsage({ requestId, stage: 'finishing', copies: 2, equipmentIds: [wash.id] }, admin)
+
+      expect((await service.stockLevels(admin)).find((level) => level.consumableId === ipa.id)?.onHand).toBe(960)
+    })
+
+    it('records a correction as the difference from the amount counted', async () => {
+      await service.recordStockMovement({ consumableId: ipa.id, kind: 'restock', amount: 1_000 }, admin)
+
+      const { events } = await service.recordStockMovement({ consumableId: ipa.id, kind: 'correction', counted: 700 }, admin)
+
+      expect(events[0].amount).toBe(-300)
+    })
+
+    it('flags stock below its minimum as low', async () => {
+      await service.recordStockMovement({ consumableId: ipa.id, kind: 'restock', amount: 400 }, admin)
+
+      expect((await service.stockLevels(admin)).find((level) => level.consumableId === ipa.id)).toMatchObject({ low: true, missing: false })
+    })
+
+    it('puts undone usage back into stock', async () => {
+      const { transactionId } = await service.recordStockMovement({ consumableId: ipa.id, kind: 'restock', amount: 1_000 }, admin)
+
+      await service.undoUsage(transactionId!, admin)
+
+      expect((await service.stockLevels(admin)).find((level) => level.consumableId === ipa.id)?.onHand).toBe(0)
+    })
+
+    it('has nothing to undo twice', async () => {
+      const { transactionId } = await service.recordStockMovement({ consumableId: ipa.id, kind: 'restock', amount: 1_000 }, admin)
+      await service.undoUsage(transactionId!, admin)
+
+      await expect(service.undoUsage(transactionId!, admin)).rejects.toMatchObject({ status: 404 })
+    })
+
+    it('captures a recorded step with counts only', async () => {
+      const requestId = await estimatedPrint()
+      capture.mockClear()
+
+      await service.recordStepUsage({ requestId, stage: 'finishing', copies: 2, equipmentIds: [wash.id] }, admin)
+
+      expect(capture).toHaveBeenCalledWith(admin.id, 'usage_step_recorded', {
+        stage: 'finishing',
+        print_type: 'resin',
+        copy_count: 2,
+        event_count: 2,
+        has_printer: false,
+        has_material: false,
+        equipment_count: 1,
+        outcome: undefined,
+      })
+    })
   })
 
   describe('print-ready notifications', () => {

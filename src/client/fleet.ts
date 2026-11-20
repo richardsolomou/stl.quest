@@ -1,14 +1,9 @@
 import type { Messages } from '../core/i18n'
-import { PRINT_TYPES, type PrinterSummary, type PrintType } from '../core/types'
+import { PRINT_TYPES, type PrintType } from '../core/types'
 
-export function fleetPrintTypes(printers: PrinterSummary[]) {
-  const present = new Set(printers.map((printer) => printer.printType))
-  return PRINT_TYPES.filter((printType) => present.has(printType))
-}
-
-export function availablePrintTypes(printers?: PrinterSummary[]) {
-  const configured = printers ? fleetPrintTypes(printers) : []
-  return configured.length ? configured : PRINT_TYPES
+/** The types a print can be given: what the workspace prints, plus the type it already has so it stays valid. */
+export function requestPrintTypeChoices(printTypes: readonly PrintType[], current?: PrintType) {
+  return PRINT_TYPES.filter((printType) => printTypes.includes(printType) || printType === current)
 }
 
 export function printTypeLabel(t: Messages, printType: PrintType) {

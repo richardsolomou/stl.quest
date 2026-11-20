@@ -1,20 +1,20 @@
-import type { PriceCalculatorJob, PriceCalculatorSettings } from '../core/priceCalculator'
-import { isPrintType } from '../core/types'
+import type { PriceCalculatorJob } from '../core/priceCalculator'
+import { isPrintType, type PrintType } from '../core/types'
 
 export type CalculatorSearch = {
-  printType?: PriceCalculatorSettings['printType']
+  printType?: PrintType
   material?: number
   unit?: PriceCalculatorJob['materialUnit']
   hours?: number
   plates?: number
   printer?: string
+  /** Comma-separated request IDs to estimate together, chosen on the board. */
+  requests?: string
 }
 
-export function calculatorSearch(
-  printType: PriceCalculatorSettings['printType'],
-  job: PriceCalculatorJob,
-  printerId?: string,
-): CalculatorSearch {
+const MAX_ESTIMATED_REQUESTS = 200
+
+export function calculatorSearch(printType: PrintType, job: PriceCalculatorJob, printerId?: string): CalculatorSearch {
   return {
     printType,
     material: round(job.materialAmount),
@@ -34,6 +34,7 @@ export function validateCalculatorSearch(input: Record<string, unknown>): Calcul
     hours: amount(input.hours),
     plates: Number.isInteger(plates) ? plates : undefined,
     printer: typeof input.printer === 'string' && input.printer.length > 0 && input.printer.length <= 200 ? input.printer : undefined,
+    requests: typeof input.requests === 'string' && estimatedRequestIds(input.requests).length > 0 ? input.requests : undefined,
   }
 }
 
@@ -58,4 +59,9 @@ function amount(value: unknown) {
 
 function round(value: number) {
   return Math.round(value * 100) / 100
+}
+
+export function estimatedRequestIds(requests: string | undefined) {
+  if (!requests) return []
+  return [...new Set(requests.split(',').filter((id) => id.length > 0 && id.length <= 200))].slice(0, MAX_ESTIMATED_REQUESTS)
 }

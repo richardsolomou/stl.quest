@@ -6,16 +6,21 @@ import type { PrinterPreset } from './printerPresets'
 
 export const PRINTERS_SETTING = 'printers'
 
+/** A catalogue printer takes its print type and build volume from its model; only a custom printer keeps its own. */
 export function normalizePrinterProfile(profile: Partial<PrinterProfile> & Pick<PrinterProfile, 'id' | 'name'>): PrinterProfile {
   const preset = getPrinterPreset(profile.presetId) ?? inferredPrinterPreset(profile)
   return {
     id: profile.id,
     presetId: profile.presetId ?? preset?.id,
-    widthMm: positiveDimension(profile.widthMm) ?? preset?.widthMm,
-    depthMm: positiveDimension(profile.depthMm) ?? preset?.depthMm,
-    heightMm: positiveDimension(profile.heightMm) ?? preset?.heightMm,
+    widthMm: preset ? preset.widthMm : positiveNumber(profile.widthMm),
+    depthMm: preset ? preset.depthMm : positiveNumber(profile.depthMm),
+    heightMm: preset ? preset.heightMm : positiveNumber(profile.heightMm),
     name: profile.name,
-    printType: profile.printType ?? preset?.printType ?? 'resin',
+    printType: preset?.printType ?? profile.printType ?? 'resin',
+    ...(positiveNumber(profile.purchasePrice) ? { purchasePrice: profile.purchasePrice } : {}),
+    ...(positiveNumber(profile.lifespanHours) ? { lifespanHours: profile.lifespanHours } : {}),
+    ...(!preset && positiveNumber(profile.powerWatts) ? { powerWatts: profile.powerWatts } : {}),
+    ...(profile.addOnPresetIds?.length ? { addOnPresetIds: profile.addOnPresetIds } : {}),
     ...(profile.archived ? { archived: true } : {}),
     ...(profile.used ? { used: true } : {}),
   }
@@ -37,9 +42,22 @@ export function printerProfileFromPreset(id: string, preset: PrinterPreset): Pri
     widthMm: preset.widthMm,
     depthMm: preset.depthMm,
     heightMm: preset.heightMm,
-    name: `${preset.brand} ${preset.model}`,
+    name: printerModelName(preset),
     printType: preset.printType,
   }
+}
+
+export function printerModelName(preset: Pick<PrinterPreset, 'brand' | 'model'>) {
+  return `${preset.brand} ${preset.model}`
+}
+
+/** The name, numbered when an active printer already has it, so a second identical machine is valid as soon as it is added. */
+export function uniquePrinterName(name: string, profiles: PrinterProfile[]) {
+  const taken = new Set(profiles.filter(({ archived }) => !archived).map((profile) => profile.name.trim().toLowerCase()))
+  if (!taken.has(name.toLowerCase())) return name
+  let number = 2
+  while (taken.has(`${name} · ${number}`.toLowerCase())) number++
+  return `${name} · ${number}`
 }
 
 export function printerProfilesValidationError(profiles: PrinterProfile[], t: Messages) {
@@ -122,7 +140,7 @@ export async function storedPrinterProfiles(repository: { getSetting<T>(key: str
   return stored.map(normalizePrinterProfile)
 }
 
-function positiveDimension(value?: number) {
+function positiveNumber(value?: number) {
   return value !== undefined && Number.isFinite(value) && value > 0 ? value : undefined
 }
 

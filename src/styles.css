@@ -48,14 +48,29 @@
   }
 }
 
+/* A ticket landing on a new stage drops onto its rail and its stage colour flashes through it once. */
 @keyframes card-settle {
   0% {
-    transform: translateY(-3px);
-    box-shadow: 0 0 0 1px var(--blueprint);
+    transform: translateY(-6px);
+    box-shadow: 0 0 0 2px var(--stage, var(--ring));
+  }
+  60% {
+    transform: translateY(1px);
   }
   100% {
     transform: translateY(0);
-    box-shadow: none;
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@keyframes cell-stamp {
+  0% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
   }
 }
 
@@ -79,6 +94,51 @@
   html {
     @apply min-h-full font-sans;
     font-size: 18px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .font-heading {
+    font-stretch: var(--heading-stretch);
+  }
+
+  .font-serif {
+    font-stretch: var(--name-stretch);
+    letter-spacing: var(--name-tracking);
+  }
+
+  .font-mono {
+    font-stretch: var(--mono-stretch);
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--stage-up_next, var(--ring)) 30%, transparent);
+  }
+
+  input,
+  textarea {
+    caret-color: var(--primary);
+  }
+
+  /* Stage colour for anything carrying `data-stage`, so a region, a tab, and a copy cell share one source. */
+  [data-stage='todo'] {
+    --stage: var(--stage-todo);
+    --stage-foreground: var(--stage-todo-foreground);
+  }
+  [data-stage='up_next'] {
+    --stage: var(--stage-up_next);
+    --stage-foreground: var(--stage-up_next-foreground);
+  }
+  [data-stage='in_progress'] {
+    --stage: var(--stage-in_progress);
+    --stage-foreground: var(--stage-in_progress-foreground);
+  }
+  [data-stage='post_processing'] {
+    --stage: var(--stage-post_processing);
+    --stage-foreground: var(--stage-post_processing-foreground);
+  }
+  [data-stage='done'] {
+    --stage: var(--stage-done);
+    --stage-foreground: var(--stage-done-foreground);
   }
 
   body {

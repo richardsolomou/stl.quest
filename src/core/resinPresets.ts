@@ -1,4 +1,5 @@
-import catalog from '../../catalogs/resins/catalog.generated.json'
+import type { ResinConsumable } from './consumables'
+import { TYPICAL_RESIN_DENSITY_GRAMS_PER_ML } from './priceCalculator'
 
 export type ResinPreset = {
   id: string
@@ -10,8 +11,18 @@ export type ResinPreset = {
   source: { id: string; url: string }
 }
 
-export const RESIN_PRESETS = catalog.presets as ResinPreset[]
+export function resinPresetName(preset: Pick<ResinPreset, 'brand' | 'name'>) {
+  return `${preset.brand} ${preset.name}`
+}
 
-export function getResinPreset(id?: string) {
-  return id ? RESIN_PRESETS.find((preset) => preset.id === id) : undefined
+/** A library resin from the catalogue, unpriced (NaN) since the catalogue knows no prices, and typically dense when it does not say. */
+export function resinFromPreset(id: string, preset: ResinPreset): ResinConsumable {
+  return {
+    id,
+    kind: 'resin',
+    name: resinPresetName(preset),
+    resinPresetId: preset.id,
+    pricePerLitre: Number.NaN,
+    densityGramsPerMl: preset.densityGramsPerMl ?? TYPICAL_RESIN_DENSITY_GRAMS_PER_ML,
+  }
 }

@@ -1,51 +1,37 @@
 import { SegmentedControl } from '@/components/ui/segmented-control'
-import { Field, FieldDescription, FieldLabel, FieldTitle } from '@/components/ui/field'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { PriceCalculation, PriceCalculatorJob, PriceCalculatorSettings } from '../../../core/priceCalculator'
-import { PRINT_TYPES, type PrinterSummary } from '../../../core/types'
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import type { PriceCalculatorJob, PrintCost } from '../../../core/priceCalculator'
+import type { PrintType } from '../../../core/types'
 import { useI18n } from '../../i18n'
-import { SettingsSection } from '../settings/SettingsLayout'
+import { Docket } from '../settings/SettingsLayout'
 import { NumberInput } from './fields'
 import { formatNumber } from './format'
 
+/** The slicer's totals and the hands-on time: the amounts the quote multiplies its cost basis by. */
 export function JobSection({
-  settings,
+  printType,
   job,
   result,
-  printers,
-  printerId,
+  density,
   onJobChange,
-  onPrintTypeChange,
-  onPrinterChange,
 }: {
-  settings: PriceCalculatorSettings
+  printType: PrintType
   job: PriceCalculatorJob
-  result: PriceCalculation
-  printers: PrinterSummary[]
-  printerId?: string
+  result: PrintCost
+  /** The resin's density in g/mL, for converting between the slicer's millilitres and grams. */
+  density: number
   onJobChange: (job: PriceCalculatorJob) => void
-  onPrintTypeChange: (printType: PriceCalculatorSettings['printType']) => void
-  onPrinterChange: (printerId: string | undefined) => void
 }) {
   const { t, locale } = useI18n()
   const copy = t.calculator.job
   return (
-    <SettingsSection title={copy.title} className="lg:col-start-1 lg:row-start-1">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field className="sm:col-span-2">
-          <FieldTitle>{copy.printType}</FieldTitle>
-          <SegmentedControl
-            legend={copy.printType}
-            value={settings.printType}
-            options={PRINT_TYPES.map((value) => ({ value, label: copy[value], id: `calculator-print-type-${value}` }))}
-            onChange={onPrintTypeChange}
-          />
-        </Field>
-        {printers.length > 0 && <PrinterChoice printers={printers} printerId={printerId} onPrinterChange={onPrinterChange} />}
-        <Field className="sm:col-span-2">
-          <div className="flex items-center justify-between gap-3">
+    <Docket title={copy.title} className="lg:col-start-1 lg:row-start-2">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <Field className="col-span-2 sm:col-span-3">
+          {/* Fixed height so the resin unit toggle doesn't shift the form when the print type changes. */}
+          <div className="flex h-8 items-center justify-between gap-3">
             <FieldLabel htmlFor="calculator-material">{copy.expectedMaterial}</FieldLabel>
-            {settings.printType === 'resin' ? (
+            {printType === 'resin' ? (
               <SegmentedControl
                 legend={copy.materialUnit}
                 size="xs"
@@ -71,16 +57,17 @@ export function JobSection({
             onChange={(materialAmount) => onJobChange({ ...job, materialAmount })}
           />
           <FieldDescription>
-            {settings.printType === 'resin'
+            {printType === 'resin'
               ? copy.conversion(
                   formatNumber(job.materialUnit === 'ml' ? result.materialGrams : result.materialMl, locale),
                   job.materialUnit === 'ml' ? 'g' : 'mL',
-                  formatNumber(settings.resinDensityGramsPerMl, locale),
+                  formatNumber(density, locale),
                 )
               : copy.filamentHint}
           </FieldDescription>
         </Field>
-        <Field>
+        {/* Inputs side by side line up even when one label wraps at phone width. */}
+        <Field className="justify-end">
           <FieldLabel htmlFor="calculator-hours">{copy.printHours}</FieldLabel>
           <NumberInput
             id="calculator-hours"
@@ -90,7 +77,7 @@ export function JobSection({
             onChange={(printHours) => onJobChange({ ...job, printHours })}
           />
         </Field>
-        <Field>
+        <Field className="justify-end">
           <FieldLabel htmlFor="calculator-plates">{copy.plateRuns}</FieldLabel>
           <NumberInput
             id="calculator-plates"
@@ -100,7 +87,7 @@ export function JobSection({
             onChange={(plates) => onJobChange({ ...job, plates: Math.round(plates) })}
           />
         </Field>
-        <Field className="sm:col-span-2">
+        <Field className="col-span-2 sm:col-span-1">
           <FieldLabel htmlFor="calculator-labour">{copy.handsOnTime}</FieldLabel>
           <NumberInput
             id="calculator-labour"
@@ -112,47 +99,6 @@ export function JobSection({
           <FieldDescription>{copy.handsOnHint}</FieldDescription>
         </Field>
       </div>
-    </SettingsSection>
-  )
-}
-
-// Base UI reserves an empty value for no selection, so the workspace setup needs its own value.
-const WORKSPACE_SETUP = 'workspace'
-
-function PrinterChoice({
-  printers,
-  printerId,
-  onPrinterChange,
-}: {
-  printers: PrinterSummary[]
-  printerId?: string
-  onPrinterChange: (printerId: string | undefined) => void
-}) {
-  const copy = useI18n().t.calculator.job
-  const options = [
-    { value: WORKSPACE_SETUP, label: copy.workspaceSetup },
-    ...printers.map((printer) => ({ value: printer.id, label: printer.name })),
-  ]
-  return (
-    <Field className="sm:col-span-2">
-      <FieldLabel htmlFor="calculator-price-on">{copy.priceOn}</FieldLabel>
-      <Select
-        items={options}
-        value={printerId ?? WORKSPACE_SETUP}
-        onValueChange={(value) => onPrinterChange(value && value !== WORKSPACE_SETUP ? value : undefined)}
-      >
-        <SelectTrigger className="w-full" id="calculator-price-on">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <FieldDescription>{copy.printerHint}</FieldDescription>
-    </Field>
+    </Docket>
   )
 }

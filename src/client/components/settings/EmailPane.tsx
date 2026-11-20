@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,8 @@ import {
   MAX_EMAIL_TEMPLATE_SUBJECT_LENGTH,
   emailLogoDataUrl,
   emailTemplatePlaceholderCount,
+  plausibleReplyTo,
+  validSenderName,
   fromHeader,
   senderDisplayName,
   type EmailSender,
@@ -38,8 +40,8 @@ import { QueryState } from '../QueryState'
 import { SettingNotice, errorNotice } from '../SettingNotice'
 import { PageHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { SmtpDialog } from './SmtpIntegrationSettings'
-import { UnsavedChangesGuard } from './UnsavedChangesGuard'
 import { useI18n } from '../../i18n'
+import { useAutosave, useAutosavedDraft } from '../../useAutosave'
 
 const previewPrints = (sample: Messages['settings']['email']['sample']) => [
   { name: sample.firstPrint, count: 2 },
@@ -113,38 +115,44 @@ export function EmailPane({ workspaceName }: { workspaceName: string }) {
             if (file) void choose(file)
           }}
         />
-        <div className="flex flex-wrap items-center gap-3">
-          {logo && (
-            <img
-              src={emailLogoDataUrl(logo)}
-              alt={copy.logo.current}
-              className="h-12 max-w-60 rounded-sm border border-border/70 bg-white object-contain p-1"
-            />
-          )}
-          <Button type="button" variant="outline" disabled={mutation.isPending} onClick={() => input.current?.click()}>
-            {mutation.isPending && <Spinner />}
-            {logo ? copy.logo.replace : copy.logo.upload}
-          </Button>
-          {logo && (
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={mutation.isPending}
-              onClick={() => {
-                setTooLarge(false)
-                mutation.mutate({ data: { workspaceSlug, data: null } })
-              }}
-            >
-              {t.common.remove}
-            </Button>
-          )}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          {/* Email paper stays white in both themes, and without a logo the header shows the name as `brandHtml` sets it. */}
+          <div className="grid h-20 w-full max-w-72 place-items-center overflow-hidden rounded-sm border border-border/70 bg-white px-4">
+            {logoSrc ? (
+              <img src={logoSrc} alt={copy.logo.current} className="max-h-12 max-w-full object-contain" />
+            ) : (
+              <span className="ph-no-capture truncate font-sans text-xl font-semibold text-[#15171c]">{workspaceName}</span>
+            )}
+          </div>
+          <div className="flex min-w-0 flex-1 basis-56 flex-col gap-3">
+            <p className="text-sm text-muted-foreground">{logo ? copy.logo.shown : copy.logo.fallback}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="outline" disabled={mutation.isPending} onClick={() => input.current?.click()}>
+                {mutation.isPending && <Spinner />}
+                {logo ? copy.logo.replace : copy.logo.upload}
+              </Button>
+              {logo && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={mutation.isPending}
+                  onClick={() => {
+                    setTooLarge(false)
+                    mutation.mutate({ data: { workspaceSlug, data: null } })
+                  }}
+                >
+                  {t.common.remove}
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
         {tooLarge && <SettingNotice notice={errorNotice(copy.logo.tooLarge, copy.logo.tooLargeHint(MAX_EMAIL_LOGO_BYTES / 1024))} />}
         {mutation.error && <SettingNotice notice={errorNotice(copy.logo.notSaved, copy.logo.notSavedHint, mutation.error)} />}
       </SettingsSection>
       <SenderSection sender={sender} relayed={relayed} ownServer={smtp.configured} />
-      <MailServerSection smtp={smtp} hosted={hosted} />
-      <TemplatesSection templates={templates} ownServer={smtp.configured} workspaceName={workspaceName} logoSrc={logoSrc} />
+      <MailServerSection smtp={smtp} hosted={hosted} templatesSaved={Object.keys(templates).length > 0} />
+      {smtp.configured && <TemplatesSection templates={templates} workspaceName={workspaceName} logoSrc={logoSrc} />}
       <SettingsSection
         title={copy.preview.title}
         description={[
@@ -171,66 +179,51 @@ function SenderSection({ sender, relayed, ownServer }: { sender: EmailSender; re
   const workspaceSlug = useWorkspaceSlug()
   const callSave = useServerFn(saveEmailSender)
   const queryClient = useQueryClient()
-  const [name, setName] = useState(sender.name ?? '')
-  const [replyTo, setReplyTo] = useState(sender.replyTo ?? '')
   const { t } = useI18n()
   const copy = t.settings.email.sender
-  const mutation = useMutation({
-    mutationFn: callSave,
-    onSuccess: (saved) => {
-      setName(saved.sender.name ?? '')
-      setReplyTo(saved.sender.replyTo ?? '')
+  const stored = useMemo(() => ({ name: sender.name ?? '', replyTo: sender.replyTo ?? '' }), [sender.name, sender.replyTo])
+  const { draft, setDraft, bind } = useAutosavedDraft(stored, {
+    valid: (value) => validSenderName(value.name) && plausibleReplyTo(value.replyTo),
+    save: async (value) => {
+      const saved = await callSave({ data: { workspaceSlug, name: value.name.trim(), replyTo: value.replyTo.trim() } })
       queryClient.setQueryData(emailBrandingQuery(workspaceSlug).queryKey, (current) => current && { ...current, sender: saved.sender })
     },
   })
-  const dirty = name.trim() !== (sender.name ?? '') || replyTo.trim() !== (sender.replyTo ?? '')
+  // Checked once the field is left, so an address is not called invalid while it is still being typed.
+  const [leftReplyTo, setLeftReplyTo] = useState(false)
+  const replyToInvalid = leftReplyTo && !plausibleReplyTo(draft.replyTo)
   return (
-    <SettingsSection title={copy.title} description={copy.description}>
-      <UnsavedChangesGuard dirty={dirty} />
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={(event) => {
-          event.preventDefault()
-          if (dirty) mutation.mutate({ data: { workspaceSlug, name: name.trim(), replyTo: replyTo.trim() } })
-        }}
-      >
-        <Field>
-          <FieldLabel htmlFor="email-sender-name">{copy.nameLabel}</FieldLabel>
-          <Input
-            id="email-sender-name"
-            value={name}
-            maxLength={MAX_EMAIL_SENDER_NAME_LENGTH}
-            autoComplete="organization"
-            disabled={mutation.isPending}
-            onChange={(event) => setName(event.target.value)}
-          />
-          <FieldDescription>{relayed ? copy.nameRelayed : ownServer ? copy.nameOwnServer : copy.nameDefault}</FieldDescription>
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="email-reply-to">{copy.replyToLabel}</FieldLabel>
-          <Input
-            id="email-reply-to"
-            type="email"
-            value={replyTo}
-            autoComplete="email"
-            disabled={mutation.isPending}
-            onChange={(event) => setReplyTo(event.target.value)}
-          />
-          <FieldDescription>{copy.replyToHint}</FieldDescription>
-        </Field>
-        <div>
-          <Button type="submit" disabled={!dirty || mutation.isPending}>
-            {mutation.isPending && <Spinner />}
-            {t.common.save}
-          </Button>
-        </div>
-      </form>
-      {mutation.error && <SettingNotice notice={errorNotice(copy.notSaved, copy.notSavedHint, mutation.error)} />}
+    <SettingsSection {...bind} title={copy.title} description={copy.description}>
+      <Field>
+        <FieldLabel htmlFor="email-sender-name">{copy.nameLabel}</FieldLabel>
+        <Input
+          id="email-sender-name"
+          value={draft.name}
+          maxLength={MAX_EMAIL_SENDER_NAME_LENGTH}
+          autoComplete="organization"
+          onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+        />
+        <FieldDescription>{relayed ? copy.nameRelayed : ownServer ? copy.nameOwnServer : copy.nameDefault}</FieldDescription>
+      </Field>
+      <Field data-invalid={replyToInvalid || undefined}>
+        <FieldLabel htmlFor="email-reply-to">{copy.replyToLabel}</FieldLabel>
+        <Input
+          id="email-reply-to"
+          type="email"
+          value={draft.replyTo}
+          autoComplete="email"
+          aria-invalid={replyToInvalid || undefined}
+          onFocus={() => setLeftReplyTo(false)}
+          onBlur={() => setLeftReplyTo(true)}
+          onChange={(event) => setDraft((current) => ({ ...current, replyTo: event.target.value }))}
+        />
+        {replyToInvalid ? <FieldError>{copy.replyToInvalid}</FieldError> : <FieldDescription>{copy.replyToHint}</FieldDescription>}
+      </Field>
     </SettingsSection>
   )
 }
 
-function MailServerSection({ smtp, hosted }: { smtp: PublicSmtpConfig; hosted: boolean }) {
+function MailServerSection({ smtp, hosted, templatesSaved }: { smtp: PublicSmtpConfig; hosted: boolean; templatesSaved: boolean }) {
   const workspaceSlug = useWorkspaceSlug()
   const queryClient = useQueryClient()
   const callSave = useServerFn(saveWorkspaceSmtp)
@@ -255,6 +248,11 @@ function MailServerSection({ smtp, hosted }: { smtp: PublicSmtpConfig; hosted: b
           </Button>
         }
       />
+      {!smtp.configured && (
+        <p className="border-t border-border pt-3 text-sm text-muted-foreground">
+          {templatesSaved ? t.settings.email.templates.descriptionSaved : t.settings.email.templates.descriptionNone}
+        </p>
+      )}
       {open && (
         <SmtpDialog
           smtp={smtp}
@@ -268,88 +266,48 @@ function MailServerSection({ smtp, hosted }: { smtp: PublicSmtpConfig; hosted: b
   )
 }
 
-function TemplatesSection({
-  templates,
-  ownServer,
-  workspaceName,
-  logoSrc,
-}: {
-  templates: EmailTemplates
-  ownServer: boolean
-  workspaceName: string
-  logoSrc?: string
-}) {
+function TemplatesSection({ templates, workspaceName, logoSrc }: { templates: EmailTemplates; workspaceName: string; logoSrc?: string }) {
   const [kind, setKind] = useState<EmailTemplateKind>('print-ready')
-  // Drafts outlive switching between emails, so comparing two templates never discards an edit.
-  const [drafts, setDrafts] = useState<EmailTemplates>({})
   const { t } = useI18n()
   const copy = t.settings.email.templates
-  const startingPoint = (option: EmailTemplateKind) => templates[option] ?? defaultEmailTemplate(option, t.email)
-  const changed = (option: EmailTemplateKind) => {
-    const draft = drafts[option]
-    const start = startingPoint(option)
-    return draft !== undefined && (draft.subject.trim() !== start.subject || draft.html.trim() !== start.html)
-  }
   return (
-    <SettingsSection
-      title={copy.title}
-      description={ownServer ? copy.descriptionOwnServer : Object.keys(templates).length ? copy.descriptionSaved : copy.descriptionNone}
-    >
-      {ownServer && (
-        <>
-          <Field>
-            <FieldLabel htmlFor="email-template-kind">{copy.kindLabel}</FieldLabel>
-            <Select
-              items={emailTemplateKinds.map((option) => ({ value: option.id, label: copy.kinds[option.id] }))}
-              value={kind}
-              onValueChange={(value) => setKind(value as EmailTemplateKind)}
-            >
-              <SelectTrigger id="email-template-kind" className="w-full sm:w-64">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {emailTemplateKinds.map((option) => (
-                  <SelectItem key={option.id} value={option.id}>
-                    {copy.kinds[option.id]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <UnsavedChangesGuard dirty={emailTemplateKinds.some((option) => changed(option.id))} />
-          <TemplateEditor
-            key={kind}
-            kind={kind}
-            saved={templates[kind]}
-            draft={drafts[kind] ?? startingPoint(kind)}
-            changed={changed(kind)}
-            onChange={(draft) => setDrafts((current) => ({ ...current, [kind]: draft }))}
-            onSaved={(saved, template) => setDrafts((current) => ({ ...current, [saved]: template }))}
-            workspaceName={workspaceName}
-            logoSrc={logoSrc}
-          />
-        </>
-      )}
+    <SettingsSection title={copy.title} description={copy.descriptionOwnServer}>
+      <Field>
+        <FieldLabel htmlFor="email-template-kind">{copy.kindLabel}</FieldLabel>
+        <Select
+          items={emailTemplateKinds.map((option) => ({ value: option.id, label: copy.kinds[option.id] }))}
+          value={kind}
+          onValueChange={(value) => setKind(value as EmailTemplateKind)}
+        >
+          <SelectTrigger id="email-template-kind" className="w-full sm:w-64">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {emailTemplateKinds.map((option) => (
+              <SelectItem key={option.id} value={option.id}>
+                {copy.kinds[option.id]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      <TemplateEditor key={kind} kind={kind} saved={templates[kind]} workspaceName={workspaceName} logoSrc={logoSrc} />
     </SettingsSection>
   )
 }
 
+/**
+ * One email's subject and HTML, saved as they are edited; the standard email is stored as no template, so going back to
+ * it and editing it back to the standard text are the same.
+ */
 function TemplateEditor({
   kind,
   saved,
-  draft,
-  changed,
-  onChange,
-  onSaved,
   workspaceName,
   logoSrc,
 }: {
   kind: EmailTemplateKind
   saved?: EmailTemplate
-  draft: EmailTemplate
-  changed: boolean
-  onChange: (draft: EmailTemplate) => void
-  onSaved: (kind: EmailTemplateKind, template?: EmailTemplate) => void
   workspaceName: string
   logoSrc?: string
 }) {
@@ -359,15 +317,23 @@ function TemplateEditor({
   const { t } = useI18n()
   const copy = t.settings.email.templates
   const sample = t.settings.email.sample
-  const mutation = useMutation({
-    mutationFn: callSave,
-    onSuccess: ({ templates }, { data }) => {
-      onSaved(data.kind, templates[data.kind])
+  const standard = defaultEmailTemplate(kind, t.email)
+  const [draft, setDraft] = useState(saved ?? standard)
+  const { subject, html } = draft
+  const placeholderCount = emailTemplatePlaceholderCount(draft)
+  const tooManyPlaceholders = placeholderCount > MAX_EMAIL_TEMPLATE_PLACEHOLDERS
+  const trimmed = { subject: subject.trim(), html: html.trim() }
+  const isStandard = trimmed.subject === standard.subject && trimmed.html === standard.html
+  const autosave = useAutosave({
+    value: trimmed,
+    initial: saved ?? standard,
+    valid: Boolean(trimmed.subject && trimmed.html) && !tooManyPlaceholders,
+    save: async (template) => {
+      const standardText = template.subject === standard.subject && template.html === standard.html
+      const { templates } = await callSave({ data: { workspaceSlug, kind, template: standardText ? null : template } })
       queryClient.setQueryData(emailBrandingQuery(workspaceSlug).queryKey, (current) => current && { ...current, templates })
     },
   })
-  const { subject, html } = draft
-  const dirty = changed || !saved
   const template = draft
   const preview =
     kind === 'invite'
@@ -382,25 +348,18 @@ function TemplateEditor({
           template,
         })
   const placeholders = emailTemplateKinds.find((option) => option.id === kind)!.placeholders
-  const placeholderCount = emailTemplatePlaceholderCount(draft)
-  const tooManyPlaceholders = placeholderCount > MAX_EMAIL_TEMPLATE_PLACEHOLDERS
   return (
-    <form
-      className="flex flex-col gap-4"
-      onSubmit={(event) => {
-        event.preventDefault()
-        if (dirty) mutation.mutate({ data: { workspaceSlug, kind, template: { subject: subject.trim(), html: html.trim() } } })
-      }}
-    >
+    <div className="flex flex-col gap-4" onBlur={() => void autosave.flush()}>
       <Field>
         <FieldLabel htmlFor="email-template-subject">{copy.subjectLabel}</FieldLabel>
         <Input
           id="email-template-subject"
           value={subject}
           maxLength={MAX_EMAIL_TEMPLATE_SUBJECT_LENGTH}
-          disabled={mutation.isPending}
-          onChange={(event) => onChange({ ...draft, subject: event.target.value })}
+          aria-invalid={!trimmed.subject || undefined}
+          onChange={(event) => setDraft({ ...draft, subject: event.target.value })}
         />
+        {!trimmed.subject && <FieldError>{copy.subjectRequired}</FieldError>}
       </Field>
       <Field>
         <FieldLabel htmlFor="email-template-html">{copy.htmlLabel}</FieldLabel>
@@ -409,10 +368,9 @@ function TemplateEditor({
           value={html}
           maxLength={MAX_EMAIL_TEMPLATE_HTML_LENGTH}
           spellCheck={false}
-          disabled={mutation.isPending}
-          aria-invalid={tooManyPlaceholders || undefined}
+          aria-invalid={tooManyPlaceholders || !trimmed.html || undefined}
           className="max-h-96 font-mono text-xs [field-sizing:fixed] h-64"
-          onChange={(event) => onChange({ ...draft, html: event.target.value })}
+          onChange={(event) => setDraft({ ...draft, html: event.target.value })}
         />
         <FieldDescription>
           {copy.placeholders}
@@ -425,6 +383,7 @@ function TemplateEditor({
           .
         </FieldDescription>
         {tooManyPlaceholders && <FieldError>{copy.tooManyPlaceholders(MAX_EMAIL_TEMPLATE_PLACEHOLDERS, placeholderCount)}</FieldError>}
+        {!trimmed.html && <FieldError>{copy.htmlRequired}</FieldError>}
       </Field>
       <Field>
         <iframe
@@ -435,24 +394,14 @@ function TemplateEditor({
         />
         <FieldDescription>{copy.previewHint}</FieldDescription>
       </Field>
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={!dirty || !subject.trim() || !html.trim() || tooManyPlaceholders || mutation.isPending}>
-          {mutation.isPending && <Spinner />}
-          {copy.save}
-        </Button>
-        {saved && (
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={mutation.isPending}
-            onClick={() => mutation.mutate({ data: { workspaceSlug, kind, template: null } })}
-          >
+      {!isStandard && (
+        <div>
+          <Button type="button" variant="ghost" onClick={() => setDraft(standard)}>
             {copy.useStandard}
           </Button>
-        )}
-      </div>
-      {mutation.error && <SettingNotice notice={errorNotice(copy.notSaved, copy.notSavedHint, mutation.error)} />}
-    </form>
+        </div>
+      )}
+    </div>
   )
 }
 

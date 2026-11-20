@@ -1,20 +1,32 @@
 import { describe, expect, it } from 'vitest'
+import catalog from '../../catalogs/printers/catalog.generated.json'
 import { CLOSEST_PRINTER_PRESET_LIMIT, filterPrinterPresets, PRINTER_PRESETS } from './printerPresets'
+
+const CATALOGUE: {
+  id: string
+  brand: string
+  printType: string
+  source: { url: string }
+  image?: { src: string; sourceId: string; sourceUrl: string }
+}[] = catalog.presets
 
 describe('printer presets', () => {
   it('keeps stable unique IDs', () => {
     expect(new Set(PRINTER_PRESETS.map((preset) => preset.id)).size).toBe(PRINTER_PRESETS.length)
   })
 
-  it('provides positive build volumes and provenance', () => {
+  it('provides positive build volumes', () => {
+    expect(PRINTER_PRESETS.every((preset) => preset.widthMm > 0 && preset.depthMm > 0 && preset.heightMm > 0)).toBe(true)
+  })
+
+  it('shows local pictures', () => {
+    expect(PRINTER_PRESETS.every((preset) => !preset.image || preset.image.startsWith('/printer-presets/'))).toBe(true)
+  })
+
+  it('records the provenance of every printer and picture in the full catalogue', () => {
     expect(
-      PRINTER_PRESETS.every(
-        (preset) =>
-          preset.widthMm > 0 &&
-          preset.depthMm > 0 &&
-          preset.heightMm > 0 &&
-          preset.source.url.startsWith('https://') &&
-          (!preset.image || (preset.image.src.startsWith('/printer-presets/') && preset.image.sourceUrl.startsWith('https://'))),
+      CATALOGUE.every(
+        (preset) => preset.source.url.startsWith('https://') && (!preset.image || preset.image.sourceUrl.startsWith('https://')),
       ),
     ).toBe(true)
   })
@@ -90,7 +102,7 @@ describe('printer presets', () => {
 
   it('includes PrusaSlicer thumbnails for Prusa resin printers', () => {
     expect(
-      PRINTER_PRESETS.filter((preset) => preset.brand === 'Prusa' && preset.printType === 'resin').map((preset) => preset.image?.sourceId),
+      CATALOGUE.filter((preset) => preset.brand === 'Prusa' && preset.printType === 'resin').map((preset) => preset.image?.sourceId),
     ).toEqual(['prusaslicer', 'prusaslicer'])
   })
 
@@ -100,7 +112,7 @@ describe('printer presets', () => {
   })
 
   it('includes official product images for current Phrozen printers', () => {
-    expect(PRINTER_PRESETS.filter((preset) => preset.image?.sourceId === 'phrozen-product-pages').map((preset) => preset.id)).toEqual([
+    expect(CATALOGUE.filter((preset) => preset.image?.sourceId === 'phrozen-product-pages').map((preset) => preset.id)).toEqual([
       'resin-phrozen-sonic-mega-8k-s',
       'resin-phrozen-sonic-mega-8k-v2',
       'resin-phrozen-sonic-mighty-8k',

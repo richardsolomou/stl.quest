@@ -17,8 +17,8 @@ import { FilterCombobox } from './FilterCombobox'
 import { TagTreeRow } from './TagBadge'
 import type { BoardSearch } from '../boardSearch'
 import { activeBoardFilters, BOARD_METADATA_FILTERS } from '../boardFilterState'
-import { availablePrintTypes, printTypeLabel } from '../fleet'
-import { signalProductTourProgress } from '../productTour'
+import { printTypeLabel } from '../fleet'
+import { useWorkspacePrintTypes } from '../workspace'
 import { printGroupRows } from '../../core/printGroups'
 import type { Messages } from '../../core/i18n'
 import { useI18n } from '../i18n'
@@ -83,8 +83,9 @@ export function BoardFilters({
   const hydrated = useHydrated()
   const [expanded, setExpanded] = useState(false)
   const [query, setQuery] = useState(search.q ?? '')
-  const printTypes = availablePrintTypes()
-  const showPrintType = true
+  const printTypes = useWorkspacePrintTypes()
+  // A workspace that prints one type has nothing to narrow by.
+  const showPrintType = printTypes.length > 1
   const sortGroups = sortGroupsProp.map((group) => ({
     id: group.id,
     label: t.board.sort.groups[group.id],
@@ -115,7 +116,6 @@ export function BoardFilters({
   )
   const active = activeBoardFilters(t, search, facets, tagOptions.find((option) => option.value === search.tag)?.label)
   const advanced = active.length
-  const previousAdvanced = useRef(advanced)
 
   const updateQuery = useCallback(
     (value: string) => {
@@ -155,10 +155,19 @@ export function BoardFilters({
     })
   }
 
+  // "/" jumps to search from anywhere on the page, as on most boards and lists, unless the user is already typing.
+  const searchRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
-    if (previousAdvanced.current === 0 && advanced > 0) signalProductTourProgress('filter')
-    previousAdvanced.current = advanced
-  }, [advanced])
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return
+      const target = event.target as HTMLElement | null
+      if (target?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return
+      event.preventDefault()
+      searchRef.current?.focus()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   return (
     <section
@@ -166,13 +175,15 @@ export function BoardFilters({
       aria-label={ariaLabel ?? f.ariaLabel}
       data-hydrated={hydrated}
     >
-      <div className="flex min-h-9.5 items-center gap-2 max-[900px]:flex-wrap">
-        <InputGroup className="w-[clamp(190px,24vw,340px)] bg-card max-[900px]:w-full">
+      <div className="flex min-h-9.5 items-center gap-2 max-sm:gap-1.5">
+        <InputGroup className="w-[clamp(190px,24vw,340px)] bg-card max-sm:w-auto max-sm:min-w-0 max-sm:flex-1">
           <InputGroupAddon>
             <Search aria-hidden="true" />
           </InputGroupAddon>
           <InputGroupInput
+            ref={searchRef}
             aria-label={f.searchAria}
+            aria-keyshortcuts="/"
             value={query}
             onChange={(event) => updateQuery(event.target.value)}
             placeholder={f.searchPlaceholder}
@@ -191,9 +202,7 @@ export function BoardFilters({
 
         {showSort && (
           <Menu>
-            <MenuTrigger
-              render={<Button type="button" variant="outline" aria-label={f.sortAria(activeSort.label)} data-onboarding="sort" />}
-            >
+            <MenuTrigger render={<Button type="button" variant="outline" aria-label={f.sortAria(activeSort.label)} />}>
               <ArrowUpDown />
               <span className="max-sm:sr-only">{f.sort}</span>
             </MenuTrigger>
@@ -205,10 +214,7 @@ export function BoardFilters({
             >
               <MenuRadioGroup
                 value={activeSort.value}
-                onValueChange={(value: BoardSort) => {
-                  signalProductTourProgress('sort')
-                  onChange({ sort: value === defaultSort ? undefined : value })
-                }}
+                onValueChange={(value: BoardSort) => onChange({ sort: value === defaultSort ? undefined : value })}
               >
                 {sortGroups.map((group) => (
                   <MenuGroup key={group.id} className="p-0.5">
@@ -230,19 +236,17 @@ export function BoardFilters({
         )}
 
         <Popover open={expanded} onOpenChange={setExpanded}>
-          <PopoverTrigger render={<Button type="button" variant="outline" data-onboarding="filters" />}>
+          <PopoverTrigger render={<Button type="button" variant="outline" />}>
             <SlidersHorizontal />
             <span className="max-sm:sr-only">{f.filters}</span>
-            {advanced > 0 && (
-              <span className="rounded-full bg-primary px-1.5 font-mono text-[10px] text-primary-foreground">{advanced}</span>
-            )}
+            {advanced > 0 && <span className="rounded-full bg-foreground px-1.5 font-mono text-[10px] text-background">{advanced}</span>}
           </PopoverTrigger>
           <PopoverContent
             align="start"
             sideOffset={8}
             className="max-h-[var(--available-height)] w-[min(680px,calc(100vw-24px))] gap-0 overflow-hidden p-0"
           >
-            <header className="flex shrink-0 items-start justify-between border-b-2 border-dashed border-blueprint/25 p-3">
+            <header className="flex shrink-0 items-start justify-between border-b border-border p-3">
               <PopoverHeader>
                 <PopoverTitle>{f.moreFilters}</PopoverTitle>
                 <PopoverDescription>{description ?? f.description}</PopoverDescription>
@@ -416,7 +420,7 @@ export function BoardFilters({
           </Button>
         )}
 
-        <div className="flex-1" />
+        <div className="flex-1 max-sm:hidden" />
         {presence}
         {action}
       </div>

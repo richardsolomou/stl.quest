@@ -6,6 +6,7 @@ import {
   fillEmailTemplate,
   hostedSmtpPortAllowed,
   MAX_EMAIL_TEMPLATE_PLACEHOLDERS,
+  plausibleReplyTo,
   plainPlaceholder,
   renderEmail,
   senderDisplayName,
@@ -134,5 +135,19 @@ describe('email templates', () => {
 
   it('counts placeholders in the subject and body', () => {
     expect(emailTemplatePlaceholderCount({ subject: '{{workspace}}', html: '<p>{{ name }} {{link}} {{unknown}}</p>' })).toBe(4)
+  })
+})
+
+describe('reply-to address', () => {
+  it('accepts an empty address', () => {
+    expect(plausibleReplyTo('')).toBe(true)
+  })
+
+  it('accepts an address', () => {
+    expect(plausibleReplyTo(' prints@example.com ')).toBe(true)
+  })
+
+  it('rejects an address without a domain', () => {
+    expect(plausibleReplyTo('prints@')).toBe(false)
   })
 })

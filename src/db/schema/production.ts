@@ -209,3 +209,45 @@ export const managedStorageEntitlements = sqliteTable(
   },
   (table) => [index('managed_storage_entitlements_owner').on(table.ownerId)],
 )
+
+/**
+ * The append-only usage log (see core/usage). Request, printer, equipment, consumable, and user IDs are plain text:
+ * printers, equipment, and consumables live in settings JSON, and deleting a print or an account must not erase the
+ * stock and spend it recorded.
+ */
+export const usageEvents = sqliteTable(
+  'usage_events',
+  {
+    id: text().primaryKey(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    transactionId: text('transaction_id').notNull(),
+    stage: text({ enum: ['printing', 'finishing', 'stock'] }).notNull(),
+    kind: text({ enum: ['use', 'restock', 'correction', 'waste', 'replace'] }).notNull(),
+    requestId: text('request_id'),
+    printerId: text('printer_id'),
+    equipmentId: text('equipment_id'),
+    consumableId: text('consumable_id'),
+    amount: real().notNull(),
+    unit: text({ enum: ['ml', 'g', 'item', 'minute', 'plate'] }).notNull(),
+    copies: integer(),
+    outcome: text({ enum: ['completed', 'failed'] }),
+    unitPrice: real('unit_price'),
+    currency: text(),
+    userId: text('user_id'),
+    createdAt: integer('created_at').notNull(),
+    undoneAt: integer('undone_at'),
+  },
+  (table) => [
+    check('usage_events_stage_check', sql`${table.stage} IN ('printing', 'finishing', 'stock')`),
+    check('usage_events_kind_check', sql`${table.kind} IN ('use', 'restock', 'correction', 'waste', 'replace')`),
+    check('usage_events_unit_check', sql`${table.unit} IN ('ml', 'g', 'item', 'minute', 'plate')`),
+    check('usage_events_outcome_check', sql`${table.outcome} IN ('completed', 'failed') OR ${table.outcome} IS NULL`),
+    check('usage_events_copies_check', sql`${table.copies} > 0 OR ${table.copies} IS NULL`),
+    index('usage_events_request').on(table.workspaceId, table.requestId),
+    index('usage_events_consumable').on(table.workspaceId, table.consumableId),
+    index('usage_events_transaction').on(table.workspaceId, table.transactionId),
+    index('usage_events_created').on(table.workspaceId, table.createdAt),
+  ],
+)

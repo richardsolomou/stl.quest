@@ -1,14 +1,13 @@
-# Capturing product tour media
+# Capturing the product tour GIF
 
-`scripts/productTour/capture/` holds the reproducible capture code for the landing-page product tour and the animated README preview. Recordings land in the ignored `.capture/`; the published copies live in `public/`.
+`scripts/productTour/capture/` holds the reproducible capture code for the animated README preview. Recordings land in the ignored `.capture/`; the published copy lives in `public/`.
 
 ## Outputs
 
-| Command            | Output                                  | Destination                                                                       |
-| ------------------ | --------------------------------------- | --------------------------------------------------------------------------------- |
-| `pnpm tour:video`  | `.capture/product-tour.{mp4,webm,webp}` | Copy to `public/`.                                                                |
-| `pnpm tour:gif`    | `.capture/product-tour.gif`             | Copy to `public/`; the README loads it from `https://stl.quest/product-tour.gif`. |
-| `pnpm tour:verify` | `.capture/verify/*.png`                 | Inspect locally before recording; do not commit these screenshots.                |
+| Command            | Output                      | Destination                                                                       |
+| ------------------ | --------------------------- | --------------------------------------------------------------------------------- |
+| `pnpm tour:gif`    | `.capture/product-tour.gif` | Copy to `public/`; the README loads it from `https://stl.quest/product-tour.gif`. |
+| `pnpm tour:verify` | `.capture/verify/*.png`     | Inspect locally before recording; do not commit these screenshots.                |
 
 The scripts target `http://localhost:3001` by default. Override that with `BASE`. Demo credentials default to `richard@stl.quest` and `demo-demo-demo`; `DEMO_EMAIL` and `DEMO_PASSWORD` override them.
 
@@ -16,23 +15,21 @@ The scripts target `http://localhost:3001` by default. Override that with `BASE`
 
 - Node 24 and this repository installed with `pnpm install`.
 - The capture browser, installed once with `pnpm exec playwright install chromium`.
-- `ffmpeg` with H.264, WebM, PNG, and GIF palette support, plus `cwebp` for the poster image.
-- A running STL Quest instance seeded with the demo workspace. The demo dataset is built from sanitized production data by a private tool outside this repository, which seeds a local instance, starts it, and runs these capture commands one scene at a time. Without it, point `BASE` at any instance whose data you are willing to publish.
+- `ffmpeg` with PNG and GIF palette support.
+- A running STL Quest instance seeded with a demo workspace. The curated demo dataset is built from sanitized production data by a private tool outside this repository, which seeds a local instance, starts it, and runs these capture commands. `scripts/seedPowerUser.ts` seeds fictional data that also works; it turns usage tracking on, so turn off **Track usage and stock** in General settings before recording. Otherwise point `BASE` at any instance whose data you are willing to publish.
 
-Recording changes the board. Reseed and restart the instance between the two capture commands rather than running them against the same seed.
+Usage tracking must stay off, as it is by default, or step sheets interrupt the loop. Recording changes the board, so reseed and restart the instance before each take, and let it finish generating model thumbnails first. `pnpm tour:verify` leaves the board unchanged.
 
 ## Publishing
 
-Copy `.capture/product-tour.mp4`, `.webm`, and `.webp` into `public/`, then run `pnpm build` and inspect the rendered page at desktop and mobile widths through a complete playback cycle.
-
 Copy `.capture/product-tour.gif` to `public/product-tour.gif`. Deploying the hosted service updates the animation shown in the README.
 
-Before publishing either asset, verify that no real names, email addresses, profile images, URLs, filenames, secrets, or other identifiers are visible.
+Before publishing, verify that no real names, email addresses, profile images, URLs, filenames, secrets, or other identifiers are visible.
 
 ## Editing the shot
 
-`scripts/productTour/capture/record.ts` contains two scenes: `landing` is the full landing-page tour and `gif` is the short README loop. Their dimensions and pacing live in `scripts/productTour/capture/config.ts`; prefer adjusting `speed`, `trim`, and, for the video, `orbitSpeed` before changing individual pauses.
+`scripts/productTour/capture/record.ts` holds the scene: a queued print moves up next, then the print that fires next is started on an idle printer from its Start printing menu, taken off the printer, and marked ready. Its dimensions and pacing live in `scripts/productTour/capture/config.ts`; prefer adjusting `speed` before changing individual pauses.
 
-The capture deliberately signs in before recording, injects a visible cursor, uses stepped mouse movement for readable actions, and dispatches the 3D orbit inside the page for smooth animation. Playwright does not record its native drag ghost. Preserve these mechanics unless the replacement is validated in the rendered output.
+The capture deliberately signs in before recording, injects a visible cursor, and uses stepped mouse movement and wheel scrolling for readable actions. Preserve these mechanics unless the replacement is validated in the rendered output.
 
-Selectors describe the curated demo data and are intentionally strict. A missing card, menu, or dialog should fail the take rather than silently record dead air. If a selector breaks after an application change, inspect the live demo, update only the affected action, and record the full scene again.
+The scene picks cards and printers by position, through the shared selectors in `config.ts`, so it runs on any demo data with a full queue and at least one idle printer for the next print. A missing card, menu, or button should fail the take rather than silently record dead air. If a selector breaks after an application change, inspect the live demo with `pnpm tour:verify`, update only the affected action, and record the full scene again.

@@ -41,7 +41,8 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it defines the layout (`src/core`
 - When adding a new provider, request field, settings workflow, or account action, search the existing registries, domain policies, form models, query utilities, and adapter bases first. Extend the established source of truth instead of adding another conditional or literal.
 - Refactors are incremental: keep behavior unchanged, add focused regression coverage at the extracted boundary, and visually inspect affected rendered states. Avoid repo-wide cleanup batches that mix unrelated behavior changes.
 - Inspect open searchable pickers with long labels at desktop and narrow widths.
-- Disable save actions when state matches storage; avoid redundant saved labels.
+- Settings forms autosave through `useAutosave`/`useAutosavedDraft` (`src/client/useAutosave.tsx`), which report to the page header status; keep an explicit Save only for the confirmation exceptions in DESIGN.md (Autosave), and disable it when state matches storage.
+- Put a list page's primary add action in the page header and a long section's named add in its heading, never only at the bottom of a list (DESIGN.md, Settings Spec Sheet).
 
 ## Co-change patterns
 

@@ -25,10 +25,10 @@ export function RequestModelField({
     <SourcePreviewImage
       key={request.id}
       request={request}
-      className="mb-3 h-40 w-full rounded-lg border border-ticket-foreground/15 bg-background object-contain [background-image:var(--grid)] sm:h-48"
+      className="mb-3 h-40 w-full rounded-lg border border-ticket-foreground/15 bg-thumb object-contain sm:h-48"
       fallback={
-        <div className="mb-3 grid h-40 place-items-center rounded-lg border-2 border-dashed border-primary/25 bg-primary/5">
-          <Link2 className="size-10 text-primary" />
+        <div className="mb-3 grid h-40 place-items-center rounded-lg border-2 border-dashed border-foreground/20 bg-thumb">
+          <Link2 className="size-10 text-muted-foreground" />
         </div>
       }
     />
@@ -52,7 +52,7 @@ export function RequestModelField({
       {attachment.state === 'empty' ? (
         <button
           type="button"
-          className="grid h-40 w-full place-items-center gap-1 rounded-lg border-2 border-dashed border-primary/40 bg-primary/5 text-sm text-primary hover:bg-primary/10 sm:h-48"
+          className="grid h-40 w-full place-items-center gap-1 rounded-lg border-2 border-dashed border-foreground/25 bg-thumb text-sm font-semibold text-foreground transition-colors hover:border-primary sm:h-48"
           onClick={() => input.current?.click()}
         >
           <Upload className="size-8" />

@@ -4,10 +4,11 @@ import { useAuthAction } from '../client/useAuthAction'
 import { CircleAlert } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { CardContent } from '@/components/ui/card'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
+import { AuthTicket } from '../client/components/AuthTicket'
 import { AuthBrand } from '../client/components/Brand'
 import { authClient } from '../client/authClient'
 import { useI18n } from '../client/i18n'
@@ -31,14 +32,10 @@ function ResetPasswordPage() {
   const error = tokenError ? copy.linkInvalid : action.error
 
   return (
-    <main className="grid min-h-dvh place-items-center p-6 [background-image:var(--grid)] [background-size:24px_24px]">
+    <main className="grid min-h-dvh place-items-center p-6">
       <div className="flex w-full max-w-[440px] flex-col gap-8">
         <AuthBrand />
-        <Card>
-          <CardHeader>
-            <CardTitle>{copy.title}</CardTitle>
-            <CardDescription>{copy.description}</CardDescription>
-          </CardHeader>
+        <AuthTicket title={copy.title} description={copy.description}>
           <CardContent>
             <form
               className="flex flex-col gap-4"
@@ -77,7 +74,7 @@ function ResetPasswordPage() {
               </Button>
             </form>
           </CardContent>
-        </Card>
+        </AuthTicket>
       </div>
     </main>
   )

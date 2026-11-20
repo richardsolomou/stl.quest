@@ -25,7 +25,7 @@ import { RequestDetails } from './RequestDetails'
 import { RequestDownloadButton } from './RequestDownloadButton'
 import { MoveDialog } from './MoveDialog'
 import { AddOptionalFieldButton, RemovableField } from './OptionalFieldControls'
-import { availablePrintTypes, printTypeLabel } from '../fleet'
+import { printTypeLabel, requestPrintTypeChoices } from '../fleet'
 import { errorMessage, isReportableMutationError } from '../../core/error'
 import { removeRequestFromQueries, restoreRequestQueries } from '../queries'
 import {
@@ -35,7 +35,7 @@ import {
   requestUpdateData,
   type RequestEditorValues,
 } from '../requestEditor'
-import { useWorkspaceSlug } from '../workspace'
+import { useWorkspacePrintTypes, useWorkspaceSlug } from '../workspace'
 import { useModelAttachment } from '../modelAttachment'
 import { workflow } from '../../core/workflow'
 import { estimatePending, formatEstimateMaterial, formatEstimateTime } from '../../core/printEstimates'
@@ -92,9 +92,9 @@ export function RequestModal({
   const [sourceOpen, setSourceOpen] = useState(Boolean(request.sourceUrl))
   const [error, setError] = useState('')
   const [saveFailure, setSaveFailure] = useState('')
-  const [confirmation, setConfirmation] = useState<'discard' | 'delete' | null>(null)
+  const [confirmation, setConfirmation] = useState<'discard' | 'cancel' | 'delete' | null>(null)
   const [moveOpen, setMoveOpen] = useState(false)
-  const printTypes = availablePrintTypes()
+  const printTypes = requestPrintTypeChoices(useWorkspacePrintTypes(), request.printType)
   const selectedPrinter =
     request.printer?.id === values.printerId ? request.printer : printers.find((printer) => printer.id === values.printerId)
   const automaticEstimate = {
@@ -145,6 +145,18 @@ export function RequestModal({
   const requestClose = () => {
     if (dirty) setConfirmation('discard')
     else onClose()
+  }
+  // Cancel leaves edit mode for the print as it was, rather than closing the dialog.
+  const stopEditing = () => {
+    setValues(requestEditorValues(request))
+    attachment.reset()
+    setError('')
+    setSaveFailure('')
+    setEditing(false)
+  }
+  const requestCancel = () => {
+    if (dirty) setConfirmation('cancel')
+    else stopEditing()
   }
 
   // Fields go first: an upload that fails afterwards leaves the dialog open on a saved print with the
@@ -211,6 +223,9 @@ export function RequestModal({
         </Button>
       )}
       {moveAction}
+      <Button type="button" variant="outline" onClick={requestCancel} disabled={busy}>
+        {t.common.cancel}
+      </Button>
       <Button type="submit" form={editFormId} disabled={busy}>
         {busy && <Spinner />}
         {attachment.uploading
@@ -233,7 +248,7 @@ export function RequestModal({
         preventClose={busy}
         footer={editing ? editActions : viewActions}
       >
-        <div className="md:sticky md:top-0 md:self-start md:[&_.viewer]:mb-0">
+        <div className="max-md:[&_.viewer]:aspect-video md:sticky md:top-0 md:self-start md:[&_.viewer]:mb-0">
           <RequestModelField request={request} editing={editing && canAttach} attachment={attachment} />
         </div>
 
@@ -265,27 +280,29 @@ export function RequestModal({
               </Field>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 [&>[data-slot=field]]:min-w-0">
-              <Field>
-                <FieldLabel htmlFor="request-print-type">{t.requests.fields.printType}</FieldLabel>
-                <Select
-                  items={printTypes.map((value) => ({ value, label: printTypeLabel(t, value) }))}
-                  value={values.printType}
-                  onValueChange={(value) => {
-                    patchValues({ printType: value ?? '', printerId: '' })
-                  }}
-                >
-                  <SelectTrigger id="request-print-type" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {printTypes.map((value) => (
-                      <SelectItem key={value} value={value}>
-                        {printTypeLabel(t, value)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
+              {printTypes.length > 1 && (
+                <Field>
+                  <FieldLabel htmlFor="request-print-type">{t.requests.fields.printType}</FieldLabel>
+                  <Select
+                    items={printTypes.map((value) => ({ value, label: printTypeLabel(t, value) }))}
+                    value={values.printType}
+                    onValueChange={(value) => {
+                      patchValues({ printType: value ?? '', printerId: '' })
+                    }}
+                  >
+                    <SelectTrigger id="request-print-type" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {printTypes.map((value) => (
+                        <SelectItem key={value} value={value}>
+                          {printTypeLabel(t, value)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              )}
               {isAdmin && (
                 <Field>
                   <FieldLabel htmlFor="request-printer">{t.requests.fields.printer}</FieldLabel>
@@ -443,7 +460,13 @@ export function RequestModal({
         destructive
         pending={deleteMutation.isPending}
         onCancel={() => setConfirmation(null)}
-        onConfirm={() => (confirmation === 'delete' ? deleteMutation.mutate({ data: { workspaceSlug, id: request.id } }) : onClose())}
+        onConfirm={() => {
+          if (confirmation === 'delete') deleteMutation.mutate({ data: { workspaceSlug, id: request.id } })
+          else if (confirmation === 'cancel') {
+            stopEditing()
+            setConfirmation(null)
+          } else onClose()
+        }}
       />
     </>
   )

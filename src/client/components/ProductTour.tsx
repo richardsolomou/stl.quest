@@ -32,9 +32,10 @@ import {
   PRODUCT_TOUR_ID,
   PRODUCT_TOUR_PROGRESS_EVENT,
   productTourPage,
+  questCopy,
   type ProductTourProgress,
 } from '../productTour'
-import { useWorkspaceSlug } from '../workspace'
+import { useWorkspacePrintTypes, useWorkspaceSlug } from '../workspace'
 
 type QuestStepData = { quest: OnboardingQuest; dismiss: () => void }
 
@@ -53,6 +54,8 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
   const { data } = useQuery(onboardingQuery(workspaceSlug))
   const { data: requests } = useQuery(requestsQuery(workspaceSlug))
   const page = productTourPage(location.pathname)
+  const printTypes = useWorkspacePrintTypes()
+  const copyOf = useCallback((task: OnboardingTaskId) => questCopy(t.shell.onboarding.quests, task, printTypes), [printTypes, t])
   const applicable = useMemo(() => applicableOnboardingQuests(isAdmin), [isAdmin])
   const visible = useMemo(
     () => (data ? availableOnboardingQuests(applicable, data, (requests?.requests.length ?? 0) > 0) : []),
@@ -134,7 +137,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     if (source === 'interaction' && !completesOnboarding) {
       const quest = applicable.find((item) => item.id === task)
       if (quest) {
-        toast.success(t.shell.tour.questComplete(t.shell.onboarding.quests[quest.id].title), {
+        toast.success(t.shell.tour.questComplete(copyOf(quest.id).title), {
           description: t.shell.tour.xpEarned(quest.points),
           action: { label: t.shell.tour.viewOnboarding, onClick: () => setOpen(true) },
         })
@@ -190,8 +193,8 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
     return {
       id: active.id,
       target: `[data-onboarding="${ui.target}"]`,
-      title: t.shell.onboarding.quests[active.id].title,
-      content: t.shell.onboarding.quests[active.id].description,
+      title: copyOf(active.id).title,
+      content: copyOf(active.id).description,
       placement: ui.placement,
       data: {
         quest: active,
@@ -202,7 +205,7 @@ export function ProductTour({ isAdmin }: { isAdmin: boolean }) {
         },
       } satisfies QuestStepData,
     }
-  }, [active, posthog, t])
+  }, [active, copyOf, posthog])
 
   useEffect(() => {
     const element = !open && active ? document.querySelector(`[data-onboarding="${PRODUCT_QUEST_UI[active.id].target}"]`) : undefined
@@ -341,6 +344,10 @@ function QuestPopover({
   const completed = data ? applicable.filter((quest) => data.completedTasks.includes(quest.id)).length : 0
   const skipped = data ? applicable.filter((quest) => data.skippedTasks.includes(quest.id)).length : 0
   const showList = !complete || reviewing
+  // Open quests lead; resolved ones fold away until asked for, so the list stays short on a phone.
+  const listed = reviewing
+    ? visible
+    : visible.filter((quest) => !data?.completedTasks.includes(quest.id) && !data?.skippedTasks.includes(quest.id))
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <Tooltip>
@@ -351,7 +358,7 @@ function QuestPopover({
                 <button
                   type="button"
                   className={cn(
-                    'fixed right-4 bottom-4 z-50 grid size-11 max-sm:bottom-20 cursor-pointer place-items-center rounded-full border-2 border-blueprint/40 bg-background text-muted-foreground shadow-lg transition-colors hover:bg-muted hover:text-foreground',
+                    'fixed right-4 bottom-4 z-50 grid size-11 max-sm:bottom-20 cursor-pointer place-items-center rounded-full border border-border bg-popover text-muted-foreground shadow-lg transition-colors hover:bg-muted hover:text-foreground',
                     !complete && 'text-primary',
                     activePrompt && 'ring-4 ring-primary/20',
                     complete && 'invisible pointer-events-none',
@@ -371,14 +378,21 @@ function QuestPopover({
           {complete ? t.shell.tour.allComplete : newCount ? t.shell.tour.newQuests(newCount) : t.shell.tour.completeYourQuest}
         </TooltipContent>
       </Tooltip>
-      <PopoverContent side="top" align="end" sideOffset={10} className="w-[min(22rem,calc(100vw-2rem))] gap-0 p-0">
-        <header className={cn('p-3', showList && 'border-b border-dashed border-blueprint/25')}>
+      <PopoverContent
+        side="top"
+        align="end"
+        sideOffset={10}
+        className="max-h-(--available-height) w-[min(22rem,calc(100vw-2rem))] gap-0 p-0"
+      >
+        <header className={cn('shrink-0 p-3', showList && 'border-b border-border')}>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="font-heading text-xs tracking-[0.08em] text-primary uppercase">
+              <p className="font-heading text-xs tracking-[0.015em] text-primary uppercase">
                 {complete ? t.shell.tour.allComplete : t.shell.tour.completeYourQuest}
               </p>
-              <h2 className="font-heading text-lg">{complete ? t.shell.tour.readyForNext : t.shell.tour.learnByDoing}</h2>
+              <h2 className="font-heading text-lg/tight font-extrabold uppercase">
+                {complete ? t.shell.tour.readyForNext : t.shell.tour.learnByDoing}
+              </h2>
             </div>
             <span className="shrink-0 rounded-full bg-primary/15 px-2.5 py-1 font-mono text-xs font-semibold text-primary">
               {t.shell.tour.xp(points)}
@@ -386,7 +400,7 @@ function QuestPopover({
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full rounded-full bg-primary transition-[width]"
+              className="h-full rounded-full bg-foreground transition-[width]"
               style={{ width: `${applicable.length ? (resolvedCount / applicable.length) * 100 : 0}%` }}
             />
           </div>
@@ -403,15 +417,15 @@ function QuestPopover({
           )}
         </header>
         {showList && (
-          <div className="max-h-[min(28rem,var(--available-height))] overflow-y-auto p-1.5">
+          <div className="app-scrollbar max-h-[28rem] min-h-0 overflow-y-auto overscroll-contain p-1.5">
             {onboardingSectionIds.map((section) => {
-              const sectionQuests = visible.filter((quest) => quest.section === section)
+              const sectionQuests = listed.filter((quest) => quest.section === section)
               if (!sectionQuests.length) return null
               return (
                 <section key={section} className="not-first:mt-1" aria-labelledby={`quest-section-${section}`}>
                   <h3
                     id={`quest-section-${section}`}
-                    className="px-2.5 pt-1.5 pb-0.5 font-heading text-[11px] tracking-[0.08em] text-muted-foreground uppercase"
+                    className="px-2.5 pt-1.5 pb-0.5 font-heading text-[11px] tracking-[0.015em] text-muted-foreground uppercase"
                   >
                     {t.shell.onboarding.sections[section]}
                   </h3>
@@ -421,6 +435,16 @@ function QuestPopover({
                 </section>
               )
             })}
+            {!complete && resolvedCount > 0 && (
+              <button
+                type="button"
+                className="mt-1 w-full cursor-pointer rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                aria-expanded={reviewing}
+                onClick={() => setReviewing(!reviewing)}
+              >
+                {reviewing ? t.shell.tour.hideResolved : t.shell.tour.showResolved(resolvedCount)}
+              </button>
+            )}
           </div>
         )}
       </PopoverContent>
@@ -442,7 +466,8 @@ function QuestRow({
   updateProgress: (operation: OnboardingProgressOperation) => void
 }) {
   const { t } = useI18n()
-  const title = t.shell.onboarding.quests[quest.id].title
+  const printTypes = useWorkspacePrintTypes()
+  const title = questCopy(t.shell.onboarding.quests, quest.id, printTypes).title
   const completed = data?.completedTasks.includes(quest.id) ?? false
   const skipped = data?.skippedTasks.includes(quest.id) ?? false
   const newQuest = !!data?.celebratedTasks.length && !data.celebratedTasks.includes(quest.id)
@@ -454,17 +479,17 @@ function QuestRow({
         onClick={() => launch(quest)}
       >
         {completed ? (
-          <Check className="size-4 shrink-0 text-primary" />
+          <Check className="size-4 shrink-0 text-success" />
         ) : skipped ? (
           <Circle className="size-4 shrink-0 text-muted-foreground/50" />
         ) : (
           <Flag className="size-4 shrink-0 text-primary" />
         )}
-        <span className="min-w-0 flex-1">
-          <span className={cn('block text-sm font-medium', (completed || skipped) && 'text-muted-foreground line-through')}>{title}</span>
-          <span className="block text-xs text-muted-foreground">
-            {completed ? t.shell.tour.rowComplete : skipped ? t.shell.tour.rowSkipped : t.shell.tour.rowPoints(quest.points, newQuest)}
-          </span>
+        <span className={cn('min-w-0 flex-1 truncate text-sm font-medium', (completed || skipped) && 'text-muted-foreground line-through')}>
+          {title}
+        </span>{' '}
+        <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+          {completed ? t.shell.tour.rowComplete : skipped ? t.shell.tour.rowSkipped : t.shell.tour.rowPoints(quest.points, newQuest)}
         </span>
       </button>
       {skipped ? (
@@ -482,13 +507,14 @@ function QuestRow({
         <Button
           type="button"
           variant="ghost"
-          size="sm"
-          className="text-xs text-muted-foreground"
+          size="icon-sm"
+          className="text-muted-foreground"
           aria-label={t.shell.tour.skip(title)}
+          title={t.shell.tour.notForMe}
           disabled={busy}
           onClick={() => updateProgress({ operation: 'skip', task: quest.id })}
         >
-          {t.shell.tour.notForMe}
+          <X />
         </Button>
       ) : null}
     </div>
@@ -504,10 +530,10 @@ function QuestTooltip({ closeProps, step, tooltipProps }: TooltipRenderProps) {
       role="note"
       aria-live="polite"
       aria-label={t.shell.tour.promptLabel}
-      className="pointer-events-none w-[min(19rem,calc(100vw-2rem))] select-none rounded-lg border-2 border-blueprint/40 bg-background p-3 text-foreground shadow-xl"
+      className="pointer-events-none w-[min(19rem,calc(100vw-2rem))] select-none rounded-lg border border-border bg-popover p-3 text-foreground shadow-xl"
     >
       <div className="flex items-center justify-between gap-3">
-        <span className="font-heading text-xs tracking-[0.08em] text-primary uppercase">{t.shell.tour.promptHeading(quest.points)}</span>
+        <span className="font-heading text-xs tracking-[0.015em] text-primary uppercase">{t.shell.tour.promptHeading(quest.points)}</span>
         <Button
           {...closeProps}
           type="button"
