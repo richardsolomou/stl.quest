@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # check=skip=SecretsUsedInArgOrEnv
-FROM ghcr.io/richardsolomou/ras-stack-runtime-binaries:runtime-v1.0.9@sha256:b72916b0db314c9cdaab83142b845e3cba77777c44ecefaaf9e2661c24b5e164 AS runtime-binaries
+FROM ghcr.io/richardsolomou/ras-stack-runtime-binaries:runtime-v1.0.10@sha256:87f67169f1e3d99ee1729c2988e40e8d2e8b0460517d27f323d2d2fce9031d53 AS runtime-binaries
 
 FROM node:24-alpine AS build
 WORKDIR /app
