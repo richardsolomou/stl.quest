@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.3.0
+
+### Minor Changes
+
+- 516ed8d: Set how much supports and waste add to material estimates, including a fixed amount per resin part, and the filament infill and wall count your slicer uses, in Pricing settings, so that estimates match how you print; resin estimates now allow 60% plus 1 mL per part instead of 15%, and filament estimates allow 25% on a two-wall shell with 15% infill.
+- 516ed8d: Put selected prints on a plate and record what the slicer says the plate used, from a Bambu Studio or OrcaSlicer file or from typed totals, and record what each print was charged, so that Spend shows each print's measured material, time, cost, and profit.
+- 516ed8d: Offer to fill in Spend from prints finished before usage tracking was on, estimating each from its print estimate and tagging it as estimated, so that spend starts with your real history without changing stock or part wear.
+
 ## 2.2.0
 
 ### Minor Changes
