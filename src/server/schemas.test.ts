@@ -142,8 +142,8 @@ describe('server input schemas', () => {
     })
   })
 
-  it('rejects a margin that leaves nothing to cost', () => {
-    expect(() => priceCalculatorSettingsSchema.parse({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, standardMarginPercent: 100 })).toThrow()
+  it('rejects a markup above its maximum', () => {
+    expect(() => priceCalculatorSettingsSchema.parse({ ...DEFAULT_PRICE_CALCULATOR_SETTINGS, markupPercent: 2_001 })).toThrow()
   })
 
   it('rejects an unknown currency', () => {

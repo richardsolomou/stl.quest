@@ -314,7 +314,16 @@ describe.each(backends)('upgrading stored inventory (%s)', (dialect) => {
     expect({
       applied: (await backend.database.select({ id: applied.id }).from(applied).all()).map(({ id }) => id),
       printers: await (await repository.scoped('farm')).listInventory('printers'),
-    }).toEqual({ applied: ['0001_legacy_costing', '0002_inventory_tables'], printers: [resin] })
+    }).toEqual({ applied: ['0001_legacy_costing', '0002_inventory_tables', '0003_markup_percent'], printers: [resin] })
+  })
+
+  it('turns a stored margin into the markup that prices the same', async () => {
+    const workspace = await released()
+    await workspace.setSetting('price_calculator', { currency: 'GBP', labourCostPerHour: 18, standardMarginPercent: 25 })
+
+    const upgraded = await upgrade()
+
+    expect(await upgraded.getSetting('price_calculator')).toEqual({ currency: 'GBP', labourCostPerHour: 18, markupPercent: 33.33 })
   })
 
   it('creates no printers for a workspace whose v1.52 costing never saved any', async () => {

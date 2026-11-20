@@ -3,7 +3,14 @@ import { ChevronRight, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { CopyButtonLabel, useCopied } from '../useCopied'
-import type { CostBasis, PriceCalculatorJob, PriceCalculatorSettings, PrintCost } from '../../../core/priceCalculator'
+import {
+  profitSharePercent,
+  roundQuote,
+  type CostBasis,
+  type PriceCalculatorJob,
+  type PriceCalculatorSettings,
+  type PrintCost,
+} from '../../../core/priceCalculator'
 import type { PrinterSummary, PrintType } from '../../../core/types'
 import { useI18n } from '../../i18n'
 import { Docket } from '../settings/SettingsLayout'
@@ -14,7 +21,7 @@ export function QuoteSection({
   rates,
   printType,
   job,
-  result,
+  result: exact,
   basis,
   comparison,
   printer: selected,
@@ -42,7 +49,8 @@ export function QuoteSection({
   // Consumables alone still produce a price, which reads as a real quote before any slicer totals are in.
   const empty = job.materialAmount === 0 && job.printHours === 0
   const money = (value: number) => formatMoney(value, rates.currency, locale)
-  const margin = formatNumber(rates.standardMarginPercent, locale)
+  const result = roundQuote(exact, rates.currency)
+  const markup = formatNumber(rates.markupPercent, locale)
   const others = [...comparison].sort((a, b) => a.result.suggestedPrice - b.result.suggestedPrice)
   const cheapest = others[0]?.result.suggestedPrice
   const dearest = others.at(-1)?.result.suggestedPrice
@@ -65,7 +73,13 @@ export function QuoteSection({
           ) : (
             <>
               <div className="mt-1 font-heading text-5xl font-extrabold tracking-tight">{money(result.suggestedPrice)}</div>
-              <p className="mt-2 text-xs text-muted-foreground">{copy.costAndMargin(money(result.estimatedCost), margin)}</p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {copy.costAndProfit(
+                  money(result.costToMake),
+                  money(result.markup),
+                  formatNumber(profitSharePercent(rates.markupPercent), locale, 1),
+                )}
+              </p>
               <Button
                 type="button"
                 variant="ghost"
@@ -106,9 +120,9 @@ export function QuoteSection({
                 )
               })}
               <CostRow label={copy.failureAllowance} value={money(result.failureAllowance)} />
-              <TotalRow label={copy.estimatedCost} value={money(result.estimatedCost)} />
               {result.labour > 0 && <CostRow label={copy.labour} value={money(result.labour)} />}
-              <CostRow label={copy.marginAmount(margin)} value={money(result.margin)} />
+              <TotalRow label={copy.costToMake} value={money(result.costToMake)} />
+              <CostRow label={copy.markupAmount(markup)} value={money(result.markup)} />
               <TotalRow label={copy.suggestedPrice} value={money(result.suggestedPrice)} />
             </dl>
             {typical && <p className="mt-3 text-xs text-muted-foreground">{copy.typicalNote}</p>}
@@ -163,7 +177,7 @@ function CostRow({ label, value, typical = false }: { label: string; value: stri
         {label}
         {typical && <TypicalTag />}
       </dt>
-      <dd className="font-mono tabular-nums">{value}</dd>
+      <dd className="text-right font-mono tabular-nums">{value}</dd>
     </>
   )
 }
@@ -173,7 +187,7 @@ function TotalRow({ label, value }: { label: string; value: string }) {
     <>
       <div className="col-span-2 my-0.5 border-t border-dashed border-border" />
       <dt className="font-medium">{label}</dt>
-      <dd className="font-mono font-medium tabular-nums">{value}</dd>
+      <dd className="text-right font-mono font-medium tabular-nums">{value}</dd>
     </>
   )
 }

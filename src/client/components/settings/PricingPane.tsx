@@ -9,6 +9,7 @@ import {
   electricityPresetsAvailable,
   PRICE_CALCULATOR_CURRENCIES,
   PRICE_CALCULATOR_MAXIMUMS,
+  profitSharePercent,
   selectPriceCalculatorCurrency,
   type PriceCalculatorSettings,
   validPriceCalculatorSettings,
@@ -28,6 +29,7 @@ import {
   currencySymbol,
   electricitySourceLabel,
   formatEurosPerKwh,
+  formatNumber,
 } from '../priceCalculator/format'
 import { PageHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 
@@ -267,11 +269,15 @@ function LabourSection({
           onChange={(failureAllowancePercent) => onSettingsChange({ ...settings, failureAllowancePercent })}
         />
         <NumberSetting
-          label={copy.standardMargin}
-          value={settings.standardMarginPercent}
+          label={copy.markup}
+          description={copy.markupHint(
+            formatNumber(settings.markupPercent, locale),
+            formatNumber(profitSharePercent(settings.markupPercent), locale, 1),
+          )}
+          value={settings.markupPercent}
           min={0}
-          max={PRICE_CALCULATOR_MAXIMUMS.standardMarginPercent}
-          onChange={(standardMarginPercent) => onSettingsChange({ ...settings, standardMarginPercent })}
+          max={PRICE_CALCULATOR_MAXIMUMS.markupPercent}
+          onChange={(markupPercent) => onSettingsChange({ ...settings, markupPercent })}
         />
       </div>
     </SettingsSection>
