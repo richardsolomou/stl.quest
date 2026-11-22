@@ -32,6 +32,8 @@ export type SupplyPreset = {
   usedBySource?: string
   note?: string
   source?: { id: string; url: string }
+  /** The manufacturer's product photo, served from the app's own files. */
+  image?: { src: string }
 }
 
 /** Catalogue supplies that suit a workspace printing these types. */

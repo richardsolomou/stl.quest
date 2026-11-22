@@ -1,0 +1,701 @@
+{
+  "images": [
+    {
+      "presetId": "part-anycubic-acf-film-photon-mono-4-ultra",
+      "sourcePageUrl": "https://store.anycubic.com/products/acf-film-for-photon-series",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0245/5519/2380/files/S020267_1.jpg?v=1737024538",
+      "note": "Variant image for Photon Mono 4 Ultra.",
+      "src": "/part-presets/part-anycubic-acf-film-photon-mono-4-ultra.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-anycubic-acf-film-photon-mono-m7",
+      "sourcePageUrl": "https://store.anycubic.com/products/acf-film-for-photon-series",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0245/5519/2380/files/S020159-1.jpg?v=1712650946",
+      "note": "Variant image for Photon Mono M7 / M7 Pro (2 pcs).",
+      "src": "/part-presets/part-anycubic-acf-film-photon-mono-m7.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-anycubic-acf-film-photon-mono-m7-max",
+      "sourcePageUrl": "https://store.anycubic.com/products/acf-film-for-photon-series",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0245/5519/2380/files/1_1_b6cbcbce-8158-424a-8549-9a579db1f3ad.jpg?v=1737024361",
+      "note": "Variant image for Photon Mono M7 Max (2 pcs).",
+      "src": "/part-presets/part-anycubic-acf-film-photon-mono-m7-max.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-anycubic-fep-film-photon-m3-plus",
+      "sourcePageUrl": "https://store.anycubic.com/products/fep-film",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0245/5519/2380/files/S020054-1.jpg?v=1759110415",
+      "note": "Variant image for Photon M3 Plus / Mono X series (2 pcs).",
+      "src": "/part-presets/part-anycubic-fep-film-photon-m3-plus.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-anycubic-fep-film-photon-mono-4",
+      "sourcePageUrl": "https://store.anycubic.com/products/fep-film",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0245/5519/2380/files/S020131_6.jpg?v=1759110415",
+      "note": "Variant image for Photon Mono 4 / 4 Ultra / 2 (2 pcs).",
+      "src": "/part-presets/part-anycubic-fep-film-photon-mono-4.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-anycubic-nfep-film-photon-mono-m7",
+      "sourcePageUrl": "https://store.anycubic.com/products/nfep-film-for-photon-series",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0245/5519/2380/files/S020150-1.jpg?v=1737027888",
+      "note": "Variant image for Photon Mono M7 (shared with M7 Pro and M5 series).",
+      "src": "/part-presets/part-anycubic-nfep-film-photon-mono-m7.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-anycubic-nfep-film-photon-mono-m7-pro",
+      "sourcePageUrl": "https://store.anycubic.com/products/nfep-film-for-photon-series",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0245/5519/2380/files/S020150-1.jpg?v=1737027888",
+      "note": "Variant image for Photon Mono M7 Pro (shared with M7).",
+      "src": "/part-presets/part-anycubic-nfep-film-photon-mono-m7-pro.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-anycubic-screen-protector-photon-mono-4",
+      "sourcePageUrl": "https://store.anycubic.com/products/screen-protector",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0245/5519/2380/files/S020273_2.jpg?v=1737028341",
+      "note": "Variant image for Photon Mono 4 / 4 Ultra; includes the cleaning cloth from the kit.",
+      "src": "/part-presets/part-anycubic-screen-protector-photon-mono-4.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-anycubic-screen-protector-photon-mono-m7",
+      "sourcePageUrl": "https://store.anycubic.com/products/screen-protector",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0245/5519/2380/files/S020302_3.jpg?v=1747394598",
+      "note": "Variant image for Photon Mono M7.",
+      "src": "/part-presets/part-anycubic-screen-protector-photon-mono-m7.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-air-filter-h2-series",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/air-filter-h2-series",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/077aae32b982485aaf002f4109357d73/FAC116.png",
+      "src": "/part-presets/part-bambu-lab-air-filter-h2-series.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-air-filter-p2s",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/air-filter-p2s",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/1e7e07a33e1649c2aa84b2ecaa17b4ae/FAC158.jpg",
+      "src": "/part-presets/part-bambu-lab-air-filter-p2s.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-air-filter-x1-p1",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/activated-carbon-air-filter-x1-p1-series",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/f30c64778bb94008ac950ac8b6505813/bfe4a1cea2b88cc78620534bf4073dff_adf6d6e4-244f-4330-89e4-757218137b60.png",
+      "src": "/part-presets/part-bambu-lab-air-filter-x1-p1.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-air-filter-x2d",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/air-filter-x2d",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/fbab1d29802f437197575c29b82595a4/FAC213.png",
+      "src": "/part-presets/part-bambu-lab-air-filter-x2d.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-dual-texture-pei-plate",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/bambu-dual-texture-pei-plate",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/ec43602ae55a4c9099b3208d6d3519bf/Dual_Texture_PEI_6c6e2271-d6a3-41a5-b708-952f86cac212.png",
+      "src": "/part-presets/part-bambu-lab-dual-texture-pei-plate.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-external-exhaust-air-filter",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/air-filter-for-external-exhaust-fan-kit",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/b55e4634348c46c68dbf700c8f503d52/20251229-205313.png",
+      "src": "/part-presets/part-bambu-lab-external-exhaust-air-filter.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-filament-cutter-h2d-h2c",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/replacement-filament-cutter",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/7b2b9cbeb1af4b31b7a6408afc21c621/H2D.png",
+      "note": "Shows the H2D variant; the H2C variant has its own similar image.",
+      "src": "/part-presets/part-bambu-lab-filament-cutter-h2d-h2c.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-filament-cutter-h2s-p2s-a2l",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/replacement-filament-cutter",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/31b2f1d5f75147e99911de0b885539e8/4a5b75a0b5eb47e4081ac4bb13a8080d_6670af1b-87ee-478c-8383-f374d251234e.png",
+      "note": "Image of the H2S/A2L variant; the P2S variant has a slightly different image.",
+      "src": "/part-presets/part-bambu-lab-filament-cutter-h2s-p2s-a2l.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-filament-cutter-x1-p1-a1",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/replacement-filament-cutter",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/31b2f1d5f75147e99911de0b885539e8/4a5b75a0b5eb47e4081ac4bb13a8080d_6670af1b-87ee-478c-8383-f374d251234e.png",
+      "note": "Image of the X1C/P1/A1 variants, shared with the H2S/A2L cutter.",
+      "src": "/part-presets/part-bambu-lab-filament-cutter-x1-p1-a1.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-filament-cutter-x2d",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/replacement-filament-cutter",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/01c91adb01044a76b3e4db726be2cb74/X2D_Left.png",
+      "note": "Shows the X2D (Left) cutter; the Right cutter has its own similar image.",
+      "src": "/part-presets/part-bambu-lab-filament-cutter-x2d.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-high-flow-hotend-h2-p2s-x2d-0-4-hardened",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/f0e4a04139284f62a807eb005bc04293/FAH063.jpg",
+      "src": "/part-presets/part-bambu-lab-high-flow-hotend-h2-p2s-x2d-0-4-hardened.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-hotend-a1-0-4-stainless",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/d9c6db96eaa9408886ba04bd0ff37cdc/0.4_6c7827ac-f37d-4e1b-a9b9-f6412cabef4c.png",
+      "note": "Variant image for 0.4 mm stainless steel; carries a plain \"Stainless Steel\" caption under the part.",
+      "src": "/part-presets/part-bambu-lab-hotend-a1-0-4-stainless.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-hotend-a1-mini-0-4-stainless",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/d9c6db96eaa9408886ba04bd0ff37cdc/0.4_6c7827ac-f37d-4e1b-a9b9-f6412cabef4c.png",
+      "note": "Variant image for 0.4 mm stainless steel (the A1 and A1 mini share it); carries a plain \"Stainless Steel\" caption under the part.",
+      "src": "/part-presets/part-bambu-lab-hotend-a1-mini-0-4-stainless.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-hotend-a2l-0-4-stainless",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/bambu-hotend-a1-a2",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/d9c6db96eaa9408886ba04bd0ff37cdc/0.4_6c7827ac-f37d-4e1b-a9b9-f6412cabef4c.png",
+      "note": "Variant image for 0.4 mm stainless steel (shared across A1/A1 mini/A2L); carries a plain \"Stainless Steel\" caption under the part.",
+      "src": "/part-presets/part-bambu-lab-hotend-a2l-0-4-stainless.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-hotend-h2-p2s-x2d-0-4-hardened",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/bambu-hotend-h2-p2s",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/01085a1084eb46b4965ed268246bdf60/FAH060-V1.jpg",
+      "src": "/part-presets/part-bambu-lab-hotend-h2-p2s-x2d-0-4-hardened.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-hotend-p1-0-4-hardened",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/bambu-hotend-p1-series",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/0aba1ff1195d4e37a23d80a97eb71922/FAH001-N-1_1e94f2a4-3688-4391-9ad8-71a3ff754c31.png",
+      "note": "Image of the \"Hotend\" variant (not the complete hotend assembly), shared with the X1C hotend.",
+      "src": "/part-presets/part-bambu-lab-hotend-p1-0-4-hardened.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-hotend-x1c-0-4-hardened",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/bambu-hotend-x1c",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/0aba1ff1195d4e37a23d80a97eb71922/FAH001-N-1_1e94f2a4-3688-4391-9ad8-71a3ff754c31.png",
+      "note": "Image of the \"Hotend\" variant (not the complete hotend assembly), shared with the P1 Series hotend.",
+      "src": "/part-presets/part-bambu-lab-hotend-x1c-0-4-hardened.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-nozzle-wiper-a2l",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/nozzle-wiper-a2l",
+      "sourceUrl": "https://store.bblcdn.eu/s8/mqxkp/a161abe3b86b49c1911193f22ffb743a/FAZ071.png",
+      "src": "/part-presets/part-bambu-lab-nozzle-wiper-a2l.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-nozzle-wiping-pad-h2d-h2c",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/nozzle-wiping-pad-h2-series",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/7b7514c3aee048928b15a103aaebc51a/FAW005_(2).png",
+      "src": "/part-presets/part-bambu-lab-nozzle-wiping-pad-h2d-h2c.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-nozzle-wiping-pad-h2s",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/nozzle-wiping-pad-h2-series",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/cea1ed6c302c45f28cd5475cb53f55fa/FAW008.png",
+      "src": "/part-presets/part-bambu-lab-nozzle-wiping-pad-h2s.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-nozzle-wiping-pad-p2s-x2d",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/nozzle-wiping-pad-p2s-x2d",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/056279df3c334984a1914df94219a3ef/FAW006.jpg",
+      "src": "/part-presets/part-bambu-lab-nozzle-wiping-pad-p2s-x2d.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-ptfe-tube-4m",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/ptfe-tubes",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/14df6753830541349aa974ce6a5a2a51/4mPTFE_cfdcd944-5d0a-4496-8c9d-4f1442c34a0a.png",
+      "src": "/part-presets/part-bambu-lab-ptfe-tube-4m.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-purge-wiper-a2l",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/purge-wiper-a2l",
+      "sourceUrl": "https://store.bblcdn.eu/s8/mqxkp/4bbeba981da84421a30eb41adae38ef5/FAZ060.png",
+      "src": "/part-presets/part-bambu-lab-purge-wiper-a2l.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-purge-wiper-h2d-h2c",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/purge-wiper-h2-series",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/53d00a4853874e87b3a88d908b030a5f/FAC100PurgeWiper.png",
+      "src": "/part-presets/part-bambu-lab-purge-wiper-h2d-h2c.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-purge-wiper-h2s",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/purge-wiper-h2-series",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/18ee518d1b574428b8de0f6f86c97dcf/FAC147.png",
+      "src": "/part-presets/part-bambu-lab-purge-wiper-h2s.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-purge-wiper-p2s",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/purge-wiper-p2s",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/4992e59fcbf94edc876a9e08d4eacf61/FAC162-1.jpg",
+      "src": "/part-presets/part-bambu-lab-purge-wiper-p2s.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-purge-wiper-x2d",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/purge-wiper-x2d",
+      "sourceUrl": "https://store.bblcdn.eu/s8/bwqnt/2f87b35589554ee3ae772dd811269f05/FAC209.png",
+      "src": "/part-presets/part-bambu-lab-purge-wiper-x2d.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-textured-pei-plate",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/bambu-textured-pei-plate",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/dec8fc3eda4345e18625f0910973bd91/Textured_PEI_72683a6f-6e35-4f66-887c-0f3dfc4b1039.png",
+      "note": "Shared image for the 256 mm X1/P1/A1/P2S/X2D variants.",
+      "src": "/part-presets/part-bambu-lab-textured-pei-plate.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-textured-pei-plate-a1-mini",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/bambu-textured-pei-plate",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/3a1e1b9a3db44762b223c4a4a7ffea96/Textured_PEI_mini.png",
+      "src": "/part-presets/part-bambu-lab-textured-pei-plate-a1-mini.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-textured-pei-plate-h2c-a2l",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/bambu-textured-pei-plate",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/5f89769d5e644f1fbd3a1179ef7c21bd/20251118-191239.jpg",
+      "src": "/part-presets/part-bambu-lab-textured-pei-plate-h2c-a2l.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-textured-pei-plate-h2d-h2s",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/bambu-textured-pei-plate",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/034c6fa1a9cd44f79cfea74b7c983685/H2DH2S.jpg",
+      "src": "/part-presets/part-bambu-lab-textured-pei-plate-h2d-h2s.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-tungsten-carbide-hotend-h2-p2s-x2d-0-4",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/tungsten-carbide-hotend-h2-p2s-x2d",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/357b012ae5f14d06a6246d7fd8ae1255/FAH040.jpg",
+      "src": "/part-presets/part-bambu-lab-tungsten-carbide-hotend-h2-p2s-x2d-0-4.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-x-belt-a2l",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/x-belt-a2l",
+      "sourceUrl": "https://store.bblcdn.eu/s8/mqxkp/54ca4d5eafa8442e94d5846ef5c0bfd0/FAB013.png",
+      "src": "/part-presets/part-bambu-lab-x-belt-a2l.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-xy-belt-h2",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/xy-belt-h2-series",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/aef9ad7c938a4808bce0754e85b9007d/FAB010.png",
+      "src": "/part-presets/part-bambu-lab-xy-belt-h2.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-xy-belt-p2s",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/xy-belt-p2s",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/47fefc8dac804279a0bf32f1bba328c8/FAC169-1.jpg",
+      "src": "/part-presets/part-bambu-lab-xy-belt-p2s.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-xy-belt-x1-p1",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/xy-belt",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/452c15473bb4495791ef43d59ada91ad/XY2pcs.png",
+      "src": "/part-presets/part-bambu-lab-xy-belt-x1-p1.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-xy-belt-x2d",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/xy-belt-x2d",
+      "sourceUrl": "https://store.bblcdn.eu/s8/bwqnt/53653e069b3d4073bc9d82c9cd293535/FAB012.png",
+      "src": "/part-presets/part-bambu-lab-xy-belt-x2d.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-bambu-lab-y-belt-a2l",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/y-belt-a2l",
+      "sourceUrl": "https://store.bblcdn.eu/s8/mqxkp/d505286adabb45e89c63ccc4523ad793/FAB014.png",
+      "src": "/part-presets/part-bambu-lab-y-belt-a2l.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-creality-smooth-pei-plate-235",
+      "sourcePageUrl": "https://store.creality.com/products/smooth-pei-build-plate-235-235mm",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0893/0603/8637/files/4a29d37ecd396f67b9d8db931cca0ea2_140dba25-82e7-4a37-a5d9-b939535c4f7f-Photoroom.png?v=1762200606",
+      "src": "/part-presets/part-creality-smooth-pei-plate-235.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-elegoo-acf-film-mars-4-ultra",
+      "sourcePageUrl": "https://us.elegoo.com/products/acf-film-for-mars-4-ultra-5-pcs",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0684/4792/8423/files/ACF-Film-for-Mars-4-Ultra-_5Pcs_-1.jpg?v=1787632545",
+      "src": "/part-presets/part-elegoo-acf-film-mars-4-ultra.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-elegoo-acf-film-saturn-3-ultra",
+      "sourcePageUrl": "https://us.elegoo.com/products/acf-film-for-saturn-3-ultra-5-pcs",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0684/4792/8423/files/ACFFilmforelegooSaturn3Ultra_5Pcs_1.jpg?v=1787632490",
+      "src": "/part-presets/part-elegoo-acf-film-saturn-3-ultra.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-elegoo-fep-film-mars-4-5",
+      "sourcePageUrl": "https://us.elegoo.com/products/fep-film-for-mars-4-5-pcs",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0684/4792/8423/files/FEP-Film-for-Mars-4-5Pcs-1.jpg?v=1787632547",
+      "src": "/part-presets/part-elegoo-fep-film-mars-4-5.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-elegoo-lcd-mars-4",
+      "sourcePageUrl": "https://us.elegoo.com/products/lcd-screen-for-mars-4",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0684/4792/8423/files/LCD-Screen-for-Mars-4-1.jpg?v=1787632560",
+      "src": "/part-presets/part-elegoo-lcd-mars-4.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-elegoo-lcd-mars-5",
+      "sourcePageUrl": "https://us.elegoo.com/products/lcd-screen-for-mars-5",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0684/4792/8423/files/1--LCD-Screen-for-Mars-5.jpg?v=1787634562",
+      "src": "/part-presets/part-elegoo-lcd-mars-5.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-elegoo-lcd-mars-5-ultra",
+      "sourcePageUrl": "https://us.elegoo.com/products/lcd-screen-for-mars-5-ultra",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0684/4792/8423/files/1--LCD-Screen-for-Mars-5-Ultra.jpg?v=1787634567",
+      "src": "/part-presets/part-elegoo-lcd-mars-5-ultra.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-elegoo-lcd-saturn-3",
+      "sourcePageUrl": "https://us.elegoo.com/products/lcd-screen-for-saturn-3-saturn-3-ultra",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0684/4792/8423/files/elegooLCDScreenforSaturn3_Saturn3Ultra_1.jpg?v=1787632486",
+      "src": "/part-presets/part-elegoo-lcd-saturn-3.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-elegoo-lcd-saturn-4",
+      "sourcePageUrl": "https://us.elegoo.com/products/lcd-screen-for-saturn-4-saturn-4-ultra",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0684/4792/8423/files/LCDScreenforSaturn4_Saturn4Ultra_1.jpg?v=1787634676",
+      "src": "/part-presets/part-elegoo-lcd-saturn-4.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-elegoo-lcd-saturn-4-ultra-16k",
+      "sourcePageUrl": "https://us.elegoo.com/products/lcd-screen-for-saturn-4-ultra-16k",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0684/4792/8423/files/LCD-Screen-for-Saturn-4-Ultra-16K.jpg?v=1787634793",
+      "src": "/part-presets/part-elegoo-lcd-saturn-4-ultra-16k.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-elegoo-pfa-film-saturn",
+      "sourcePageUrl": "https://us.elegoo.com/products/elegoo-pfa-release-liner-for-saturn-2-3d-printer",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0684/4792/8423/files/PFA_Film_for_Saturn_2_1.jpg?v=1787634473",
+      "src": "/part-presets/part-elegoo-pfa-film-saturn.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-formlabs-build-platform-2-print-surface",
+      "sourcePageUrl": "https://dental.formlabs.com/products/build-platform-2/",
+      "sourceUrl": "https://dental-media.formlabs.com/filer_public_thumbnails/filer_public/79/b6/79b683a9-21a3-4060-b401-bcf330823d21/bp2-1_1.png__640x0_subsampling-2.png",
+      "note": "Shows the whole Build Platform 2; the print surface is its stainless sheet, and Formlabs has no photo of the surface alone.",
+      "src": "/part-presets/part-formlabs-build-platform-2-print-surface.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-formlabs-build-platform-2l-print-surface",
+      "sourcePageUrl": "https://formlabs.com/support/Printing-with-the-Build-Platform-2L/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/13/d7/13d7e3c3-b9ff-4f4b-9ed7-3854feff1bd8/optimized_for_web_png-formlabs_build20platform202l_02628129.png",
+      "note": "Shows the whole Build Platform 2L; the print surface is its stainless sheet, and Formlabs has no photo of the surface alone.",
+      "src": "/part-presets/part-formlabs-build-platform-2l-print-surface.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-formlabs-form-3-resin-tank-v2-1",
+      "sourcePageUrl": "https://formlabs.com/products/form-3-resin-tank/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/76/25/7625d5d8-0596-459c-a44b-67a593b8d036/12222020_f3_tank_v2_1_013.png",
+      "src": "/part-presets/part-formlabs-form-3-resin-tank-v2-1.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-formlabs-form-3l-resin-tank-v3",
+      "sourcePageUrl": "https://formlabs.com/products/form-3l-resin-tank/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/6e/ec/6eec0f63-b835-40b5-be81-d781ec7c4da8/08012020_3l-prints_042-copy.png",
+      "src": "/part-presets/part-formlabs-form-3l-resin-tank-v3.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-formlabs-form-4-flex-build-platform",
+      "sourcePageUrl": "https://formlabs.com/de/products/form-4-flex-build-platform/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/a4/61/a4614b6d-af72-46a8-9505-503c55b50d20/02272024_dsl_bp2_313-sh-standard_store.png",
+      "src": "/part-presets/part-formlabs-form-4-flex-build-platform.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-formlabs-form-4-resin-tank",
+      "sourcePageUrl": "https://formlabs.com/products/form-4-resin-tank/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/fa/a4/faa4e79d-43ee-4d23-944d-6b6e44629f41/02292024_dsl_resin_tank_511-sh-standard_store.png",
+      "src": "/part-presets/part-formlabs-form-4-resin-tank.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-formlabs-form-4l-flex-build-platform",
+      "sourcePageUrl": "https://formlabs.com/de/products/form-4l-flex-build-platform/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/cf/0c/cf0c2f0c-1474-4d70-b759-a7a5df602648/10012024_f4l_bp_flex__015_no_shadow_store.png",
+      "src": "/part-presets/part-formlabs-form-4l-flex-build-platform.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-formlabs-form-4l-resin-tank",
+      "sourcePageUrl": "https://formlabs.com/products/form-4l-resin-tank/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/cf/6b/cf6b95cd-a6ad-4b06-8812-393b64f6702f/08132024_4l_resin_tank_040-sh-softness_no_shadow_crop.png",
+      "src": "/part-presets/part-formlabs-form-4l-resin-tank.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-formlabs-form-studio-1-build-platform-flex",
+      "sourcePageUrl": "https://formlabs.com/de/products/form-studio-1-build-platform-flex/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/6d/76/6d76bab4-2c8e-4c04-8ed1-e983b1d34a4a/08042026_clerk_bpflex_silho_526-edit_shadow_store.png",
+      "src": "/part-presets/part-formlabs-form-studio-1-build-platform-flex.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-formlabs-form-studio-1-resin-tank",
+      "sourcePageUrl": "https://formlabs.com/de/products/form-studio-resin-tank/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/b2/60/b260b94e-cf9d-4249-84de-c8310b3daf8d/08042026_clerk_tank_silho_557_alt-edit_shadow_final_store.png",
+      "src": "/part-presets/part-formlabs-form-studio-1-resin-tank.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-formlabs-form-studio-1-resin-tank-pro",
+      "sourcePageUrl": "https://formlabs.com/de/products/form-studio-resin-tank-pro/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/bb/c6/bbc6fd6d-45fc-47c3-87c2-0c25e49b3d4b/08042026_clerk_tank_pro_silho_555_alt-edit_shadow_final_store.png",
+      "src": "/part-presets/part-formlabs-form-studio-1-resin-tank-pro.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-heygears-lcd-protector-reflex",
+      "sourcePageUrl": "https://store.heygears.com/products/reflex-tempered-glass-lcd-screen-protector",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/Reflex-Tempered-Glass-LCD-Screen-Protector.webp?v=1745833146",
+      "src": "/part-presets/part-heygears-lcd-protector-reflex.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-heygears-lcd-protector-reflex-2",
+      "sourcePageUrl": "https://store.heygears.com/products/reflex-2-lcd-screen-protective-film-kit",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/ReflexLCDScreenTape-1_e2d2ec78-0ec7-40b4-ab10-f0d1b3fa58b6.webp?v=1772440610",
+      "src": "/part-presets/part-heygears-lcd-protector-reflex-2.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-heygears-lcd-protector-reflex-rs",
+      "sourcePageUrl": "https://store.heygears.com/products/reflex-rs-lcd-screen-tempered-film-kit",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/ReflexRSLCDScreenTemperedFilmKit_471c878f-80fc-4247-a545-fb7dfa8c97e3.webp?v=1769654665",
+      "src": "/part-presets/part-heygears-lcd-protector-reflex-rs.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-heygears-lcd-reflex",
+      "sourcePageUrl": "https://store.heygears.com/products/reflex-lcd-screen",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/ReflexLCDScreen.webp?v=1745833160",
+      "src": "/part-presets/part-heygears-lcd-reflex.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-heygears-lcd-reflex-2",
+      "sourcePageUrl": "https://store.heygears.com/products/reflex-2-lcd-screen",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/RE2_-08.webp?v=1769654234",
+      "src": "/part-presets/part-heygears-lcd-reflex-2.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-heygears-lcd-reflex-rs",
+      "sourcePageUrl": "https://store.heygears.com/products/reflex-rs-lcd-screen",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/ReflexRSLCDScreen-11.jpg?v=1745833122",
+      "src": "/part-presets/part-heygears-lcd-reflex-rs.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-heygears-lcd-reflex-rs-turbo",
+      "sourcePageUrl": "https://store.heygears.com/products/amber-screen-set-reflex-rs-series",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/AmberScreenUpgradeKit.webp?v=1752547926",
+      "src": "/part-presets/part-heygears-lcd-reflex-rs-turbo.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-heygears-pulsing-release-film-reflex",
+      "sourcePageUrl": "https://store.heygears.com/products/pulsing-release-film",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/Reflex-Pulsing-Release-Film-Module.webp?v=1745833149",
+      "src": "/part-presets/part-heygears-pulsing-release-film-reflex.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-heygears-pulsing-release-film-reflex-2",
+      "sourcePageUrl": "https://store.heygears.com/products/reflex-2-series-pulsing-release-film",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/1__1.png?v=1763034237",
+      "src": "/part-presets/part-heygears-pulsing-release-film-reflex-2.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-heygears-pulsing-release-film-reflex-rs",
+      "sourcePageUrl": "https://store.heygears.com/products/reflex-rs-pulsing-release-film-set",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/Reflex-RS-Release-Film-Set-1.webp?v=1745833130",
+      "src": "/part-presets/part-heygears-pulsing-release-film-reflex-rs.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-heygears-release-film-reflex",
+      "sourcePageUrl": "https://store.heygears.com/products/reflex-release-film-module-v1-0",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/Reflex-Release-Film-Module-v1.0.webp?v=1745833161",
+      "src": "/part-presets/part-heygears-release-film-reflex.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-heygears-release-film-reflex-2",
+      "sourcePageUrl": "https://store.heygears.com/products/reflex-2-series-release-film",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/1__1_2.png?v=1763034106",
+      "src": "/part-presets/part-heygears-release-film-reflex-2.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-heygears-release-film-reflex-rs",
+      "sourcePageUrl": "https://store.heygears.com/products/reflex-rs-release-film-set",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/ReflexRSReleaseFilmSet_93f15b16-3682-43de-bbc8-a304fc6b6d5a.jpg?v=1769654839",
+      "src": "/part-presets/part-heygears-release-film-reflex-rs.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-phrozen-lcd-mighty-8k",
+      "sourcePageUrl": "https://us.phrozen3d.com/products/lcd-sonic-mighty-8k",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0758/4337/1286/files/LCD_Mighty8K_1400x1600_01_cc2d3d12-f4f6-450a-bd9a-d3977f52cec6.png?v=1730453971",
+      "src": "/part-presets/part-phrozen-lcd-mighty-8k.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-phrozen-lcd-mighty-revo",
+      "sourcePageUrl": "https://us.phrozen3d.com/products/lcd-sonic-mighty-revo",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0758/4337/1286/files/10.1_SonicMightyRevo_6cb9154e-6b6b-46d6-b195-7d92a808bfc3.png?v=1730453980",
+      "src": "/part-presets/part-phrozen-lcd-mighty-revo.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-phrozen-lcd-mighty-revo-16k-max",
+      "sourcePageUrl": "https://us.phrozen3d.com/products/revomax-lcd-panel-assembly",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0758/4337/1286/files/SonicMightyRevo16KMAX1.png?v=1789986106",
+      "src": "/part-presets/part-phrozen-lcd-mighty-revo-16k-max.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-phrozen-lcd-mini-8k-s",
+      "sourcePageUrl": "https://us.phrozen3d.com/products/lcd-sonic-mini-8k-s",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0758/4337/1286/files/7.1_SonicMini8KS_15f42757-7a69-438c-a512-096e4058ddf8.png?v=1730453958",
+      "src": "/part-presets/part-phrozen-lcd-mini-8k-s.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-phrozen-lcd-protector-mighty",
+      "sourcePageUrl": "https://us.phrozen3d.com/products/mighty-lcd-screen-protector",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0758/4337/1286/products/LCDScreenProtector_1_3a58142d-1f7b-4360-b37d-e98b18559c79.png?v=1696313133",
+      "note": "All store images show the retail box, not the protector itself.",
+      "src": "/part-presets/part-phrozen-lcd-protector-mighty.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-phrozen-lcd-protector-mighty-revo",
+      "sourcePageUrl": "https://us.phrozen3d.com/products/mighty-revo-lcd-screen-protector",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0758/4337/1286/files/LCDScreenProtector_1.png?v=1745200322",
+      "note": "All store images show the retail box (the others add a hand or the printer); box shot chosen.",
+      "src": "/part-presets/part-phrozen-lcd-protector-mighty-revo.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-phrozen-lcd-protector-mighty-revo-16k-max",
+      "sourcePageUrl": "https://us.phrozen3d.com/products/revomax-13-5-tempered-glass-lcd-screen-protector",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0758/4337/1286/files/14__MightyRevoMAX_1400x1600_3a07c372-6abf-494d-a479-6e19b171bf0b.png?v=1787308683",
+      "src": "/part-presets/part-phrozen-lcd-protector-mighty-revo-16k-max.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-phrozen-pfa-film-mighty",
+      "sourcePageUrl": "https://us.phrozen3d.com/products/nfep-film-mighty",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0758/4337/1286/files/Sonic_Mighty_8K_PFA_1400x1600_00c9a345-cee2-43c5-a7cb-1c9bd4ffda22.png?v=1730453932",
+      "src": "/part-presets/part-phrozen-pfa-film-mighty.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-phrozen-pfa-film-mighty-revo-16k-max-heated",
+      "sourcePageUrl": "https://us.phrozen3d.com/products/revomax-heated-tank-pfa-release-film",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0758/4337/1286/files/PFA___RevoMAX_1400x1600-1_388d3109-5710-4091-8a56-a0cc07eef8fd.png?v=1787308846",
+      "note": "All store images show the cardboard retail box, not the film.",
+      "src": "/part-presets/part-phrozen-pfa-film-mighty-revo-16k-max-heated.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-prusa-fep-film-sl1",
+      "sourcePageUrl": "https://www.prusa3d.com/product/fep-film-3-pcs-sl1/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/1657.jpg",
+      "src": "/part-presets/part-prusa-fep-film-sl1.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-prusa-fep-film-sl1s",
+      "sourcePageUrl": "https://www.prusa3d.com/product/fep-film-3-pcs-sl1s/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/1659.jpg",
+      "src": "/part-presets/part-prusa-fep-film-sl1s.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-prusa-nozzle-brass-0-4",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusa-nozzle-brass-0-4-mm/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/5777.jpg",
+      "note": "Only product image; Prusa overlays a \"Ø 0.4 mm\" size legend with dots in the corner.",
+      "src": "/part-presets/part-prusa-nozzle-brass-0-4.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-prusa-satin-sheet",
+      "sourcePageUrl": "https://www.prusa3d.com/product/satin-powder-coated-steel-sheet/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/5269.jpg",
+      "src": "/part-presets/part-prusa-satin-sheet.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-prusa-smooth-pei-sheet",
+      "sourcePageUrl": "https://www.prusa3d.com/product/smooth-pei-steel-sheet/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/5358.jpg",
+      "src": "/part-presets/part-prusa-smooth-pei-sheet.webp",
+      "checkedAt": "2026-11-22"
+    }
+  ]
+}

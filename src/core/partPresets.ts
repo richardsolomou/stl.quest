@@ -38,6 +38,8 @@ export type PartPreset = {
   /** The manufacturer's store price for one pack on the checked date. */
   listPrice?: { amount: number; currency: string; packSize?: number; url: string; checked: string; note?: string }
   source: { id: string; url: string }
+  /** The manufacturer's product photo, served from the app's own files. */
+  image?: { src: string }
 }
 
 export function partPresetsForPrinter(parts: readonly PartPreset[], printerPresetId: string) {
