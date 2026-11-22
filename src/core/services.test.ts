@@ -4123,6 +4123,14 @@ describe('STLQuestService crash recovery', () => {
       await expect(service.receiveSpoolman({ upsert: { ...spool, id: 5_000 } })).rejects.toMatchObject({ status: 413 })
     })
 
+    it('waits for the first send again once the token is replaced', async () => {
+      await service.receiveSpoolman({ replace: [{ ...spool, remainingGrams: 600 }] })
+
+      await service.connectSpoolman('replacement-hash', admin)
+
+      expect((await service.spoolman(admin)).connection?.receivedAt).toBeUndefined()
+    })
+
     it('refuses spools once disconnected', async () => {
       await service.disconnectSpoolman(admin)
 

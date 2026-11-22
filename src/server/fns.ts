@@ -1880,14 +1880,19 @@ export const getStockLevels = createServerFn({ method: 'GET' })
     }),
   )
 
+/** Where the bridge reaches this app and its ingest endpoint, from the public origin so a TLS proxy's https survives. */
+export function spoolmanUrls(request: Request) {
+  const origin = publicOrigin(request)
+  return { appUrl: `${origin}${appPath('')}`, ingestUrl: `${origin}${appPath('/api/spoolman/spools')}` }
+}
+
 export const getSpoolman = createServerFn({ method: 'GET' })
   .validator(workspaceInputSchema)
   .handler(async ({ data }) =>
     rpc(async () => {
       const context = await workspaceContext(await app(), data.workspaceSlug)
       const spoolman = await context.service.spoolman(context.identity)
-      const origin = new URL(getRequest().url).origin
-      return { ...spoolman, appUrl: `${origin}${appPath('')}`, ingestUrl: `${origin}${appPath('/api/spoolman/spools')}` }
+      return { ...spoolman, ...spoolmanUrls(getRequest()) }
     }),
   )
 

@@ -3583,7 +3583,8 @@ export class DrizzleRepository implements Repository {
     await this.database
       .insert(spoolmanConnections)
       .values({ workspaceId, tokenHash, createdAt: now })
-      .onConflictDoUpdate({ target: spoolmanConnections.workspaceId, set: { tokenHash, createdAt: now } })
+      // A replaced token has received nothing yet, so the page waits for its first send rather than showing the old one's.
+      .onConflictDoUpdate({ target: spoolmanConnections.workspaceId, set: { tokenHash, createdAt: now, receivedAt: null } })
       .run()
   }
 
