@@ -13,8 +13,16 @@ const marble = {
   material: 'PLA',
   density: 1.22,
   pattern: 'marble',
-  colors: [{ name: 'White Marble', hex: 'F7F3F0' }],
+  colors: [
+    { name: 'White Marble', hex: 'F7F3F0' },
+    { name: 'Red Granite', hex: 'AD4E38' },
+  ],
 }
+// A variant block with more than one colour, since a single colour flagged differently is that colour, not a product.
+const range = [
+  { name: 'Clear', hex: 'EEEEEE' },
+  { name: 'Teal', hex: '008080' },
+]
 
 describe('filament catalog synchronization', () => {
   it('folds spool sizes of one product into one preset', () => {
@@ -41,21 +49,30 @@ describe('filament catalog synchronization', () => {
     expect(
       parse([
         { ...basic, material: 'PETG' },
-        { ...basic, material: 'PETG', translucent: true },
+        { ...basic, material: 'PETG', translucent: true, colors: range },
       ]).map((preset) => preset.name),
     ).toEqual(['PETG', 'Translucent PETG'])
   })
 
+  it('keeps a single colour flagged differently in its product', () => {
+    expect(
+      parse([
+        { ...basic, name: 'Basic {color_name}' },
+        { ...basic, name: 'Basic {color_name}', translucent: true, colors: [{ name: 'Natural', hex: 'F5F5DC' }] },
+      ]).map((preset) => [preset.name, preset.colors?.map((colour) => colour.names.en)]),
+    ).toEqual([['Basic PLA', ['Jade White', 'Natural']]])
+  })
+
   it('names a gradient variant', () => {
-    expect(parse([basic, { ...basic, multi_color_direction: 'longitudinal' }]).map((preset) => preset.name)).toEqual([
+    expect(parse([basic, { ...basic, multi_color_direction: 'longitudinal', colors: range }]).map((preset) => preset.name)).toEqual([
       'Gradient PLA',
       'PLA',
     ])
   })
 
   it('qualifies only by what differs within the product line', () => {
-    const silk = { ...basic, name: 'Silk {color_name}', translucent: true }
-    expect(parse([silk, { ...silk, multi_color_direction: 'coaxial' }]).map((preset) => preset.name)).toEqual([
+    const silk = { ...basic, name: 'Silk {color_name}', translucent: true, colors: range }
+    expect(parse([silk, { ...silk, multi_color_direction: 'coaxial', colors: range }]).map((preset) => preset.name)).toEqual([
       'Dual Color Silk PLA',
       'Silk PLA',
     ])

@@ -52,7 +52,9 @@ export function parseSpoolmanFilaments(files: { path: string; contents: string }
       const line = productLine(filament.name)
       const material = filament.material.trim()
       const name = line.toLocaleLowerCase().includes(material.toLocaleLowerCase()) ? line : `${line} ${material}`.trim()
-      return name ? [{ file, filament, brand, material, name, variant: variantWords(filament, name) }] : []
+      // A block holding one colour flagged differently describes that colour, so only a range of colours makes a product.
+      const variant = (filament.colors?.length ?? 0) > 1 ? variantWords(filament, name) : []
+      return name ? [{ file, filament, brand, material, name, variant }] : []
     })
   })
   const presets = new Map<string, GeneratedFilamentPreset>()

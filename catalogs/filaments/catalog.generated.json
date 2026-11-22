@@ -32628,6 +32628,12 @@
       "densityGramsPerCm3": 1.24,
       "colors": [
         {
+          "hex": "#FFFFFF",
+          "names": {
+            "en": "Natural"
+          }
+        },
+        {
           "hex": "#101010",
           "names": {
             "en": "Black"
@@ -33651,6 +33657,12 @@
           "names": {
             "en": "White"
           }
+        },
+        {
+          "hex": "#FFFFFF",
+          "names": {
+            "en": "Clear"
+          }
         }
       ],
       "source": {
@@ -33778,25 +33790,6 @@
       }
     },
     {
-      "id": "filament-protopasta-translucent-basic-pla",
-      "brand": "Protopasta",
-      "name": "Translucent Basic PLA",
-      "type": "PLA",
-      "densityGramsPerCm3": 1.24,
-      "colors": [
-        {
-          "hex": "#FFFFFF",
-          "names": {
-            "en": "Natural"
-          }
-        }
-      ],
-      "source": {
-        "id": "spoolmandb",
-        "url": "https://github.com/Donkie/SpoolmanDB/blob/8e391c16be4bfde29dfc184e2f0b9a8d154ab550/filaments/protopasta.json"
-      }
-    },
-    {
       "id": "filament-protopasta-translucent-petg",
       "brand": "Protopasta",
       "name": "Translucent PETG",
@@ -33874,25 +33867,6 @@
           "hex": "#F69E22",
           "names": {
             "en": "Nerfed Orange"
-          }
-        }
-      ],
-      "source": {
-        "id": "spoolmandb",
-        "url": "https://github.com/Donkie/SpoolmanDB/blob/8e391c16be4bfde29dfc184e2f0b9a8d154ab550/filaments/protopasta.json"
-      }
-    },
-    {
-      "id": "filament-protopasta-translucent-simply-petg",
-      "brand": "Protopasta",
-      "name": "Translucent Simply PETG",
-      "type": "PETG",
-      "densityGramsPerCm3": 1.2,
-      "colors": [
-        {
-          "hex": "#FFFFFF",
-          "names": {
-            "en": "Clear"
           }
         }
       ],
