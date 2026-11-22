@@ -46,8 +46,8 @@ A print's start and end are one print: Bambuddy's end event continues the start 
 
 ## What a print records
 
-- **Finished**: the plate records Bambuddy's measured hours and grams, split across its prints by model volume, then estimate, then copies, just as typed plate totals are. The grams go by each tray's material (see [Filaments](#filaments)) until the bridge reports which spools the print used (see [Grams per spool](#grams-per-spool)). A plate already recorded from a slicer file or typed totals keeps that recording, and a plate shared with things not in STL Quest is left for you to record, since Bambuddy cannot tell what share was yours.
-- **Failed** or **cancelled**: its hours and grams are recorded as failed usage on the plate's prints, which still wears the printer, and the plate's copies go back to Up next, flagged with the plate that failed, to be printed again. Bambuddy already scales a stopped print's grams to how far it got, so each print's share is what it had used by then. A plate recorded from a slicer file before it failed splits that waste by what the file measured for each print rather than by volume.
+- **Finished**: the plate records Bambuddy's measured hours and grams, split across its prints by model volume, then estimate, then copies, just as typed plate totals are, until the bridge sends the print's sliced file (see [Sliced files](#sliced-files)). The grams go by each tray's material (see [Filaments](#filaments)) until the bridge reports which spools the print used (see [Grams per spool](#grams-per-spool)). A plate already recorded from a slicer file or typed totals keeps that recording, and a plate shared with things not in STL Quest is left for you to record, since Bambuddy cannot tell what share was yours.
+- **Failed** or **cancelled**: its hours and grams are recorded as failed usage on the plate's prints, which still wears the printer, and the plate's copies go back to Up next, flagged with the plate that failed, to be printed again. Bambuddy already scales a stopped print's grams to how far it got, so each print's share is what it had used by then. A plate recorded from a slicer file before it failed splits that waste by what the file measured for each print rather than by volume, until the bridge sends the print's sliced file, which charges each object up to where the print stopped.
 - Each printer's dialog under **Settings → Printers** shows its plate runs Bambuddy reported finished or failed, and how many failed. A stopped print is someone's choice, not the printer failing, so it is left out.
 
 A repeated end event records nothing twice. The workspace keeps the newest 2,000 prints.
@@ -79,11 +79,24 @@ STL Quest charges each spool's grams to the filament its Spoolman filament count
 
 The key and Bambuddy's address stay in the bridge; STL Quest never holds them, and the bridge only reads from Bambuddy. Bambuddy's built-in inventory keeps its own spools, which STL Quest cannot match, so their prints keep going by their trays' materials.
 
+## Sliced files
+
+With the bridge reading Bambuddy (see [Grams per spool](#grams-per-spool)), STL Quest also asks it for the sliced `.gcode.3mf` of each print it linked to a plate run and recorded itself, for up to a day after the print ended. Each poll, after sending spools, the bridge asks `GET /api/bambuddy/sliced` which prints want a file, downloads at most three of them from Bambuddy's archive (`GET /api/v1/archives/{archive_id}/download`), and streams each to `POST /api/bambuddy/sliced?run_id=…&plate=…`. The plate is the one Bambuddy's print log says the run printed, for a file of several plates. Nothing is stored in the bridge but which files it skipped, and STL Quest keeps only what it read from the file, never the file.
+
+The same **Read Status** key reads the archive, since Bambuddy grants archive reads to it. The key acts as the user who made it, so that user needs to see every archive (`archives:read_all`), or the bridge only gets the files of prints they started. A file Bambuddy's archive does not have, one over 64 MB, and one STL Quest cannot read are skipped, and the print keeps the split it had.
+
+STL Quest reads the plate the same way as an uploaded file: each labelled object's grams per filament, matched to its print by its `SQ-<n>` tag, then by name (see [Plate runs](#plate-runs)), with purge and prime tower shared out by weight and objects not in STL Quest kept apart. What the printer measured wins: each filament's figures are scaled so they add up to the grams Bambuddy reported for its material, or charged to its spool, and the plate's time is Bambuddy's measured duration. When the file's filaments and the measured ones don't line up, every figure is scaled by the measured total instead. Then:
+
+- **Finished**: the plate's recording is replaced by the per-object split, which shows as **Measured by the slicer for each object**.
+- **Failed** or **cancelled**: the waste is split by what each object had printed when it stopped. Bambu Studio and OrcaSlicer print layer by layer and mark progress in the G-code (`M73 P`), the same percentage the printer reports, so STL Quest reads each object's extrusion up to the first marker past Bambuddy's `progress`: an object shorter than where the print stopped counts in full and a taller one only up to that height, each as waste on its own request. Bambuddy sends no failed layer, only `progress`. A file without progress markers falls back to splitting the waste by each object's whole share, and the plate's dialog says so.
+
+A plate recorded by hand, from an uploaded file or typed totals, keeps that recording, and its print's file is never fetched. Spools the bridge sends later are scaled onto the same per-object split.
+
 ## Pricing from the failure rate
 
 Once a printer has 20 finished or failed plate runs reported, quotes for it price failures from its own share of failed runs instead of the flat failure allowance under **Settings → Pricing**. Stopped prints don't count either way. A workspace whose allowance is 0% keeps pricing no failures. The quote's breakdown says which one it used. At 20 runs one failure moves the rate by 5 points, half the default allowance; with fewer, one bad run would move a quote by more than the allowance it replaces.
 
-Per-object splits from sliced files in Bambuddy's archive, and failures of single skipped objects need more than Bambuddy's webhook carries and are not read yet.
+Failures of single skipped objects aren't read: Bambuddy can skip an object on a running print, but reports it in neither its webhook nor its archive.
 
 ## The endpoint
 
@@ -104,9 +117,20 @@ The body is Bambuddy's generic webhook JSON. STL Quest reads `event`, `printer`,
 | `415`    | The body is not `application/json`.                                           |
 | `429`    | More than 60 requests in a minute for this token; wait `Retry-After` seconds. |
 
+The bridge's sliced files use their own endpoint, with the same token:
+
+```http
+GET /api/bambuddy/sliced
+POST /api/bambuddy/sliced?run_id=512&plate=1
+Authorization: Bearer stlq_spoolman_…
+Content-Type: application/octet-stream
+```
+
+`GET` answers `{"runs": [{"run_id": "512", "archive_id": "88"}]}`, at most ten prints. `POST` takes the file's bytes and answers `204` once read (or for a print that no longer wants a file), `404` for a run STL Quest hasn't received, `413` over 64 MB, `415` for anything but `application/octet-stream`, and `422` for a file that is not a sliced plate with labelled objects, or holds several plates without `plate`. Both share a limit of 20 requests a minute per token.
+
 ## Security
 
-- The token can only add prints, what they used per spool, and spools to one workspace. The only thing it reads back is the spools the workspace's admins queued for the bridge to add to Spoolman ([Spoolman](spoolman.md#security)). It reads no stock, requests, or prints, cannot sign in, and cookies are never read, so a browser cannot be made to send one.
+- The token can only add prints, what they used per spool, their sliced files, and spools to one workspace. The only things it reads back are the spools the workspace's admins queued for the bridge to add to Spoolman ([Spoolman](spoolman.md#security)), and the Bambuddy run and archive IDs of prints that want a sliced file, which Bambuddy itself sent. It reads no stock, requests, or prints, cannot sign in, and cookies are never read, so a browser cannot be made to send one.
 - STL Quest stores only a SHA-256 hash of the token.
-- The token is checked before the body is read, bodies are capped at 4 MB, and each token is limited to 60 requests a minute on each server for Bambuddy's notifications and another 60 for the bridge's spool usage.
+- The token is checked before the body is read, bodies are capped at 4 MB (64 MB for a sliced file, refused as soon as it streams past that), and each token is limited to 60 requests a minute on each server for Bambuddy's notifications, another 60 for the bridge's spool usage, and 20 for sliced files.
 - What a print reports is shown only to workspace admins, and only its outcome and whether it linked reach telemetry, never its file or printer name.

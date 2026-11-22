@@ -1,5 +1,5 @@
 import { stripModelExtension } from './assetKeys'
-import { wearPartsFor, type Consumable } from './consumables'
+import { consumablesOfKind, wearPartsFor, type Consumable } from './consumables'
 import { printerCostPerMinute, type CostedPrinter, type PriceCalculatorSettings } from './priceCalculator'
 import { taggedRequestNumber } from './request'
 import { consumed, priced, supplied, type UsageDraft, type UsageEvent } from './usage'
@@ -155,6 +155,32 @@ export function matchSlicedObjects(
     const stem = slicedObjectStem(name)
     return stems.find((candidate) => candidate.stem === stem)?.requestId
   })
+}
+
+/**
+ * The library filament the slicer's filament most likely is: the same colour and type, else the same colour, else the
+ * same type. A filament's type is its catalogue entry's when it has one, otherwise a word of its name.
+ */
+export function suggestedFilament(
+  library: Consumable[],
+  filament: { type?: string; color?: string },
+  presetTypes: ReadonlyMap<string, string> = new Map(),
+) {
+  const colour = filament.color?.toLowerCase()
+  const type = filament.type?.toLowerCase()
+  const ranked = consumablesOfKind(library, 'filament')
+    .map((candidate) => {
+      const candidateType = (candidate.filamentPresetId && presetTypes.get(candidate.filamentPresetId))?.toLowerCase()
+      const typeMatches = Boolean(type) && (candidateType === type || new RegExp(`\\b${escapeRegExp(type!)}\\b`, 'i').test(candidate.name))
+      const colourMatches = Boolean(colour) && candidate.colour?.hex.toLowerCase() === colour
+      return { id: candidate.id, score: (colourMatches ? 2 : 0) + (typeMatches ? 1 : 0) }
+    })
+    .filter(({ score }) => score > 0)
+  return ranked.reduce<(typeof ranked)[number] | undefined>((best, next) => (!best || next.score > best.score ? next : best), undefined)?.id
+}
+
+function escapeRegExp(text: string) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 /**

@@ -149,5 +149,8 @@ export const server = {
     alreadyLinked: 'this print is already linked to a plate',
     invalid: 'send Bambuddy’s generic webhook JSON with an event and a printer',
     invalidUsage: 'send {"run_id": "…", "spools": [{"spool_id": 1, "grams": 1.5}]}',
+    invalidSlicedFile: 'send the sliced file’s bytes with ?run_id=…, and &plate=… for a file of several plates',
+    slicedUnreadable: 'this is not a sliced Bambu Studio or OrcaSlicer file with labelled objects',
+    slicedPlateUnknown: 'this file holds several sliced plates; send the plate that printed with &plate=…',
   },
 }

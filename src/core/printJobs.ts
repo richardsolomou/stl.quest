@@ -1,6 +1,7 @@
 import type { FilamentConsumable } from './consumables'
-import { heldByPlates, printingPlate, type Plate } from './plates'
+import { heldByPlates, printingPlate, type Plate, type PlateMeasured } from './plates'
 import { taggedRequestNumber } from './request'
+import type { SlicedPlate } from './slicedPlate'
 import { sameText } from './spoolman'
 
 /**
@@ -47,6 +48,30 @@ export const MAX_PRINT_SPOOLS = 32
  */
 export type PrintUsageReport = { runId: string; spools: PrintSpoolUsage[] }
 
+/**
+ * What a print's sliced file from Bambuddy's archive says each object used, per filament the plate uses, with each
+ * object on the print it matched or on none.
+ */
+export type PrintSlicedPlate = {
+  filaments: { type?: string; color?: string }[]
+  objects: { requestId?: string; amounts: number[] }[]
+  overhead: number[]
+  /** The slicer's print time, for a finished print the printer reported no duration for. */
+  minutes?: number
+  /**
+   * For a print that did not finish: true when the amounts stop where it stopped, false when the file has no progress
+   * markers to tell, so they are the whole plate's and only weigh the prints against each other.
+   */
+  cut?: boolean
+}
+
+/** The most a sliced file the bridge sends may be; Bambu Studio's `.gcode.3mf` of a full plate is a few tens of MB. */
+export const MAX_SLICED_FILE_BYTES = 64 * 1024 * 1024
+/** How long after a print ends STL Quest still asks the bridge for its sliced file. */
+export const SLICED_FILE_WAIT_MS = 24 * 60 * 60_000
+/** The most prints one ask for sliced files names. */
+export const MAX_SLICED_FILES_WANTED = 10
+
 export type PrintJob = Omit<PrintReport, 'outcome'> & {
   id: string
   outcome: PrintJobOutcome
@@ -57,6 +82,8 @@ export type PrintJob = Omit<PrintReport, 'outcome'> & {
   personal: boolean
   /** What it used per Spoolman spool, once the bridge reported it. */
   filamentUsage?: PrintSpoolUsage[]
+  /** Its sliced file, once the bridge sent it, or that the file it sent could not be read. */
+  slicedPlate?: PrintSlicedPlate | 'unreadable'
   /** The usage its end recorded, so a repeated event never records it twice. */
   transactionId?: string
   startedAt?: number
@@ -283,4 +310,84 @@ export function printSpoolMaterials<Material extends { id: string }>(
     if (material && grams > 0) totals.set(material, (totals.get(material) ?? 0) + grams)
   }
   return { materials: [...totals.keys()], totals: [...totals.values()] }
+}
+
+/**
+ * Whether STL Quest wants an ended print's sliced file: a print of a plate run, ended lately, whose usage it recorded
+ * itself. A plate recorded from a slicer file or typed totals keeps that, so its print's file is never fetched.
+ */
+export function wantsSlicedFile(job: PrintJob, plates: Plate[], now: number) {
+  if (!job.runId || !job.plateId || job.slicedPlate || job.outcome === 'printing') return false
+  if (job.endedAt === undefined || now - job.endedAt > SLICED_FILE_WAIT_MS) return false
+  if (job.outcome !== 'finished') return Boolean(job.transactionId)
+  const plate = plates.find(({ id }) => id === job.plateId)
+  return Boolean(plate) && (!plate!.recording || plate!.recording.transactionId === job.transactionId)
+}
+
+/** A sliced plate as a print keeps it, with what was printed by then for a print that `stopped`. */
+export function printSlicedPlate(plate: SlicedPlate, assignments: (string | undefined)[], stopped: boolean): PrintSlicedPlate {
+  const slots = plate.filaments.map(({ slot }) => slot)
+  const source = stopped && plate.printed ? plate.printed : { objects: plate.objects.map(({ grams }) => grams), overhead: plate.overhead }
+  return {
+    filaments: plate.filaments.map(({ type, color }) => ({ ...(type && { type }), ...(color && { color }) })),
+    objects: plate.objects.map((_, index) => ({
+      ...(assignments[index] && { requestId: assignments[index] }),
+      amounts: slots.map((slot) => source.objects[index][slot] ?? 0),
+    })),
+    overhead: slots.map((slot) => source.overhead[slot] ?? 0),
+    ...(stopped ? { cut: Boolean(plate.printed) } : plate.minutes !== undefined && { minutes: plate.minutes }),
+  }
+}
+
+/**
+ * A sliced plate's figures as a plate recording, with what was measured winning: slots of one material become one,
+ * and each material's objects and overhead are scaled to what was measured of it. When the measured materials and
+ * the file's do not line up, every figure is scaled by the measured total instead; with nothing measured, the file's
+ * figures stand.
+ */
+export function slicedPrintInput<Material>(
+  sliced: PrintSlicedPlate,
+  slotMaterials: Material[],
+  measured: { material: Material; amount: number }[],
+): { input: PlateMeasured; materials: Material[] } {
+  const materials = [...new Set(slotMaterials)]
+  const column = slotMaterials.map((material) => materials.indexOf(material))
+  const merged = (amounts: number[]) =>
+    materials.map((_, index) => amounts.reduce((total, amount, slot) => (column[slot] === index ? total + Math.max(0, amount) : total), 0))
+  const objects = sliced.objects.map(({ requestId, amounts }) => ({ ...(requestId && { requestId }), amounts: merged(amounts) }))
+  const overhead = merged(sliced.overhead)
+  const fileAmounts = materials.map((_, index) => objects.reduce((total, object) => total + object.amounts[index], overhead[index]))
+  const measuredAmounts = materials.map((material) =>
+    measured.reduce((total, entry) => (entry.material === material ? total + entry.amount : total), 0),
+  )
+  const measuredTotal = measured.reduce((total, { amount }) => total + amount, 0)
+  const fileTotal = fileAmounts.reduce((total, amount) => total + amount, 0)
+  const byMaterial =
+    measured.every(({ material }) => materials.includes(material)) &&
+    fileAmounts.every((amount, index) => amount === 0 || measuredAmounts[index] > 0)
+  const scale = materials.map((_, index) => {
+    if (measuredTotal <= 0) return 1
+    if (byMaterial) return fileAmounts[index] > 0 ? measuredAmounts[index] / fileAmounts[index] : 0
+    return fileTotal > 0 ? measuredTotal / fileTotal : 0
+  })
+  return {
+    materials,
+    input: {
+      objects: objects.map((object) => ({ ...object, amounts: object.amounts.map((amount, index) => amount * scale[index]) })),
+      // A material measured but hardly in the file still counts, spread over the prints like purge.
+      overhead: overhead.map((amount, index) =>
+        measuredTotal > 0 && byMaterial && fileAmounts[index] === 0 ? measuredAmounts[index] : amount * scale[index],
+      ),
+    },
+  }
+}
+
+/**
+ * What a plate's dialog says about its print's sliced file: that a stopped print's waste stops where it did, that the
+ * file could not show where, or that it could not be read. A finished print's recording already says it.
+ */
+export function slicedFileNote(job: Pick<PrintJob, 'slicedPlate'>): 'cut' | 'whole' | 'unreadable' | undefined {
+  if (job.slicedPlate === 'unreadable') return 'unreadable'
+  if (job.slicedPlate?.cut === undefined) return undefined
+  return job.slicedPlate.cut ? 'cut' : 'whole'
 }

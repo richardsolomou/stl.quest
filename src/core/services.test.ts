@@ -22,6 +22,7 @@ import type { InventoryItems, InventoryKind } from './inventory'
 import { seesOnlyOwnRequests } from './visibility'
 import { PRINT_TYPE_SETTING } from './printTypes'
 import { USAGE_TRACKING_SETTING } from './usageTracking'
+import { layeredPlateFile, slicedPlateFile } from '../../e2e/fixtures/slicedPlate'
 import { MAX_COVER_BYTES } from './coverImage'
 
 const capture = vi.fn(async () => undefined)
@@ -4622,6 +4623,211 @@ describe('STLQuestService crash recovery', () => {
         expect(capture).toHaveBeenCalledWith('server', 'print_received', { outcome: 'finished', linked_by: 'printer', has_printer: true })
       })
 
+      describe('sliced files from Bambuddy', () => {
+        const PLA = { type: 'PLA', color: '#000000', density: 1.24, diameter: 1.75 }
+        const tag = async (requestId: string, name: string) => `SQ-${(await repository.getRequest(requestId))!.number} ${name}`
+        const grams = async (requestId: string) =>
+          (await service.listUsage({ requestId }, admin))
+            .filter((event) => event.unit === 'g' && !event.undoneAt)
+            .reduce((total, { amount }) => total + amount, 0)
+        async function twoPrints() {
+          const hull = await queued()
+          const turret = await queued()
+          await start(hull, turret)
+          return { hull, turret }
+        }
+        async function hullAndTurretFile(hull: string, turret: string) {
+          return slicedPlateFile({
+            filaments: [PLA],
+            objects: [
+              { id: '1', name: await tag(hull, 'Hull.stl'), extrusionMm: 3000 },
+              { id: '2', name: await tag(turret, 'Turret.stl'), extrusionMm: 1000 },
+            ],
+          })
+        }
+
+        it('splits a finished print’s measured grams by the objects in its sliced file', async () => {
+          const { hull, turret } = await twoPrints()
+          await service.receivePrint({ ...finished, runId: '7' })
+
+          await service.receivePrintSlicedFile({ runId: '7' }, await hullAndTurretFile(hull, turret))
+
+          expect([await grams(hull), await grams(turret)]).toEqual([expect.closeTo(30, 6), expect.closeTo(10, 6)])
+        })
+
+        it('records the plate as split by the sliced file, from the printer', async () => {
+          const { hull, turret } = await twoPrints()
+          const { id } = (await repository.listPlates())[0]
+          await service.receivePrint({ ...finished, runId: '7' })
+
+          await service.receivePrintSlicedFile({ runId: '7' }, await hullAndTurretFile(hull, turret))
+
+          expect((await plateOf(id)).recording).toMatchObject({ source: 'printer', method: 'measured', minutes: 120 })
+        })
+
+        it('keeps the measured hours', async () => {
+          const { hull, turret } = await twoPrints()
+          await service.receivePrint({ ...finished, runId: '7' })
+
+          await service.receivePrintSlicedFile({ runId: '7' }, await hullAndTurretFile(hull, turret))
+
+          const minutes = (await service.listUsage({}, admin)).filter((event) => event.unit === 'minute' && !event.undoneAt)
+          expect(minutes.reduce((total, { amount }) => total + amount, 0)).toBeCloseTo(120, 6)
+        })
+
+        it('keeps a plate recorded from a slicer file by hand', async () => {
+          const { hull, turret } = await twoPrints()
+          const { id } = (await repository.listPlates())[0]
+          await service.recordPlate(
+            {
+              plateId: id,
+              minutes: 60,
+              materials: [{ consumableId: filament.id }],
+              objects: [
+                { requestId: hull, amounts: [5] },
+                { requestId: turret, amounts: [5] },
+              ],
+              overhead: [0],
+            },
+            admin,
+          )
+          await service.receivePrint({ ...finished, runId: '7' })
+
+          await service.receivePrintSlicedFile({ runId: '7' }, await hullAndTurretFile(hull, turret))
+
+          expect([await grams(hull), await grams(turret)]).toEqual([5, 5])
+        })
+
+        it('charges a failed print’s short object in full and its tall one up to where it stopped', async () => {
+          const { hull, turret } = await twoPrints()
+          await service.receivePrint({ ...finished, outcome: 'failed', progress: 50, grams: 71, runId: '7' })
+          const file = layeredPlateFile([
+            { id: '1', name: await tag(turret, 'Turret.stl'), layers: 20, mmPerLayer: 10 },
+            { id: '2', name: await tag(hull, 'Hull.stl'), layers: 100, mmPerLayer: 10 },
+          ])
+
+          await service.receivePrintSlicedFile({ runId: '7' }, file)
+
+          expect([await grams(turret), await grams(hull)]).toEqual([expect.closeTo(20, 6), expect.closeTo(51, 6)])
+        })
+
+        it('weighs a failed print’s waste by the whole plate when its file has no progress markers', async () => {
+          const { hull, turret } = await twoPrints()
+          await service.receivePrint({ ...finished, outcome: 'failed', progress: 50, grams: 60, runId: '7' })
+          const file = layeredPlateFile(
+            [
+              { id: '1', name: await tag(turret, 'Turret.stl'), layers: 20, mmPerLayer: 10 },
+              { id: '2', name: await tag(hull, 'Hull.stl'), layers: 100, mmPerLayer: 10 },
+            ],
+            { markers: false },
+          )
+
+          await service.receivePrintSlicedFile({ runId: '7' }, file)
+
+          expect([await grams(turret), await grams(hull)]).toEqual([expect.closeTo(10, 6), expect.closeTo(50, 6)])
+        })
+
+        it('does not move a failed plate’s copies twice', async () => {
+          const { hull, turret } = await twoPrints()
+          await service.receivePrint({ ...finished, outcome: 'failed', progress: 50, runId: '7' })
+
+          await service.receivePrintSlicedFile({ runId: '7' }, await hullAndTurretFile(hull, turret))
+
+          expect((await counts(hull)).up_next).toBe(1)
+        })
+
+        it('asks for an ended print’s sliced file with its archive', async () => {
+          await twoPrints()
+          await service.receivePrint({ ...finished, runId: '7', archiveId: '3' })
+
+          expect(await service.slicedFilesWanted()).toEqual([{ runId: '7', archiveId: '3' }])
+        })
+
+        it('stops asking for a file once it has it', async () => {
+          const { hull, turret } = await twoPrints()
+          await service.receivePrint({ ...finished, runId: '7' })
+
+          await service.receivePrintSlicedFile({ runId: '7' }, await hullAndTurretFile(hull, turret))
+
+          expect(await service.slicedFilesWanted()).toEqual([])
+        })
+
+        it('refuses a file it cannot read', async () => {
+          await twoPrints()
+          await service.receivePrint({ ...finished, runId: '7' })
+
+          await expect(service.receivePrintSlicedFile({ runId: '7' }, new TextEncoder().encode('nope'))).rejects.toMatchObject({
+            status: 422,
+          })
+        })
+
+        it('stops asking for a file it could not read', async () => {
+          await twoPrints()
+          await service.receivePrint({ ...finished, runId: '7' })
+
+          await service.receivePrintSlicedFile({ runId: '7' }, new TextEncoder().encode('nope')).catch(() => undefined)
+
+          expect(await service.slicedFilesWanted()).toEqual([])
+        })
+
+        it('refuses a file of several plates without the plate that printed', async () => {
+          const { hull, turret } = await twoPrints()
+          await service.receivePrint({ ...finished, runId: '7' })
+          const { unzipSync, zipSync } = await import('fflate')
+          const single = unzipSync(await hullAndTurretFile(hull, turret))
+          const file = zipSync({ ...single, 'Metadata/plate_2.gcode': single['Metadata/plate_1.gcode'] })
+
+          await expect(service.receivePrintSlicedFile({ runId: '7' }, file)).rejects.toMatchObject({ status: 422 })
+        })
+
+        it('reads the plate that printed from a file of several', async () => {
+          const { hull, turret } = await twoPrints()
+          await service.receivePrint({ ...finished, runId: '7' })
+          const { unzipSync, zipSync } = await import('fflate')
+          const single = unzipSync(await hullAndTurretFile(hull, turret))
+          const info = new TextDecoder().decode(single['Metadata/slice_info.config'])
+          const plates = info.replace(/<plate>[\s\S]*<\/plate>/, (one) => `${one}${one.replace('value="1"', 'value="2"')}`)
+          const file = zipSync({
+            ...single,
+            'Metadata/plate_2.gcode': single['Metadata/plate_1.gcode'],
+            'Metadata/plate_1.gcode': new TextEncoder().encode('M83\nG1 E100\n'),
+            'Metadata/slice_info.config': new TextEncoder().encode(plates),
+          })
+
+          await service.receivePrintSlicedFile({ runId: '7', plate: 2 }, file)
+
+          expect(await grams(hull)).toBeCloseTo(30, 6)
+        })
+
+        it('asks to send a file again for a print it has not heard of yet', async () => {
+          await expect(service.receivePrintSlicedFile({ runId: '8' }, new Uint8Array())).rejects.toMatchObject({ status: 404 })
+        })
+
+        it('ignores a file for a print it does not want one for', async () => {
+          await service.receivePrint({ ...finished, runId: '7' })
+
+          await service.receivePrintSlicedFile({ runId: '7' }, new TextEncoder().encode('nope'))
+
+          expect((await repository.listPrintJobs())[0].slicedPlate).toBeUndefined()
+        })
+
+        it('captures a sliced file with counts only', async () => {
+          const { hull, turret } = await twoPrints()
+          await service.receivePrint({ ...finished, runId: '7' })
+          capture.mockClear()
+
+          await service.receivePrintSlicedFile({ runId: '7' }, await hullAndTurretFile(hull, turret))
+
+          expect(capture).toHaveBeenCalledWith('server', 'print_sliced_file_received', {
+            outcome: 'finished',
+            object_count: 2,
+            matched_count: 2,
+            cut: false,
+            recorded: true,
+          })
+        })
+      })
+
       describe('per spool', () => {
         const petg: Consumable = { id: 'petg', kind: 'filament', name: 'PETG', pricePerKg: 25 }
         const used = async (requestId: string) =>
@@ -4857,6 +5063,28 @@ describe('STLQuestService crash recovery', () => {
           await service.receivePrintUsage(report)
 
           expect((await repository.listPrintJobs())[0].transactionId).toBe(transactionId)
+        })
+
+        it('keeps the sliced file’s split when the spools arrive after it', async () => {
+          const hull = await queued()
+          const turret = await queued()
+          await start(hull, turret)
+          await service.receivePrint({ ...finished, runId: '7' })
+          const tag = async (requestId: string, name: string) => `SQ-${(await repository.getRequest(requestId))!.number} ${name}`
+          const file = slicedPlateFile({
+            objects: [
+              { id: '1', name: await tag(hull, 'Hull.stl'), extrusionMm: 3000 },
+              { id: '2', name: await tag(turret, 'Turret.stl'), extrusionMm: 1000 },
+            ],
+          })
+          await service.receivePrintSlicedFile({ runId: '7' }, file)
+
+          await service.receivePrintUsage({ runId: '7', spools: [{ spoolId: 1, grams: 80 }] })
+
+          expect([await used(hull), await used(turret)]).toEqual([
+            [[filament.id, expect.closeTo(60, 6)]],
+            [[filament.id, expect.closeTo(20, 6)]],
+          ])
         })
 
         it('asks to send spools again for a print it has not heard of yet', async () => {

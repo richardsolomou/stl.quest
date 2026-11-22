@@ -3,7 +3,7 @@
  * vendor change, and after each burst of changes and every few minutes it sends all spools if any changed, and on start
  * and reconnect always, so a missed event or a restart never leaves STL Quest behind. It also collects the spools STL
  * Quest queued to add, adds them to Spoolman, and reports each one back; and, given a Bambuddy, reads what each print
- * charged to which Spoolman spool and sends that too. It only connects out: Spoolman and Bambuddy stay on the local
+ * charged to which Spoolman spool and sends that too, along with the sliced file of each print STL Quest asks for. It only connects out: Spoolman and Bambuddy stay on the local
  * network, their addresses and keys stay here, and STL Quest receives with its ingest token. Node runs this file
  * directly, so it uses only erasable TypeScript.
  */
@@ -13,6 +13,7 @@ export type Config = {
   ingestUrl: string
   restocksUrl: string
   usageUrl: string
+  slicedUrl: string
   token: string
   debounceMs: number
   resyncMs: number
@@ -65,6 +66,7 @@ export function readConfig(environment: Environment): Config {
     ingestUrl: `${app}/api/spoolman/spools`,
     restocksUrl: `${app}/api/spoolman/restocks`,
     usageUrl: `${app}/api/bambuddy/usage`,
+    slicedUrl: `${app}/api/bambuddy/sliced`,
     token: required('STLQUEST_TOKEN'),
     debounceMs: seconds('DEBOUNCE_SECONDS', 3),
     resyncMs: seconds('RESYNC_SECONDS', 15 * 60),
@@ -108,17 +110,30 @@ export async function fetchSpools(config: Config, fetcher: typeof fetch = fetch)
 }
 
 /**
- * Calls STL Quest with the token, posting `body` when there is one. A 404 comes back for the caller to read; a refused
- * token, a request to slow down, or any other failure throws.
+ * Calls STL Quest with the token, posting `body` when there is one: JSON, or a stream of bytes. A status in `passed`
+ * (404 by default) comes back for the caller to read; a refused token, a request to slow down, or any other failure
+ * throws.
  */
-async function stlQuest(config: Config, url: string, body: unknown, fetcher: typeof fetch) {
+async function stlQuest(
+  config: Config,
+  url: string,
+  body: unknown,
+  fetcher: typeof fetch,
+  { passed = [404], timeoutMs = 30_000 }: { passed?: number[]; timeoutMs?: number } = {},
+) {
+  const stream = body instanceof ReadableStream
   const response = await fetcher(url, {
     ...(body !== undefined && { method: 'POST' }),
-    headers: { authorization: `Bearer ${config.token}`, ...(body !== undefined && { 'content-type': 'application/json' }) },
-    ...(body !== undefined && { body: JSON.stringify(body) }),
-    signal: AbortSignal.timeout(30_000),
+    headers: {
+      authorization: `Bearer ${config.token}`,
+      ...(body !== undefined && { 'content-type': stream ? 'application/octet-stream' : 'application/json' }),
+    },
+    ...(body !== undefined && { body: stream ? body : JSON.stringify(body) }),
+    // Node sends a streamed body only half duplex.
+    ...(stream && { duplex: 'half' }),
+    signal: AbortSignal.timeout(timeoutMs),
   })
-  if (response.ok || response.status === 404) return response
+  if (response.ok || passed.includes(response.status)) return response
   const reason = await response.text().catch(() => '')
   if (response.status === 401) throw new Error('STL Quest refused the token; create a new one under Settings → Spoolman')
   if (response.status === 429) throw new RetryLater(Number(response.headers.get('retry-after') ?? 60) * 1_000)
@@ -183,6 +198,10 @@ export async function syncRestocks(config: Config, fetcher: typeof fetch = fetch
 /** One print in Bambuddy's print log (`GET /api/v1/print-log/`), whose ID is the run ID its webhook sends. */
 export type BambuddyRun = {
   id: number
+  /** The archived file the run printed. */
+  archive_id?: number | null
+  /** Which plate of a file of several the run printed, 1-based. */
+  plate_id?: number | null
   printer_id?: number | null
   print_name?: string | null
   status: string
@@ -270,7 +289,7 @@ export async function syncPrints(
   log: Log = () => {},
 ) {
   const { bambuddy } = config
-  if (!bambuddy) return
+  if (!bambuddy) return []
   const { items: runs } = await readBambuddy<{ items: BambuddyRun[] }>(bambuddy, '/api/v1/print-log/?limit=100', fetcher)
   const usage = await readBambuddy<BambuddyUsage[]>(bambuddy, '/api/v1/inventory/usage?spoolman=true&limit=500', fetcher)
   let posts = 0
@@ -286,6 +305,83 @@ export async function syncPrints(
   }
   const recent = new Set(runs.map(({ id }) => String(id)))
   for (const runId of sent.keys()) if (!recent.has(runId)) sent.delete(runId)
+  return runs
+}
+
+/** The most a sliced file may be for STL Quest to take it, as `MAX_SLICED_FILE_BYTES` in STL Quest says. */
+export const MAX_SLICED_FILE_BYTES = 64 * 1024 * 1024
+/** Sliced files sent a poll at most; each can be tens of MB. */
+const MAX_SLICED_PER_POLL = 3
+/** Downloading a large file from Bambuddy and sending it on can take a while on a slow uplink. */
+const SLICED_TIMEOUT_MS = 5 * 60_000
+
+/**
+ * Sends STL Quest the sliced file of each print it asks for, downloaded from Bambuddy's archive and streamed on as it
+ * arrives. `runs` is Bambuddy's print log, which says which plate of the file each run printed. A file Bambuddy does
+ * not have, or that is too large or that STL Quest cannot read, goes in `skipped` and is not tried again.
+ */
+export async function sendSlicedFiles(
+  config: Config,
+  runs: BambuddyRun[],
+  skipped: Set<string>,
+  fetcher: typeof fetch = fetch,
+  log: Log = () => {},
+) {
+  const { bambuddy } = config
+  if (!bambuddy) return
+  const asked = await stlQuest(config, config.slicedUrl, undefined, fetcher)
+  // An STL Quest from before sliced files has no such endpoint.
+  if (asked.status === 404) return
+  const { runs: wanted } = (await asked.json()) as { runs: { run_id: string; archive_id?: string }[] }
+  let sent = 0
+  for (const { run_id: runId, archive_id: wantedArchive } of wanted) {
+    if (skipped.has(runId)) continue
+    if (sent++ === MAX_SLICED_PER_POLL) break
+    const printed = runs.find(({ id }) => String(id) === runId)
+    const archiveId = printed?.archive_id ?? wantedArchive
+    const skip = (reason: string) => {
+      skipped.add(runId)
+      log(`not sending the sliced file of run ${runId}: ${reason}`)
+    }
+    if (archiveId === undefined || archiveId === null) {
+      skip('Bambuddy archived no file for it')
+      continue
+    }
+    const file = await fetcher(`${bambuddy.url}/api/v1/archives/${encodeURIComponent(String(archiveId))}/download`, {
+      headers: { 'X-API-Key': bambuddy.apiKey },
+      signal: AbortSignal.timeout(SLICED_TIMEOUT_MS),
+    })
+    if (file.status === 401 || file.status === 403)
+      throw new Error('Bambuddy refused the API key; it needs Read Status, and its owner needs to see every archive')
+    if (file.status === 404) {
+      skip('Bambuddy’s archive does not have it')
+      continue
+    }
+    if (!file.ok || !file.body) throw new Error(`Bambuddy answered ${file.status}`)
+    if (Number(file.headers.get('content-length')) > MAX_SLICED_FILE_BYTES) {
+      await file.body.cancel()
+      skip(`it is larger than ${MAX_SLICED_FILE_BYTES / 1024 / 1024} MB`)
+      continue
+    }
+    const query = new URLSearchParams({ run_id: runId, ...(printed?.plate_id && { plate: String(printed.plate_id) }) })
+    const response = await stlQuest(config, `${config.slicedUrl}?${query}`, file.body, fetcher, {
+      passed: [404, 413, 422],
+      timeoutMs: SLICED_TIMEOUT_MS,
+    })
+    if (response.ok) log(`sent the sliced file of run ${runId} to STL Quest`)
+    else if (response.status === 404) log(`STL Quest has not received run ${runId} yet; sending its sliced file again next poll`)
+    else skip(await refusalOf(response))
+  }
+}
+
+/** STL Quest's reason for refusing a request: its JSON `error`, else its text. */
+async function refusalOf(response: Response) {
+  const text = (await response.text().catch(() => '')).trim()
+  try {
+    const { error } = JSON.parse(text) as { error?: unknown }
+    if (typeof error === 'string') return error
+  } catch {}
+  return text || `STL Quest answered ${response.status}`
 }
 
 type Log = (message: string) => void
@@ -369,7 +465,13 @@ export function run(config: Config, log: Log = console.log) {
   repeat('restocks', config.restockMs, () => syncRestocks(config, fetch, log), log)
   if (config.bambuddy) {
     const sent = new Map<string, string>()
-    repeat('Bambuddy', config.bambuddy.pollMs, () => syncPrints(config, sent, fetch, Date.now(), log), log)
+    const skipped = new Set<string>()
+    repeat(
+      'Bambuddy',
+      config.bambuddy.pollMs,
+      async () => sendSlicedFiles(config, await syncPrints(config, sent, fetch, Date.now(), log), skipped, fetch, log),
+      log,
+    )
   }
 }
 

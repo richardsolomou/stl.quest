@@ -116,6 +116,7 @@ export function mapPrintJob(row: typeof printJobs.$inferSelect): PrintJob {
     ...optional('grams'),
     ...optional('filamentDetails'),
     ...(row.filamentUsage !== null && { filamentUsage: JSON.parse(row.filamentUsage) as PrintSpoolUsage[] }),
+    ...(row.slicedPlate !== null && { slicedPlate: JSON.parse(row.slicedPlate) as NonNullable<PrintJob['slicedPlate']> }),
     ...optional('reason'),
     ...optional('progress'),
     ...optional('archiveId'),

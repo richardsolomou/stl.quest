@@ -109,3 +109,37 @@ export function slicedPlateArchive(files: Record<string, string>) {
 function escapeXml(text: string) {
   return text.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
 }
+
+export type LayeredFixtureObject = { id: string; name: string; layers: number; mmPerLayer: number }
+
+/**
+ * A plate as Bambu Studio writes it layer by layer: each layer starts with its `M73 P` progress marker and Z height,
+ * then prints every object still that tall, so a short object is done before a tall one's top layers.
+ */
+export function layeredPlateGcode(objects: LayeredFixtureObject[], { markers = true } = {}) {
+  const layers = Math.max(...objects.map((object) => object.layers))
+  const lines = ['; HEADER_BLOCK_START', '; BambuStudio 02.09.01.70', `; total layer number: ${layers}`, '; HEADER_BLOCK_END', 'M83', 'T0']
+  if (markers) lines.push(`M73 P0 R${layers}`)
+  for (let layer = 0; layer < layers; layer++) {
+    lines.push('; CHANGE_LAYER', `; Z_HEIGHT: ${((layer + 1) * 0.2).toFixed(2)}`)
+    if (markers) lines.push(`M73 P${Math.floor((layer * 100) / layers)} R${layers - layer}`, `M73 L${layer + 1}`)
+    for (const object of objects.filter((candidate) => candidate.layers > layer))
+      lines.push(
+        `; start printing object, unique label id: ${object.id}`,
+        `G1 X1 Y1 E${object.mmPerLayer}`,
+        `; stop printing object, unique label id: ${object.id}`,
+      )
+  }
+  if (markers) lines.push('M73 P100 R0')
+  lines.push('M84')
+  return lines.join('\n') + '\n'
+}
+
+export function layeredPlateFile(objects: LayeredFixtureObject[], options?: { markers?: boolean }) {
+  return slicedPlateArchive({
+    'Metadata/plate_1.gcode': layeredPlateGcode(objects, options),
+    'Metadata/slice_info.config': slicedPlateSliceInfo({
+      objects: objects.map(({ id, name, layers, mmPerLayer }) => ({ id, name, extrusionMm: layers * mmPerLayer })),
+    }),
+  })
+}

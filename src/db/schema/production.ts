@@ -380,6 +380,8 @@ export const printJobs = sqliteTable(
     filamentDetails: text('filament_details'),
     /** JSON: what the print used per Spoolman spool, as `PrintSpoolUsage[]`. */
     filamentUsage: text('filament_usage'),
+    /** JSON: what its sliced file from Bambuddy's archive says each object used, as `PrintSlicedPlate`. */
+    slicedPlate: text('sliced_plate'),
     reason: text(),
     progress: real(),
     archiveId: text('archive_id'),

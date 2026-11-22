@@ -23,18 +23,36 @@ export async function ingestWorkspace(request: Request, limiter: ReturnType<type
   return await (await app()).spoolmanWorkspace(tokenHash)
 }
 
-/** Reads a push to an ingest endpoint: the workspace first, then a JSON body bounded before it is parsed. */
+/** Reads a push to an ingest endpoint: the workspace first, then a body of `contentType` bounded as it streams in. */
+export async function readIngestBytes(
+  request: Request,
+  {
+    maxBytes,
+    limiter,
+    invalid,
+    contentType,
+  }: { maxBytes: number; limiter: ReturnType<typeof fixedWindowLimiter>; invalid: string; contentType: RegExp },
+) {
+  const context = await ingestWorkspace(request, limiter)
+  if (context instanceof Response) return context
+  if (!contentType.test(request.headers.get('content-type') ?? '')) {
+    await request.body?.cancel()
+    return ingestProblem(415, invalid)
+  }
+  const body = await readLimitedBody(request, maxBytes)
+  if (!body) return ingestProblem(413, serverMessages().server.spoolman.tooLarge(maxBytes / 1024 / 1024))
+  return { context, body }
+}
+
+/** Reads a JSON push to an ingest endpoint, bounded before it is parsed. */
 export async function readIngest(
   request: Request,
   { maxBytes, limiter, invalid }: { maxBytes: number; limiter: ReturnType<typeof fixedWindowLimiter>; invalid: string },
 ) {
-  const context = await ingestWorkspace(request, limiter)
-  if (context instanceof Response) return context
-  if (!/^application\/json\b/i.test(request.headers.get('content-type') ?? '')) return ingestProblem(415, invalid)
-  const body = await readLimitedBody(request, maxBytes)
-  if (!body) return ingestProblem(413, serverMessages().server.spoolman.tooLarge(maxBytes / 1024 / 1024))
+  const read = await readIngestBytes(request, { maxBytes, limiter, invalid, contentType: /^application\/json\b/i })
+  if (read instanceof Response) return read
   try {
-    return { context, json: JSON.parse(new TextDecoder().decode(body)) as unknown }
+    return { context: read.context, json: JSON.parse(new TextDecoder().decode(read.body)) as unknown }
   } catch {
     return ingestProblem(400, invalid)
   }

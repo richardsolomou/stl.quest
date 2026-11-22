@@ -1,0 +1,1 @@
+ALTER TABLE `print_jobs` ADD `sliced_plate` text;

@@ -40,6 +40,13 @@ export type SlicedPlate = {
   slicerGrams?: number
   /** The slicer's print time prediction. */
   minutes?: number
+  /**
+   * For a print that stopped at a progress, what each object (in `objects` order) and the overhead had used by then,
+   * per slot: everything extruded before the G-code's `M73 P` progress markers passed it. The slicer prints layer by
+   * layer, so an object shorter than where the print stopped is whole and a taller one is cut at that height. Absent
+   * when the G-code has no progress markers.
+   */
+  printed?: { objects: number[][]; overhead: number[] }
 }
 
 export class SlicedFileError extends Error {}
@@ -54,11 +61,14 @@ const DEFAULT_DIAMETER = 1.75
 /** Bambu firmware takes T255, T65279, and T65535 as commands rather than tools, so only a loaded slot switches. */
 const MAX_SLOTS_UNSTATED = 64
 
-/** Reads a Bambu Studio or OrcaSlicer `.gcode.3mf` (every plate G-code it holds) or a plain `.gcode`. */
-export function readSlicedFile(bytes: Uint8Array, fileName: string): SlicedPlate[] {
-  if (isZip(bytes)) return readArchive(bytes)
+/**
+ * Reads a Bambu Studio or OrcaSlicer `.gcode.3mf` (every plate G-code it holds) or a plain `.gcode`, and with
+ * `stoppedAt`, a print's progress in percent, also what it had printed by then.
+ */
+export function readSlicedFile(bytes: Uint8Array, fileName: string, stoppedAt?: number): SlicedPlate[] {
+  if (isZip(bytes)) return readArchive(bytes, stoppedAt)
   if (!/\.g(code)?$/i.test(fileName)) throw new SlicedFileError('not a sliced file')
-  const reader = new GcodeReader()
+  const reader = new GcodeReader(stoppedAt)
   const decoder = new TextDecoder()
   for (let offset = 0; offset < bytes.length; offset += CHUNK)
     reader.push(decoder.decode(bytes.subarray(offset, offset + CHUNK), { stream: true }))
@@ -70,7 +80,7 @@ function isZip(bytes: Uint8Array) {
   return bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 3 && bytes[3] === 4
 }
 
-function readArchive(bytes: Uint8Array) {
+function readArchive(bytes: Uint8Array, stoppedAt?: number) {
   let directoryEntries = 0
   let entries = 0
   const readers = new Map<number, GcodeReader>()
@@ -88,7 +98,7 @@ function readArchive(bytes: Uint8Array) {
       const plate = PLATE_GCODE.exec(entry.name)
       if (!plate && entry.name !== SLICE_INFO) return
       const decoder = new TextDecoder()
-      const reader = plate ? new GcodeReader() : undefined
+      const reader = plate ? new GcodeReader(stoppedAt) : undefined
       if (plate) readers.set(Number(plate[1]), reader!)
       let text = ''
       entry.ondata = (error, chunk, final) => {
@@ -184,6 +194,10 @@ class GcodeReader {
   private colors: string[] = []
   private totalGrams?: number
   private estimatedMinutes?: number
+  private progressMarked = false
+  private printed?: { objects: Map<string, number[]>; overhead: number[] }
+
+  constructor(private readonly stoppedAt?: number) {}
 
   push(text: string) {
     const lines = (this.rest + text).split('\n')
@@ -219,6 +233,13 @@ class GcodeReader {
       filaments,
       ...optional('slicerGrams', info?.weight ?? this.totalGrams),
       ...optional('minutes', info?.predictionSeconds !== undefined ? info.predictionSeconds / 60 : this.estimatedMinutes),
+      ...(this.stoppedAt !== undefined &&
+        this.progressMarked && {
+          printed: {
+            objects: ids.map((id) => grams((this.printed?.objects ?? this.objects).get(id) ?? [])),
+            overhead: grams(this.printed?.overhead ?? this.overhead),
+          },
+        }),
     }
   }
 
@@ -245,7 +266,10 @@ class GcodeReader {
     const command = code.split(/\s/, 1)[0].toUpperCase()
     if (command === 'M82') this.relative = false
     else if (command === 'M83') this.relative = true
-    else if (command === 'G92') {
+    else if (command === 'M73') {
+      const progress = /\sP(\d+(?:\.\d+)?)/i.exec(code)
+      if (progress) this.progress(Number(progress[1]))
+    } else if (command === 'G92') {
       const e = extrusion(code)
       if (e !== undefined) this.lastE = e
     } else if (/^T\d+$/.test(command)) {
@@ -258,6 +282,16 @@ class GcodeReader {
       if (!this.relative) this.lastE = e
       const lengths = this.label === undefined ? this.overhead : this.objectLengths(this.label)
       lengths[this.slot] = (lengths[this.slot] ?? 0) + length
+    }
+  }
+
+  /** The printer shows a marker's percent until the next one, so a print stopped at a percent got as far as the first marker past it. */
+  private progress(percent: number) {
+    this.progressMarked = true
+    if (this.stoppedAt === undefined || this.printed || percent <= this.stoppedAt) return
+    this.printed = {
+      objects: new Map([...this.objects].map(([id, lengths]) => [id, [...lengths]])),
+      overhead: [...this.overhead],
     }
   }
 

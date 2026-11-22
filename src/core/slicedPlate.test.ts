@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { strToU8, zipSync } from 'fflate'
-import { filamentGrams, slicedPlateArchive, slicedPlateFile, slicedPlateGcode, slicedPlateSliceInfo } from '../../e2e/fixtures/slicedPlate'
+import {
+  filamentGrams,
+  layeredPlateFile,
+  slicedPlateArchive,
+  slicedPlateFile,
+  slicedPlateGcode,
+  slicedPlateSliceInfo,
+} from '../../e2e/fixtures/slicedPlate'
 import { readSlicedFile, SlicedFileError } from './slicedPlate'
 
 const PLA = { type: 'PLA', color: '#6F5034', density: 1.24, diameter: 1.75 }
@@ -163,5 +170,43 @@ describe('readSlicedFile', () => {
 
   it('rejects a project that was never sliced', () => {
     expect(() => readSlicedFile(zipSync({ '3D/3dmodel.model': strToU8('<model/>') }), 'project.3mf')).toThrow(SlicedFileError)
+  })
+})
+
+describe('readSlicedFile up to a progress', () => {
+  const objects = [
+    { id: '1', name: 'Short.stl', layers: 20, mmPerLayer: 10 },
+    { id: '2', name: 'Tall.stl', layers: 100, mmPerLayer: 10 },
+  ]
+  const stoppedAt = (progress?: number, markers = true) =>
+    readSlicedFile(layeredPlateFile(objects, { markers }), 'plate.gcode.3mf', progress)[0]
+  const printedMm = (progress: number) => stoppedAt(progress).printed!.objects.map((grams) => grams[0] / filamentGrams(1, PLA))
+
+  it('charges an object shorter than where the print stopped in full', () => {
+    expect(printedMm(50)[0]).toBeCloseTo(200, 6)
+  })
+
+  it('charges a taller object only up to where the print stopped', () => {
+    expect(printedMm(50)[1]).toBeCloseTo(510, 6)
+  })
+
+  it('charges nothing past the first layer at 0%', () => {
+    expect(printedMm(0)).toEqual([expect.closeTo(10, 6), expect.closeTo(10, 6)])
+  })
+
+  it('keeps every object whole at 100%', () => {
+    expect(printedMm(100)).toEqual([expect.closeTo(200, 6), expect.closeTo(1000, 6)])
+  })
+
+  it('keeps the whole plate alongside what was printed', () => {
+    expect(stoppedAt(50).objects[1].grams[0]).toBeCloseTo(filamentGrams(1000, PLA), 6)
+  })
+
+  it('reports nothing printed for G-code without progress markers', () => {
+    expect(stoppedAt(50, false).printed).toBeUndefined()
+  })
+
+  it('reports nothing printed when no progress is asked for', () => {
+    expect(stoppedAt().printed).toBeUndefined()
   })
 })

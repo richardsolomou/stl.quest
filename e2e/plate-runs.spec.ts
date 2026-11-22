@@ -4,6 +4,7 @@ import { request as httpRequest, type Locator, type Page } from '@playwright/tes
 import { strFromU8, unzipSync } from 'fflate'
 import { expect, test } from './fixtures/test'
 import { expectWithinViewportWidth } from './fixtures/layout'
+import { layeredPlateFile } from './fixtures/slicedPlate'
 import { boxStl } from './fixtures/stl'
 import { enterAdminWorkspace } from './fixtures/workspace'
 
@@ -127,11 +128,54 @@ test('runs a plate as one and sends it back to print again when Bambuddy reports
   await expect(station.locator(`[data-plate-badge="${retried}"]`)).toHaveCount(2)
   const failed = await page.request.post('/api/bambuddy/events', {
     headers: { authorization: `Bearer ${token}` },
-    data: { event: 'print_failed', printer, filename: 'plate', duration: '0h 42m', filament_grams: '9.0', progress: '35' },
+    data: {
+      event: 'print_failed',
+      printer,
+      filename: 'plate',
+      duration: '0h 42m',
+      filament_grams: '9.0',
+      progress: '35',
+      run_id: '9001',
+      archive_id: '77',
+    },
   })
   expect(failed.status()).toBe(204)
   const upNext = page.locator('[data-status="up_next"]')
   await expect(upNext.getByText(`Plate #${retried} failed`)).toHaveCount(2)
+  // The bridge asks which prints want their sliced file and streams it from Bambuddy's archive with the same token.
+  const bridge = { authorization: `Bearer ${token}` }
+  expect((await page.request.get('/api/bambuddy/sliced', { headers: { authorization: 'Bearer stlq_spoolman_wrong' } })).status()).toBe(401)
+  const wanted = (await (await page.request.get('/api/bambuddy/sliced', { headers: bridge })).json()) as { runs: unknown[] }
+  expect(wanted.runs).toContainEqual({ run_id: '9001', archive_id: '77' })
+  const slicedFile = (runId: string) =>
+    page.request.post(`/api/bambuddy/sliced?run_id=${runId}`, {
+      headers: { ...bridge, 'content-type': 'application/octet-stream' },
+      data: Buffer.from(
+        layeredPlateFile([
+          { id: '1', name: `${retries[0]}.stl`, layers: 20, mmPerLayer: 10 },
+          { id: '2', name: `${retries[1]}.stl`, layers: 100, mmPerLayer: 10 },
+        ]),
+      ),
+    })
+  expect((await slicedFile('9999')).status()).toBe(404)
+  expect((await slicedFile('9001')).status()).toBe(204)
+  const afterFile = (await (await page.request.get('/api/bambuddy/sliced', { headers: bridge })).json()) as { runs: unknown[] }
+  expect(afterFile.runs).not.toContainEqual({ run_id: '9001', archive_id: '77' })
+  // The failed plate says its waste stops where the print did, read from the sliced file.
+  await card(page, retries[1]).click()
+  await page.getByRole('button', { name: `On plate #${retried}` }).click()
+  const failedPlate = page.getByRole('dialog', { name: `Plate #${retried}` })
+  const slicedNote = failedPlate.getByText('Its waste stops where it did, by the sliced file from Bambuddy')
+  await expect(slicedNote).toBeVisible()
+  await screenshot(page, 'plate-run-failed-sliced')
+  await page.setViewportSize({ width: 320, height: 800 })
+  await slicedNote.scrollIntoViewIfNeeded()
+  await expectWithinViewportWidth(page, slicedNote)
+  await screenshot(page, 'plate-run-failed-sliced-mobile')
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
   await screenshot(page, 'plate-run-failed')
   await page.setViewportSize({ width: 320, height: 800 })
   const flag = upNext.getByText(`Plate #${retried} failed`).first()

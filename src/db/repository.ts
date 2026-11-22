@@ -4751,6 +4751,7 @@ function printJobRow(job: PrintJobChanges) {
     grams: job.grams ?? null,
     filamentDetails: job.filamentDetails ?? null,
     filamentUsage: job.filamentUsage ? JSON.stringify(job.filamentUsage) : null,
+    slicedPlate: job.slicedPlate ? JSON.stringify(job.slicedPlate) : null,
     reason: job.reason ?? null,
     progress: job.progress ?? null,
     archiveId: job.archiveId ?? null,
