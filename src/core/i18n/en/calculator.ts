@@ -51,7 +51,8 @@ export const calculator = {
     resinAmount: (amount: string) => `${amount} mL resin`,
     filamentAmount: (amount: string) => `${amount} g filament`,
     printElectricity: 'Print electricity',
-    failureAllowance: 'Failure allowance',
+    failureAllowance: (percent: string) => `Failure allowance (${percent})`,
+    measuredFailureAllowance: (percent: string, runs: number) => `Failure allowance (${percent}, measured over ${runs} runs)`,
     labour: 'Labour',
     costToMake: 'Cost to make',
     printerWear: 'Printer wear',
@@ -131,6 +132,8 @@ export const calculator = {
     businessDescription: 'What your time costs, how often prints fail, and what you add on top.',
     labour: (symbol: string) => `Labour (${symbol}/h)`,
     failureAllowance: 'Failure allowance (%)',
+    failureAllowanceHint: (runs: number) =>
+      `A printer with ${runs} or more finished or failed plate runs reported by Bambuddy prices failures from its own rate instead. Stopped prints don’t count, and 0% stays 0%.`,
     markup: 'Markup on cost (%)',
     markupHint: (markup: string, share: string) => `A ${markup}% markup keeps ${share}% of each sale as profit.`,
   },

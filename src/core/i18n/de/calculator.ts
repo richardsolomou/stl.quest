@@ -57,7 +57,8 @@ export const calculator: typeof en = {
     resinAmount: (amount: string) => `${amount} mL Harz`,
     filamentAmount: (amount: string) => `${amount} g Filament`,
     printElectricity: 'Strom für den Druck',
-    failureAllowance: 'Ausfallreserve',
+    failureAllowance: (percent) => `Ausfallreserve (${percent})`,
+    measuredFailureAllowance: (percent, runs) => `Ausfallreserve (${percent}, gemessen über ${runs} Plattenläufe)`,
     labour: 'Arbeitszeit',
     costToMake: 'Herstellungskosten',
     printerWear: 'Druckerverschleiß',
@@ -142,6 +143,8 @@ export const calculator: typeof en = {
     businessDescription: 'Was Ihre Zeit kostet, wie oft Drucke scheitern und was Sie aufschlagen.',
     labour: (symbol: string) => `Arbeitszeit (${symbol}/h)`,
     failureAllowance: 'Ausfallreserve (%)',
+    failureAllowanceHint: (runs) =>
+      `Ein Drucker mit ${runs} oder mehr von Bambuddy gemeldeten fertigen oder fehlgeschlagenen Plattenläufen berechnet Ausfälle stattdessen mit seiner eigenen Quote. Abgebrochene Drucke zählen nicht, und 0 % bleibt 0 %.`,
     markup: 'Aufschlag auf die Kosten (%)',
     markupHint: (markup: string, share: string) => `Bei ${markup} % Aufschlag bleiben ${share} % jedes Verkaufs als Gewinn.`,
   },

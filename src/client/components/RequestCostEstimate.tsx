@@ -18,7 +18,9 @@ export function RequestCostEstimate({ request }: { request: PublicPrintRequest }
   const { t, locale } = useI18n()
   const workspaceSlug = useWorkspaceSlug()
   const query = useQuery(priceCalculatorSettingsQuery(workspaceSlug))
-  const printers = useQuery(printersQuery(workspaceSlug)).data?.profiles ?? []
+  const printerData = useQuery(printersQuery(workspaceSlug)).data
+  const printers = printerData?.profiles ?? []
+  const printerRuns = printerData?.runs ?? []
   const consumables = usePricedConsumables(workspaceSlug, query.data?.settings.currency ?? DEFAULT_PRICE_CALCULATOR_SETTINGS.currency)
   const equipment = useQuery(equipmentQuery(workspaceSlug)).data?.equipment ?? []
   const estimate = requestPrintEstimate(request)
@@ -26,9 +28,9 @@ export function RequestCostEstimate({ request }: { request: PublicPrintRequest }
   const { settings } = query.data
   const input = { ...estimate, printType: request.printType, quantity: request.quantity }
   const assigned = printers.find((printer) => printer.id === request.printer?.id && printer.printType === request.printType)
-  const quote = priceRequest({ rates: settings, consumables, printer: assigned, equipment }, input)
+  const quote = priceRequest({ rates: settings, consumables, printer: assigned, equipment, printerRuns }, input)
   if (!quote) return null
-  const comparison = priceRequestOnPrinters(settings, printers, input, consumables, equipment)
+  const comparison = priceRequestOnPrinters(settings, printers, input, consumables, equipment, printerRuns)
   const money = (value: number) => formatMoney(value, settings.currency, locale)
   const others = comparison
     .flatMap(({ printer, quote: printerQuote }) => (printerQuote ? [{ printer, cost: printerQuote.result.estimatedCost }] : []))

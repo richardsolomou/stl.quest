@@ -11,6 +11,7 @@ import {
   type PriceCalculatorJob,
   type PriceCalculatorSettings,
 } from '../../core/priceCalculator'
+import type { PrinterRunCount } from '../../core/printJobs'
 import type { PrinterProfile, PrintType } from '../../core/types'
 import type { calculatorPrefill } from '../calculatorSearch'
 import { requestPrintTypeChoices } from '../fleet'
@@ -48,7 +49,9 @@ export function PriceCalculator({
 }) {
   const { t } = useI18n()
   const query = useQuery(priceCalculatorSettingsQuery(workspaceSlug))
-  const printers = useQuery(printersQuery(workspaceSlug)).data?.profiles.filter((printer) => !printer.archived) ?? []
+  const printerData = useQuery(printersQuery(workspaceSlug)).data
+  const printers = printerData?.profiles.filter((printer) => !printer.archived) ?? []
+  const printerRuns = printerData?.runs ?? []
   const consumables = usePricedConsumables(workspaceSlug, query.data?.settings.currency ?? DEFAULT_PRICE_CALCULATOR_SETTINGS.currency)
   const equipment = useQuery(equipmentQuery(workspaceSlug)).data?.equipment.filter((item) => !item.archived) ?? []
   if (!query.data) {
@@ -72,6 +75,7 @@ export function PriceCalculator({
         settings={query.data.settings}
         saved={query.data.saved}
         printers={printers}
+        printerRuns={printerRuns}
         consumables={consumables}
         equipment={equipment}
       />
@@ -82,6 +86,7 @@ export function PriceCalculator({
       rates={query.data.settings}
       saved={query.data.saved}
       printers={printers}
+      printerRuns={printerRuns}
       consumables={consumables}
       equipment={equipment}
       prefill={prefill}
@@ -100,6 +105,7 @@ function LoadedPriceCalculator({
   rates,
   saved,
   printers,
+  printerRuns,
   consumables,
   equipment,
   prefill,
@@ -107,6 +113,7 @@ function LoadedPriceCalculator({
   rates: PriceCalculatorSettings
   saved: boolean
   printers: PrinterProfile[]
+  printerRuns: PrinterRunCount[]
   consumables: Consumable[]
   equipment: EquipmentItem[]
   prefill?: Prefill
@@ -126,7 +133,7 @@ function LoadedPriceCalculator({
   const material = picked(materials, materialId)
   const usable = equipment.filter((item) => servesPrintType(item, printType))
   const chosenEquipment = chosenFinishing(usable, printType, equipmentIds)
-  const picks = { rates, printType, consumables, material, equipment: chosenEquipment }
+  const picks = { rates, printType, consumables, material, equipment: chosenEquipment, printerRuns }
   const cost = (on?: PrinterProfile) => costPrint({ ...picks, job, printer: on })
   const result = cost(printer)
   const basis = costBasis({ ...picks, printer })

@@ -51,6 +51,7 @@ export function QuoteSection({
   const money = (value: number) => formatMoney(value, rates.currency, locale)
   const result = roundQuote(exact, rates.currency)
   const markup = formatNumber(rates.markupPercent, locale)
+  const failurePercent = `${formatNumber(result.failureRate.percent, locale, 1)}%`
   const others = [...comparison].sort((a, b) => a.result.suggestedPrice - b.result.suggestedPrice)
   const cheapest = others[0]?.result.suggestedPrice
   const dearest = others.at(-1)?.result.suggestedPrice
@@ -119,7 +120,14 @@ export function QuoteSection({
                   </Fragment>
                 )
               })}
-              <CostRow label={copy.failureAllowance} value={money(result.failureAllowance)} />
+              <CostRow
+                label={
+                  result.failureRate.runs === undefined
+                    ? copy.failureAllowance(failurePercent)
+                    : copy.measuredFailureAllowance(failurePercent, result.failureRate.runs)
+                }
+                value={money(result.failureAllowance)}
+              />
               {result.labour > 0 && <CostRow label={copy.labour} value={money(result.labour)} />}
               <TotalRow label={copy.costToMake} value={money(result.costToMake)} />
               <CostRow label={copy.markupAmount(markup)} value={money(result.markup)} />

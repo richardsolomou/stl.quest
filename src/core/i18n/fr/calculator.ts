@@ -57,7 +57,8 @@ export const calculator: typeof en = {
     resinAmount: (amount: string) => `${amount} mL de résine`,
     filamentAmount: (amount: string) => `${amount} g de filament`,
     printElectricity: 'Électricité d’impression',
-    failureAllowance: 'Marge pour échecs',
+    failureAllowance: (percent) => `Marge pour échecs (${percent})`,
+    measuredFailureAllowance: (percent, runs) => `Marge pour échecs (${percent}, mesurée sur ${runs} passages de plateau)`,
     labour: 'Main-d’œuvre',
     costToMake: 'Coût de production',
     printerWear: 'Usure de l’imprimante',
@@ -141,6 +142,8 @@ export const calculator: typeof en = {
     businessDescription: 'Ce que coûte votre temps, la fréquence des échecs et ce que vous ajoutez.',
     labour: (symbol: string) => `Main-d’œuvre (${symbol}/h)`,
     failureAllowance: 'Marge pour échecs (%)',
+    failureAllowanceHint: (runs) =>
+      `Une imprimante avec ${runs} passages de plateau terminés ou échoués ou plus signalés par Bambuddy chiffre les échecs à son propre taux. Les impressions arrêtées ne comptent pas, et 0 % reste 0 %.`,
     markup: 'Majoration sur le coût (%)',
     markupHint: (markup: string, share: string) => `Une majoration de ${markup} % garde ${share} % de chaque vente comme bénéfice.`,
   },

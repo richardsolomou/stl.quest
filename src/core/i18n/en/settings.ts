@@ -744,7 +744,8 @@ export const settings = {
       wearPerHour: (cost: string) => `Wears ${cost} per print hour.`,
       lifetime: (run: string, lifespan?: string) => (lifespan ? `${run} of ${lifespan} print hours run` : `${run} print hours run`),
       runs: (runs: number, failed: number, rate: string) =>
-        `${runs} plate ${runs === 1 ? 'run' : 'runs'} reported · ${failed} failed or cancelled (${rate})`,
+        `${runs} plate ${runs === 1 ? 'run' : 'runs'} finished or failed · ${failed} failed (${rate})`,
+      runsPricing: (minimum: number, used: boolean) => (used ? 'Quotes use this rate' : `Quotes use it from ${minimum} runs`),
       pastLifespan: 'Past its lifespan',
       addOns: 'Add-on modules',
       addOnsHint: 'Modules bolted onto this printer that draw power while printing, such as a pulsing release module or an AMS.',

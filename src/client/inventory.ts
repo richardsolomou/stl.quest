@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import type { Consumable } from '../core/consumables'
-import type { InventoryItems, InventoryKind } from '../core/inventory'
+import type { InventoryItem, InventoryItems, InventoryKind } from '../core/inventory'
 import type { PriceCalculatorCurrency } from '../core/priceCalculator'
 import { landedConsumables, type ShippingTakenOut } from '../core/stores'
 import {
@@ -20,6 +20,12 @@ import { useWorkspaceSlug } from './workspace'
 const queries = { printers: printersQuery, equipment: equipmentQuery, consumables: consumablesQuery, stores: storesQuery }
 /** Where each kind's list sits in what its query returns. */
 const listField = { printers: 'profiles', equipment: 'equipment', consumables: 'consumables', stores: 'stores' } as const
+
+/** Puts a changed list in its query's cache, keeping whatever else the query returned (a printer's runs). */
+export function storeInventory(queryClient: QueryClient, workspaceSlug: string, kind: InventoryKind, items: InventoryItem[]) {
+  const { queryKey } = queries[kind](workspaceSlug)
+  queryClient.setQueryData(queryKey, (data) => data && { ...data, [listField[kind]]: items })
+}
 
 type Change<Kind extends InventoryKind> =
   | { item: InventoryItems[Kind]; shippingTakenOut?: ShippingTakenOut }
@@ -42,8 +48,8 @@ export function useInventory<Kind extends InventoryKind>(kind: Kind) {
   const stored = (): InventoryItems[Kind][] =>
     queryClient.getQueryData<Record<string, InventoryItems[Kind][]>>(queryKey)?.[listField[kind]] ?? []
   // What a store sells is repriced with it, so its consumables are fetched again.
-  const changed = async ({ items }: { items: unknown[] }) => {
-    queryClient.setQueryData(queryKey, { [listField[kind]]: items } as never)
+  const changed = async ({ items }: { items: InventoryItem[] }) => {
+    storeInventory(queryClient, workspaceSlug, kind, items)
     if (kind === 'stores') await queryClient.invalidateQueries({ queryKey: consumablesQuery(workspaceSlug).queryKey })
   }
   const mutation = useMutation({
@@ -81,8 +87,7 @@ export function useConsumableBatch() {
   const queryClient = useQueryClient()
   const create = useServerFn(createConsumables)
   const share = useServerFn(shareFilamentPrice)
-  const store = ({ items }: { items: Consumable[] }) =>
-    queryClient.setQueryData(consumablesQuery(workspaceSlug).queryKey, { consumables: items })
+  const store = ({ items }: { items: Consumable[] }) => storeInventory(queryClient, workspaceSlug, 'consumables', items)
   const add = useMutation({
     mutationFn: ({ items, onHand }: { items: Consumable[]; onHand?: number }) => create({ data: { workspaceSlug, items, onHand } }),
     onSuccess: async (result, { onHand }) => {

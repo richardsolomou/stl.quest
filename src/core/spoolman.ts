@@ -182,7 +182,8 @@ export function spoolmanStock(filaments: SpoolmanFilament[], matches: Map<number
   return stock
 }
 
-function sameText(left: string | undefined, right: string | undefined) {
+/** Whether two names read the same, ignoring case, spaces, and punctuation. */
+export function sameText(left: string | undefined, right: string | undefined) {
   const normalize = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')
   return left !== undefined && right !== undefined && normalize(left) === normalize(right)
 }

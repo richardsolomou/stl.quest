@@ -62,6 +62,7 @@ import {
 } from '../core/auth'
 import type { BoardConfig, Repository, Role, StorageMigration, Telemetry } from '../core/types'
 import { PRINTERS_SKIPPED_SETTING } from '../core/printers'
+import { printerRunCounts } from '../core/printJobs'
 import { PRINT_TYPE_SETTING, storedPrintTypeChoice, workspacePrintTypes } from '../core/printTypes'
 import { storedUsageTracking } from '../core/usageTracking'
 import { applyOnboardingProgressOperation, recordOnboardingTask } from '../core/onboarding'
@@ -425,7 +426,11 @@ export const getPrinters = createServerFn({ method: 'GET' })
     rpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      return { profiles: await context.repository.listInventory('printers') }
+      return {
+        profiles: await context.repository.listInventory('printers'),
+        // Quotes price a printer's failures from its own rate once it has reported enough runs.
+        runs: printerRunCounts(await context.repository.listPrintJobs()),
+      }
     }),
   )
 
