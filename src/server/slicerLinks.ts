@@ -29,8 +29,10 @@ export function signSlicerLink(secret: string, claims: SlicerLinkClaims, now = D
 
 /** The claims a link was signed with, or undefined when it was altered, signed by another deployment, or has expired. */
 export function verifySlicerLink(secret: string, payload: string, signed: string, now = Date.now()) {
-  const expected = signature(secret, payload)
-  const given = Buffer.from(signed, 'base64url')
+  // Compared as text: decoding first would accept other spellings of the same bytes, since base64url's last character
+  // carries unused bits.
+  const expected = Buffer.from(signature(secret, payload).toString('base64url'))
+  const given = Buffer.from(signed)
   if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) return undefined
   let parsed: unknown
   try {
