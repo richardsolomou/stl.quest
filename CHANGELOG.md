@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.9.0
+
+### Minor Changes
+
+- 78886ea: Restock from a pasted Bambu Lab order confirmation email under Consumables → What you need, so that what arrived is matched to your filaments and added to stock, with new catalogue colours and prices taken from the order when you choose, without typing each one in.
+- 721ab49: Record the stores you buy consumables from, with their shipping cost and free-shipping threshold, so What you need lists what to buy by store, ranked by days of supply left, with each order's way to free shipping.
+
+### Patch Changes
+
+- 99ba23b: Accept a slicer download link only with its exact signature, so that a link altered in its last character is always refused.
+
 ## 2.8.1
 
 ### Patch Changes
