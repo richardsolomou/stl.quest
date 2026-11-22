@@ -6,7 +6,7 @@ import { imageContentType } from '../core/coverImage'
 import { sourceCoverChange } from '../core/request'
 import { inviteIsActive } from '../core/invites'
 import { createServerFn } from '@tanstack/react-start'
-import { getRequest, setCookie } from '@tanstack/react-start/server'
+import { getRequest } from '@tanstack/react-start/server'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import {
   brandedEmailParts,
@@ -175,7 +175,7 @@ import {
 import { assertStorageAllowed, hostedStorageRequiresRemote, localStorageEnabled, storageConfigured } from './storagePolicy'
 import { HOSTED_OWNED_WORKSPACE_LIMIT, hostedDeployment } from './hosted'
 import { cloudStorageApp, requireCloudStorageApp, setCloudStorageApp } from './cloudStorage'
-import { INVITE_COOKIE, inviteCookiePath, normalizeAuthHeaders, writeAuthCookies } from './authCookies'
+import { normalizeAuthHeaders, writeAuthCookies, writeInviteCookie } from './authCookies'
 import { mutationRpc, rpc } from './rpc'
 import { requestLocale, serverMessages } from './locale'
 import { LOCALES } from '../core/i18n/locales'
@@ -958,7 +958,7 @@ export const createInvite = createServerFn({ method: 'POST' })
         recipientEmail: data.email,
         expiresAt: Date.now() + INVITE_TTL,
       })
-      const url = publicUrl(getRequest(), `/invite/${token}`)
+      const url = inviteUrl(getRequest(), token)
       if (data.email) {
         try {
           await sendInviteEmail(mailer!, await readEmailBranding(context.repository), {
@@ -1036,13 +1036,7 @@ export const beginProviderInvite = createServerFn({ method: 'POST' })
       if (!instance.authCapabilities.socialProviders.includes(data.provider)) {
         throw new Response(errors().auth.providerNotEnabled(data.provider), { status: 400 })
       }
-      setCookie(INVITE_COOKIE, data.token, {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: publicOrigin(getRequest()).startsWith('https:'),
-        path: inviteCookiePath(),
-        maxAge: 10 * 60,
-      })
+      writeInviteCookie(data.token)
       return { provider: data.provider }
     }),
   )
@@ -1910,6 +1904,10 @@ export const getStockLevels = createServerFn({ method: 'GET' })
       }
     }),
   )
+
+export function inviteUrl(request: Request, token: string) {
+  return publicUrl(request, `/invite/${token}`)
+}
 
 /** Where the bridge reaches this app and its ingest endpoint, from the public origin so a TLS proxy's https survives. */
 export function spoolmanUrls(request: Request) {

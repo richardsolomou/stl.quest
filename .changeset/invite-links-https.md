@@ -2,4 +2,4 @@
 'stl.quest': patch
 ---
 
-Build invite links, invite sign-in cookies, and notification email links from the public address so that they keep https behind a TLS proxy.
+Build invite links, notification email links, and the return from connecting cloud storage from the public address, and secure the invite sign-in cookie, so that they keep https behind a TLS proxy.
