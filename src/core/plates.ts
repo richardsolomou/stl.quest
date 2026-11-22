@@ -19,13 +19,18 @@ export const MAX_PLATE_PRINTS = 100
 export const MAX_PLATE_OBJECTS = 1_000
 export const MAX_PLATE_FILAMENTS = 32
 /**
- * The most model data one plate file is built from, each model counted once however many copies it has: models are
- * converted one at a time, so this bounds the server's memory and how long a slicer waits for the file.
+ * The most stored model data one plate file is built from, each model counted once however many copies it has, which
+ * bounds how much a build reads and how long a slicer waits; each model's conversion memory has its own budget.
  */
 export const MAX_PLATE_FILE_BYTES = 256 * 1024 * 1024
 
-/** What a plate's combined file is saved as, which slicers also take as the project's name. */
-export function plateFileName(number: number) {
+/**
+ * What a plate's combined file is saved as, which slicers take as the project's name. OrcaSlicer also names the only
+ * object of a 3MF it did not write after the file, and its copies keep that name, so a one-model plate is named after
+ * the model to keep its tag.
+ */
+export function plateFileName(number: number, objectNames: string[]) {
+  if (objectNames.length === 1) return `${objectNames[0].replace(/\.[^.\s]+$/, '')}.3mf`
   return `stlquest-plate-${number}.3mf`
 }
 

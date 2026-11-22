@@ -5,6 +5,7 @@ import {
   heldByPlates,
   matchSlicedObjects,
   plateBrokenBy,
+  plateFileName,
   plateMoves,
   plateStart,
   plateUsageDrafts,
@@ -21,6 +22,17 @@ import type { UsageEvent } from './usage'
 
 const hull = { requestId: 'hull', name: 'Chimera hull', fileName: 'Chimera_Hull_Uncut_repaired.stl' }
 const turret = { requestId: 'turret', name: 'Turret', fileName: 'Chrimera_Turret.stl' }
+
+describe('plateFileName', () => {
+  it('names a plate of several models after the plate', () => {
+    expect(plateFileName(3, ['SQ-7 hull.stl', 'SQ-8 turret.stl'])).toBe('stlquest-plate-3.3mf')
+  })
+
+  // OrcaSlicer names the only object of a 3MF it did not write after the file, which its copies inherit.
+  it('names a plate of one model after that model', () => {
+    expect(plateFileName(3, ['SQ-7 hull.stl'])).toBe('SQ-7 hull.3mf')
+  })
+})
 
 describe('slicedObjectStem', () => {
   it('drops the model extension', () => {
