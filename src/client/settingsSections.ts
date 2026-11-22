@@ -10,6 +10,7 @@ export const settingsSections = [
   'email',
   'storage',
   'spoolman',
+  'bambuddy',
 ] as const
 export type SettingsSection = (typeof settingsSections)[number]
 
@@ -17,7 +18,7 @@ export type SettingsSection = (typeof settingsSections)[number]
 export const settingsSectionGroups = [
   { id: 'workspace', sections: ['board', 'users'] },
   { id: 'production', sections: ['printers', 'equipment', 'consumables', 'pricing'] },
-  { id: 'connections', sections: ['email', 'storage', 'spoolman'] },
+  { id: 'connections', sections: ['email', 'storage', 'spoolman', 'bambuddy'] },
 ] as const satisfies { id: string; sections: SettingsSection[] }[]
 
 export function isSettingsSection(value: string): value is SettingsSection {

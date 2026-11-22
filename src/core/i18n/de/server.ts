@@ -136,5 +136,12 @@ export const server: typeof en = {
     notOnPlate: 'dieser Druck liegt nicht auf dieser Druckplatte',
     printTypeUnknown: 'wähle zuerst einen Drucker für diese Druckplatte',
     invalidCharge: 'gib den berechneten Betrag als Zahl ab null ein',
+    printerNeeded: 'wähle den Drucker, auf dem diese Druckplatte läuft',
+    onRunningPlate: (number: number) => `diese Exemplare liegen auf Druckplatte #${number}; verschiebe stattdessen die Druckplatte`,
+  },
+  prints: {
+    notFound: 'Druck nicht gefunden',
+    alreadyLinked: 'dieser Druck ist bereits mit einer Druckplatte verknüpft',
+    invalid: 'sende das generische Webhook-JSON von Bambuddy mit einem Ereignis und einem Drucker',
   },
 }

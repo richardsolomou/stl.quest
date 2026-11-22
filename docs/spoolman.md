@@ -92,7 +92,7 @@ rest_command:
 
 ## Security
 
-- The token is the endpoint's only credential. It can add spools to one workspace and nothing else: it reads nothing back and cannot sign in. Cookies are never read, so a browser cannot be tricked into sending one.
+- The token is the endpoint's only credential. It can add spools, and [Bambuddy's print events](bambuddy.md), to one workspace and nothing else: it reads nothing back and cannot sign in. Cookies are never read, so a browser cannot be tricked into sending one.
 - STL Quest stores only a SHA-256 hash of the token. A database leak does not reveal it.
 - The token is checked before the body is read, bodies are capped at 2 MB, and each token is limited to 60 requests a minute on each server.
 - Spoolman has no authentication of its own, so keep it off the internet. The bridge only connects out, so nothing needs to be exposed.

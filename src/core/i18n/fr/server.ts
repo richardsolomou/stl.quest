@@ -136,5 +136,12 @@ export const server: typeof en = {
     notOnPlate: 'cette impression n’est pas sur ce plateau',
     printTypeUnknown: 'choisissez d’abord une imprimante pour ce plateau',
     invalidCharge: 'saisissez le montant facturé, zéro ou plus',
+    printerNeeded: 'choisissez l’imprimante sur laquelle ce plateau tourne',
+    onRunningPlate: (number: number) => `ces exemplaires sont sur le plateau n° ${number} ; déplacez plutôt le plateau`,
+  },
+  prints: {
+    notFound: 'impression introuvable',
+    alreadyLinked: 'cette impression est déjà reliée à un plateau',
+    invalid: 'envoyez le JSON du webhook générique de Bambuddy avec un événement et une imprimante',
   },
 }

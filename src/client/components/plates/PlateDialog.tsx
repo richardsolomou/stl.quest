@@ -8,6 +8,7 @@ import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
+import { cn } from '@/lib/utils'
 import { errorMessage } from '../../../core/error'
 import { matchSlicedObjects, splitPlate, type PlateMaterialChoice, type PlateMeasured, type PlateTotals } from '../../../core/plates'
 import { readSlicedFile, type SlicedPlate } from '../../../core/slicedPlate'
@@ -148,6 +149,16 @@ function PlateSummary({ plate, onRecord, onClose }: { plate: PlateView; onRecord
           )}
         </tbody>
       </table>
+      {plate.print && (
+        <p
+          className={cn(
+            'text-xs',
+            plate.print.outcome === 'failed' || plate.print.outcome === 'cancelled' ? 'text-destructive' : 'text-muted-foreground',
+          )}
+        >
+          {copy.dialog.reported(copy.outcome[plate.print.outcome], when.format(plate.print.receivedAt))}
+        </p>
+      )}
       {recording && (
         <p className="text-xs leading-relaxed text-muted-foreground">
           {[

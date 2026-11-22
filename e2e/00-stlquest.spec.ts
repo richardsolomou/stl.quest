@@ -2001,11 +2001,16 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Board' }).click()
   for (const name of ['plate-hull', 'plate-turret']) await upload(page, { name, printType: 'Filament', buffer: boxStl(name, 10, 10, 10) })
   await selectRequestCards(page, ['plate-hull', 'plate-turret'], multipleSelectionModifier)
-  await page.getByRole('toolbar', { name: 'Selection actions' }).getByRole('button', { name: 'Put on a plate' }).click()
-  const planPlate = page.getByRole('dialog', { name: 'Put on a plate' })
+  // Starting a plate moves its prints to Printing on its printer together, and they wear the plate so it reads as one.
+  await page.getByRole('toolbar', { name: 'Selection actions' }).getByRole('button', { name: 'Start a plate' }).click()
+  const planPlate = page.getByRole('dialog', { name: 'Start a plate' })
   await expect(planPlate.getByLabel('Printer')).toContainText('Bambu Lab X1 Carbon')
-  await planPlate.getByRole('button', { name: 'Put on a plate' }).click()
-  await expect(page.getByText('Made plate #1.')).toBeVisible()
+  await screenshot(page, 'plate-start')
+  await planPlate.getByRole('button', { name: 'Start on Bambu Lab X1 Carbon' }).click()
+  await expect(page.getByText('Started plate #1 on Bambu Lab X1 Carbon.')).toBeVisible()
+  const x1cStation = page.locator('[data-status="in_progress"] [data-station]').filter({ hasText: 'Bambu Lab X1 Carbon' })
+  await expect(x1cStation.locator('[data-plate-badge="1"]')).toHaveCount(2)
+  await screenshot(page, 'plate-running')
   await requestCard(page, 'plate-hull').click()
   await page.getByRole('button', { name: 'On plate #1' }).click()
   const plateDialog = page.getByRole('dialog', { name: 'Plate #1' })
@@ -2033,6 +2038,13 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(platePrints.getByRole('row').filter({ hasText: 'plate-hull' })).toContainText('4.38 g')
   await expect(platePrints.getByRole('row').filter({ hasText: 'plate-turret' })).toContainText('1.88 g')
   await screenshot(page, 'plate-recorded')
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Escape')
+  // A plate's copy never moves on its own: moving one moves the whole plate.
+  await x1cStation.getByRole('button', { name: 'Move plate to Finishing' }).click()
+  await expect(page.getByText('Moved plate #1 to Finishing.')).toBeVisible()
+  await expect(page.locator('[data-status="post_processing"] [data-plate-badge="1"]')).toHaveCount(2)
+  await screenshot(page, 'plate-finishing')
   // A printer counts the print hours it ran against its lifespan, and keeps when it was bought.
   await page.goto('/settings/printers')
   const x1cRow = page.getByRole('button', { name: 'Edit Bambu Lab X1 Carbon' })
@@ -2110,6 +2122,35 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await choose(page.getByRole('combobox', { name: 'What Generic Red counts towards' }), 'Prusament PLA · Galaxy Silver')
   await expect(page.getByText('PLA · 1 spool · Chosen by hand')).toBeVisible()
   await screenshot(page, 'spoolman-filaments')
+  // Bambuddy's webhook reports prints with the same token; one that finds no plate waits to be attached or marked personal.
+  const sendPrint = (data: Record<string, unknown>, token = spoolmanToken) =>
+    page.request.post('/api/bambuddy/events', { headers: { authorization: `Bearer ${token}` }, data })
+  expect((await sendPrint({ event: 'test', title: 'Bambuddy Test', source: 'Bambuddy' })).status()).toBe(204)
+  expect((await sendPrint({ event: 'print_complete', printer: 'P1S' }, 'stlq_spoolman_wrong')).status()).toBe(401)
+  expect(
+    (
+      await sendPrint({
+        event: 'print_complete',
+        printer: 'P1S',
+        filename: 'Benchy',
+        duration: '1h 30m',
+        filament_grams: '12.5',
+        run_id: '41',
+        archive_id: '9',
+        source: 'Bambuddy',
+      })
+    ).status(),
+  ).toBe(204)
+  await page.getByLabel('Settings sections').getByRole('link', { name: 'Bambuddy' }).click()
+  await expect(page.getByRole('region', { name: 'Bambuddy' })).toContainText('Receiving')
+  const unlinkedPrints = page.getByRole('list', { name: 'Unlinked prints' })
+  await expect(unlinkedPrints).toContainText('Benchy')
+  await expect(unlinkedPrints).toContainText('P1S · no printer here has this name · 1.5 h · 12.5 g')
+  await screenshot(page, 'bambuddy-unlinked')
+  await unlinkedPrints.getByRole('button', { name: 'Mark personal' }).click()
+  await expect(page.getByText('Every print found its plate.')).toBeVisible()
+  await expect(page.getByRole('list', { name: 'Recent prints' })).toContainText('Personal')
+  await page.getByLabel('Settings sections').getByRole('link', { name: 'Spoolman' }).click()
   await page.getByLabel('Settings sections').getByRole('link', { name: 'Consumables' }).click()
   await page.getByRole('button', { expanded: false }).filter({ hasText: '3 colours' }).click()
   await page.getByRole('button', { name: 'Edit Prusament PLA · Galaxy Silver' }).click()

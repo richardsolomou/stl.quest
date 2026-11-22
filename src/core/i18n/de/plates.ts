@@ -1,6 +1,27 @@
 import type { plates as en } from '../en/plates'
 
 export const plates: typeof en = {
+  startPlate: 'Druckplatte starten',
+  run: {
+    description: (prints, copies) =>
+      `${prints} ${prints === 1 ? 'Druck' : 'Drucke'}, ${copies} ${copies === 1 ? 'Exemplar' : 'Exemplare'}. Sie wandern gemeinsam in „Druckt“ und bleiben bis zur Nachbearbeitung zusammen.`,
+    choosePrinter: 'Drucker wählen',
+    printerHint: 'Die Druckplatte läuft darauf, und ihre Drucke wandern an seine Station.',
+    start: (printer) => (printer ? `Auf ${printer} starten` : 'Druckplatte starten'),
+    starting: 'Wird gestartet…',
+    started: (number, printer) => `Druckplatte #${number} auf ${printer} gestartet.`,
+    past: 'Alle Drucke hier sind schon über „Druckt“ hinaus, daher wird ein bereits gelaufener Druck erfasst.',
+    mixed:
+      'Einige dieser Drucke sind schon über „Druckt“ hinaus. Starte eine Druckplatte mit Drucken, die noch nicht gedruckt wurden, oder wähle nur fertige, um einen vergangenen Lauf zu erfassen.',
+  },
+  moveTo: (stage) => `Druckplatte nach ${stage} verschieben`,
+  moved: (number, stage) => `Druckplatte #${number} nach ${stage} verschoben.`,
+  moveFailed: 'Die Druckplatte konnte nicht verschoben werden.',
+  failedBadge: (number) => `Druckplatte #${number} fehlgeschlagen`,
+  sharedHint: (number) => `Auf Druckplatte #${number}. Ihre Exemplare wandern gemeinsam.`,
+  failedHint: (number) =>
+    `Druckplatte #${number} ist fehlgeschlagen oder wurde abgebrochen, daher sind ihre Exemplare zum erneuten Drucken zurück.`,
+  outcome: { printing: 'Druckt', finished: 'Fertig', failed: 'Fehlgeschlagen', cancelled: 'Abgebrochen' },
   putOnPlate: 'Auf eine Druckplatte',
   name: (number) => `Druckplatte #${number}`,
   station: (prints) => `${prints} ${prints === 1 ? 'Druck' : 'Drucke'}`,
@@ -36,8 +57,10 @@ export const plates: typeof en = {
     source: {
       file: 'Aus der Slicer-Datei',
       totals: 'Aus eingegebenen Summen',
+      printer: 'Vom Drucker, über Bambuddy',
     },
     recordedAt: (when) => `Erfasst ${when}`,
+    reported: (outcome, when) => `${outcome} · gemeldet ${when}`,
     replaceFile: 'Erneut hochladen',
     replaceTotals: 'Summen erneut eingeben',
     delete: 'Druckplatte löschen',

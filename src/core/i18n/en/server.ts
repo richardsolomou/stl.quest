@@ -132,5 +132,12 @@ export const server = {
     notOnPlate: 'that print is not on this plate',
     printTypeUnknown: 'choose a printer for this plate first',
     invalidCharge: 'enter what was charged as an amount of zero or more',
+    printerNeeded: 'choose the printer this plate runs on',
+    onRunningPlate: (number: number) => `these copies are on plate #${number}; move the plate instead`,
+  },
+  prints: {
+    notFound: 'print not found',
+    alreadyLinked: 'this print is already linked to a plate',
+    invalid: 'send Bambuddy’s generic webhook JSON with an event and a printer',
   },
 }

@@ -304,8 +304,8 @@ export const usageEvents = pgTable(
 
 /**
  * What went on one run of a printer, so the slicer's totals for the run can be split across its prints (see core/plates).
- * A plate is a record, not a board stage: its prints move as before, and it keeps the usage transaction it recorded so a
- * new upload replaces it.
+ * A plate started from the board runs: `status_id` is the stage its copies move through together, null once the run is
+ * over. It keeps the usage transaction it recorded so a new upload replaces it.
  */
 export const plates = pgTable(
   'plates',
@@ -318,20 +318,24 @@ export const plates = pgTable(
     printerId: text('printer_id'),
     otherStuff: integer('other_stuff').notNull().default(0),
     transactionId: text('transaction_id'),
-    source: text({ enum: ['file', 'totals'] }),
+    source: text({ enum: ['file', 'totals', 'printer'] }),
     method: text({ enum: ['measured', 'volume', 'estimate', 'even'] }),
     unit: text({ enum: ['g', 'ml'] }),
     minutes: doublePrecision(),
     otherAmount: doublePrecision('other_amount'),
     overheadAmount: doublePrecision('overhead_amount'),
     recordedAt: bigint('recorded_at', { mode: 'number' }),
+    statusId: text('status_id', { enum: ['in_progress', 'post_processing'] }),
+    startedAt: bigint('started_at', { mode: 'number' }),
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),
     updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
   },
   (table) => [
     unique('plates_workspace_id_unique').on(table.workspaceId, table.id),
     unique('plates_workspace_number_unique').on(table.workspaceId, table.number),
-    check('plates_source_check', sql`${table.source} IN ('file', 'totals') OR ${table.source} IS NULL`),
+    check('plates_source_check', sql`${table.source} IN ('file', 'totals', 'printer') OR ${table.source} IS NULL`),
+    check('plates_status_check', sql`${table.statusId} IN ('in_progress', 'post_processing') OR ${table.statusId} IS NULL`),
+    index('plates_status').on(table.workspaceId, table.statusId),
     check('plates_method_check', sql`${table.method} IN ('measured', 'volume', 'estimate', 'even') OR ${table.method} IS NULL`),
     check('plates_unit_check', sql`${table.unit} IN ('g', 'ml') OR ${table.unit} IS NULL`),
     foreignKey({
@@ -366,5 +370,52 @@ export const plateItems = pgTable(
       name: 'plate_items_workspace_request_fk',
     }).onDelete('cascade'),
     check('plate_items_copies_check', sql`${table.copies} > 0`),
+  ],
+)
+
+/**
+ * Prints a printer reported running, through Bambuddy's webhook (see core/printJobs). Each links to the plate run it
+ * was, or waits unlinked until someone attaches it or marks it personal; deleting a plate unlinks its prints first.
+ */
+export const printJobs = pgTable(
+  'print_jobs',
+  {
+    id: text().primaryKey(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    printerName: text('printer_name').notNull(),
+    printerId: text('printer_id'),
+    fileName: text('file_name'),
+    outcome: text({ enum: ['printing', 'finished', 'failed', 'cancelled'] }).notNull(),
+    minutes: doublePrecision(),
+    grams: doublePrecision(),
+    filamentDetails: text('filament_details'),
+    reason: text(),
+    progress: doublePrecision(),
+    archiveId: text('archive_id'),
+    runId: text('run_id'),
+    plateId: text('plate_id'),
+    personal: integer('personal').notNull().default(0),
+    transactionId: text('transaction_id'),
+    startedAt: bigint('started_at', { mode: 'number' }),
+    endedAt: bigint('ended_at', { mode: 'number' }),
+    receivedAt: bigint('received_at', { mode: 'number' }).notNull(),
+  },
+  (table) => [
+    unique('print_jobs_workspace_id_unique').on(table.workspaceId, table.id),
+    index('print_jobs_received').on(table.workspaceId, table.receivedAt),
+    index('print_jobs_plate').on(table.workspaceId, table.plateId),
+    check('print_jobs_outcome_check', sql`${table.outcome} IN ('printing', 'finished', 'failed', 'cancelled')`),
+    foreignKey({
+      columns: [table.workspaceId, table.printerId],
+      foreignColumns: [printers.workspaceId, printers.id],
+      name: 'print_jobs_workspace_printer_fk',
+    }),
+    foreignKey({
+      columns: [table.workspaceId, table.plateId],
+      foreignColumns: [plates.workspaceId, plates.id],
+      name: 'print_jobs_workspace_plate_fk',
+    }),
   ],
 )

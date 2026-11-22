@@ -5,7 +5,7 @@ import { attachClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/clos
 import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge/extract-closest-edge'
 import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/types'
 import { Button } from '@/components/ui/button'
-import { Archive, ArrowRight, Check, ChevronDown, Copy, Download, Layers3, Move, RotateCcw, Trash2 } from 'lucide-react'
+import { Archive, ArrowRight, Check, ChevronDown, Copy, Download, Layers, Layers3, Move, RotateCcw, Trash2 } from 'lucide-react'
 import { Menu, MenuContent, MenuGroup, MenuGroupLabel, MenuItem, MenuTrigger } from '@/components/ui/menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu'
@@ -26,6 +26,7 @@ import { AgeStamp } from './AgeStamp'
 import { useNow } from '../useNow'
 import { isAgeHot } from '../../core/requestAge'
 import { useI18n } from '../i18n'
+import type { CardPlate } from '../boardPlates'
 
 /**
  * How a card presents in its zone of the board: `row` in the queue's backlog list, `ticket` hanging on the up-next rail
@@ -59,6 +60,7 @@ export function RequestCard({
   showRequester = false,
   tagPaths,
   tagCopyCounts,
+  plate,
   selected = false,
   selectionMode = false,
   selectedRequestIds,
@@ -97,6 +99,8 @@ export function RequestCard({
   /** Full paths keyed by tag id. Supplying it is what makes the card show its tags. */
   tagPaths?: Map<string, string>
   tagCopyCounts?: Map<string, number>
+  /** The plate the card's copies are on, or the one that failed before they came back to print again. */
+  plate?: CardPlate
   selected?: boolean
   selectionMode?: boolean
   selectedRequestIds?: string[]
@@ -265,6 +269,19 @@ export function RequestCard({
       {request.notes}
     </p>
   )
+  const plateBadge = plate && (
+    <span
+      data-plate-badge={plate.number}
+      title={plate.failed ? t.plates.failedHint(plate.number) : t.plates.sharedHint(plate.number)}
+      className={cn(
+        'inline-flex shrink-0 items-center gap-1 rounded-[3px] border px-1 py-px font-mono text-[11px] leading-none font-semibold uppercase',
+        plate.failed ? 'border-destructive/40 text-destructive' : 'border-current/30',
+      )}
+    >
+      <Layers className="size-3" aria-hidden="true" />
+      {plate.failed ? t.plates.failedBadge(plate.number) : t.plates.name(plate.number)}
+    </span>
+  )
   const cells = counts && <CopyCells counts={counts} status={status} stamp={settling} className="mt-1.5" />
   const now = useNow()
   // An overdue ticket carries the heat on its own header, not only in its age stamp.
@@ -360,6 +377,7 @@ export function RequestCard({
           {notes}
           {cells}
           <span className="mt-2 flex items-start gap-2 border-t border-dashed border-ticket-foreground/20 pt-2 font-mono text-[11px] leading-tight text-ticket-muted uppercase">
+            {plateBadge}
             <span className="min-w-0 flex-1 break-words" title={showPrinter ? request.printer?.name : undefined}>
               {meta.join(' · ')}
             </span>
@@ -409,6 +427,7 @@ export function RequestCard({
                   variant === 'row' ? 'text-muted-foreground' : 'text-ticket-muted',
                 )}
               >
+                {plateBadge}
                 {meta.length > 0 && (
                   <span className="min-w-0 flex-1 truncate" title={showPrinter ? request.printer?.name : undefined}>
                     {meta.join(' · ')}
@@ -417,7 +436,12 @@ export function RequestCard({
                 <span className="ml-auto shrink-0 font-mono">{countLabel}</span>
               </span>
             )}
-            {variant === 'slip' && <span className="mt-0.5 block font-mono text-[11px] leading-none text-ticket-muted">{countLabel}</span>}
+            {variant === 'slip' && (
+              <span className="mt-0.5 flex flex-wrap items-center gap-1.5 font-mono text-[11px] leading-none text-ticket-muted">
+                {plateBadge}
+                {countLabel}
+              </span>
+            )}
             {variant !== 'slip' && notes}
             {variant !== 'slip' && cells}
           </span>

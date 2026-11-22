@@ -7,6 +7,7 @@ import { EquipmentPane } from './settings/EquipmentPane'
 import { PricingPane } from './settings/PricingPane'
 import { PrintersPane } from './settings/PrintersPane'
 import { SpoolmanPane } from './settings/SpoolmanPane'
+import { BambuddyPane } from './settings/BambuddyPane'
 import { StoragePane } from './settings/StoragePane'
 import { UsersPane } from './settings/UsersPane'
 
@@ -40,5 +41,7 @@ export function SettingsPanes({
       return <StoragePane />
     case 'spoolman':
       return <SpoolmanPane />
+    case 'bambuddy':
+      return <BambuddyPane />
   }
 }

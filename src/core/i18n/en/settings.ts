@@ -40,6 +40,7 @@ export const settings = {
         spend: 'See what your prints actually cost',
         maintenance: 'See when each wear part is due',
         spoolman: 'Show Spoolman stock in Consumables',
+        bambuddy: 'Link Bambuddy’s prints to their plates',
         turnOn: 'Turn on',
         whatItDoes: 'What this does',
         explanation:
@@ -87,6 +88,7 @@ export const settings = {
     email: 'Email',
     storage: 'Storage',
     spoolman: 'Spoolman',
+    bambuddy: 'Bambuddy',
   },
   pricing: {
     title: 'Pricing',
@@ -709,6 +711,8 @@ export const settings = {
         'Enter what you paid, including tax, shipping, and add-on modules, less anything you expect to sell it for. The lifespan covers the frame and mechanics, as wear parts are costed on their own; most machines last 2,000–10,000 print hours.',
       wearPerHour: (cost: string) => `Wears ${cost} per print hour.`,
       lifetime: (run: string, lifespan?: string) => (lifespan ? `${run} of ${lifespan} print hours run` : `${run} print hours run`),
+      runs: (runs: number, failed: number, rate: string) =>
+        `${runs} plate ${runs === 1 ? 'run' : 'runs'} reported · ${failed} failed or cancelled (${rate})`,
       pastLifespan: 'Past its lifespan',
       addOns: 'Add-on modules',
       addOnsHint: 'Modules bolted onto this printer that draw power while printing, such as a pulsing release module or an AMS.',
@@ -818,6 +822,51 @@ export const settings = {
       noLibrary: 'Add the filaments you buy in Consumables to count Spoolman stock towards them.',
       error: 'The link could not be saved.',
     },
+  },
+  bambuddy: {
+    title: 'Bambuddy',
+    description:
+      'Read what your printers actually ran from Bambuddy: real hours, grams, and whether each plate finished, failed, or was cancelled. STL Quest only listens; it never sends a print to Bambuddy.',
+    loading: 'Loading prints…',
+    loadError: 'Could not load prints',
+    connect: {
+      title: 'Connect',
+      description: 'Bambuddy sends a webhook when a print starts and ends, with the same token the Spoolman bridge uses.',
+      needsToken: 'Create a token in Spoolman settings first. Bambuddy sends with the same token.',
+      tokenLink: 'Spoolman settings',
+      steps: [
+        'In Bambuddy, open Settings → Notifications and add a Webhook provider with the Generic payload format.',
+        'Set the URL below, and put the token in the Authorization header.',
+        'Turn on print start, complete, failed, and stopped, and turn off attaching photos.',
+        'Name each printer the same in Bambuddy and STL Quest, so prints find their printer.',
+      ],
+      url: 'Webhook URL',
+      urlHint: 'Bambuddy has to be able to reach this address.',
+      docs: 'How prints find their plate',
+      last: (when: string) => `Last print reported ${when}`,
+      none: 'No prints reported yet.',
+    },
+    unlinked: {
+      title: 'Unlinked prints',
+      description:
+        'Prints that found no plate: nothing was printing on that printer here, and the job name had no SQ tag. Attach each to a plate or a print, or mark it personal.',
+      empty: 'Every print found its plate.',
+      attachTo: 'Attach to a plate',
+      attachTag: (tag: string) => `Attach to ${tag}`,
+      personal: 'Mark personal',
+      notPersonal: 'Not personal',
+      error: 'The print could not be changed.',
+    },
+    recent: {
+      title: 'Recent prints',
+      description: 'What Bambuddy reported, newest first.',
+      empty: 'Nothing reported yet.',
+      onPlate: (number: number) => `Plate #${number}`,
+      personal: 'Personal',
+      unlinked: 'Unlinked',
+    },
+    unknownPrinter: (name: string) => `${name} · no printer here has this name`,
+    untitled: 'Untitled print',
   },
   email: {
     title: 'Email',

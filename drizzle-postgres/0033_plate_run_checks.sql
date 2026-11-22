@@ -1,0 +1,3 @@
+ALTER TABLE "plates" DROP CONSTRAINT "plates_source_check";--> statement-breakpoint
+ALTER TABLE "plates" ADD CONSTRAINT "plates_status_check" CHECK ("plates"."status_id" IN ('in_progress', 'post_processing') OR "plates"."status_id" IS NULL);--> statement-breakpoint
+ALTER TABLE "plates" ADD CONSTRAINT "plates_source_check" CHECK ("plates"."source" IN ('file', 'totals', 'printer') OR "plates"."source" IS NULL);

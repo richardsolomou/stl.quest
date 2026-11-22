@@ -1,8 +1,28 @@
-import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, notExists, lt, lte, max, ne, or, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  notExists,
+  notInArray,
+  lt,
+  lte,
+  max,
+  ne,
+  or,
+  sql,
+} from 'drizzle-orm'
 import { isDeepStrictEqual } from 'node:util'
 import type { AdminAccountDetails, AdminWorkspace } from '../core/admin'
 import type {
   CopyMove,
+  NewPlate,
   CopyTagEdit,
   NewPrintRequest,
   OperationPayload,
@@ -71,6 +91,7 @@ import {
   usageEvents,
   plateItems,
   plates,
+  printJobs,
   printers,
   consumables,
   equipment,
@@ -90,6 +111,7 @@ import {
   mapAssetGenerationJob,
   mapInvite,
   mapPlate,
+  mapPrintJob,
   mapRequest,
   mapUsageEvent,
   mapUserIdentity,
@@ -99,7 +121,8 @@ import {
 import type { MaintenanceTotals } from '../core/maintenance'
 import { MAX_USAGE_LIST, type UsageEvent, type UsageFilters } from '../core/usage'
 import type { PriceCalculatorCurrency } from '../core/priceCalculator'
-import type { Plate, PlateItem, PlateRecording } from '../core/plates'
+import type { Plate, PlateItem, PlateRecording, PlateRunStage } from '../core/plates'
+import { MAX_PRINT_JOBS, type PrintJob } from '../core/printJobs'
 import { inventoryColumns, inventoryItem, inventoryTables } from './repository/inventory'
 import { requestConditions, requestOrderBy, requestSelection, type RequestFilterOptions } from './repository/requestQuery'
 
@@ -1407,24 +1430,29 @@ export class DrizzleRepository implements Repository {
 
   async moveCopiesBatch(inputs: CopyMove[]) {
     await this.database.transaction(async (tx) => {
-      const active = await tx
-        .select({ requestId: operations.requestId })
-        .from(operations)
-        .where(
-          and(
-            eq(operations.workspaceId, await this.workspace()),
-            inArray(
-              operations.requestId,
-              inputs.map(({ id }) => id),
-            ),
-            ne(operations.state, 'committed'),
-          ),
-        )
-        .limit(1)
-        .get()
-      if (active) throw new Response('another operation is already running for this request', { status: 409 })
+      await this.assertNoActiveOperation(tx, inputs)
       await this.moveCards(tx, inputs, 'invalid move')
     })
+  }
+
+  private async assertNoActiveOperation(database: DatabaseExecutor, inputs: CopyMove[]) {
+    if (inputs.length === 0) return
+    const active = await database
+      .select({ requestId: operations.requestId })
+      .from(operations)
+      .where(
+        and(
+          eq(operations.workspaceId, await this.workspace()),
+          inArray(
+            operations.requestId,
+            inputs.map(({ id }) => id),
+          ),
+          ne(operations.state, 'committed'),
+        ),
+      )
+      .limit(1)
+      .get()
+    if (active) throw new Response('another operation is already running for this request', { status: 409 })
   }
 
   /** Checks each print and stage still holds the cards the moves take copies of, then moves the copies and the tags they carry. */
@@ -2598,9 +2626,11 @@ export class DrizzleRepository implements Repository {
   async maintenanceTotals(): Promise<MaintenanceTotals> {
     const workspaceId = await this.workspace()
     const runMinutes = sql<number>`coalesce(sum(${usageEvents.amount}), 0)`.mapWith(Number)
-    // A left join's unmatched row has no ID, and must not count as a plate.
+    // A left join's unmatched row has no ID, and must not count as a plate; a plate run counts once for all its prints.
     const runPlates =
-      sql<number>`coalesce(sum(case when ${usageEvents.id} is null then 0 else coalesce(${usageEvents.copies}, 1) end), 0)`.mapWith(Number)
+      sql<number>`coalesce(sum(case when ${usageEvents.id} is null or ${usageEvents.plateId} is not null then 0 else coalesce(${usageEvents.copies}, 1) end), 0) + count(distinct ${usageEvents.plateId})`.mapWith(
+        Number,
+      )
     const runs = and(
       eq(usageEvents.workspaceId, workspaceId),
       eq(usageEvents.kind, 'use'),
@@ -2824,10 +2854,11 @@ export class DrizzleRepository implements Repository {
     )
   }
 
-  async createPlate(plate: { id: string; printerId?: string; otherStuff: boolean; items: PlateItem[]; createdAt: number }) {
+  async createPlate(plate: NewPlate, moves: CopyMove[] = []) {
     const workspaceId = await this.workspace()
     return await this.database.transaction(async (tx) => {
       await this.lockWorkspace(tx, workspaceId)
+      await this.assertNoActiveOperation(tx, moves)
       const last = await tx
         .select({ number: sql<number>`coalesce(max(${plates.number}), 0)`.mapWith(Number) })
         .from(plates)
@@ -2841,6 +2872,8 @@ export class DrizzleRepository implements Repository {
           number: (last?.number ?? 0) + 1,
           printerId: plate.printerId ?? null,
           otherStuff: plate.otherStuff,
+          statusId: plate.stage ?? null,
+          startedAt: plate.stage ? plate.createdAt : null,
           createdAt: plate.createdAt,
           updatedAt: plate.createdAt,
         })
@@ -2849,8 +2882,83 @@ export class DrizzleRepository implements Repository {
         .insert(plateItems)
         .values(plate.items.map(({ requestId, copies }) => ({ workspaceId, plateId: plate.id, requestId, copies })))
         .run()
+      await this.moveCards(tx, moves, 'invalid move')
+      // A running plate's prints print on its printer, so the board shows them on its station.
+      if (plate.stage && plate.printerId)
+        await tx
+          .update(requests)
+          .set({ printerId: plate.printerId, automaticPrinterAssignment: false })
+          .where(
+            and(
+              eq(requests.workspaceId, workspaceId),
+              inArray(
+                requests.id,
+                plate.items.map(({ requestId }) => requestId),
+              ),
+            ),
+          )
+          .run()
       return (await this.platesWith(tx, workspaceId, plate.id))[0]
     })
+  }
+
+  async movePlate(id: string, moves: CopyMove[], stage: PlateRunStage | undefined, at: number) {
+    const workspaceId = await this.workspace()
+    await this.database.transaction(async (tx) => {
+      await this.assertNoActiveOperation(tx, moves)
+      await this.moveCards(tx, moves, 'invalid move')
+      await tx
+        .update(plates)
+        .set({ statusId: stage ?? null, updatedAt: at })
+        .where(and(eq(plates.workspaceId, workspaceId), eq(plates.id, id)))
+        .run()
+    })
+  }
+
+  async listPrintJobs() {
+    const rows = await this.database
+      .select()
+      .from(printJobs)
+      .where(eq(printJobs.workspaceId, await this.workspace()))
+      .orderBy(desc(printJobs.receivedAt))
+      .limit(MAX_PRINT_JOBS)
+      .all()
+    return rows.map(mapPrintJob)
+  }
+
+  async insertPrintJob(job: PrintJob) {
+    const workspaceId = await this.workspace()
+    await this.database.transaction(async (tx) => {
+      await tx
+        .insert(printJobs)
+        .values({
+          ...printJobRow(job),
+          id: job.id,
+          workspaceId,
+          printerName: job.printerName,
+          outcome: job.outcome,
+          receivedAt: job.receivedAt,
+        })
+        .run()
+      const kept = tx
+        .select({ id: printJobs.id })
+        .from(printJobs)
+        .where(eq(printJobs.workspaceId, workspaceId))
+        .orderBy(desc(printJobs.receivedAt), desc(printJobs.id))
+        .limit(MAX_PRINT_JOBS)
+      await tx
+        .delete(printJobs)
+        .where(and(eq(printJobs.workspaceId, workspaceId), notInArray(printJobs.id, kept)))
+        .run()
+    })
+  }
+
+  async updatePrintJob(job: PrintJob) {
+    await this.database
+      .update(printJobs)
+      .set({ ...printJobRow(job), printerName: job.printerName, outcome: job.outcome, receivedAt: job.receivedAt })
+      .where(and(eq(printJobs.workspaceId, await this.workspace()), eq(printJobs.id, job.id)))
+      .run()
   }
 
   async deletePlate(id: string, undoneAt: number) {
@@ -2859,6 +2967,11 @@ export class DrizzleRepository implements Repository {
       const [plate] = await this.platesWith(tx, workspaceId, id)
       if (!plate) return false
       if (plate.recording) await this.undoUsageWith(tx, workspaceId, plate.recording.transactionId, undoneAt)
+      await tx
+        .update(printJobs)
+        .set({ plateId: null })
+        .where(and(eq(printJobs.workspaceId, workspaceId), eq(printJobs.plateId, id)))
+        .run()
       await tx
         .delete(plates)
         .where(and(eq(plates.workspaceId, workspaceId), eq(plates.id, id)))
@@ -3013,6 +3126,11 @@ export class DrizzleRepository implements Repository {
           .update(plates)
           .set({ printerId: null })
           .where(and(eq(plates.workspaceId, workspaceId), eq(plates.printerId, id)))
+          .run()
+        await tx
+          .update(printJobs)
+          .set({ printerId: null })
+          .where(and(eq(printJobs.workspaceId, workspaceId), eq(printJobs.printerId, id)))
           .run()
       }
       if (kind === 'consumables') {
@@ -4447,4 +4565,24 @@ function copyCount(inputs: { count: number }[]) {
 
 function uniqueBy<T>(items: T[], key: (item: T) => string) {
   return [...new Map(items.map((item) => [key(item), item])).values()]
+}
+
+/** A print's optional fields as columns, null where it has none, so an update clears what it no longer has. */
+function printJobRow(job: PrintJob) {
+  return {
+    printerId: job.printerId ?? null,
+    fileName: job.fileName ?? null,
+    minutes: job.minutes ?? null,
+    grams: job.grams ?? null,
+    filamentDetails: job.filamentDetails ?? null,
+    reason: job.reason ?? null,
+    progress: job.progress ?? null,
+    archiveId: job.archiveId ?? null,
+    runId: job.runId ?? null,
+    plateId: job.plateId ?? null,
+    personal: job.personal,
+    transactionId: job.transactionId ?? null,
+    startedAt: job.startedAt ?? null,
+    endedAt: job.endedAt ?? null,
+  }
 }

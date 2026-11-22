@@ -105,6 +105,9 @@ import {
   recordStockMovementSchema,
   restockFromOrderSchema,
   linkSpoolmanFilamentSchema,
+  movePlateSchema,
+  attachPrintJobSchema,
+  printJobPersonalSchema,
   createPlateSchema,
   plateIdSchema,
   recordPlateSchema,
@@ -1905,7 +1908,11 @@ export const getStockLevels = createServerFn({ method: 'GET' })
 /** Where the bridge reaches this app and its ingest endpoint, from the public origin so a TLS proxy's https survives. */
 export function spoolmanUrls(request: Request) {
   const origin = publicOrigin(request)
-  return { appUrl: `${origin}${appPath('')}`, ingestUrl: `${origin}${appPath('/api/spoolman/spools')}` }
+  return {
+    appUrl: `${origin}${appPath('')}`,
+    ingestUrl: `${origin}${appPath('/api/spoolman/spools')}`,
+    printsUrl: `${origin}${appPath('/api/bambuddy/events')}`,
+  }
 }
 
 export const getSpoolman = createServerFn({ method: 'GET' })
@@ -2002,6 +2009,34 @@ export const recordPlate = createServerFn({ method: 'POST' })
     const { workspaceSlug, ...input } = data
     return workspaceMutation(workspaceSlug, (context) => context.service.recordPlate(input, context.identity))
   })
+
+export const movePlate = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(movePlateSchema))
+  .handler(async ({ data }) =>
+    workspaceMutation(data.workspaceSlug, (context) => context.service.movePlate(data.plateId, data.to, context.identity)),
+  )
+
+export const getPrintJobs = createServerFn({ method: 'GET' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const context = await workspaceContext(await app(), data.workspaceSlug)
+      return { jobs: await context.service.printJobs(context.identity), ...spoolmanUrls(getRequest()) }
+    }),
+  )
+
+export const attachPrintJob = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(attachPrintJobSchema))
+  .handler(async ({ data }) => {
+    const { workspaceSlug, ...input } = data
+    return workspaceMutation(workspaceSlug, (context) => context.service.attachPrintJob(input, context.identity))
+  })
+
+export const setPrintJobPersonal = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(printJobPersonalSchema))
+  .handler(async ({ data }) =>
+    workspaceMutation(data.workspaceSlug, (context) => context.service.setPrintJobPersonal(data.jobId, data.personal, context.identity)),
+  )
 
 export const deletePlate = createServerFn({ method: 'POST' })
   .validator(inWorkspace(plateIdSchema))

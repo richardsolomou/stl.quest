@@ -47,7 +47,7 @@ export function SelectionBar({
     { action: download, icon: <Download />, label: actions.downloadModels(prints) },
     { action: repeat, icon: <RotateCcw />, label: actions.printAgain },
     { action: estimate, icon: <Calculator />, label: actions.estimate },
-    { action: plate, icon: <Layers />, label: t.plates.putOnPlate },
+    { action: plate, icon: <Layers />, label: t.plates.startPlate },
     { action: archive, icon: <Archive />, label: actions.archive },
   ]
   return (

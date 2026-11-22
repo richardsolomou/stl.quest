@@ -1,4 +1,24 @@
 export const plates = {
+  startPlate: 'Start a plate',
+  run: {
+    description: (prints: number, copies: number) =>
+      `${prints} ${prints === 1 ? 'print' : 'prints'}, ${copies} ${copies === 1 ? 'copy' : 'copies'}. They move to Printing together and stay together through Finishing.`,
+    choosePrinter: 'Choose a printer',
+    printerHint: 'The plate runs on it, and its prints move to its station.',
+    start: (printer?: string) => (printer ? `Start on ${printer}` : 'Start plate'),
+    starting: 'Starting…',
+    started: (number: number, printer: string) => `Started plate #${number} on ${printer}.`,
+    past: 'Every print here is past Printing, so this records a run that already happened.',
+    mixed:
+      'Some of these prints are past Printing. Start a plate from prints that haven’t printed yet, or choose only finished ones to record a past run.',
+  },
+  moveTo: (stage: string) => `Move plate to ${stage}`,
+  moved: (number: number, stage: string) => `Moved plate #${number} to ${stage}.`,
+  moveFailed: 'The plate could not be moved.',
+  failedBadge: (number: number) => `Plate #${number} failed`,
+  sharedHint: (number: number) => `On plate #${number}. Its copies move together.`,
+  failedHint: (number: number) => `Plate #${number} failed or was cancelled, so its copies came back to print again.`,
+  outcome: { printing: 'Printing', finished: 'Finished', failed: 'Failed', cancelled: 'Cancelled' },
   putOnPlate: 'Put on a plate',
   name: (number: number) => `Plate #${number}`,
   station: (prints: number) => `${prints} ${prints === 1 ? 'print' : 'prints'}`,
@@ -34,8 +54,10 @@ export const plates = {
     source: {
       file: 'From the slicer file',
       totals: 'From typed totals',
+      printer: 'From the printer, through Bambuddy',
     },
     recordedAt: (when: string) => `Recorded ${when}`,
+    reported: (outcome: string, when: string) => `${outcome} · reported ${when}`,
     replaceFile: 'Upload again',
     replaceTotals: 'Enter totals again',
     delete: 'Delete plate',
