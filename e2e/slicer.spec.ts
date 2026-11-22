@@ -14,9 +14,10 @@ test('opens a print in its printer’s slicer through a link that works without 
   await enterAdminWorkspace(page)
 
   await page.goto('/settings/printers')
-  await page.getByRole('button', { name: 'Add filament printer' }).click()
+  await page.getByRole('button', { name: 'Add printer', exact: true }).click()
   await page.getByRole('button', { name: 'Custom printer' }).click()
   const printerDialog = page.getByRole('dialog', { name: /printer/i })
+  await printerDialog.getByRole('group', { name: 'Print type' }).getByRole('button', { name: 'Filament' }).click()
   await printerDialog.getByLabel('Name', { exact: true }).fill('Slicer printer')
   const dialog = page.getByRole('dialog', { name: 'Slicer printer' })
   await choose(dialog.getByRole('combobox', { name: 'Slicer' }), 'OrcaSlicer')
