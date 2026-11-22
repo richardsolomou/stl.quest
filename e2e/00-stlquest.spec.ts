@@ -2012,6 +2012,10 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.goto('/settings/board')
   await page.getByRole('switch', { name: 'Track usage and stock' }).click()
   await expect(autosaveStatus(page)).toHaveText('Saved')
+  // A settings page opened directly arrives with its data instead of fetching it once the page starts.
+  const equipmentDocument = await (await page.request.get('/settings/equipment')).text()
+  expect(equipmentDocument).toMatch(/No equipment yet|Find equipment/)
+  expect(equipmentDocument).not.toContain('Loading equipment…')
 
   // Phones swap the settings sidebar for one picker that names the current group and page.
   await page.setViewportSize({ width: 320, height: 800 })

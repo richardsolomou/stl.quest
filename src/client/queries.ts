@@ -44,6 +44,7 @@ import { estimatePending } from '../core/printEstimates'
 import type { ResinPreset } from '../core/resinPresets'
 import type { PublicRequestQueryResult, RequestFilters } from '../core/types'
 import { MAX_USAGE_LIST, type UsageEvent, type UsageFilters } from '../core/usage'
+import type { SettingsSection } from './settingsSections'
 
 export type RequestQuerySnapshot = [readonly unknown[], PublicRequestQueryResult | undefined]
 
@@ -201,3 +202,43 @@ export const catalogueQuery = <Name extends keyof Catalogues>(name: Name) =>
   queryOptions({ queryKey: ['catalogue', name], queryFn: (): Promise<Catalogues[Name]> => catalogues[name](), staleTime: Infinity })
 export const printersQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['printers', workspaceSlug], queryFn: () => getPrinters({ data: { workspaceSlug } }) })
+
+/** Loads the workspace data a settings section opens with, so a direct visit renders it on the server instead of fetching after hydration. */
+function prefetchSettingsSection(queryClient: QueryClient, section: SettingsSection, workspaceSlug: string, usageTracking: boolean) {
+  const prefetch = queryClient.prefetchQuery.bind(queryClient)
+  switch (section) {
+    case 'board':
+      return [prefetch(boardQuery(workspaceSlug))]
+    case 'printers':
+      return [prefetch(printersQuery(workspaceSlug)), prefetch(priceCalculatorSettingsQuery(workspaceSlug))]
+    case 'equipment':
+      return [prefetch(equipmentQuery(workspaceSlug)), prefetch(consumablesQuery(workspaceSlug))]
+    case 'consumables':
+      return [
+        prefetch(consumablesQuery(workspaceSlug)),
+        prefetch(printersQuery(workspaceSlug)),
+        prefetch(priceCalculatorSettingsQuery(workspaceSlug)),
+        ...(usageTracking ? [prefetch(stockQuery(workspaceSlug))] : []),
+      ]
+    case 'pricing':
+      return [prefetch(priceCalculatorSettingsQuery(workspaceSlug))]
+    case 'users':
+      return [prefetch(usersQuery(workspaceSlug)), prefetch(invitesQuery(workspaceSlug))]
+    case 'email':
+      return [prefetch(emailBrandingQuery(workspaceSlug))]
+    case 'storage':
+      return [
+        prefetch(storageQuery(workspaceSlug)),
+        prefetch(storageMigrationQuery(workspaceSlug)),
+        prefetch(cloudConnectionsQuery(workspaceSlug)),
+      ]
+  }
+}
+
+// Only admins see workspace settings, so loading them for anyone else would only collect authorization errors.
+export async function preloadSettingsSection(queryClient: QueryClient, section: SettingsSection) {
+  const session = await queryClient.ensureQueryData(sessionQuery())
+  const workspaceSlug = session.identity?.workspaceSlug
+  if (session.identity?.role !== 'admin' || !workspaceSlug) return
+  await Promise.all(prefetchSettingsSection(queryClient, section, workspaceSlug, session.usageTracking))
+}

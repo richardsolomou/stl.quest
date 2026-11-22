@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { SettingsPanes } from '../client/components/SettingsPanes'
 import { isSettingsSection } from '../client/settingsSections'
 import { SettingsShell } from '../client/components/settings/SettingsShell'
-import { peopleQuery, requestsQuery, sessionQuery } from '../client/queries'
+import { peopleQuery, preloadSettingsSection, requestsQuery, sessionQuery } from '../client/queries'
 import { useI18n } from '../client/i18n'
 
 export const Route = createFileRoute('/settings/$section')({
@@ -14,6 +14,9 @@ export const Route = createFileRoute('/settings/$section')({
         to: '/settings/$section',
         params: { section: 'board' },
       })
+  },
+  loader: ({ context, params }) => {
+    if (isSettingsSection(params.section)) return preloadSettingsSection(context.queryClient, params.section)
   },
   component: SettingsPage,
 })

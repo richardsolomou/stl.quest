@@ -1,7 +1,14 @@
 import { QueryClient } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
 import type { PublicPrintRequest, PublicRequestQueryResult } from '../core/types'
-import { pendingEstimateRefetchInterval, preloadSessionQueries, removeRequestFromQueries, restoreRequestQueries } from './queries'
+import {
+  pendingEstimateRefetchInterval,
+  preloadSessionQueries,
+  preloadSettingsSection,
+  removeRequestFromQueries,
+  restoreRequestQueries,
+} from './queries'
+import type { SettingsSection } from './settingsSections'
 
 const request = {
   id: 'request-1',
@@ -116,5 +123,34 @@ describe('pendingEstimateRefetchInterval', () => {
         { ...request, estimateGeometryStatus: 'failed' },
       ]),
     ).toBe(false)
+  })
+})
+
+describe('preloadSettingsSection', () => {
+  const admin = { identity: { role: 'admin', workspaceSlug: 'workshop' }, usageTracking: true }
+  async function preloadedKeys(section: SettingsSection, session: unknown = admin) {
+    const prefetchQuery = vi.fn().mockResolvedValue(undefined)
+    const queryClient = { ensureQueryData: vi.fn().mockResolvedValue(session), prefetchQuery } as unknown as QueryClient
+    await preloadSettingsSection(queryClient, section)
+    return prefetchQuery.mock.calls.map(([options]) => options.queryKey)
+  }
+
+  it('loads the equipment section with the consumables it uses', async () => {
+    expect(await preloadedKeys('equipment')).toEqual([
+      ['equipment', 'workshop'],
+      ['consumables', 'workshop'],
+    ])
+  })
+
+  it('loads the consumables section with its stock when usage is tracked', async () => {
+    expect(await preloadedKeys('consumables')).toContainEqual(['stock', 'workshop'])
+  })
+
+  it('leaves stock out of the consumables section when usage is not tracked', async () => {
+    expect(await preloadedKeys('consumables', { ...admin, usageTracking: false })).not.toContainEqual(['stock', 'workshop'])
+  })
+
+  it('loads nothing for a member, whom the page sends away', async () => {
+    expect(await preloadedKeys('equipment', { identity: { role: 'member', workspaceSlug: 'workshop' } })).toEqual([])
   })
 })
