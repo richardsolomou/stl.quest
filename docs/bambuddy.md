@@ -65,13 +65,13 @@ Bambuddy's webhook describes the filament a print used only in words, so on its 
      BAMBUDDY_API_KEY: bb_…
    ```
 
-Every `BAMBUDDY_POLL_SECONDS` (60 by default) the bridge reads Bambuddy's print log (`GET /api/v1/print-log/`) and its Spoolman usage history (`GET /api/v1/inventory/usage?spoolman=true`). That history names a spool, a printer, a print, and grams, but no run, so the bridge gives each charge to the run on the same printer, of the same print, that ended within ten minutes of it. It sends each run's spools to the webhook URL with the run ID Bambuddy's end event carried:
+Every `BAMBUDDY_POLL_SECONDS` (60 by default) the bridge reads Bambuddy's print log (`GET /api/v1/print-log/`) and its Spoolman usage history (`GET /api/v1/inventory/usage?spoolman=true`). That history names a spool, a printer, a print, and grams, but no run, so the bridge gives each charge to the run on the same printer, of the same print, that ended within ten minutes of it. It sends each run's spools to `POST /api/bambuddy/usage`, with the same token and the run ID Bambuddy's end event carried:
 
 ```json
-{ "event": "print_usage", "run_id": "512", "spools": [{ "spool_id": 12, "grams": 30.4 }] }
+{ "run_id": "512", "spools": [{ "spool_id": 12, "grams": 30.4 }] }
 ```
 
-STL Quest charges each spool's grams to the filament its Spoolman filament counts towards (**Settings → Spoolman → Filaments**), and anything else to the first filament. A finished print whose plate it recorded is recorded again from the spools; a plate recorded from a slicer file or typed totals keeps that. A failed or cancelled print's failed usage is recorded again from them, without moving its copies a second time. A print STL Quest has not received yet answers `404`, so the bridge sends it again on its next poll, for up to an hour after the run ended.
+STL Quest charges each spool's grams to the filament its Spoolman filament counts towards (**Settings → Spoolman → Filaments**), and anything else to the first filament. A finished print whose plate it recorded is recorded again from the spools; a plate recorded from a slicer file or typed totals keeps that. A failed or cancelled print's failed usage is recorded again from them, without moving its copies a second time. A print STL Quest has not received yet answers `404`, so the bridge sends it again on its next poll, for up to an hour after the run ended. The bridge sends at most ten runs a poll and skips runs that ended over an hour ago, including when it starts, so runs that ended while it was stopped for longer are not recorded by spool. That endpoint has its own limit of 60 requests a minute per token, so the bridge can never use up the allowance Bambuddy's notifications need.
 
 The key and Bambuddy's address stay in the bridge; STL Quest never holds them, and the bridge only reads from Bambuddy. Bambuddy's built-in inventory keeps its own spools, which STL Quest cannot match, so their prints keep the first filament.
 
@@ -83,7 +83,7 @@ Authorization: Bearer stlq_spoolman_…
 Content-Type: application/json
 ```
 
-The body is Bambuddy's generic webhook JSON, or the bridge's `print_usage` event above. STL Quest reads `event`, `printer`, `filename`, `duration` (such as `1h 23m`), `filament_grams` (such as `12.3`), `filament_details`, `reason`, `progress`, `archive_id`, and `run_id`, and ignores the rest. It keeps `print_start`, `print_complete`, `print_failed`, and `print_stopped`, and accepts and drops every other event.
+The body is Bambuddy's generic webhook JSON. STL Quest reads `event`, `printer`, `filename`, `duration` (such as `1h 23m`), `filament_grams` (such as `12.3`), `filament_details`, `reason`, `progress`, `archive_id`, and `run_id`, and ignores the rest. It keeps `print_start`, `print_complete`, `print_failed`, and `print_stopped`, and accepts and drops every other event.
 
 | Response | Meaning                                                                       |
 | -------- | ----------------------------------------------------------------------------- |
@@ -96,7 +96,7 @@ The body is Bambuddy's generic webhook JSON, or the bridge's `print_usage` event
 
 ## Security
 
-- The token can only add prints and spools to one workspace. It reads nothing back and cannot sign in, and cookies are never read, so a browser cannot be made to send one.
+- The token can only add prints, what they used per spool, and spools to one workspace. The only thing it reads back is the spools the workspace's admins queued for the bridge to add to Spoolman ([Spoolman](spoolman.md#security)). It reads no stock, requests, or prints, cannot sign in, and cookies are never read, so a browser cannot be made to send one.
 - STL Quest stores only a SHA-256 hash of the token.
-- The token is checked before the body is read, bodies are capped at 4 MB, and each token is limited to 60 requests a minute on each server.
+- The token is checked before the body is read, bodies are capped at 4 MB, and each token is limited to 60 requests a minute on each server for Bambuddy's notifications and another 60 for the bridge's spool usage.
 - What a print reports is shown only to workspace admins, and only its outcome and whether it linked reach telemetry, never its file or printer name.

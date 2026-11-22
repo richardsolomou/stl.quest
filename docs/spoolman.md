@@ -94,7 +94,7 @@ GET /api/spoolman/restocks
 Authorization: Bearer stlq_spoolman_…
 ```
 
-answers `{"restocks": [{"id": "…", "filament_id": 3, "initial_weight": 1000, "comment": "stlquest-restock:…"}]}`, the oldest 50 first, and takes the outcome of each as `POST /api/spoolman/restocks` with `{"id": "…", "spool_id": 12}` or `{"id": "…", "error": "…"}`. A `404` means the spool is no longer waiting.
+answers `{"restocks": [{"id": "…", "filament_id": 3, "initial_weight": 1000, "comment": "stlquest-restock:…"}]}`, the oldest 50 first, and takes the outcome of each as `POST /api/spoolman/restocks` with `{"id": "…", "spool_id": 12}` or `{"id": "…", "error": "…"}`. A `404` means the spool is no longer waiting. Both share a limit of 120 requests a minute per token.
 
 For example, a Home Assistant `rest_command` that sends one spool:
 
@@ -111,7 +111,7 @@ rest_command:
 
 ## Security
 
-- The token is the endpoint's only credential. It can add spools, and [Bambuddy's print events](bambuddy.md), to one workspace. The only thing it reads back is the spools the workspace's admins queued to add to Spoolman (each one's Spoolman filament ID, weight, and marker), and it can mark them added or refused. It reads no stock, requests, or prints, and cannot sign in. Cookies are never read, so a browser cannot be tricked into sending one.
+- The token is the endpoint's only credential. It can add spools, and [Bambuddy's print events and what each print used per spool](bambuddy.md), to one workspace. The only thing it reads back is the spools the workspace's admins queued to add to Spoolman (each one's Spoolman filament ID, weight, and marker), and it can mark them added or refused. It reads no stock, requests, or prints, and cannot sign in. Cookies are never read, so a browser cannot be tricked into sending one.
 - STL Quest stores only a SHA-256 hash of the token. A database leak does not reveal it.
-- The token is checked before the body is read, bodies are capped at 2 MB, and each token is limited to 60 requests a minute on each server.
+- The token is checked before the body is read, bodies are capped at 2 MB, and each token is limited on each server to 60 requests a minute for spools and 120 for spools to add.
 - Spoolman has no authentication of its own, so keep it off the internet. The bridge only connects out, so nothing needs to be exposed.

@@ -8,16 +8,20 @@ const finished = { event: 'print_complete', printer: 'X2D', filename: 'SQ-1 Hull
 let temporary: string
 
 async function ingest() {
-  const { receiveBambuddyRequest } = await import('./bambuddyIngest')
+  const { receiveBambuddyRequest, receivePrintUsageRequest } = await import('./bambuddyIngest')
   return (request: Request) =>
-    receiveBambuddyRequest(request).catch((error: unknown) => {
-      if (error instanceof Response) return error
-      throw error
-    })
+    (new URL(request.url).pathname === '/api/bambuddy/usage' ? receivePrintUsageRequest : receiveBambuddyRequest)(request).catch(
+      (error: unknown) => {
+        if (error instanceof Response) return error
+        throw error
+      },
+    )
 }
 
-function post(body: string, headers: Record<string, string> = {}) {
-  return new Request('http://localhost/api/bambuddy/events', {
+const usage = (body: object) => post(JSON.stringify(body), {}, 'http://localhost/api/bambuddy/usage')
+
+function post(body: string, headers: Record<string, string> = {}, url = 'http://localhost/api/bambuddy/events') {
+  return new Request(url, {
     method: 'POST',
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', ...headers },
     body,
@@ -90,7 +94,7 @@ describe('Bambuddy ingest', () => {
     const receive = await ingest()
     await receive(post(JSON.stringify(finished)))
 
-    const response = await receive(post(JSON.stringify({ event: 'print_usage', run_id: '3', spools: [{ spool_id: 4, grams: 12.5 }] })))
+    const response = await receive(usage({ run_id: '3', spools: [{ spool_id: 4, grams: 12.5 }] }))
 
     expect({ status: response.status, usage: (await storedPrints())[0].filamentUsage }).toEqual({
       status: 204,
@@ -99,15 +103,22 @@ describe('Bambuddy ingest', () => {
   })
 
   it('asks the bridge to send spools again for a print not received yet', async () => {
-    const response = await (
-      await ingest()
-    )(post(JSON.stringify({ event: 'print_usage', run_id: '9', spools: [{ spool_id: 4, grams: 1 }] })))
+    const response = await (await ingest())(usage({ run_id: '9', spools: [{ spool_id: 4, grams: 1 }] }))
 
     expect(response.status).toBe(404)
   })
 
+  it('keeps taking Bambuddy’s notifications once the bridge used up its own limit', async () => {
+    const receive = await ingest()
+    for (let sent = 0; sent < 61; sent++) await receive(usage({ run_id: '9', spools: [{ spool_id: 4, grams: 1 }] }))
+
+    const response = await receive(post(JSON.stringify(finished)))
+
+    expect(response.status).toBe(204)
+  })
+
   it('refuses spools sent without a run', async () => {
-    const response = await (await ingest())(post(JSON.stringify({ event: 'print_usage', spools: [{ spool_id: 4, grams: 1 }] })))
+    const response = await (await ingest())(usage({ spools: [{ spool_id: 4, grams: 1 }] }))
 
     expect(response.status).toBe(400)
   })

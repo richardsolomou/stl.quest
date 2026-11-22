@@ -12,7 +12,7 @@ export type Config = {
   spoolmanUrl: string
   ingestUrl: string
   restocksUrl: string
-  printsUrl: string
+  usageUrl: string
   token: string
   debounceMs: number
   resyncMs: number
@@ -64,7 +64,7 @@ export function readConfig(environment: Environment): Config {
     spoolmanUrl: withoutTrailingSlash(spoolmanUrl.href),
     ingestUrl: `${app}/api/spoolman/spools`,
     restocksUrl: `${app}/api/spoolman/restocks`,
-    printsUrl: `${app}/api/bambuddy/events`,
+    usageUrl: `${app}/api/bambuddy/usage`,
     token: required('STLQUEST_TOKEN'),
     debounceMs: seconds('DEBOUNCE_SECONDS', 3),
     resyncMs: seconds('RESYNC_SECONDS', 15 * 60),
@@ -199,6 +199,8 @@ export type SpoolUsage = { spool_id: number; grams: number }
 const CHARGE_WINDOW_MS = 10 * 60_000
 /** A run STL Quest still has not received this long after it ended never will, so the bridge stops sending it. */
 const GIVE_UP_MS = 60 * 60_000
+/** Runs sent a poll at most, so a backlog goes over a few polls instead of all at once. */
+const MAX_RUNS_PER_POLL = 10
 
 /** Bambuddy writes UTC times without a zone. */
 const utc = (time: string) => Date.parse(/(?:z|[+-]\d\d:?\d\d)$/i.test(time) ? time : `${time}Z`)
@@ -238,7 +240,7 @@ export function runSpools(runs: BambuddyRun[], usage: BambuddyUsage[]) {
 
 /** Sends what a run charged to each spool; false when STL Quest has not received the run's print yet. */
 export async function sendPrintUsage(config: Config, runId: string, spools: SpoolUsage[], fetcher: typeof fetch = fetch) {
-  const response = await stlQuest(config, config.printsUrl, { event: 'print_usage', run_id: runId, spools }, fetcher)
+  const response = await stlQuest(config, config.usageUrl, { run_id: runId, spools }, fetcher)
   return response.status !== 404
 }
 
@@ -254,19 +256,20 @@ async function readBambuddy<Body>(bambuddy: NonNullable<Config['bambuddy']>, pat
 }
 
 /**
- * Sends each recent run's Spoolman spools that STL Quest has not been sent as they are now. `sent` remembers what went,
- * by run, between polls.
+ * Sends each recent run's Spoolman spools that STL Quest has not been sent as they are now, skipping runs that ended
+ * too long ago to wait for. `sent` remembers what went, by run, between polls.
  */
 export async function syncPrints(config: Config, sent: Map<string, string>, fetcher: typeof fetch = fetch, now = Date.now()) {
   const { bambuddy } = config
   if (!bambuddy) return
   const { items: runs } = await readBambuddy<{ items: BambuddyRun[] }>(bambuddy, '/api/v1/print-log/?limit=100', fetcher)
   const usage = await readBambuddy<BambuddyUsage[]>(bambuddy, '/api/v1/inventory/usage?spoolman=true&limit=500', fetcher)
+  let posts = 0
   for (const [runId, spools] of runSpools(runs, usage)) {
     const sending = JSON.stringify(spools)
-    if (sent.get(runId) === sending) continue
-    const ended = utc(runs.find(({ id }) => String(id) === runId)!.completed_at!)
-    if ((await sendPrintUsage(config, runId, spools, fetcher)) || now - ended > GIVE_UP_MS) sent.set(runId, sending)
+    if (sent.get(runId) === sending || now - utc(runs.find(({ id }) => String(id) === runId)!.completed_at!) > GIVE_UP_MS) continue
+    if (posts++ === MAX_RUNS_PER_POLL) break
+    if (await sendPrintUsage(config, runId, spools, fetcher)) sent.set(runId, sending)
   }
   const recent = new Set(runs.map(({ id }) => String(id)))
   for (const runId of sent.keys()) if (!recent.has(runId)) sent.delete(runId)

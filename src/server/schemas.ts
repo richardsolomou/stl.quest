@@ -718,7 +718,6 @@ export const spoolmanRestockIdSchema = z.object({ id })
 /** What the bridge read from Bambuddy that a print used per Spoolman spool. */
 export const bambuddyUsageSchema = z
   .object({
-    event: z.literal('print_usage'),
     run_id: z.string().trim().min(1).max(64),
     spools: z
       .array(z.object({ spool_id: spoolmanKey, grams: z.number().min(0).max(100_000) }))

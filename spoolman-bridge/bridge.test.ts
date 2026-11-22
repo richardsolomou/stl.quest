@@ -270,7 +270,7 @@ describe('syncPrints', () => {
     await syncPrints(bambuddy, sent, reader, Date.parse('2026-11-20T10:01:00Z'))
     await syncPrints(bambuddy, sent, reader, Date.parse('2026-11-20T10:02:00Z'))
 
-    expect(calls(reader).filter((call) => call.startsWith('POST'))).toEqual(['POST https://stl.quest/api/bambuddy/events'])
+    expect(calls(reader).filter((call) => call.startsWith('POST'))).toEqual(['POST https://stl.quest/api/bambuddy/usage'])
   })
 
   it('sends a run again while STL Quest has not received its print', async () => {
@@ -287,21 +287,56 @@ describe('syncPrints', () => {
     const sent = new Map<string, string>()
     const reader = fetcher(404)
 
-    await syncPrints(bambuddy, sent, reader, Date.parse('2026-11-20T12:00:00Z'))
-    await syncPrints(bambuddy, sent, reader, Date.parse('2026-11-20T12:01:00Z'))
+    await syncPrints(bambuddy, sent, reader, Date.parse('2026-11-20T10:01:00Z'))
+    await syncPrints(bambuddy, sent, reader, Date.parse('2026-11-20T11:01:00Z'))
 
     expect(calls(reader).filter((call) => call.startsWith('POST'))).toHaveLength(1)
+  })
+
+  it('skips runs that ended before it started', async () => {
+    const reader = fetcher(204)
+
+    await syncPrints(bambuddy, new Map(), reader, Date.parse('2026-11-20T12:00:00Z'))
+
+    expect(calls(reader).filter((call) => call.startsWith('POST'))).toEqual([])
+  })
+
+  it('sends at most a few runs a poll', async () => {
+    const runs = Array.from({ length: 15 }, (_, index) => ({
+      id: index + 1,
+      printer_id: index + 1,
+      print_name: 'Hull',
+      status: 'completed',
+      completed_at: '2026-11-20T10:00:00',
+    }))
+    const reader = vi.fn(async (url: string | URL | Request, _init?: RequestInit) => {
+      const target = href(url)
+      if (target.includes('/api/v1/print-log/')) return json({ items: runs, total: runs.length })
+      if (target.includes('/api/v1/inventory/usage'))
+        return json(
+          runs.map(({ printer_id }) => ({
+            spoolman_spool_id: 3,
+            printer_id,
+            print_name: 'Hull',
+            weight_used: 1,
+            created_at: '2026-11-20T10:00:04',
+          })),
+        )
+      return new Response(null, { status: 204 })
+    })
+
+    await syncPrints(bambuddy, new Map(), reader, Date.parse('2026-11-20T10:01:00Z'))
+
+    expect(calls(reader).filter((call) => call.startsWith('POST'))).toHaveLength(10)
   })
 })
 
 describe('sendPrintUsage', () => {
-  it('sends a run’s spools as a Bambuddy event', async () => {
+  it('sends a run’s spools', async () => {
     const fetcher = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response(null, { status: 204 }))
 
     await sendPrintUsage(config, '5', [{ spool_id: 3, grams: 12.5 }], fetcher)
 
-    expect(fetcher.mock.calls[0][1]?.body).toBe(
-      JSON.stringify({ event: 'print_usage', run_id: '5', spools: [{ spool_id: 3, grams: 12.5 }] }),
-    )
+    expect(fetcher.mock.calls[0][1]?.body).toBe(JSON.stringify({ run_id: '5', spools: [{ spool_id: 3, grams: 12.5 }] }))
   })
 })

@@ -2272,7 +2272,11 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await screenshot(page, 'spoolman-restocks-320')
   await page.setViewportSize({ width: 1280, height: 720 })
   // The bridge sends what a Bambuddy print charged to each Spoolman spool, by the run its end event named.
-  const spoolUsage = (run_id: string) => sendPrint({ event: 'print_usage', run_id, spools: [{ spool_id: 1, grams: 12.5 }] })
+  const spoolUsage = (run_id: string) =>
+    page.request.post('/api/bambuddy/usage', {
+      headers: { authorization: `Bearer ${spoolmanToken}` },
+      data: { run_id, spools: [{ spool_id: 1, grams: 12.5 }] },
+    })
   expect((await spoolUsage('41')).status()).toBe(204)
   expect((await spoolUsage('999')).status()).toBe(404)
   await page.getByRole('button', { name: 'Disconnect' }).click()
