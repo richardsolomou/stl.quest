@@ -130,7 +130,15 @@ function DeleteInventoryDialog({
   )
 }
 
-const REFERENCE_ORDER = ['requests', 'plates', 'usage', 'stock', 'supplies', 'parts'] as const satisfies (keyof InventoryReferences)[]
+const REFERENCE_ORDER = [
+  'requests',
+  'plates',
+  'usage',
+  'stock',
+  'supplies',
+  'parts',
+  'bought',
+] as const satisfies (keyof InventoryReferences)[]
 
 function ReferenceSummary({ references, loading, failed }: { references?: InventoryReferences; loading: boolean; failed: boolean }) {
   const copy = useI18n().t.settings.inventoryDelete

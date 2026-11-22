@@ -113,6 +113,7 @@ export const server: typeof en = {
     exists: 'un élément avec cet identifiant existe déjà',
     full: (limit: number) => `un espace de travail peut en utiliser jusqu’à ${limit} à la fois ; archivez-en un d’abord`,
     notArchived: 'archivez cet élément avant de le supprimer',
+    storeMissing: 'cette boutique n’existe plus ; actualisez la page et choisissez-en une autre',
   },
   usage: {
     unknownConsumable: 'consommable inconnu',

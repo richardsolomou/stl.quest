@@ -124,6 +124,7 @@ const consumableBaseSchema = {
   name: z.string().trim().min(1).max(120),
   minimumStock: z.number().positive().max(10_000_000).optional(),
   packSize: z.number().positive().max(10_000_000).optional(),
+  storeId: z.string().trim().min(1).max(200).optional(),
 }
 const filamentConsumableSchema = z.object({
   ...consumableBaseSchema,
@@ -273,11 +274,19 @@ const printerProfileSchema = z.object({
     .optional(),
 })
 
-/** One printer, piece of equipment, or consumable; whether it is archived is changed only by `inventoryArchiveSchema`. */
+const storeSchema = z.object({
+  id: z.string().trim().min(1).max(200),
+  name: z.string().trim().min(1).max(100),
+  shippingCost: z.number().nonnegative().max(100_000).optional(),
+  freeShippingOver: z.number().positive().max(1_000_000).optional(),
+})
+
+/** One printer, piece of equipment, consumable, or store; whether it is archived is changed only by `inventoryArchiveSchema`. */
 export const inventoryItemSchema = z.discriminatedUnion('inventory', [
   z.object({ inventory: z.literal('printers'), item: printerProfileSchema }),
   z.object({ inventory: z.literal('equipment'), item: equipmentItemSchema }),
   z.object({ inventory: z.literal('consumables'), item: consumableSchema }),
+  z.object({ inventory: z.literal('stores'), item: storeSchema }),
 ])
 export const inventoryItemRefSchema = z.object({
   inventory: z.enum(INVENTORY_KINDS),

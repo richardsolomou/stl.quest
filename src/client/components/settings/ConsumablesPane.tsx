@@ -34,7 +34,15 @@ import { useConsumableBatch, useInventory } from '../../inventory'
 import { activeItems } from '../../../core/inventory'
 import { createId } from '../../id'
 import { matchesListSearch, showsListSearch } from '../../listSearch'
-import { catalogueQuery, consumablesQuery, equipmentQuery, priceCalculatorSettingsQuery, printersQuery, stockQuery } from '../../queries'
+import {
+  catalogueQuery,
+  consumablesQuery,
+  equipmentQuery,
+  priceCalculatorSettingsQuery,
+  printersQuery,
+  stockQuery,
+  storesQuery,
+} from '../../queries'
 import { signalProductTourProgress } from '../../productTour'
 import { useUsageTracking, useWorkspacePrintTypes, useWorkspaceSlug } from '../../workspace'
 import { UsageTrackingInvite } from '../UsageTracking'
@@ -50,6 +58,7 @@ import { LowMarker, StockSummary } from './ConsumableStock'
 import { VirtualList } from './VirtualList'
 import { PrinterPresetImage } from './PrinterPresetImage'
 import { PageHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { StoresSection } from './Stores'
 import { SupplyNeeds } from './SupplyNeeds'
 
 type LabelledGroup = WearPartGroup & { label: string }
@@ -103,8 +112,11 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
   const printers = useMemo(() => profiles ?? [], [profiles])
   const printTypes = useWorkspacePrintTypes()
   const tracking = useUsageTracking()
-  const stock = useQuery({ ...stockQuery(workspaceSlug), enabled: tracking }).data?.stock
+  const stockData = useQuery({ ...stockQuery(workspaceSlug), enabled: tracking }).data
+  const stock = stockData?.stock
   const levels = useMemo(() => stock ?? [], [stock])
+  const storeList = useQuery(storesQuery(workspaceSlug)).data?.stores
+  const stores = useMemo(() => storeList ?? [], [storeList])
   const { mutation, save, setArchived, remove } = useInventory('consumables')
   const batch = useConsumableBatch()
   // A new item scrolls into view once it is stored, so it is found where it landed when its dialog closes.
@@ -300,6 +312,9 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
           workspaceSlug={workspaceSlug}
           consumables={saved}
           levels={stock}
+          dailyUse={stockData?.dailyUse}
+          stores={stores}
+          money={money}
           printers={printers}
           printTypes={printTypes}
           onAddMaterial={addMaterial}
@@ -368,6 +383,8 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
           ))}
         </div>
       </SettingsSection>
+
+      <StoresSection stores={stores} consumables={saved} symbol={symbol} money={money} />
 
       <ArchivedInventory
         kind="consumables"
@@ -444,6 +461,7 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
           consumable={editing}
           isNew={!saved.some(({ id }) => id === editing.id)}
           library={saved}
+          stores={stores}
           workspaceSlug={workspaceSlug}
           level={levels.find(({ consumableId }) => consumableId === editing.id)}
           printers={printers}

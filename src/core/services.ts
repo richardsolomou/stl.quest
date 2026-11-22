@@ -71,6 +71,8 @@ import type { OrderRestockInput } from './orders/orderRestock'
 import { sameFilamentProduct, withSharedFilamentPrice } from './filamentPresets'
 import type { EquipmentItem } from './equipment'
 import { activeItems, INVENTORY_LIMITS, type InventoryItems, type InventoryKind } from './inventory'
+import { dailyUse, USAGE_RATE_DAYS } from './shopping'
+import type { Store } from './stores'
 import { canDeleteInventoryItem, deletedItemKind } from './inventoryDeletion'
 import { printerLifetimes } from './maintenance'
 import {
@@ -1477,6 +1479,19 @@ export class STLQuestService {
     )
   }
 
+  /** How much of each consumable goes per day at its recent rate, for those whose stock log is long enough to say. */
+  async dailyUse(identity: Identity): Promise<Record<string, number>> {
+    await this.requireUsageTracking(identity)
+    const now = Date.now()
+    const uses = await this.repository.recentStockUse(now - USAGE_RATE_DAYS * 86_400_000)
+    return Object.fromEntries(
+      (await this.consumables()).flatMap((consumable) => {
+        const rate = dailyUse(consumable, uses, now)
+        return rate === undefined ? [] : [[consumable.id, rate]]
+      }),
+    )
+  }
+
   /** Each charged print's whole-life cost and finish, so profit counts it once, against everything it used. */
   async chargedPrints(identity: Identity) {
     await this.requireUsageTracking(identity)
@@ -1801,13 +1816,14 @@ export class STLQuestService {
     this.changed('inventory.deleted')
     this.capture(identity.id, 'inventory_item_deleted', {
       inventory_kind: kind,
-      item_kind: deletedItemKind(kind, item),
+      item_kind: kind === 'stores' ? 'store' : deletedItemKind(kind, item),
       request_count: references.requests,
       plate_count: references.plates,
       usage_count: references.usage,
       stock_count: references.stock,
       equipment_count: references.supplies,
       part_count: references.parts,
+      consumable_count: references.bought,
     })
     return items
   }
@@ -1829,9 +1845,11 @@ export class STLQuestService {
     change: (items: InventoryItems[Kind][]) => InventoryItems[Kind][],
   ) {
     this.requireAdmin(identity)
+    // Read outside the lock, so a store deleted in that moment is still refused, by the foreign key instead.
+    const stores = kind === 'consumables' ? new Set((await this.repository.listInventory('stores')).map(({ id }) => id)) : undefined
     const { previous, items } = await this.repository.changeInventory(kind, (current) => {
       const next = change(current)
-      this.validateInventory(kind, current, next)
+      this.validateInventory(kind, current, next, stores)
       return next
     })
     this.changed('inventory.changed')
@@ -1840,17 +1858,25 @@ export class STLQuestService {
   }
 
   /** Checks only what the change touched, so an item stored before a rule existed never blocks editing another. */
-  private validateInventory<Kind extends InventoryKind>(kind: Kind, previous: InventoryItems[Kind][], next: InventoryItems[Kind][]) {
+  private validateInventory<Kind extends InventoryKind>(
+    kind: Kind,
+    previous: InventoryItems[Kind][],
+    next: InventoryItems[Kind][],
+    stores: Set<string> | undefined,
+  ) {
     const active = activeItems(next).length
     if (active > INVENTORY_LIMITS[kind] && active > activeItems(previous).length)
       throw new Response(this.text.inventory.full(INVENTORY_LIMITS[kind]), { status: 409 })
-    if (kind !== 'printers') return
     const stored = new Map(previous.map((item) => [item.id, JSON.stringify(item)]))
-    for (const printer of next as PrinterProfile[]) {
-      if (stored.get(printer.id) === JSON.stringify(printer)) continue
-      const error = printerValidationError(printer, next as PrinterProfile[], this.messages())
-      if (error) throw new Response(error, { status: 400 })
+    const changed = next.filter((item) => stored.get(item.id) !== JSON.stringify(item))
+    if (kind === 'printers') {
+      for (const printer of changed as PrinterProfile[]) {
+        const error = printerValidationError(printer, next as PrinterProfile[], this.messages())
+        if (error) throw new Response(error, { status: 400 })
+      }
     }
+    if (stores && (changed as Consumable[]).some(({ storeId }) => storeId !== undefined && !stores.has(storeId)))
+      throw new Response(this.text.inventory.storeMissing, { status: 409 })
   }
 
   private captureInventory<Kind extends InventoryKind>(
@@ -1871,6 +1897,13 @@ export class STLQuestService {
         catalogue_count: active.filter((item) => item.presetId).length,
         with_supplies_count: active.filter((item) => item.supplies.length).length,
       })
+    } else if (kind === 'stores') {
+      const active = activeItems(items as Store[])
+      this.capture(identity, 'stores_saved', {
+        store_count: active.length,
+        with_shipping_count: active.filter((store) => store.shippingCost !== undefined).length,
+        with_free_shipping_count: active.filter((store) => store.freeShippingOver !== undefined).length,
+      })
     } else {
       const library = items as Consumable[]
       this.capture(identity, 'consumables_saved', {
@@ -1879,6 +1912,7 @@ export class STLQuestService {
         part_count: consumablesOfKind(library, 'part').length,
         supply_count: consumablesOfKind(library, 'supply').length,
         catalogue_supply_count: consumablesOfKind(library, 'supply').filter((supply) => supply.supplyPresetId).length,
+        with_store_count: activeItems(library).filter((consumable) => consumable.storeId).length,
       })
     }
   }

@@ -6,7 +6,8 @@ import type { DeletedItemKind, UsageEvent } from './usage'
 /**
  * What names an item, counted so deleting it says what loses the link: prints and plates lose their printer, usage
  * and stock movements keep their cost under the item's name (see `keepsDeletedName`), equipment stops using a deleted
- * supply, and wear parts bound to a deleted custom printer stay in the library, grouped under a printer that is gone.
+ * supply, wear parts bound to a deleted custom printer stay in the library, grouped under a printer that is gone, and
+ * consumables bought from a deleted store name no store.
  */
 export type InventoryReferences = {
   requests: number
@@ -19,9 +20,11 @@ export type InventoryReferences = {
   supplies: number
   /** Wear parts bound to the custom printer. */
   parts: number
+  /** Consumables bought from the store. */
+  bought: number
 }
 
-export const NO_REFERENCES: InventoryReferences = { requests: 0, plates: 0, usage: 0, stock: 0, supplies: 0, parts: 0 }
+export const NO_REFERENCES: InventoryReferences = { requests: 0, plates: 0, usage: 0, stock: 0, supplies: 0, parts: 0, bought: 0 }
 
 /** Only an archived item can be deleted, so deleting is always a second step after archiving, which can be undone. */
 export function canDeleteInventoryItem(item: { archived?: boolean }) {
@@ -32,7 +35,8 @@ export function referenceCount(references: InventoryReferences) {
   return Object.values(references).reduce((total, count) => total + count, 0)
 }
 
-export function deletedItemKind<Kind extends InventoryKind>(kind: Kind, item: InventoryItems[Kind]): DeletedItemKind {
+/** What usage keeps of a deleted item it used; no usage names a store. */
+export function deletedItemKind(kind: Exclude<InventoryKind, 'stores'>, item: InventoryItems[InventoryKind]): DeletedItemKind {
   if (kind === 'printers') return 'printer'
   if (kind === 'equipment') return 'equipment'
   return (item as Consumable).kind

@@ -71,6 +71,25 @@ export const equipment = pgTable(
   ],
 )
 
+/** Where consumables are bought, with what an order costs to ship and the order total that ships free. */
+export const stores = pgTable(
+  'stores',
+  {
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    id: text().notNull(),
+    position: integer().notNull(),
+    name: text().notNull(),
+    shippingCost: doublePrecision('shipping_cost'),
+    freeShippingOver: doublePrecision('free_shipping_over'),
+    archivedAt: bigint('archived_at', { mode: 'number' }),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+    updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.workspaceId, table.id] }), index('stores_position').on(table.workspaceId, table.position)],
+)
+
 /**
  * Resins, filaments, wear parts, and supplies in one table: `price` is per litre, per kilogram, or per unit as the kind
  * is bought, `preset_id` is the resin, filament, part, or supply catalogue entry, and the remaining columns belong to one kind.
@@ -101,6 +120,7 @@ export const consumables = pgTable(
     slicer: text('slicer'),
     minimumStock: doublePrecision('minimum_stock'),
     packSize: doublePrecision('pack_size'),
+    storeId: text('store_id'),
     archivedAt: bigint('archived_at', { mode: 'number' }),
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),
     updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
@@ -112,6 +132,11 @@ export const consumables = pgTable(
     check('consumables_lifespan_unit_check', sql`${table.lifespanUnit} IN ('plates', 'hours') OR ${table.lifespanUnit} IS NULL`),
     check('consumables_unit_check', sql`${table.unit} IN ('ml', 'g', 'item') OR ${table.unit} IS NULL`),
     index('consumables_position').on(table.workspaceId, table.position),
+    foreignKey({
+      columns: [table.workspaceId, table.storeId],
+      foreignColumns: [stores.workspaceId, stores.id],
+      name: 'consumables_workspace_store_fk',
+    }),
   ],
 )
 

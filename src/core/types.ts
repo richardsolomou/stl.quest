@@ -6,6 +6,7 @@ import type { Locale } from './i18n/locales'
 import type { MaintenanceTotals } from './maintenance'
 import type { StockTotal, UsageEvent, UsageFilters } from './usage'
 import type { InventoryItems, InventoryKind } from './inventory'
+import type { RecentStockUse } from './shopping'
 import type { InventoryReferences } from './inventoryDeletion'
 import type { Plate, PlateItem, PlateRecording } from './plates'
 import type { PriceCalculatorCurrency } from './priceCalculator'
@@ -547,6 +548,8 @@ interface RepositoryShape {
   stockTotals(): StockTotal[]
   /** Every printer's printing runs over its whole life, and since each part's last replacement on it (see core/maintenance). */
   maintenanceTotals(): MaintenanceTotals
+  /** Live recorded events per consumable and unit: what uses, waste, and replacements took since `since`, and when the first was logged. */
+  recentStockUse(since: number): RecentStockUse[]
   /** Every print with a charge, its live spend in this currency or unpriced totalled over all time (see core/spend). */
   chargedPrints(currency: PriceCalculatorCurrency): ChargedPrint[]
   /**

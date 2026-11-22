@@ -33,6 +33,7 @@ import {
   getStockLevels,
   getSpoolman,
   getPrinterLifetimes,
+  getStores,
   getUsagePrefills,
   getUsageBackfillPreview,
   getChargedPrints,
@@ -139,6 +140,8 @@ export const consumablesQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['consumables', workspaceSlug], queryFn: () => getConsumables({ data: { workspaceSlug } }) })
 export const equipmentQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['equipment', workspaceSlug], queryFn: () => getEquipment({ data: { workspaceSlug } }) })
+export const storesQuery = (workspaceSlug: string) =>
+  queryOptions({ queryKey: ['stores', workspaceSlug], queryFn: () => getStores({ data: { workspaceSlug } }) })
 export const inventoryReferencesQuery = (workspaceSlug: string, inventory: InventoryKind, id: string) =>
   queryOptions({
     queryKey: ['inventoryReferences', workspaceSlug, inventory, id],
@@ -250,6 +253,7 @@ function prefetchSettingsSection(queryClient: QueryClient, section: SettingsSect
         prefetch(consumablesQuery(workspaceSlug)),
         prefetch(printersQuery(workspaceSlug)),
         prefetch(priceCalculatorSettingsQuery(workspaceSlug)),
+        prefetch(storesQuery(workspaceSlug)),
         ...(usageTracking ? [prefetch(stockQuery(workspaceSlug))] : []),
       ]
     case 'pricing':

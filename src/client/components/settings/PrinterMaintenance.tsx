@@ -23,6 +23,7 @@ import {
   printerLifetimesQuery,
   printersQuery,
   stockQuery,
+  storesQuery,
 } from '../../queries'
 import { useWorkspaceSlug } from '../../workspace'
 import { currencySymbol, formatNumber, formatRate } from '../priceCalculator/format'
@@ -43,6 +44,7 @@ export function PrinterMaintenance({ printer }: { printer: PrinterProfile }) {
   const levels = useQuery(stockQuery(workspaceSlug)).data?.stock ?? []
   const printers = useQuery(printersQuery(workspaceSlug)).data?.profiles ?? []
   const catalogue = useQuery(catalogueQuery('parts')).data
+  const stores = useQuery(storesQuery(workspaceSlug)).data?.stores ?? []
   const currency =
     useQuery(priceCalculatorSettingsQuery(workspaceSlug)).data?.settings.currency ?? DEFAULT_PRICE_CALCULATOR_SETTINGS.currency
   const { save, setArchived } = useInventory('consumables')
@@ -110,6 +112,7 @@ export function PrinterMaintenance({ printer }: { printer: PrinterProfile }) {
           key={editing.id}
           consumable={editing}
           library={consumables}
+          stores={stores}
           isNew={!consumables.some(({ id }) => id === editing.id)}
           workspaceSlug={workspaceSlug}
           level={levels.find(({ consumableId }) => consumableId === editing.id)}

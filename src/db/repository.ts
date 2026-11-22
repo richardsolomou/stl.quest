@@ -2672,6 +2672,31 @@ export class DrizzleRepository implements Repository {
     }
   }
 
+  async recentStockUse(since: number) {
+    const workspaceId = await this.workspace()
+    const rows = await this.database
+      .select({
+        consumableId: usageEvents.consumableId,
+        unit: usageEvents.unit,
+        used: sql<number>`coalesce(sum(case when ${usageEvents.kind} in ('use', 'waste', 'replace') and ${usageEvents.createdAt} >= ${since} then ${usageEvents.amount} else 0 end), 0)`.mapWith(
+          Number,
+        ),
+        firstAt: sql<number>`min(${usageEvents.createdAt})`.mapWith(Number),
+      })
+      .from(usageEvents)
+      .where(
+        and(
+          eq(usageEvents.workspaceId, workspaceId),
+          isNotNull(usageEvents.consumableId),
+          isNull(usageEvents.undoneAt),
+          eq(usageEvents.estimated, false),
+        ),
+      )
+      .groupBy(usageEvents.consumableId, usageEvents.unit)
+      .all()
+    return rows.flatMap(({ consumableId, ...use }) => (consumableId ? [{ consumableId, ...use }] : []))
+  }
+
   async chargedPrints(currency: PriceCalculatorCurrency) {
     const workspaceId = await this.workspace()
     const rows = await this.database
@@ -2939,7 +2964,7 @@ export class DrizzleRepository implements Repository {
         else
           await tx
             .update(table)
-            .set({ ...columns, archivedAt, updatedAt: now } as never)
+            .set({ ...columns, archivedAt, updatedAt: now })
             .where(and(eq(table.workspaceId, workspaceId), eq(table.id, item.id)))
             .run()
       }
@@ -2976,42 +3001,7 @@ export class DrizzleRepository implements Repository {
       check(item, references)
       if (!item) throw new Error('a deleted inventory item must exist')
 
-      const field = usageInventoryFields[kind]
-      const named = and(eq(usageEvents.workspaceId, workspaceId), eq(usageEvents[field], id))
-      const events = await tx
-        .select({
-          id: usageEvents.id,
-          consumableId: usageEvents.consumableId,
-          equipmentId: usageEvents.equipmentId,
-          deletedItemName: usageEvents.deletedItemName,
-        })
-        .from(usageEvents)
-        .where(named)
-        .all()
-      const keeping = events
-        .filter((event) =>
-          keepsDeletedName(
-            {
-              consumableId: event.consumableId ?? undefined,
-              equipmentId: event.equipmentId ?? undefined,
-              deletedItemName: event.deletedItemName ?? undefined,
-            },
-            kind,
-          ),
-        )
-        .map((event) => event.id)
-      for (let start = 0; start < keeping.length; start += USAGE_INSERT_BATCH)
-        await tx
-          .update(usageEvents)
-          .set({ deletedItemName: item.name, deletedItemKind: deletedItemKind(kind, item) })
-          .where(and(eq(usageEvents.workspaceId, workspaceId), inArray(usageEvents.id, keeping.slice(start, start + USAGE_INSERT_BATCH))))
-          .run()
-      await tx
-        .update(usageEvents)
-        .set({ [field]: null })
-        .where(named)
-        .run()
-
+      if (kind !== 'stores') await this.unlinkUsage(tx, workspaceId, kind, item)
       if (kind === 'printers') {
         const { printType } = item as PrinterProfile
         await tx
@@ -3036,6 +3026,12 @@ export class DrizzleRepository implements Repository {
             .run()
         }
       }
+      if (kind === 'stores')
+        await tx
+          .update(consumables)
+          .set({ storeId: null, updatedAt: Date.now() })
+          .where(and(eq(consumables.workspaceId, workspaceId), eq(consumables.storeId, id)))
+          .run()
 
       await tx
         .delete(table)
@@ -3045,12 +3041,65 @@ export class DrizzleRepository implements Repository {
     })
   }
 
+  /** Usage that named a deleted item keeps its name and kind where the item was what it used, and loses the link. */
+  private async unlinkUsage(
+    tx: DatabaseTransaction,
+    workspaceId: string,
+    kind: Exclude<InventoryKind, 'stores'>,
+    item: InventoryItems[InventoryKind],
+  ) {
+    const id = item.id
+    const field = usageInventoryFields[kind]
+    const named = and(eq(usageEvents.workspaceId, workspaceId), eq(usageEvents[field], id))
+    const events = await tx
+      .select({
+        id: usageEvents.id,
+        consumableId: usageEvents.consumableId,
+        equipmentId: usageEvents.equipmentId,
+        deletedItemName: usageEvents.deletedItemName,
+      })
+      .from(usageEvents)
+      .where(named)
+      .all()
+    const keeping = events
+      .filter((event) =>
+        keepsDeletedName(
+          {
+            consumableId: event.consumableId ?? undefined,
+            equipmentId: event.equipmentId ?? undefined,
+            deletedItemName: event.deletedItemName ?? undefined,
+          },
+          kind,
+        ),
+      )
+      .map((event) => event.id)
+    for (let start = 0; start < keeping.length; start += USAGE_INSERT_BATCH)
+      await tx
+        .update(usageEvents)
+        .set({ deletedItemName: item.name, deletedItemKind: deletedItemKind(kind, item) })
+        .where(and(eq(usageEvents.workspaceId, workspaceId), inArray(usageEvents.id, keeping.slice(start, start + USAGE_INSERT_BATCH))))
+        .run()
+    await tx
+      .update(usageEvents)
+      .set({ [field]: null })
+      .where(named)
+      .run()
+  }
+
   private async inventoryReferencesWith(
     database: DatabaseExecutor,
     workspaceId: string,
     kind: InventoryKind,
     id: string,
   ): Promise<InventoryReferences> {
+    if (kind === 'stores') {
+      const bought = await database
+        .select({ count: count() })
+        .from(consumables)
+        .where(and(eq(consumables.workspaceId, workspaceId), eq(consumables.storeId, id)))
+        .get()
+      return { ...NO_REFERENCES, bought: bought?.count ?? 0 }
+    }
     const usage = await database
       .select({ stage: usageEvents.stage, count: count() })
       .from(usageEvents)

@@ -1207,6 +1207,15 @@ export const getConsumables = createServerFn({ method: 'GET' })
     }),
   )
 
+export const getStores = createServerFn({ method: 'GET' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const context = await workspaceAdmin(await app(), data.workspaceSlug)
+      return { stores: await context.repository.listInventory('stores') }
+    }),
+  )
+
 // Read by admins only, like consumables: the steps that ask which equipment a print used are admin board moves.
 export const getEquipment = createServerFn({ method: 'GET' })
   .validator(workspaceInputSchema)
@@ -1886,7 +1895,10 @@ export const getStockLevels = createServerFn({ method: 'GET' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const context = await workspaceContext(await app(), data.workspaceSlug)
-      return { stock: await context.service.stockLevels(context.identity) }
+      return {
+        stock: await context.service.stockLevels(context.identity),
+        dailyUse: await context.service.dailyUse(context.identity),
+      }
     }),
   )
 

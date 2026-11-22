@@ -788,6 +788,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
         stock: 1,
         supplies: 0,
         parts: 0,
+        bought: 0,
       })
     })
 
@@ -1003,6 +1004,18 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       expect(await secondary.maintenanceTotals()).toEqual({ printers: [], replacements: [] })
     })
   })
+  it('sums what was used lately per consumable, from when its stock was first logged', async () => {
+    await stock(repository, 'consumables', [ipa])
+    await repository.appendUsageEvents([
+      usageEvent({ id: 'stocked', transactionId: 'stocked', createdAt: 1_000 }),
+      usageEvent({ id: 'old-use', transactionId: 'old-use', kind: 'use', amount: 30, createdAt: 2_000 }),
+      usageEvent({ id: 'use', transactionId: 'use', kind: 'use', amount: 40, createdAt: 5_000 }),
+      usageEvent({ id: 'waste', transactionId: 'waste', kind: 'waste', amount: 10, createdAt: 6_000 }),
+      usageEvent({ id: 'estimate', transactionId: 'estimate', kind: 'use', amount: 99, createdAt: 500, estimated: true }),
+    ])
+
+    expect(await repository.recentStockUse(4_000)).toEqual([{ consumableId: 'ipa', unit: 'ml', used: 50, firstAt: 1_000 }])
+  })
 
   it('undoes every live event of a transaction once', async () => {
     await stock(repository, 'consumables', [ipa])
@@ -1022,8 +1035,9 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect([
       await secondary.listUsage({}),
       await secondary.stockTotals(),
+      await secondary.recentStockUse(0),
       await secondary.undoUsageTransaction('transaction', 2_000),
-    ]).toEqual([[], [], 0])
+    ]).toEqual([[], [], [], 0])
   })
 
   describe('charged prints', () => {
@@ -2131,7 +2145,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 45 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 47 })
     await migrated.close()
   })
 

@@ -2795,12 +2795,18 @@ describe('STLQuestService crash recovery', () => {
       await inventory.setInventoryItemArchived('printers', slaPrinter.id, true, admin)
       await inventory.createInventoryItem('consumables', grey, admin)
       await inventory.createInventoryItem('equipment', { ...wash, presetId: 'formlabs-form-wash' }, admin)
+      await inventory.createInventoryItem('stores', { id: 'bambu', name: 'Bambu Lab EU', freeShippingOver: 55 }, admin)
 
       expect(capture.mock.calls).toEqual([
         [admin.id, 'printer_saved', { printer_count: 1, added_count: 1, updated_count: 0, removed_count: 0 }],
         [admin.id, 'printer_saved', { printer_count: 0, added_count: 0, updated_count: 0, removed_count: 1 }],
-        [admin.id, 'consumables_saved', { resin_count: 1, filament_count: 0, part_count: 0, supply_count: 0, catalogue_supply_count: 0 }],
+        [
+          admin.id,
+          'consumables_saved',
+          { resin_count: 1, filament_count: 0, part_count: 0, supply_count: 0, catalogue_supply_count: 0, with_store_count: 0 },
+        ],
         [admin.id, 'equipment_saved', { equipment_count: 1, catalogue_count: 1, with_supplies_count: 0 }],
+        [admin.id, 'stores_saved', { store_count: 1, with_shipping_count: 0, with_free_shipping_count: 1 }],
       ])
     })
 
@@ -3030,6 +3036,7 @@ describe('STLQuestService crash recovery', () => {
           stock: 0,
           supplies: 0,
           parts: 1,
+          bought: 0,
         })
       })
 
@@ -3044,6 +3051,40 @@ describe('STLQuestService crash recovery', () => {
           stock: 1,
           supplies: 1,
           parts: 0,
+          bought: 0,
+        })
+      })
+
+      it('counts the consumables bought from a store', async () => {
+        await service.createInventoryItem('stores', { id: 'bambu', name: 'Bambu Lab EU' }, admin)
+        await service.updateInventoryItem('consumables', { ...ipa, storeId: 'bambu' }, admin)
+
+        expect((await service.inventoryReferences('stores', 'bambu', admin)).bought).toBe(1)
+      })
+
+      it('leaves consumables bought from a deleted store with no store', async () => {
+        await service.createInventoryItem('stores', { id: 'bambu', name: 'Bambu Lab EU' }, admin)
+        await service.updateInventoryItem('consumables', { ...ipa, storeId: 'bambu' }, admin)
+        await archive('stores', 'bambu')
+
+        await service.deleteInventoryItem('stores', 'bambu', admin)
+
+        expect((await repository.listInventory('consumables')).find(({ id }) => id === ipa.id)?.storeId).toBeUndefined()
+      })
+
+      it('refuses to buy a consumable from a deleted store', async () => {
+        await service.createInventoryItem('stores', { id: 'bambu', name: 'Bambu Lab EU' }, admin)
+        await archive('stores', 'bambu')
+        await service.deleteInventoryItem('stores', 'bambu', admin)
+
+        await expect(service.updateInventoryItem('consumables', { ...ipa, storeId: 'bambu' }, admin)).rejects.toMatchObject({
+          status: 409,
+        })
+      })
+
+      it('refuses to add a consumable bought from a deleted store', async () => {
+        await expect(service.createInventoryItem('consumables', { ...ipa, id: 'new-ipa', storeId: 'gone' }, admin)).rejects.toMatchObject({
+          status: 409,
         })
       })
 
@@ -3149,6 +3190,7 @@ describe('STLQuestService crash recovery', () => {
               stock_count: 1,
               equipment_count: 1,
               part_count: 0,
+              consumable_count: 0,
             },
           ],
         ])
@@ -3429,6 +3471,18 @@ describe('STLQuestService crash recovery', () => {
       await service.recordStepUsage({ requestId, stage: 'finishing', copies: 2, equipmentIds: [wash.id] }, admin)
 
       expect((await service.stockLevels(admin)).find((level) => level.consumableId === ipa.id)?.onHand).toBe(960)
+    })
+
+    it('says how much goes per day once stock has a week of history', async () => {
+      vi.useFakeTimers({ now: 0, toFake: ['Date'] })
+      await service.recordStockMovement({ consumableId: ipa.id, kind: 'restock', amount: 1_000 }, admin)
+      vi.setSystemTime(10 * 86_400_000)
+      await service.recordStockMovement({ consumableId: ipa.id, kind: 'waste', amount: 100 }, admin)
+
+      const rates = await service.dailyUse(admin)
+      vi.useRealTimers()
+
+      expect(rates).toEqual({ [ipa.id]: 10 })
     })
 
     it('records a correction as the difference from the amount counted', async () => {
