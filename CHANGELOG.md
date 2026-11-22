@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.11.0
+
+### Minor Changes
+
+- ad8ff1d: Start a plate from selected prints so they move through Printing and Finishing together on one printer, and read finished, failed, and cancelled prints from Bambuddy's webhook so that plate runs record real hours, grams, and failures instead of estimates.
+
+### Patch Changes
+
+- 3ac0f83: Suggest Bambu Lab desiccants for AMS units and lubricants for Bambu Lab printers at the top of the supply picker, so that they no longer sit unseen at the bottom of the list.
+
 ## 2.10.0
 
 ### Minor Changes
