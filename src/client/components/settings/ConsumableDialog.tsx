@@ -37,7 +37,9 @@ import { supplyPresetUnitPrice, type SupplyPreset } from '../../../core/supplyPr
 import { findPreset } from '../../../core/presets'
 import { getPrinterPreset } from '../../../core/printerPresets'
 import { resinPresetName, type ResinPreset } from '../../../core/resinPresets'
+import { activeItems } from '../../../core/inventory'
 import { enteredUnitScale, packSize } from '../../../core/stock'
+import type { Store } from '../../../core/stores'
 import type { Messages } from '../../../core/i18n'
 import type { PrinterProfile } from '../../../core/types'
 import type { StockLevel } from '../../../core/usage'
@@ -56,6 +58,7 @@ import { StockPanel, useStockMovements } from './ConsumableStock'
 import { ConsumableIcon } from './ConsumableIcon'
 import { materialFacts, MaterialPicker } from './ConsumablePicker'
 import { PrinterPresetImage } from './PrinterPresetImage'
+import { StoreField } from './Stores'
 
 // Past this many colours, scanning swatches by eye gets slow, so the picker offers a search.
 const SEARCHABLE_COLOURS = 24
@@ -71,6 +74,7 @@ export function ConsumableDialog({
   consumable,
   isNew,
   library,
+  stores,
   workspaceSlug,
   level,
   printers,
@@ -85,6 +89,8 @@ export function ConsumableDialog({
   isNew: boolean
   /** The stored consumables, for the other colours of the same filament. */
   library: Consumable[]
+  /** Where it can be bought from, to pick one. */
+  stores: Store[]
   workspaceSlug: string
   level?: StockLevel
   printers: PrinterProfile[]
@@ -324,6 +330,9 @@ export function ConsumableDialog({
           <OnHandField consumable={draft} each={several} value={onHand} onChange={setOnHand} />
         )}
         <StockFields consumable={draft} tracking={tracking} onChange={setDraft} />
+        {(activeItems(stores).length > 0 || draft.storeId) && (
+          <StoreField stores={stores} value={draft.storeId} onChange={(storeId) => setDraft({ ...draft, storeId })} />
+        )}
       </div>
       {!openedNew && tracking && <StockPanel workspaceSlug={workspaceSlug} consumable={draft} level={level} printers={printers} />}
     </DialogShell>

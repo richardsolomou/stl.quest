@@ -10,18 +10,18 @@ import {
   shareFilamentPrice,
   updateInventoryItem,
 } from '../server/fns'
-import { consumablesQuery, equipmentQuery, printersQuery } from './queries'
+import { consumablesQuery, equipmentQuery, printersQuery, storesQuery } from './queries'
 import { invalidateQueries } from './queryState'
 import { useWorkspaceSlug } from './workspace'
 
-const queries = { printers: printersQuery, equipment: equipmentQuery, consumables: consumablesQuery }
+const queries = { printers: printersQuery, equipment: equipmentQuery, consumables: consumablesQuery, stores: storesQuery }
 /** Where each kind's list sits in what its query returns. */
-const listField = { printers: 'profiles', equipment: 'equipment', consumables: 'consumables' } as const
+const listField = { printers: 'profiles', equipment: 'equipment', consumables: 'consumables', stores: 'stores' } as const
 
 type Change<Kind extends InventoryKind> = { item: InventoryItems[Kind] } | { id: string; archived: boolean }
 
 /**
- * Saves one printer, piece of equipment, or consumable at a time, so admins editing different items never undo each
+ * Saves one printer, piece of equipment, consumable, or store at a time, so admins editing different items never undo each
  * other: `save` creates an item the list does not have yet and updates one it does, `setArchived` archives or
  * restores one, and `remove` deletes an archived one. Each result replaces the cached list straight away; the workspace channel refreshes everyone else.
  */

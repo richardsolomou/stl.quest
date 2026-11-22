@@ -3,10 +3,13 @@ import { useQuery } from '@tanstack/react-query'
 import { Check, Info, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Progress } from '@/components/ui/progress'
 import { consumablesOfKind, type Consumable } from '../../../core/consumables'
 import { wearingParts } from '../../../core/maintenance'
 import { getPrinterPreset } from '../../../core/printerPresets'
+import { shoppingList, type ShoppingGroup } from '../../../core/shopping'
 import { missingMaterials, missingWearParts, untrackedConsumables, type PartSuggestion } from '../../../core/stock'
+import type { Store } from '../../../core/stores'
 import type { PrinterProfile, PrintType } from '../../../core/types'
 import type { StockLevel } from '../../../core/usage'
 import { useI18n } from '../../i18n'
@@ -19,13 +22,17 @@ import { ReplacedButton, WearText } from './PrinterMaintenance'
 const SHOWN_PER_LIST = 4
 
 /**
- * What to buy: tracked consumables that are low or gone, wear parts nearly worn or due on a printer, then what the fleet uses that the library lacks, from the
- * parts catalogue and missing materials. Adding one opens it to be priced.
+ * What to buy: tracked consumables that are low, gone, or due to run out, by store with each order's way to free
+ * shipping, wear parts nearly worn or due on a printer, then what the fleet uses that the library lacks, from the parts
+ * catalogue and missing materials. Adding one opens it to be priced.
  */
 export function SupplyNeeds({
   workspaceSlug,
   consumables: library,
   levels: loadedLevels,
+  dailyUse,
+  stores,
+  money,
   printers,
   printTypes,
   onAddMaterial,
@@ -35,6 +42,10 @@ export function SupplyNeeds({
   consumables: Consumable[]
   /** Undefined while stock loads, so nothing claims what is or isn't tracked yet. */
   levels?: StockLevel[]
+  /** Per consumable ID, how much goes per day at its recent rate (see core/shopping). */
+  dailyUse?: Record<string, number>
+  stores: Store[]
+  money: (value: number) => string
   printers: PrinterProfile[]
   /** What the workspace prints; nothing is suggested for another type. */
   printTypes: readonly PrintType[]
@@ -44,12 +55,9 @@ export function SupplyNeeds({
   const { t, locale } = useI18n()
   const consumables = t.settings.consumables
   const copy = consumables.needs
-  const stock = consumables.stock
   const levels = loadedLevels ?? []
-  const runningOut = levels.flatMap((level) => {
-    const consumable = library.find(({ id }) => id === level.consumableId)
-    return consumable && !consumable.archived && (level.low || level.missing) ? [{ consumable, level }] : []
-  })
+  const orders = shoppingList({ consumables: library, levels, stores, rates: new Map(Object.entries(dailyUse ?? {})) })
+  const toBuy = orders.reduce((total, order) => total + order.items.length, 0)
   const materials = missingMaterials(library, printers).filter(({ printType }) => printTypes.includes(printType))
   const catalogue = useQuery(catalogueQuery('parts')).data ?? []
   const parts = missingWearParts(library, printers, catalogue).filter(({ printType }) => printTypes.includes(printType))
@@ -63,7 +71,7 @@ export function SupplyNeeds({
   const [replaced, setReplaced] = useState<Record<string, (typeof wearing)[number] & { transactionId: string }>>({})
   const rowKey = ({ printer, part }: { printer: { id: string }; part: { id: string } }) => `${printer.id}-${part.id}`
   const wearingRows = [...wearing, ...Object.values(replaced).filter((row) => !wearing.some((other) => rowKey(other) === rowKey(row)))]
-  const nothing = runningOut.length === 0 && wearingRows.length === 0 && materials.length === 0 && parts.length === 0
+  const nothing = toBuy === 0 && wearingRows.length === 0 && materials.length === 0 && parts.length === 0
   const untracked = untrackedConsumables(library, levels)
 
   const modelName = (printerPresetId: string) => {
@@ -89,27 +97,22 @@ export function SupplyNeeds({
         )}
       </div>
       {!nothing && <p className="-mt-1.5 text-sm text-muted-foreground">{copy.description}</p>}
-      {runningOut.length > 0 && (
-        <NeedList title={copy.runningOut} count={runningOut.length}>
-          {runningOut.map(({ consumable, level }) => (
-            <NeedRow
-              key={consumable.id}
-              name={consumable.name}
-              detail={
-                level.missing ? (
-                  <span className="font-medium text-destructive">{stock.none}</span>
-                ) : (
-                  <span className="inline-flex flex-wrap items-center gap-x-1.5">
-                    <LowMarker />
-                    {stock.left(formatStock(level.onHand, consumable, locale, stock))}
-                    {level.minimum !== undefined && `· ${stock.warnsBelow(formatStock(level.minimum, consumable, locale, stock))}`}
-                  </span>
-                )
-              }
-              action={<RestockPopover workspaceSlug={workspaceSlug} consumable={consumable} onHand={level.onHand} />}
+      {toBuy > 0 && (
+        <div className="grid min-w-0 gap-3">
+          <h3 className="text-sm font-semibold">
+            {copy.toBuy} <span className="font-mono text-xs font-normal text-muted-foreground">{toBuy}</span>
+          </h3>
+          {orders.map((order) => (
+            <StoreOrder
+              key={order.store?.id ?? ''}
+              workspaceSlug={workspaceSlug}
+              order={order}
+              // With no stores set up, what to buy is one list rather than a group named for no store.
+              named={orders.length > 1 || Boolean(order.store)}
+              money={money}
             />
           ))}
-        </NeedList>
+        </div>
       )}
       {wearingRows.length > 0 && (
         <NeedList title={copy.wearingOut} count={wearingRows.length}>
@@ -174,15 +177,96 @@ export function SupplyNeeds({
   )
 }
 
-function NeedList({ title, count, children }: { title: string; count: number; children: ReactNode[] }) {
+/** One store's order: what to buy there, the order's total and shipping, and how close it is to shipping free. */
+function StoreOrder({
+  workspaceSlug,
+  order,
+  named,
+  money,
+}: {
+  workspaceSlug: string
+  order: ShoppingGroup
+  named: boolean
+  money: (value: number) => string
+}) {
+  const { t, locale } = useI18n()
+  const copy = t.settings.consumables.needs
+  const stock = t.settings.consumables.stock
+  const { store, subtotal, shipping, toFreeShipping } = order
+  const threshold = store?.freeShippingOver
+  const totals = [
+    copy.subtotal(money(subtotal)),
+    shipping === 0 ? copy.shipsFree : shipping !== undefined && copy.shipping(money(shipping)),
+    toFreeShipping !== undefined && copy.toFreeShipping(money(toFreeShipping)),
+  ].filter(Boolean)
+  const name = store?.name ?? copy.noStore
+  return (
+    <section aria-label={name} className="grid min-w-0 gap-1.5">
+      {named && (
+        <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+          <h4 className="text-sm font-medium [overflow-wrap:anywhere]">{name}</h4>
+          <p className="font-mono text-xs text-muted-foreground">{totals.join(' · ')}</p>
+        </div>
+      )}
+      {threshold !== undefined && store && (
+        <Progress
+          value={Math.min(100, (subtotal / threshold) * 100)}
+          completeTone="success"
+          aria-label={copy.freeShippingProgress(store.name)}
+        />
+      )}
+      <NeedList>
+        {order.items.map(({ consumable, level, daysLeft, packs, pack, cost }) => (
+          <NeedRow
+            key={consumable.id}
+            name={consumable.name}
+            detail={
+              <>
+                <span className="inline-flex flex-wrap items-center gap-x-1.5">
+                  {level.missing ? (
+                    <span className="font-medium text-destructive">{stock.none}</span>
+                  ) : (
+                    <>
+                      {level.low && <LowMarker />}
+                      <span>{stock.left(formatStock(level.onHand, consumable, locale, stock))}</span>
+                      {daysLeft !== undefined && (
+                        <span>· {copy.daysLeft(Math.round(daysLeft), formatNumber(Math.round(daysLeft), locale))}</span>
+                      )}
+                      {level.minimum !== undefined && (
+                        <span>· {stock.warnsBelow(formatStock(level.minimum, consumable, locale, stock))}</span>
+                      )}
+                    </>
+                  )}
+                </span>
+                <span className="block">
+                  {copy.buy(
+                    pack === 1
+                      ? formatStock(packs, consumable, locale, stock)
+                      : `${formatNumber(packs, locale)} × ${formatStock(pack, consumable, locale, stock)}`,
+                    money(cost),
+                  )}
+                </span>
+              </>
+            }
+            action={<RestockPopover workspaceSlug={workspaceSlug} consumable={consumable} onHand={level.onHand} />}
+          />
+        ))}
+      </NeedList>
+    </section>
+  )
+}
+
+function NeedList({ title, count, children }: { title?: string; count?: number; children: ReactNode[] }) {
   const more = useI18n().t.settings.consumables.needs
   const [expanded, setExpanded] = useState(false)
   const shown = expanded ? children : children.slice(0, SHOWN_PER_LIST)
   return (
     <div className="grid min-w-0 gap-1">
-      <h3 className="text-sm font-semibold">
-        {title} <span className="font-mono text-xs font-normal text-muted-foreground">{count}</span>
-      </h3>
+      {title && (
+        <h3 className="text-sm font-semibold">
+          {title} <span className="font-mono text-xs font-normal text-muted-foreground">{count}</span>
+        </h3>
+      )}
       <ul className="grid min-w-0 divide-y">{shown}</ul>
       {children.length > SHOWN_PER_LIST && (
         <Button type="button" variant="ghost" size="sm" className="justify-self-start" onClick={() => setExpanded((current) => !current)}>
@@ -198,7 +282,7 @@ function NeedRow({ name, detail, action }: { name: string; detail: ReactNode; ac
     <li className="flex min-w-0 items-center gap-3 py-2">
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium [overflow-wrap:anywhere]">{name}</p>
-        <p className="text-xs text-muted-foreground">{detail}</p>
+        <div className="text-xs text-muted-foreground">{detail}</div>
       </div>
       {action}
     </li>

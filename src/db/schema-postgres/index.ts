@@ -14,7 +14,7 @@ import {
   workspaceOnboarding,
 } from './auth'
 import { assetGenerationJobs } from './analysis'
-import { consumables, equipment, printers } from './inventory'
+import { consumables, equipment, printers, stores } from './inventory'
 import {
   managedStorageAccounts,
   managedStorageEntitlements,
@@ -64,6 +64,7 @@ export const schema = {
   requestStatuses,
   session,
   settings,
+  stores,
   subscription,
   twoFactor,
   uploadSessions,

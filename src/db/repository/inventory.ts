@@ -2,9 +2,10 @@ import type { Consumable } from '../../core/consumables'
 import type { EquipmentItem } from '../../core/equipment'
 import type { InventoryItems, InventoryKind } from '../../core/inventory'
 import { normalizePrinterProfile } from '../../core/printers'
-import { consumables, equipment, printers } from '../schema'
+import type { Store } from '../../core/stores'
+import { consumables, equipment, printers, stores } from '../schema'
 
-export const inventoryTables = { printers, equipment, consumables }
+export const inventoryTables = { printers, equipment, consumables, stores }
 
 type Tables = typeof inventoryTables
 type Owned = 'workspaceId' | 'id' | 'position' | 'archivedAt' | 'createdAt' | 'updatedAt'
@@ -52,6 +53,16 @@ export function inventoryItem<Kind extends InventoryKind>(kind: Kind, row: Row<K
       ...archived,
     } satisfies EquipmentItem as InventoryItems[Kind]
   }
+  if (kind === 'stores') {
+    const store = row as Row<'stores'>
+    return {
+      id: store.id,
+      name: store.name,
+      ...(store.shippingCost !== null && { shippingCost: store.shippingCost }),
+      ...(store.freeShippingOver !== null && { freeShippingOver: store.freeShippingOver }),
+      ...archived,
+    } satisfies Store as InventoryItems[Kind]
+  }
   return consumable(row as Row<'consumables'>, archived) as InventoryItems[Kind]
 }
 
@@ -61,6 +72,7 @@ function consumable(row: Row<'consumables'>, archived: { archived?: boolean }): 
     name: row.name,
     ...(row.minimumStock !== null && { minimumStock: row.minimumStock }),
     ...(row.packSize !== null && { packSize: row.packSize }),
+    ...(row.storeId !== null && { storeId: row.storeId }),
     ...archived,
   }
   const preset = (field: string) => (row.presetId !== null ? { [field]: row.presetId } : {})
@@ -122,6 +134,14 @@ export function inventoryColumns<Kind extends InventoryKind>(kind: Kind, item: I
       purchasedOn: equipmentItem.purchasedOn ?? null,
     } satisfies InventoryColumns<'equipment'> as unknown as InventoryColumns<Kind>
   }
+  if (kind === 'stores') {
+    const store = item as Store
+    return {
+      name: store.name,
+      shippingCost: store.shippingCost ?? null,
+      freeShippingOver: store.freeShippingOver ?? null,
+    } satisfies InventoryColumns<'stores'> as unknown as InventoryColumns<Kind>
+  }
   const library = item as Consumable
   const unset = {
     presetId: null,
@@ -140,6 +160,7 @@ export function inventoryColumns<Kind extends InventoryKind>(kind: Kind, item: I
     name: library.name,
     minimumStock: library.minimumStock ?? null,
     packSize: library.packSize ?? null,
+    storeId: library.storeId ?? null,
   }
   const columns: InventoryColumns<'consumables'> =
     library.kind === 'resin'

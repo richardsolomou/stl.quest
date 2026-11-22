@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { check, index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { check, foreignKey, index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 import { organization } from './auth'
 
 /**
@@ -70,6 +70,25 @@ export const equipment = sqliteTable(
   ],
 )
 
+/** Where consumables are bought, with what an order costs to ship and the order total that ships free. */
+export const stores = sqliteTable(
+  'stores',
+  {
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    id: text().notNull(),
+    position: integer().notNull(),
+    name: text().notNull(),
+    shippingCost: real('shipping_cost'),
+    freeShippingOver: real('free_shipping_over'),
+    archivedAt: integer('archived_at'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.workspaceId, table.id] }), index('stores_position').on(table.workspaceId, table.position)],
+)
+
 /**
  * Resins, filaments, wear parts, and supplies in one table: `price` is per litre, per kilogram, or per unit as the kind
  * is bought, `preset_id` is the resin, filament, part, or supply catalogue entry, and the remaining columns belong to one kind.
@@ -98,6 +117,7 @@ export const consumables = sqliteTable(
     unit: text({ enum: ['ml', 'g', 'item'] }),
     minimumStock: real('minimum_stock'),
     packSize: real('pack_size'),
+    storeId: text('store_id'),
     archivedAt: integer('archived_at'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
@@ -109,5 +129,10 @@ export const consumables = sqliteTable(
     check('consumables_lifespan_unit_check', sql`${table.lifespanUnit} IN ('plates', 'hours') OR ${table.lifespanUnit} IS NULL`),
     check('consumables_unit_check', sql`${table.unit} IN ('ml', 'g', 'item') OR ${table.unit} IS NULL`),
     index('consumables_position').on(table.workspaceId, table.position),
+    foreignKey({
+      columns: [table.workspaceId, table.storeId],
+      foreignColumns: [stores.workspaceId, stores.id],
+      name: 'consumables_workspace_store_fk',
+    }),
   ],
 )

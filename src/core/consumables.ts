@@ -11,6 +11,8 @@ type LibraryFields = {
   minimumStock?: number
   /** How much one bottle, spool, box, or pack holds, so restocking can count what was bought. */
   packSize?: number
+  /** The store it is bought from. */
+  storeId?: string
 }
 
 export type ResinConsumable = LibraryFields & {

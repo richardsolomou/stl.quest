@@ -204,6 +204,13 @@
       "when": 1795331436352,
       "tag": "0028_lifetime_progress",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1795337178742,
+      "tag": "0029_stores",
+      "breakpoints": true
     }
   ]
 }
