@@ -107,6 +107,7 @@ import {
   recordStockMovementSchema,
   restockFromOrderSchema,
   linkSpoolmanFilamentSchema,
+  spoolmanRestockIdSchema,
   movePlateSchema,
   attachPrintJobSchema,
   printJobPersonalSchema,
@@ -1961,6 +1962,18 @@ export const linkSpoolmanFilament = createServerFn({ method: 'POST' })
     const { workspaceSlug, ...input } = data
     return workspaceMutation(workspaceSlug, (context) => context.service.linkSpoolmanFilament(input, context.identity))
   })
+
+export const retrySpoolmanRestock = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(spoolmanRestockIdSchema))
+  .handler(async ({ data }) =>
+    workspaceMutation(data.workspaceSlug, (context) => context.service.retrySpoolmanRestock(data.id, context.identity)),
+  )
+
+export const removeSpoolmanRestock = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(spoolmanRestockIdSchema))
+  .handler(async ({ data }) =>
+    workspaceMutation(data.workspaceSlug, (context) => context.service.removeSpoolmanRestock(data.id, context.identity)),
+  )
 
 export const getPrinterLifetimes = createServerFn({ method: 'GET' })
   .validator(workspaceInputSchema)

@@ -36,6 +36,17 @@ export type PrintReport = {
   runId?: string
 }
 
+/** Grams Bambuddy charged one Spoolman spool for a print. */
+export type PrintSpoolUsage = { spoolId: number; grams: number }
+/** The most spools one print reports; a printer holds a few AMS units of four trays. */
+export const MAX_PRINT_SPOOLS = 32
+
+/**
+ * What a print used per Spoolman spool, which the Spoolman bridge reads from Bambuddy's usage history and sends with
+ * the run ID Bambuddy's end event carried, since the webhook itself only describes it in words.
+ */
+export type PrintUsageReport = { runId: string; spools: PrintSpoolUsage[] }
+
 export type PrintJob = Omit<PrintReport, 'outcome'> & {
   id: string
   outcome: PrintJobOutcome
@@ -44,12 +55,16 @@ export type PrintJob = Omit<PrintReport, 'outcome'> & {
   plateId?: string
   /** Marked as not for any request, so it leaves the unlinked list. */
   personal: boolean
+  /** What it used per Spoolman spool, once the bridge reported it. */
+  filamentUsage?: PrintSpoolUsage[]
   /** The usage its end recorded, so a repeated event never records it twice. */
   transactionId?: string
   startedAt?: number
   endedAt?: number
   receivedAt: number
 }
+
+export type PrintJobChanges = Partial<Omit<PrintJob, 'id'>>
 
 /** Bambuddy's generic webhook JSON, as far as STL Quest reads it; every value is a display string. */
 export type BambuddyEvent = {
@@ -235,4 +250,37 @@ export function continuedPrintJob(jobs: PrintJob[], report: PrintReport) {
         (job.fileName ?? '') === (report.fileName ?? ''),
     )
     .sort((left, right) => right.receivedAt - left.receivedAt)[0]
+}
+
+/** Whether two reports of a print's spools say the same, in any order. */
+export function sameSpoolUsage(left: PrintSpoolUsage[] | undefined, right: PrintSpoolUsage[]) {
+  const key = (usage: PrintSpoolUsage[]) =>
+    usage
+      .map(({ spoolId, grams }) => `${spoolId}:${grams}`)
+      .toSorted()
+      .join(',')
+  return left !== undefined && key(left) === key(right)
+}
+
+/**
+ * The library filaments a print's spools charge, each with its grams: a spool counts towards the filament its Spoolman
+ * filament matches, else `fallback`, and spools of the same filament add up. A spool with neither is left out.
+ */
+export function printSpoolMaterials<Material extends { id: string }>(
+  usage: PrintSpoolUsage[],
+  context: {
+    spools: { id: number; filamentId: number }[]
+    matches: Map<number, { consumableId: string }>
+    library: Material[]
+    fallback?: Material
+  },
+) {
+  const totals = new Map<Material, number>()
+  for (const { spoolId, grams } of usage) {
+    const filamentId = context.spools.find(({ id }) => id === spoolId)?.filamentId
+    const consumableId = filamentId === undefined ? undefined : context.matches.get(filamentId)?.consumableId
+    const material = context.library.find(({ id }) => id === consumableId) ?? context.fallback
+    if (material && grams > 0) totals.set(material, (totals.get(material) ?? 0) + grams)
+  }
+  return { materials: [...totals.keys()], totals: [...totals.values()] }
 }

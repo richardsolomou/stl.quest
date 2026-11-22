@@ -103,6 +103,66 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     expect(await repository.listSpoolmanSpools()).toEqual([])
   })
 
+  it('keeps spools to add to Spoolman until the workspace disconnects', async () => {
+    const restock = { id: 'r1', filamentId: 10, filamentName: 'Black', grams: 1000, status: 'queued' as const, createdAt: 1, updatedAt: 1 }
+    expect(await repository.queueSpoolmanRestocks([restock], 10)).toBe('disconnected')
+    await repository.connectSpoolman('hash', 1)
+    expect(await repository.queueSpoolmanRestocks([restock], 10)).toBe('queued')
+    expect(await repository.listSpoolmanRestocks()).toEqual([restock])
+    await repository.disconnectSpoolman()
+    expect(await repository.listSpoolmanRestocks()).toEqual([])
+  })
+
+  it('refuses more spools to add to Spoolman than may wait at once', async () => {
+    await repository.connectSpoolman('hash', 1)
+    const restock = (id: string) => ({ id, filamentId: 10, status: 'queued' as const, createdAt: 1, updatedAt: 1 })
+    await repository.queueSpoolmanRestocks([restock('r1')], 2)
+    expect(await repository.queueSpoolmanRestocks([restock('r2'), restock('r3')], 2)).toBe('full')
+  })
+
+  it('records the spool the bridge added to Spoolman', async () => {
+    await repository.connectSpoolman('hash', 1)
+    await repository.queueSpoolmanRestocks([{ id: 'r1', filamentId: 10, status: 'queued', createdAt: 1, updatedAt: 1 }], 10)
+    expect(await repository.settleSpoolmanRestock({ id: 'r1', spoolId: 7 }, 2)).toBe(true)
+    expect(await repository.listSpoolmanRestocks()).toEqual([
+      { id: 'r1', filamentId: 10, status: 'created', spoolId: 7, createdAt: 1, updatedAt: 2 },
+    ])
+  })
+
+  it('never settles a spool to add to Spoolman twice', async () => {
+    await repository.connectSpoolman('hash', 1)
+    await repository.queueSpoolmanRestocks([{ id: 'r1', filamentId: 10, status: 'queued', createdAt: 1, updatedAt: 1 }], 10)
+    await repository.settleSpoolmanRestock({ id: 'r1', spoolId: 7 }, 2)
+    expect(await repository.settleSpoolmanRestock({ id: 'r1', error: 'late' }, 3)).toBe(false)
+  })
+
+  it('removes a spool waiting to be added to Spoolman', async () => {
+    await repository.connectSpoolman('hash', 1)
+    await repository.queueSpoolmanRestocks([{ id: 'r1', filamentId: 10, status: 'queued', createdAt: 1, updatedAt: 1 }], 10)
+    expect(await repository.deleteSpoolmanRestock('r1')).toBe(true)
+    expect(await repository.listSpoolmanRestocks()).toEqual([])
+  })
+
+  it('keeps what a print used per Spoolman spool', async () => {
+    await repository.insertPrintJob({ id: 'job', printerName: 'X1C', outcome: 'finished', personal: false, receivedAt: 1 })
+    const [job] = await repository.listPrintJobs()
+    await repository.updatePrintJob(job.id, { filamentUsage: [{ spoolId: 3, grams: 12.5 }] })
+    expect((await repository.listPrintJobs())[0].filamentUsage).toEqual([{ spoolId: 3, grams: 12.5 }])
+  })
+
+  it('leaves the fields a print update does not name', async () => {
+    await repository.insertPrintJob({
+      id: 'job',
+      printerName: 'X1C',
+      outcome: 'finished',
+      personal: false,
+      transactionId: 't1',
+      receivedAt: 1,
+    })
+    await repository.updatePrintJob('job', { filamentUsage: [{ spoolId: 3, grams: 12.5 }] })
+    expect((await repository.listPrintJobs())[0].transactionId).toBe('t1')
+  })
+
   it('finds the workspace of a Spoolman token only by its hash', async () => {
     await repository.connectSpoolman('hash', 1)
     expect([(await repository.workspaceForSpoolmanToken('hash'))?.id, await repository.workspaceForSpoolmanToken('other')]).toEqual([
@@ -2161,7 +2221,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 51 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 52 })
     await migrated.close()
   })
 

@@ -177,6 +177,33 @@ export const spoolmanSpools = pgTable(
 )
 
 /**
+ * Spools waiting for the Spoolman bridge to add them to Spoolman, and what became of them; they go when the connection
+ * does, since only its bridge could add them.
+ */
+export const spoolmanRestocks = pgTable(
+  'spoolman_restocks',
+  {
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => spoolmanConnections.workspaceId, { onDelete: 'cascade' }),
+    id: text().notNull(),
+    filamentId: integer('filament_id').notNull(),
+    filamentName: text('filament_name'),
+    grams: doublePrecision(),
+    status: text({ enum: ['queued', 'created', 'failed'] }).notNull(),
+    spoolId: integer('spool_id'),
+    error: text(),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+    updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.id] }),
+    index('spoolman_restocks_status').on(table.workspaceId, table.status, table.createdAt),
+    check('spoolman_restocks_status_check', sql`${table.status} IN ('queued', 'created', 'failed')`),
+  ],
+)
+
+/**
  * Which library filament a Spoolman filament is, when someone chose it rather than leaving it to matching; no
  * consumable means it is deliberately linked to none. Links outlive the connection, so reconnecting keeps them.
  */

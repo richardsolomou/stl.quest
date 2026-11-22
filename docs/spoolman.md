@@ -2,7 +2,7 @@
 
 STL Quest reads filament stock from [Spoolman](https://github.com/Donkie/Spoolman), which keeps track of every spool you own. Bambu Lab users' tools (Bambuddy, SpoolmanSync, Home Assistant) already write each AMS tray's measured usage into Spoolman, and anyone can weigh a spool into it, so its numbers are better than any per-print estimate.
 
-Spoolman sends; STL Quest never reaches into your network and never holds an address or credentials for it. A small bridge next to Spoolman pushes spools out over HTTPS with a write-only token, so this works the same on [stl.quest](https://stl.quest) and on a self-hosted install.
+Spoolman sends; STL Quest never reaches into your network and never holds an address or credentials for it. A small bridge next to Spoolman pushes spools out over HTTPS with the workspace's ingest token, and collects the spools STL Quest asks it to add, so this works the same on [stl.quest](https://stl.quest) and on a self-hosted install.
 
 ## Connect
 
@@ -28,16 +28,26 @@ Spoolman sends; STL Quest never reaches into your network and never holds an add
 
 ### Bridge settings
 
-| Variable              | Default | Meaning                                                                                           |
-| --------------------- | ------- | ------------------------------------------------------------------------------------------------- |
-| `SPOOLMAN_URL`        | —       | Spoolman's address.                                                                               |
-| `STLQUEST_URL`        | —       | STL Quest's address. Must be `https` unless it is `localhost` or `STLQUEST_ALLOW_HTTP` is `true`. |
-| `STLQUEST_TOKEN`      | —       | The token from **Settings → Spoolman**.                                                           |
-| `STLQUEST_ALLOW_HTTP` | `false` | Allows plain HTTP to a self-hosted STL Quest on a network you trust.                              |
-| `DEBOUNCE_SECONDS`    | `3`     | How long to wait after a change before sending, so a burst of changes sends once.                 |
-| `RESYNC_SECONDS`      | `900`   | How often to read Spoolman again in case an event was missed.                                     |
+| Variable                | Default | Meaning                                                                                                                    |
+| ----------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `SPOOLMAN_URL`          | —       | Spoolman's address.                                                                                                        |
+| `STLQUEST_URL`          | —       | STL Quest's address. Must be `https` unless it is `localhost` or `STLQUEST_ALLOW_HTTP` is `true`.                          |
+| `STLQUEST_TOKEN`        | —       | The token from **Settings → Spoolman**.                                                                                    |
+| `STLQUEST_ALLOW_HTTP`   | `false` | Allows plain HTTP to a self-hosted STL Quest on a network you trust.                                                       |
+| `DEBOUNCE_SECONDS`      | `3`     | How long to wait after a change before sending, so a burst of changes sends once.                                          |
+| `RESYNC_SECONDS`        | `900`   | How often to read Spoolman again in case an event was missed.                                                              |
+| `RESTOCK_SECONDS`       | `60`    | How often to collect spools STL Quest queued to add to Spoolman.                                                           |
+| `BAMBUDDY_URL`          | —       | Optional. Bambuddy's address, to read what each print charged to which spool; see [Bambuddy](bambuddy.md#grams-per-spool). |
+| `BAMBUDDY_API_KEY`      | —       | Bambuddy API key with only **Read Status** allowed. Required with `BAMBUDDY_URL`.                                          |
+| `BAMBUDDY_POLL_SECONDS` | `60`    | How often to read Bambuddy's print log and usage history.                                                                  |
 
 The bridge listens to Spoolman's `/api/v1/` websocket, which reports spool, filament, and vendor changes. After each burst of changes and every `RESYNC_SECONDS` it reads every spool, archived ones included, and sends them all when anything changed; on start and after reconnecting it always sends. It needs only outbound access to STL Quest.
+
+## Adding spools from an order
+
+Restocking from a pasted order email offers to add a filament Spoolman manages as spools in Spoolman: one spool per spool ordered, holding the weight the order states, of the Spoolman filament that filament counts towards (the one with the most spools in use when several do). STL Quest queues them, and they show under **Settings → Spoolman → Spools to add**.
+
+Every `RESTOCK_SECONDS` the bridge collects the queued spools, adds each with Spoolman's `POST /api/v1/spool`, and reports the spool it made. Its stock arrives with the next spools the bridge sends. Each new spool's comment carries `stlquest-restock:<id>`, so a bridge that added a spool but could not report it finds it next time instead of adding another; leave that text in the comment until the spool shows as added. A spool Spoolman refuses shows why, with **Try again**; a spool still waiting can be removed. At most 200 spools wait at once, and disconnecting forgets them.
 
 ## How stock is counted
 
@@ -77,6 +87,15 @@ STL Quest reads these fields of a spool and ignores the rest: `id`, `remaining_w
 | `415`    | The body is not `application/json`.                                           |
 | `429`    | More than 60 requests in a minute for this token; wait `Retry-After` seconds. |
 
+The bridge collects queued spools from the same token:
+
+```http
+GET /api/spoolman/restocks
+Authorization: Bearer stlq_spoolman_…
+```
+
+answers `{"restocks": [{"id": "…", "filament_id": 3, "initial_weight": 1000, "comment": "stlquest-restock:…"}]}`, the oldest 50 first, and takes the outcome of each as `POST /api/spoolman/restocks` with `{"id": "…", "spool_id": 12}` or `{"id": "…", "error": "…"}`. A `404` means the spool is no longer waiting. Both share a limit of 120 requests a minute per token.
+
 For example, a Home Assistant `rest_command` that sends one spool:
 
 ```yaml
@@ -92,7 +111,7 @@ rest_command:
 
 ## Security
 
-- The token is the endpoint's only credential. It can add spools, and [Bambuddy's print events](bambuddy.md), to one workspace and nothing else: it reads nothing back and cannot sign in. Cookies are never read, so a browser cannot be tricked into sending one.
+- The token is the endpoint's only credential. It can add spools, and [Bambuddy's print events and what each print used per spool](bambuddy.md), to one workspace. The only thing it reads back is the spools the workspace's admins queued to add to Spoolman (each one's Spoolman filament ID, weight, and marker), and it can mark them added or refused. It reads no stock, requests, or prints, and cannot sign in. Cookies are never read, so a browser cannot be tricked into sending one.
 - STL Quest stores only a SHA-256 hash of the token. A database leak does not reveal it.
-- The token is checked before the body is read, bodies are capped at 2 MB, and each token is limited to 60 requests a minute on each server.
+- The token is checked before the body is read, bodies are capped at 2 MB, and each token is limited on each server to 60 requests a minute for spools and 120 for spools to add.
 - Spoolman has no authentication of its own, so keep it off the internet. The bridge only connects out, so nothing needs to be exposed.

@@ -174,6 +174,16 @@ describe('orderRestock', () => {
     expect(orderRestock(order, choices, context).restocks).toEqual([{ consumableId: 'basic-gray', amount: 3_000 }])
   })
 
+  it('queues a spool in Spoolman for each spool a line of a filament Spoolman manages holds', () => {
+    expect(orderRestock(order, [{ line: line(), spoolman: 'basic-gray' }], context).spoolman).toEqual([
+      { consumableId: 'basic-gray', spools: 2, grams: 1_000 },
+    ])
+  })
+
+  it('leaves the stock of a filament Spoolman manages alone', () => {
+    expect(orderRestock(order, [{ line: line(), spoolman: 'basic-gray' }], context).restocks).toEqual([])
+  })
+
   it('changes no price unless asked', () => {
     expect(orderRestock(order, [{ line: line(), consumableId: 'basic-gray' }], context).prices).toEqual([])
   })

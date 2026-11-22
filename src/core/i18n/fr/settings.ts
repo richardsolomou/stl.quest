@@ -429,7 +429,9 @@ export const settings: typeof en = {
       skip: 'Ne pas réapprovisionner',
       add: (name: string) => `Ajouter ${name} à votre liste`,
       addShort: 'Ajouter à votre liste',
-      spoolman: 'Géré par Spoolman : ajoutez cette bobine là-bas.',
+      spoolman: 'Géré par Spoolman : le pont y ajoute ses bobines et le stock suit.',
+      spoolmanAdd: (count: number) => `Ajouter ${count} ${count === 1 ? 'bobine' : 'bobines'} dans Spoolman`,
+      spoolmanQueued: (count: number) => `${count} ${count === 1 ? 'bobine attend' : 'bobines attendent'} le pont Spoolman`,
       spoolmanLink: 'Connexion Spoolman',
       unmatched: 'Absent de votre liste. Choisissez le filament qu’il réapprovisionne, ou laissez-le.',
       needsPrice: 'Absent de votre liste, et cette commande ne donne aucun prix dans votre devise pour l’ajouter.',
@@ -829,7 +831,7 @@ export const settings: typeof en = {
     connection: {
       title: 'Connexion',
       description:
-        'Un jeton permet au pont, ou à tout outil capable d’envoyer une requête web, d’ajouter des bobines à cet espace de travail. Il peut seulement envoyer, jamais lire.',
+        'Un jeton permet au pont, ou à tout outil capable d’envoyer une requête web, d’ajouter des bobines à cet espace de travail. Il envoie des bobines et des impressions, et récupère les bobines que vous demandez d’ajouter à Spoolman ; il ne lit rien d’autre.',
       name: 'Spoolman',
       status: { receiving: 'Reçoit', waiting: 'En attente', off: 'Non connecté' },
       off: 'Créez un jeton, puis lancez le pont à côté de Spoolman.',
@@ -882,6 +884,18 @@ export const settings: typeof en = {
       },
       noLibrary: 'Ajoutez les filaments que vous achetez dans les consommables pour y compter le stock Spoolman.',
       error: 'Le lien n’a pas pu être enregistré.',
+    },
+    restocks: {
+      title: 'Bobines à ajouter',
+      description:
+        'Les bobines des commandes collées attendent ici que le pont les ajoute à Spoolman. Leur stock arrive avec les prochaines bobines qu’il envoie.',
+      queued: 'En attente du pont',
+      created: (spoolId: number) => `Ajoutée à Spoolman comme bobine n° ${spoolId}`,
+      failed: (error: string) => `Spoolman l’a refusée : ${error}`,
+      retry: 'Réessayer',
+      remove: 'Retirer',
+      removeLabel: (name: string) => `Retirer la bobine ${name}`,
+      error: 'La bobine n’a pas pu être modifiée.',
     },
   },
   bambuddy: {

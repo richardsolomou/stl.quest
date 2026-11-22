@@ -2325,14 +2325,58 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     },
   })
   expect(jadeSpool.status()).toBe(204)
+  // A filament Spoolman manages is queued as spools for the bridge, which collects them with its token and reports back.
   await restockFromOrder(page, 'Blanc de jade (10100) / Filament avec bobine / 1 kg')
-  await expect(jadeRow).toContainText('Managed by Spoolman, so add this spool there.')
-  await expect(
-    page.getByRole('dialog', { name: 'Restock from an order' }).getByRole('button', { name: 'Restock', exact: true }),
-  ).toBeDisabled()
+  await expect(jadeRow).toContainText('Managed by Spoolman, so the bridge adds its spools there and the stock follows.')
+  await expect(jadeRow.getByRole('combobox')).toContainText('Add 1 spool in Spoolman')
   await screenshot(page, 'order-restock-spoolman')
-  await page.keyboard.press('Escape')
+  await page.getByRole('dialog', { name: 'Restock from an order' }).getByRole('button', { name: 'Restock 1' }).click()
+  await expect(page.getByText('1 spool waiting for the Spoolman bridge')).toBeVisible()
+  const bridge = { authorization: `Bearer ${spoolmanToken}` }
+  expect((await page.request.get('/api/spoolman/restocks', { headers: { authorization: 'Bearer stlq_spoolman_wrong' } })).status()).toBe(
+    401,
+  )
+  const { restocks } = (await (await page.request.get('/api/spoolman/restocks', { headers: bridge })).json()) as {
+    restocks: { id: string; filament_id: number; initial_weight: number; comment: string }[]
+  }
+  expect(restocks.map(({ filament_id, initial_weight }) => ({ filament_id, initial_weight }))).toEqual([
+    { filament_id: 9, initial_weight: 1_000 },
+  ])
   await page.goto('/settings/spoolman')
+  const spoolsToAdd = page.getByRole('group', { name: 'Spools to add' })
+  await expect(spoolsToAdd).toContainText('Waiting for the bridge')
+  expect(
+    (
+      await page.request.post('/api/spoolman/restocks', { headers: bridge, data: { id: restocks[0].id, error: 'Spoolman is busy' } })
+    ).status(),
+  ).toBe(204)
+  await expect(spoolsToAdd).toContainText('Spoolman refused it: Spoolman is busy')
+  await spoolsToAdd.scrollIntoViewIfNeeded()
+  await screenshot(page, 'spoolman-restock-failed')
+  await page.setViewportSize({ width: 320, height: 800 })
+  await spoolsToAdd.scrollIntoViewIfNeeded()
+  await screenshot(page, 'spoolman-restock-failed-320')
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await spoolsToAdd.getByRole('button', { name: 'Try again' }).click()
+  await expect(spoolsToAdd).toContainText('Waiting for the bridge')
+  expect((await page.request.post('/api/spoolman/restocks', { headers: bridge, data: { id: restocks[0].id, spool_id: 4 } })).status()).toBe(
+    204,
+  )
+  await expect(spoolsToAdd).toContainText('Added to Spoolman as spool #4')
+  await spoolsToAdd.scrollIntoViewIfNeeded()
+  await screenshot(page, 'spoolman-restocks')
+  await page.setViewportSize({ width: 320, height: 800 })
+  await spoolsToAdd.scrollIntoViewIfNeeded()
+  await screenshot(page, 'spoolman-restocks-320')
+  await page.setViewportSize({ width: 1280, height: 720 })
+  // The bridge sends what a Bambuddy print charged to each Spoolman spool, by the run its end event named.
+  const spoolUsage = (run_id: string) =>
+    page.request.post('/api/bambuddy/usage', {
+      headers: { authorization: `Bearer ${spoolmanToken}` },
+      data: { run_id, spools: [{ spool_id: 1, grams: 12.5 }] },
+    })
+  expect((await spoolUsage('41')).status()).toBe(204)
+  expect((await spoolUsage('999')).status()).toBe(404)
   await page.getByRole('button', { name: 'Disconnect' }).click()
   await page.getByRole('alertdialog', { name: 'Disconnect Spoolman?' }).getByRole('button', { name: 'Disconnect' }).click()
   await expect(page.getByRole('region', { name: 'Spoolman' })).toContainText('Not connected')

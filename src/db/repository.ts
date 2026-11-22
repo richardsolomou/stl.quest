@@ -67,6 +67,7 @@ import type { Consumable } from '../core/consumables'
 import type { Store } from '../core/stores'
 import { deletedItemKind, keepsDeletedName, NO_REFERENCES, withoutSupply, type InventoryReferences } from '../core/inventoryDeletion'
 import type { SpoolmanChange, SpoolmanLink, SpoolmanSpool } from '../core/spoolman'
+import type { SpoolmanRestock, SpoolmanRestockResult } from '../core/spoolmanRestocks'
 import { supportsDatabaseBackup, type DatabaseBackend } from './backend'
 import type { MigrationLog } from './dataMigrations/types'
 import { SQLiteBackend } from './backends/sqlite'
@@ -90,6 +91,7 @@ import {
   settings,
   spoolmanConnections,
   spoolmanLinks,
+  spoolmanRestocks,
   spoolmanSpools,
   uploadSessions,
   usageEvents,
@@ -126,7 +128,7 @@ import type { MaintenanceTotals } from '../core/maintenance'
 import { MAX_USAGE_LIST, type UsageEvent, type UsageFilters } from '../core/usage'
 import type { PriceCalculatorCurrency } from '../core/priceCalculator'
 import type { Plate, PlateItem, PlateRecording, PlateRunStage } from '../core/plates'
-import { MAX_PRINT_JOBS, type PrintJob } from '../core/printJobs'
+import { MAX_PRINT_JOBS, type PrintJob, type PrintJobChanges } from '../core/printJobs'
 import { inventoryColumns, inventoryItem, inventoryTables } from './repository/inventory'
 import { requestConditions, requestOrderBy, requestSelection, type RequestFilterOptions } from './repository/requestQuery'
 
@@ -2792,6 +2794,16 @@ export class DrizzleRepository implements Repository {
     return await this.database.transaction(async (tx) => await this.undoUsageWith(tx, workspaceId, transactionId, undoneAt))
   }
 
+  async replaceUsageTransaction(transactionId: string, events: UsageEvent[], undoneAt: number) {
+    const workspaceId = await this.workspace()
+    return await this.database.transaction(async (tx) => {
+      await this.lockWorkspace(tx, workspaceId)
+      if (!(await this.undoUsageWith(tx, workspaceId, transactionId, undoneAt))) return false
+      await this.insertUsageEvents(tx, workspaceId, events)
+      return true
+    })
+  }
+
   private async undoUsageWith(tx: DatabaseExecutor, workspaceId: string, transactionId: string, undoneAt: number) {
     const undone = (
       await tx
@@ -2984,11 +2996,12 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  async updatePrintJob(job: PrintJob) {
+  async updatePrintJob(id: string, changes: PrintJobChanges) {
+    const columns = { ...printJobRow(changes), printerName: changes.printerName, outcome: changes.outcome, receivedAt: changes.receivedAt }
     await this.database
       .update(printJobs)
-      .set({ ...printJobRow(job), printerName: job.printerName, outcome: job.outcome, receivedAt: job.receivedAt })
-      .where(and(eq(printJobs.workspaceId, await this.workspace()), eq(printJobs.id, job.id)))
+      .set(Object.fromEntries(Object.keys(changes).map((key) => [key, columns[key as keyof typeof columns]])))
+      .where(and(eq(printJobs.workspaceId, await this.workspace()), eq(printJobs.id, id)))
       .run()
   }
 
@@ -3018,13 +3031,14 @@ export class DrizzleRepository implements Repository {
       plate: Plate,
       printing: UsageEvent[],
     ) => { recording: PlateRecording; items: PlateItem[]; events: UsageEvent[]; superseded: string[] },
+    when?: (plate: Plate) => boolean,
   ) {
     const workspaceId = await this.workspace()
     return await this.database.transaction(async (tx) => {
       // Recording reads the prints' usage and replaces some of it, so two recordings must not interleave.
       await this.lockWorkspace(tx, workspaceId)
       let [plate] = await this.platesWith(tx, workspaceId, id)
-      if (!plate) return undefined
+      if (!plate || (when && !when(plate))) return undefined
       if (plate.recording) {
         await this.undoUsageWith(tx, workspaceId, plate.recording.transactionId, at)
         ;[plate] = await this.platesWith(tx, workspaceId, id)
@@ -4020,6 +4034,108 @@ export class DrizzleRepository implements Repository {
       .run()
   }
 
+  async listSpoolmanRestocks(): Promise<SpoolmanRestock[]> {
+    const rows = await this.database
+      .select()
+      .from(spoolmanRestocks)
+      .where(eq(spoolmanRestocks.workspaceId, await this.workspace()))
+      .orderBy(desc(spoolmanRestocks.createdAt), asc(spoolmanRestocks.id))
+      .all()
+    return rows.map(({ workspaceId: _workspace, filamentName, grams, spoolId, error, ...restock }) => ({
+      ...restock,
+      ...(filamentName !== null && { filamentName }),
+      ...(grams !== null && { grams }),
+      ...(spoolId !== null && { spoolId }),
+      ...(error !== null && { error }),
+    }))
+  }
+
+  async queueSpoolmanRestocks(restocks: SpoolmanRestock[], limit: number) {
+    const workspaceId = await this.workspace()
+    return await this.database.transaction(async (tx) => {
+      const connected = await tx
+        .select({ workspaceId: spoolmanConnections.workspaceId })
+        .from(spoolmanConnections)
+        .where(eq(spoolmanConnections.workspaceId, workspaceId))
+        .get()
+      if (!connected) return 'disconnected' as const
+      const waiting =
+        (
+          await tx
+            .select({ total: count() })
+            .from(spoolmanRestocks)
+            .where(and(eq(spoolmanRestocks.workspaceId, workspaceId), ne(spoolmanRestocks.status, 'created')))
+            .get()
+        )?.total ?? 0
+      if (waiting + restocks.length > limit) return 'full' as const
+      await tx
+        .insert(spoolmanRestocks)
+        .values(
+          restocks.map((restock) => ({
+            ...restock,
+            workspaceId,
+            filamentName: restock.filamentName ?? null,
+            grams: restock.grams ?? null,
+            spoolId: restock.spoolId ?? null,
+            error: restock.error ?? null,
+          })),
+        )
+        .run()
+      // Spools already added are only kept to show, so the oldest of them go once there are many.
+      const kept = tx
+        .select({ id: spoolmanRestocks.id })
+        .from(spoolmanRestocks)
+        .where(and(eq(spoolmanRestocks.workspaceId, workspaceId), eq(spoolmanRestocks.status, 'created')))
+        .orderBy(desc(spoolmanRestocks.updatedAt), desc(spoolmanRestocks.id))
+        .limit(limit)
+      await tx
+        .delete(spoolmanRestocks)
+        .where(
+          and(eq(spoolmanRestocks.workspaceId, workspaceId), eq(spoolmanRestocks.status, 'created'), notInArray(spoolmanRestocks.id, kept)),
+        )
+        .run()
+      return 'queued' as const
+    })
+  }
+
+  async settleSpoolmanRestock(result: SpoolmanRestockResult, now: number) {
+    const settled = await this.database
+      .update(spoolmanRestocks)
+      .set(
+        'spoolId' in result
+          ? { status: 'created', spoolId: result.spoolId, error: null, updatedAt: now }
+          : { status: 'failed', error: result.error, updatedAt: now },
+      )
+      .where(
+        and(
+          eq(spoolmanRestocks.workspaceId, await this.workspace()),
+          eq(spoolmanRestocks.id, result.id),
+          ne(spoolmanRestocks.status, 'created'),
+        ),
+      )
+      .run()
+    return settled.changes > 0
+  }
+
+  async retrySpoolmanRestock(id: string, now: number) {
+    const retried = await this.database
+      .update(spoolmanRestocks)
+      .set({ status: 'queued', error: null, updatedAt: now })
+      .where(
+        and(eq(spoolmanRestocks.workspaceId, await this.workspace()), eq(spoolmanRestocks.id, id), eq(spoolmanRestocks.status, 'failed')),
+      )
+      .run()
+    return retried.changes > 0
+  }
+
+  async deleteSpoolmanRestock(id: string) {
+    const deleted = await this.database
+      .delete(spoolmanRestocks)
+      .where(and(eq(spoolmanRestocks.workspaceId, await this.workspace()), eq(spoolmanRestocks.id, id)))
+      .run()
+    return deleted.changes > 0
+  }
+
   async deleteInvite(id: string) {
     await this.database
       .delete(invites)
@@ -4627,19 +4743,20 @@ function uniqueBy<T>(items: T[], key: (item: T) => string) {
 }
 
 /** A print's optional fields as columns, null where it has none, so an update clears what it no longer has. */
-function printJobRow(job: PrintJob) {
+function printJobRow(job: PrintJobChanges) {
   return {
     printerId: job.printerId ?? null,
     fileName: job.fileName ?? null,
     minutes: job.minutes ?? null,
     grams: job.grams ?? null,
     filamentDetails: job.filamentDetails ?? null,
+    filamentUsage: job.filamentUsage ? JSON.stringify(job.filamentUsage) : null,
     reason: job.reason ?? null,
     progress: job.progress ?? null,
     archiveId: job.archiveId ?? null,
     runId: job.runId ?? null,
     plateId: job.plateId ?? null,
-    personal: job.personal,
+    personal: job.personal ?? false,
     transactionId: job.transactionId ?? null,
     startedAt: job.startedAt ?? null,
     endedAt: job.endedAt ?? null,

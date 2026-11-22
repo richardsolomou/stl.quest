@@ -20,6 +20,7 @@ import {
 } from '../../../core/orders/orderRestock'
 import { parseOrderEmail, type OrderLine, type ParsedOrder } from '../../../core/orders/orderEmail'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS, type PriceCalculatorCurrency } from '../../../core/priceCalculator'
+import { MAX_RESTOCK_SPOOLS } from '../../../core/spoolmanRestocks'
 import { storeCurrency } from '../../../core/stores'
 import { restockFromOrder, undoUsage } from '../../../server/fns'
 import { createId } from '../../id'
@@ -33,6 +34,7 @@ import { formatQuantity } from './ConsumableStock'
 
 const SKIP = 'skip'
 const ADD = 'add'
+const SPOOLMAN = 'spoolman'
 
 type Row = { key: string; line: OrderLine; match: OrderLineMatch }
 
@@ -148,7 +150,8 @@ function OrderReview({
   const target = (row: Row) => targets[row.key] ?? defaultTarget(row, priced)
   const choices = (rows ?? []).flatMap((row): OrderRestockChoice[] => {
     const chosen = target(row)
-    if (chosen === SKIP || row.match.kind === 'spoolman') return []
+    if (chosen === SKIP) return []
+    if (row.match.kind === 'spoolman') return [{ line: row.line, spoolman: row.match.consumableId }]
     if (chosen === ADD) return row.match.kind === 'catalogue' ? [{ line: row.line, add: row.match }] : []
     return [{ line: row.line, consumableId: chosen }]
   })
@@ -171,11 +174,15 @@ function OrderReview({
   const callUndo = useServerFn(undoUsage)
   const restock = useMutation({
     mutationFn: () => callRestock({ data: { workspaceSlug, ...input! } }),
-    onSuccess: async ({ transactionId }) => {
-      await invalidateQueries(queryClient, 'stock', 'usage', 'consumables')
+    onSuccess: async ({ transactionId, spoolmanSpools }) => {
+      await invalidateQueries(queryClient, 'stock', 'usage', 'consumables', 'spoolman')
       const count = input!.restocks.length
-      toast(copy.done(count), {
-        ...((input!.added.length > 0 || input!.prices.length > 0) && { description: copy.undoKeeps }),
+      const notes = [
+        count > 0 && spoolmanSpools > 0 && copy.spoolmanQueued(spoolmanSpools),
+        (input!.added.length > 0 || input!.prices.length > 0) && copy.undoKeeps,
+      ].filter(Boolean)
+      toast(count > 0 ? copy.done(count) : copy.spoolmanQueued(spoolmanSpools), {
+        ...(notes.length > 0 && { description: notes.join(' ') }),
         ...(transactionId && {
           action: {
             label: copy.undo,
@@ -187,7 +194,7 @@ function OrderReview({
       onClose()
     },
   })
-  const count = input?.restocks.length ?? 0
+  const count = (input?.restocks.length ?? 0) + (input?.spoolman?.length ?? 0)
   return (
     <DialogShell
       onClose={onClose}
@@ -248,6 +255,7 @@ function OrderReview({
 /** A matched line restocks its match; a catalogue colour joins the list when the order prices it; anything else waits for a pick. */
 function defaultTarget({ line, match }: Row, priced: boolean) {
   if (match.kind === 'library') return match.consumableId
+  if (match.kind === 'spoolman') return SPOOLMAN
   if (match.kind === 'catalogue' && priced && line.linePrice !== undefined) return ADD
   return SKIP
 }
@@ -276,9 +284,12 @@ function OrderLineRow({
   const filaments = consumablesOfKind(consumables, 'filament')
   const addable = match.kind === 'catalogue' && priced && line.linePrice !== undefined
   const addName = match.kind === 'catalogue' ? catalogueName(catalogue, match.presetId, match.colour) : undefined
+  const managed = match.kind === 'spoolman' ? filaments.find((filament) => filament.id === match.consumableId) : undefined
   const options = [
     ...(addable && addName ? [{ value: ADD, label: copy.add(addName), hex: match.colour.hex }] : []),
-    ...filaments.map((filament) => ({ value: filament.id, label: filament.name, hex: filament.colour?.hex })),
+    ...(match.kind === 'spoolman'
+      ? [{ value: SPOOLMAN, label: copy.spoolmanAdd(Math.min(line.quantity, MAX_RESTOCK_SPOOLS)), hex: managed?.colour?.hex }]
+      : filaments.map((filament) => ({ value: filament.id, label: filament.name, hex: filament.colour?.hex }))),
     { value: SKIP, label: copy.skip, hex: undefined },
   ]
   const chosen = options.find((option) => option.value === value)
@@ -301,40 +312,39 @@ function OrderLineRow({
           <p className="font-mono text-xs text-muted-foreground">{details.join(' · ')}</p>
         </div>
       </div>
-      {match.kind === 'spoolman' ? (
-        <p className="text-xs text-muted-foreground">
-          {copy.spoolman}{' '}
-          <Link to="/settings/$section" params={{ section: 'spoolman' }} className="underline underline-offset-2">
-            {copy.spoolmanLink}
-          </Link>
-        </p>
-      ) : (
-        <Field className="min-w-0 gap-1">
-          <FieldLabel htmlFor={id} className="sr-only">
-            {copy.target(title)}
-          </FieldLabel>
-          <Select items={options} value={value} onValueChange={(next) => next && onChange(next)}>
-            <SelectTrigger className="w-full min-w-0" id={id}>
-              <SelectValue>
-                {chosen?.hex && <ColourSwatch hex={chosen.hex} />}
-                <span className="truncate">{value === ADD ? copy.addShort : chosen?.label}</span>
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {options.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.hex && <ColourSwatch hex={option.hex} className="self-center" />}
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {value === SKIP && match.kind === 'unmatched' && <FieldDescription className="text-xs">{copy.unmatched}</FieldDescription>}
-          {value === SKIP && match.kind === 'catalogue' && !addable && (
-            <FieldDescription className="text-xs">{copy.needsPrice}</FieldDescription>
-          )}
-        </Field>
-      )}
+      <Field className="min-w-0 gap-1">
+        <FieldLabel htmlFor={id} className="sr-only">
+          {copy.target(title)}
+        </FieldLabel>
+        <Select items={options} value={value} onValueChange={(next) => next && onChange(next)}>
+          <SelectTrigger className="w-full min-w-0" id={id}>
+            <SelectValue>
+              {chosen?.hex && <ColourSwatch hex={chosen.hex} />}
+              <span className="truncate">{value === ADD ? copy.addShort : chosen?.label}</span>
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.hex && <ColourSwatch hex={option.hex} className="self-center" />}
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {value === SKIP && match.kind === 'unmatched' && <FieldDescription className="text-xs">{copy.unmatched}</FieldDescription>}
+        {value === SKIP && match.kind === 'catalogue' && !addable && (
+          <FieldDescription className="text-xs">{copy.needsPrice}</FieldDescription>
+        )}
+        {match.kind === 'spoolman' && (
+          <FieldDescription className="text-xs">
+            {copy.spoolman}{' '}
+            <Link to="/settings/$section" params={{ section: 'spoolman' }} className="underline underline-offset-2">
+              {copy.spoolmanLink}
+            </Link>
+          </FieldDescription>
+        )}
+      </Field>
     </li>
   )
 }

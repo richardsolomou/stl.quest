@@ -1,6 +1,7 @@
 import { consumablesOfKind, consumableUnit, type Consumable, type FilamentColour, type FilamentConsumable } from '../consumables'
 import { filamentConsumableName, type FilamentPreset } from '../filamentPresets'
 import type { PriceCalculatorCurrency } from '../priceCalculator'
+import { MAX_RESTOCK_SPOOLS } from '../spoolmanRestocks'
 import { storeCurrency, type Store } from '../stores'
 import { packSize } from '../stock'
 import type { OrderLine, OrderVendor, ParsedOrder } from './orderEmail'
@@ -73,10 +74,14 @@ export function matchOrderLine(
   return named.length === 1 ? found(named[0].id) : { kind: 'unmatched' }
 }
 
-/** What one confirmed line restocks: a library consumable, or a catalogue colour added to the library with it. */
+/**
+ * What one confirmed line restocks: a library consumable, a catalogue colour added to the library with it, or spools
+ * of a filament Spoolman manages, which the Spoolman bridge adds there.
+ */
 export type OrderRestockChoice =
   | { line: OrderLine; consumableId: string }
   | { line: OrderLine; add: { presetId: string; colour: FilamentColour } }
+  | { line: OrderLine; spoolman: string }
 
 /** What confirming an order stores, in the consumables' own units and currencies. */
 export type OrderRestockInput = {
@@ -86,6 +91,8 @@ export type OrderRestockInput = {
   /** New prices, when the order is in the currency each is priced in and someone chose to take them. */
   prices: { consumableId: string; price: number }[]
   restocks: { consumableId: string; amount: number }[]
+  /** Spools to add in Spoolman for filaments it manages, each holding `grams` when the order says. */
+  spoolman?: { consumableId: string; spools: number; grams?: number }[]
 }
 
 /** What a line holds in a consumable's unit: its stated weight per unit, or else the consumable's pack size, times the quantity. */
@@ -128,7 +135,16 @@ export function orderRestock(
     )
   const added = new Map<string, FilamentConsumable>()
   const totals = new Map<string, { consumable: Consumable; amount: number; cost: number; costed: number }>()
+  const spoolman: NonNullable<OrderRestockInput['spoolman']> = []
   for (const choice of choices) {
+    if ('spoolman' in choice) {
+      spoolman.push({
+        consumableId: choice.spoolman,
+        spools: Math.min(choice.line.quantity, MAX_RESTOCK_SPOOLS),
+        ...(choice.line.grams && { grams: choice.line.grams }),
+      })
+      continue
+    }
     const consumable = 'add' in choice ? addition(choice.add) : context.consumables.find(({ id }) => id === choice.consumableId)
     if (!consumable) continue
     const amount = orderLineAmount(choice.line, consumable)
@@ -158,6 +174,7 @@ export function orderRestock(
         })
       : [],
     restocks: entries.map(({ consumable, amount }) => ({ consumableId: consumable.id, amount })),
+    ...(spoolman.length && { spoolman }),
   }
 
   function addition({ presetId, colour }: { presetId: string; colour: FilamentColour }) {

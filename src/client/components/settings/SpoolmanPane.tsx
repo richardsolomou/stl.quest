@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Spinner } from '@/components/ui/spinner'
 import { consumablesOfKind, type FilamentConsumable } from '../../../core/consumables'
 import { spoolmanBridgeCompose } from '../../../core/spoolman'
-import { connectSpoolman, disconnectSpoolman, linkSpoolmanFilament } from '../../../server/fns'
+import { connectSpoolman, disconnectSpoolman, linkSpoolmanFilament, removeSpoolmanRestock, retrySpoolmanRestock } from '../../../server/fns'
 import { useI18n } from '../../i18n'
 import { consumablesQuery, spoolmanQuery, type SpoolmanView } from '../../queries'
 import { invalidateQueries } from '../../queryState'
@@ -138,6 +138,7 @@ function SpoolmanSettings({ workspaceSlug, spoolman }: { workspaceSlug: string; 
           </div>
         </SettingsSection>
       )}
+      {spoolman.restocks.length > 0 && <SpoolRestocks workspaceSlug={workspaceSlug} restocks={spoolman.restocks} />}
       {(connection || filaments.length > 0) && <FilamentLinks workspaceSlug={workspaceSlug} filaments={filaments} />}
       <ConfirmDialog
         open={confirming !== undefined}
@@ -168,6 +169,76 @@ function CopyableBlock({ label, value, hint }: { label: string; value: string; h
       <pre className="overflow-x-auto rounded-lg border bg-muted/40 p-3 font-mono text-xs leading-relaxed">{value}</pre>
       <p className="text-sm text-muted-foreground">{hint}</p>
     </div>
+  )
+}
+
+/** Spools queued for the bridge to add to Spoolman, and what became of each. */
+function SpoolRestocks({ workspaceSlug, restocks }: { workspaceSlug: string; restocks: SpoolmanView['restocks'] }) {
+  const { t, locale } = useI18n()
+  const copy = t.settings.spoolman.restocks
+  const queryClient = useQueryClient()
+  const onSuccess = () => invalidateQueries(queryClient, 'spoolman')
+  const retry = useMutation({ mutationFn: useServerFn(retrySpoolmanRestock), onSuccess })
+  const remove = useMutation({ mutationFn: useServerFn(removeSpoolmanRestock), onSuccess })
+  const when = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
+  const error = retry.error ?? remove.error
+  return (
+    <SettingsSection title={copy.title} description={copy.description} layout="stacked">
+      <ul className="grid divide-y" data-spoolman-restocks>
+        {restocks.map((restock) => {
+          const name = restock.filamentName ?? t.settings.spoolman.filaments.unnamed(restock.filamentId)
+          const status =
+            restock.status === 'created'
+              ? copy.created(restock.spoolId!)
+              : restock.status === 'failed'
+                ? copy.failed(restock.error ?? '')
+                : copy.queued
+          return (
+            <li key={restock.id} className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 py-3 first:pt-0 last:pb-0">
+              <div className="min-w-0 flex-1 basis-56">
+                <p className="font-semibold [overflow-wrap:anywhere]">
+                  {name}
+                  {restock.grams !== undefined && (
+                    <span className="ml-2 font-mono text-xs font-normal text-muted-foreground tabular-nums">
+                      {formatQuantity(restock.grams, 'g', locale)}
+                    </span>
+                  )}
+                </p>
+                <p className={restock.status === 'failed' ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'}>
+                  {status} · {when.format(restock.updatedAt)}
+                </p>
+              </div>
+              {restock.status !== 'created' && (
+                <div className="flex gap-2">
+                  {restock.status === 'failed' && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={retry.isPending}
+                      onClick={() => retry.mutate({ data: { workspaceSlug, id: restock.id } })}
+                    >
+                      {copy.retry}
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={remove.isPending}
+                    aria-label={copy.removeLabel(name)}
+                    onClick={() => remove.mutate({ data: { workspaceSlug, id: restock.id } })}
+                  >
+                    {copy.remove}
+                  </Button>
+                </div>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+      {error != null && <SettingNotice notice={errorNotice(copy.error, '', error)} />}
+    </SettingsSection>
   )
 }
 

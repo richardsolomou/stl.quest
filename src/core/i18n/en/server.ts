@@ -125,6 +125,11 @@ export const server = {
     tooLarge: (megabytes: number) => `send at most ${megabytes} MB at once`,
     invalid: 'send Spoolman spools as JSON: {"spools": [...]} or one Spoolman spool event',
     rateLimited: 'too many updates; wait a minute and send again',
+    notManaged: 'Spoolman does not manage this filament, so restock it here',
+    tooManyRestocks: (max: number) => `at most ${max} spools can wait for Spoolman; remove some or wait for the bridge to add them`,
+    restockNotConnected: 'connect Spoolman before ordering spools for it',
+    restockNotFound: 'no such spool is waiting for Spoolman',
+    invalidRestock: 'send {"id": "…", "spool_id": 1} or {"id": "…", "error": "…"}',
   },
   plates: {
     notFound: 'plate not found',
@@ -143,5 +148,6 @@ export const server = {
     notFound: 'print not found',
     alreadyLinked: 'this print is already linked to a plate',
     invalid: 'send Bambuddy’s generic webhook JSON with an event and a printer',
+    invalidUsage: 'send {"run_id": "…", "spools": [{"spool_id": 1, "grams": 1.5}]}',
   },
 }

@@ -378,6 +378,8 @@ export const printJobs = sqliteTable(
     minutes: real(),
     grams: real(),
     filamentDetails: text('filament_details'),
+    /** JSON: what the print used per Spoolman spool, as `PrintSpoolUsage[]`. */
+    filamentUsage: text('filament_usage'),
     reason: text(),
     progress: real(),
     archiveId: text('archive_id'),

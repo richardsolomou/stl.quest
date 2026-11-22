@@ -1,7 +1,7 @@
 import type { PriceCalculatorCurrency } from '../../core/priceCalculator'
 import type { AssetGenerationJob, Invite, OperationPayload, PrintRequest } from '../../core/types'
 import type { Plate } from '../../core/plates'
-import type { PrintJob } from '../../core/printJobs'
+import type { PrintJob, PrintSpoolUsage } from '../../core/printJobs'
 import type { UsageEvent } from '../../core/usage'
 import { assetGenerationJobs, invites, plateItems, plates, printJobs, requests, requestStatuses, usageEvents, user } from '../schema'
 
@@ -115,6 +115,7 @@ export function mapPrintJob(row: typeof printJobs.$inferSelect): PrintJob {
     ...optional('minutes'),
     ...optional('grams'),
     ...optional('filamentDetails'),
+    ...(row.filamentUsage !== null && { filamentUsage: JSON.parse(row.filamentUsage) as PrintSpoolUsage[] }),
     ...optional('reason'),
     ...optional('progress'),
     ...optional('archiveId'),

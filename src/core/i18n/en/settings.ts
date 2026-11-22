@@ -414,7 +414,9 @@ export const settings = {
       skip: 'Don’t restock',
       add: (name: string) => `Add ${name} to your list`,
       addShort: 'Add to your list',
-      spoolman: 'Managed by Spoolman, so add this spool there.',
+      spoolman: 'Managed by Spoolman, so the bridge adds its spools there and the stock follows.',
+      spoolmanAdd: (count: number) => `Add ${count} ${count === 1 ? 'spool' : 'spools'} in Spoolman`,
+      spoolmanQueued: (count: number) => `${count} ${count === 1 ? 'spool' : 'spools'} waiting for the Spoolman bridge`,
       spoolmanLink: 'Spoolman connection',
       unmatched: 'Not in your list. Pick the filament it restocks, or leave it.',
       needsPrice: 'Not in your list, and this order gives no price in your currency to add it with.',
@@ -806,7 +808,7 @@ export const settings = {
     connection: {
       title: 'Connection',
       description:
-        'A token lets the bridge, or any tool that can send a web request, add spools to this workspace. It can only send, never read.',
+        'A token lets the bridge, or any tool that can send a web request, add spools to this workspace. It sends spools and prints, and collects the spools you ask to add to Spoolman; it reads nothing else.',
       name: 'Spoolman',
       status: { receiving: 'Receiving', waiting: 'Waiting', off: 'Not connected' },
       off: 'Create a token, then run the bridge next to Spoolman.',
@@ -854,6 +856,18 @@ export const settings = {
       by: { catalogue: 'Matched by its SpoolmanDB entry', colour: 'Matched by brand, material, and colour', manual: 'Chosen by hand' },
       noLibrary: 'Add the filaments you buy in Consumables to count Spoolman stock towards them.',
       error: 'The link could not be saved.',
+    },
+    restocks: {
+      title: 'Spools to add',
+      description:
+        'Spools from pasted orders wait here until the bridge adds them to Spoolman. Their stock arrives with the next spools it sends.',
+      queued: 'Waiting for the bridge',
+      created: (spoolId: number) => `Added to Spoolman as spool #${spoolId}`,
+      failed: (error: string) => `Spoolman refused it: ${error}`,
+      retry: 'Try again',
+      remove: 'Remove',
+      removeLabel: (name: string) => `Remove the ${name} spool`,
+      error: 'The spool could not be changed.',
     },
   },
   bambuddy: {

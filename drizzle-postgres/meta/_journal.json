@@ -253,6 +253,13 @@
       "when": 1795348436564,
       "tag": "0035_store_rate_currency",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1795352040601,
+      "tag": "0036_spoolman_restocks",
+      "breakpoints": true
     }
   ]
 }
