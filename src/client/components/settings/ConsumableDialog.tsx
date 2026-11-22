@@ -58,7 +58,7 @@ export function ConsumableDialog({
   level,
   printers,
   symbol,
-  money,
+  rate,
   onSave,
   onArchive,
   onClose,
@@ -69,7 +69,8 @@ export function ConsumableDialog({
   level?: StockLevel
   printers: PrinterProfile[]
   symbol: string
-  money: (value: number) => string
+  /** Formats a per-plate or per-hour cost. */
+  rate: (value: number) => string
   onSave: (consumable: Consumable) => Promise<void>
   onArchive: () => void
   onClose: () => void
@@ -173,7 +174,9 @@ export function ConsumableDialog({
           label={priceLabel(draft, symbol, copy)}
           value={consumablePrice(draft)}
           min={draft.kind === 'resin' || draft.kind === 'filament' ? 0.01 : 0}
-          description={draft.kind === 'part' && <ListPriceHint partPresetId={draft.partPresetId} />}
+          description={
+            draft.kind === 'part' && draft.partPresetId ? <ListPriceHint partPresetId={draft.partPresetId} /> : copy.dialog.priceHint
+          }
           onChange={(price) => setDraft(withConsumablePrice(draft, price))}
         />
         {draft.kind === 'resin' && !findPreset(resins, draft.resinPresetId)?.densityGramsPerMl && (
@@ -186,7 +189,7 @@ export function ConsumableDialog({
             onChange={(densityGramsPerMl) => setDraft({ ...draft, densityGramsPerMl })}
           />
         )}
-        {draft.kind === 'part' && !draft.partPresetId && <CustomPartFields part={draft} money={money} onChange={setDraft} />}
+        {draft.kind === 'part' && !draft.partPresetId && <CustomPartFields part={draft} rate={rate} onChange={setDraft} />}
       </div>
       <div className="grid gap-5 sm:grid-cols-2">
         <StockFields consumable={draft} tracking={tracking} onChange={setDraft} />
@@ -365,15 +368,15 @@ function PartProduct({ part, printers }: { part: PartConsumable; printers: Print
 /** How long a part of the user's own lasts, and in what, which the catalogue would otherwise know. */
 function CustomPartFields({
   part,
-  money,
+  rate,
   onChange,
 }: {
   part: PartConsumable
-  money: (value: number) => string
+  rate: (value: number) => string
   onChange: (part: PartConsumable) => void
 }) {
   const copy = useI18n().t.settings.consumables.parts
-  const cost = part.lifespanUnit === 'plates' ? copy.perPlate(money(partCostPerPlate(part))) : copy.perHour(money(partCostPerHour(part)))
+  const cost = part.lifespanUnit === 'plates' ? copy.perPlate(rate(partCostPerPlate(part))) : copy.perHour(rate(partCostPerHour(part)))
   return (
     <>
       <AmountField
@@ -389,6 +392,7 @@ function CustomPartFields({
         label={copy.lifespanUnit}
         value={part.lifespanUnit}
         options={(['plates', 'hours'] as const).map((value) => ({ value, label: copy.units[value] }))}
+        description={copy.lifespanHint}
         onChange={(lifespanUnit) => onChange({ ...part, lifespanUnit })}
       />
     </>
@@ -439,12 +443,14 @@ function UnitField<Value extends string>({
   label,
   value,
   options,
+  description,
   onChange,
 }: {
   id: string
   label: string
   value: Value
   options: { value: Value; label: string }[]
+  description?: string
   onChange: (value: Value) => void
 }) {
   return (
@@ -462,6 +468,7 @@ function UnitField<Value extends string>({
           ))}
         </SelectContent>
       </Select>
+      {description && <FieldDescription>{description}</FieldDescription>}
     </Field>
   )
 }
@@ -535,7 +542,7 @@ function StockFields<Item extends Consumable>({
   return (
     <>
       {tracking && field('minimumStock', copy.minimumStock(unitLabel), copy.minimumStockHint)}
-      {field('packSize', packLabel, copy.packSize.hint, typicalPack)}
+      {field('packSize', packLabel, consumable.kind === 'part' ? copy.packSize.partHint : copy.packSize.hint, typicalPack)}
     </>
   )
 }

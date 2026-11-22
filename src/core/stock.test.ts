@@ -3,7 +3,8 @@ import type { Consumable, PartConsumable } from './consumables'
 import catalog from '../../catalogs/parts/catalog.json'
 import type { PartPreset } from './partPresets'
 import { findPreset } from './presets'
-import { missingMaterials, missingWearParts, packSize, partCategory, partFromPreset } from './stock'
+import { missingMaterials, missingWearParts, packSize, partCategory, partFromPreset, untrackedConsumables } from './stock'
+import type { StockLevel } from './usage'
 import type { PrinterProfile } from './types'
 
 const parts = catalog.presets as PartPreset[]
@@ -130,5 +131,26 @@ describe('part from the catalogue', () => {
 describe('part category', () => {
   it('reads a German name', () => {
     expect(partCategory(part({ name: 'Ersatzdüse 0,4' }), parts)).toBe('nozzle')
+  })
+})
+
+describe('untracked consumables', () => {
+  const pla: Consumable = { id: 'pla', kind: 'filament', name: 'PLA', pricePerKg: 20 }
+  const grey: Consumable = { id: 'grey', kind: 'resin', name: 'Grey', pricePerLitre: 40, densityGramsPerMl: 1.1 }
+  const level = (consumableId: string, tracked: boolean): StockLevel => ({
+    consumableId,
+    unit: 'g',
+    onHand: 0,
+    tracked,
+    low: false,
+    missing: false,
+  })
+
+  it('counts active consumables with no tracked stock', () => {
+    expect(untrackedConsumables([pla, grey], [level('pla', true), level('grey', false)])).toBe(1)
+  })
+
+  it('leaves archived consumables out', () => {
+    expect(untrackedConsumables([{ ...pla, archived: true }], [])).toBe(0)
   })
 })

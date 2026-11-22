@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import catalog from '../../catalogs/parts/catalog.json'
-import { genericPartPresets, partPresetsForPrinter, partPresetUnitPrice, type PartPreset } from './partPresets'
+import { genericPartPresets, partPresetsForGroup, partPresetsForPrinter, partPresetUnitPrice, type PartPreset } from './partPresets'
 import { findPreset } from './presets'
 
 const PART_PRESETS = catalog.presets as PartPreset[]
@@ -44,5 +44,17 @@ describe('part presets', () => {
   it('has no unit price without a list price', () => {
     const preset = getPartPreset('part-elegoo-fep-film-mars-4-5')!
     expect(partPresetUnitPrice({ ...preset, listPrice: undefined })).toBeUndefined()
+  })
+})
+
+describe('part presets for a group', () => {
+  it('offers a model its own parts', () => {
+    expect(
+      partPresetsForGroup(PART_PRESETS, { printType: 'resin', printerPresetId: 'resin-formlabs-form-4' }).map(({ id }) => id),
+    ).toContain('part-formlabs-form-4-resin-tank')
+  })
+
+  it('offers a custom printer the generic parts of its type', () => {
+    expect(partPresetsForGroup(PART_PRESETS, { printType: 'resin' })).toEqual(genericPartPresets(PART_PRESETS, 'resin'))
   })
 })

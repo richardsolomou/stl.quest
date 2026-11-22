@@ -25,6 +25,11 @@ export function partPresetsForPrinter(parts: readonly PartPreset[], printerPrese
   return parts.filter((preset) => preset.fits.includes(printerPresetId))
 }
 
+/** The catalogue parts a wear-part group can add: its model's own, or those every printer of its type takes. */
+export function partPresetsForGroup(parts: readonly PartPreset[], group: { printType: PrintType; printerPresetId?: string }) {
+  return group.printerPresetId ? partPresetsForPrinter(parts, group.printerPresetId) : genericPartPresets(parts, group.printType)
+}
+
 export function genericPartPresets(parts: readonly PartPreset[], printType: PrintType) {
   return parts.filter((preset) => preset.printType === printType && !preset.fits.length)
 }

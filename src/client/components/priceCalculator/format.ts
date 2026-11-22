@@ -6,11 +6,14 @@ export function formatMoney(value: number, currency: PriceCalculatorCurrency, lo
   return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(value)
 }
 
-/** A per-unit rate: amounts under one currency unit keep one more digit, so €0.149/mL does not round to €0.15. */
+/**
+ * A per-unit rate: amounts under one currency unit keep one more digit, so €0.149/mL does not round to €0.15, and
+ * at least two significant digits, so a belt's €0.0048 per print hour does not read as €0.00.
+ */
 export function formatRate(value: number, currency: PriceCalculatorCurrency, locale: Locale = DEFAULT_LOCALE) {
   const digits = new Intl.NumberFormat(locale, { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2
-  const extra = value > 0 && value < 1 ? 1 : 0
-  return new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: digits + extra }).format(value)
+  const extra = value > 0 && value < 1 ? Math.max(1, Math.ceil(-Math.log10(value)) + 1 - digits) : 0
+  return new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: Math.min(digits + extra, 8) }).format(value)
 }
 
 export function currencySymbol(currency: PriceCalculatorCurrency, locale: Locale) {

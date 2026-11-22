@@ -1,11 +1,11 @@
 import { useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Check, Plus } from 'lucide-react'
+import { Check, Info, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { Consumable } from '../../../core/consumables'
 import { getPrinterPreset } from '../../../core/printerPresets'
-import { missingMaterials, missingWearParts, type PartSuggestion } from '../../../core/stock'
+import { missingMaterials, missingWearParts, untrackedConsumables, type PartSuggestion } from '../../../core/stock'
 import type { PrinterProfile, PrintType } from '../../../core/types'
 import type { StockLevel } from '../../../core/usage'
 import { useI18n } from '../../i18n'
@@ -23,7 +23,7 @@ const SHOWN_PER_LIST = 4
 export function SupplyNeeds({
   workspaceSlug,
   consumables: library,
-  levels,
+  levels: loadedLevels,
   printers,
   printTypes,
   onAddMaterial,
@@ -31,7 +31,8 @@ export function SupplyNeeds({
 }: {
   workspaceSlug: string
   consumables: Consumable[]
-  levels: StockLevel[]
+  /** Undefined while stock loads, so nothing claims what is or isn't tracked yet. */
+  levels?: StockLevel[]
   printers: PrinterProfile[]
   /** What the workspace prints; nothing is suggested for another type. */
   printTypes: readonly PrintType[]
@@ -42,6 +43,7 @@ export function SupplyNeeds({
   const consumables = t.settings.consumables
   const copy = consumables.needs
   const stock = consumables.stock
+  const levels = loadedLevels ?? []
   const runningOut = levels.flatMap((level) => {
     const consumable = library.find(({ id }) => id === level.consumableId)
     return consumable && !consumable.archived && (level.low || level.missing) ? [{ consumable, level }] : []
@@ -50,6 +52,7 @@ export function SupplyNeeds({
   const catalogue = useQuery(catalogueQuery('parts')).data ?? []
   const parts = missingWearParts(library, printers, catalogue).filter(({ printType }) => printTypes.includes(printType))
   const nothing = runningOut.length === 0 && materials.length === 0 && parts.length === 0
+  const untracked = untrackedConsumables(library, levels)
 
   const modelName = (printerPresetId: string) => {
     const preset = getPrinterPreset(printerPresetId)
@@ -62,10 +65,14 @@ export function SupplyNeeds({
         <h2 id="supply-needs" className="font-heading text-base leading-tight font-bold tracking-[0.01em] uppercase">
           {copy.title}
         </h2>
-        {nothing && (
+        {nothing && loadedLevels && (
           <p className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
-            <Check aria-hidden="true" className="size-4 shrink-0 text-success" />
-            {copy.allSet}
+            {untracked ? (
+              <Info aria-hidden="true" className="size-4 shrink-0" />
+            ) : (
+              <Check aria-hidden="true" className="size-4 shrink-0 text-success" />
+            )}
+            {untracked ? copy.untracked(untracked) : copy.allSet}
           </p>
         )}
       </div>

@@ -31,7 +31,7 @@ import { AutosaveStatus } from '../AutosaveStatus'
 import { DialogShell } from '../DialogShell'
 import { FilterCombobox } from '../FilterCombobox'
 import { NumberInput } from '../priceCalculator/fields'
-import { currencySymbol, formatMoney, formatNumber } from '../priceCalculator/format'
+import { currencySymbol, formatNumber, formatRate } from '../priceCalculator/format'
 import { EquipmentIcon } from './EquipmentIcon'
 import { EquipmentPresetPicker } from './EquipmentPresetPicker'
 
@@ -150,8 +150,8 @@ export function EquipmentDialog({
 
       <WorkflowFields draft={draft} preset={preset} onChange={update} />
       <RunFields draft={draft} preset={preset} onChange={update} />
-      <SupplyFields supplies={draft.supplies} onChange={(supplies) => update({ supplies })} />
       <WearFields draft={draft} onChange={update} />
+      <SupplyFields supplies={draft.supplies} onChange={(supplies) => update({ supplies })} />
     </DialogShell>
   )
 }
@@ -410,7 +410,7 @@ function WearFields({ draft, onChange }: { draft: EquipmentItem; onChange: (patc
     useQuery(priceCalculatorSettingsQuery(workspaceSlug)).data?.settings.currency ?? DEFAULT_PRICE_CALCULATOR_SETTINGS.currency
   const perHour =
     draft.purchasePrice !== undefined && draft.lifespanHours
-      ? formatMoney(draft.purchasePrice / draft.lifespanHours, currency, locale)
+      ? formatRate(draft.purchasePrice / draft.lifespanHours, currency, locale)
       : undefined
   const optional = (value: string) => (value === '' || !Number.isFinite(Number(value)) ? undefined : Number(value))
   return (

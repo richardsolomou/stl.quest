@@ -32,7 +32,7 @@ import { useAutosave } from '../../useAutosave'
 import { useUsageTracking } from '../../workspace'
 import { AutosaveStatus } from '../AutosaveStatus'
 import { DialogShell } from '../DialogShell'
-import { currencySymbol, formatMoney, formatNumber } from '../priceCalculator/format'
+import { currencySymbol, formatNumber, formatRate } from '../priceCalculator/format'
 import { UsageTrackingInvite } from '../UsageTracking'
 import { PrinterMaintenance } from './PrinterMaintenance'
 import { PrinterPresetImage } from './PrinterPresetImage'
@@ -199,8 +199,8 @@ function PrinterFields({
       </Field>
 
       {!preset && <CustomPrinterSpec draft={draft} onChange={onChange} />}
-      <PrinterAddOns draft={draft} onChange={onChange} />
       <PrinterWear draft={draft} currency={currency} onChange={onChange} />
+      <PrinterAddOns draft={draft} onChange={onChange} />
     </>
   )
 }
@@ -377,7 +377,7 @@ function PrinterWear({
           {copy.wear}
         </h3>
         <p className="text-sm text-muted-foreground">
-          {(wear.typical ? copy.wearTypical : copy.wearPerHour)(formatMoney(wear.perHour, currency, locale))}
+          {(wear.typical ? copy.wearTypical : copy.wearPerHour)(formatRate(wear.perHour, currency, locale))}
         </p>
       </div>
       <div className="grid grid-cols-2 gap-2 sm:max-w-md">
@@ -394,6 +394,7 @@ function PrinterWear({
           <OptionalNumber id="printer-lifespan" value={draft.lifespanHours} onChange={set('lifespanHours')} />
         </Field>
       </div>
+      <p className="text-xs text-muted-foreground">{copy.wearHint}</p>
     </section>
   )
 }
