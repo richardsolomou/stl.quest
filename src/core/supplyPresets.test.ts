@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import catalog from '../../catalogs/supplies/catalog.json'
 import { findPreset } from './presets'
-import { supplyFromPreset, supplyPresetsFor, supplyPresetsForEquipment, supplyPresetUnitPrice, type SupplyPreset } from './supplyPresets'
+import {
+  supplyFromPreset,
+  supplyPresetsFor,
+  supplyPresetsUsedBy,
+  supplyPresetUnitPrice,
+  supplyUserIds,
+  type SupplyPreset,
+} from './supplyPresets'
 
 const SUPPLY_PRESETS = catalog.presets as SupplyPreset[]
 const preset = (id: string) => findPreset(SUPPLY_PRESETS, id)!
@@ -23,7 +30,7 @@ describe('supply presets', () => {
   })
 
   it('names the wash fluids Formlabs lists for the Form Studio Wash+Cure', () => {
-    expect(supplyPresetsForEquipment(SUPPLY_PRESETS, ['postprocess-formlabs-form-studio-wash-cure']).map(({ id }) => id)).toEqual([
+    expect(supplyPresetsUsedBy(SUPPLY_PRESETS, ['postprocess-formlabs-form-studio-wash-cure']).map(({ id }) => id)).toEqual([
       'supply-formlabs-resin-washing-solution',
       'supply-isopropyl-alcohol',
       'supply-tpm',
@@ -31,7 +38,30 @@ describe('supply presets', () => {
   })
 
   it('names nothing for equipment without a catalogue model', () => {
-    expect(supplyPresetsForEquipment(SUPPLY_PRESETS, [undefined])).toEqual([])
+    expect(supplyPresetsUsedBy(SUPPLY_PRESETS, [undefined])).toEqual([])
+  })
+
+  it('names desiccant for a printer with an AMS 2 Pro, which dries filament without any dryer', () => {
+    const x2d = {
+      id: 'x2d',
+      name: 'X2D',
+      printType: 'filament' as const,
+      presetId: 'filament-bambu-lab-x2d',
+      addOnPresetIds: ['accessory-bambu-lab-ams-2-pro'],
+    }
+    expect(supplyPresetsUsedBy(SUPPLY_PRESETS, supplyUserIds([], [x2d])).map(({ id }) => id)).toEqual(
+      expect.arrayContaining(['supply-bambu-lab-molecular-sieve-desiccant', 'supply-bambu-lab-silicone-desiccant']),
+    )
+  })
+
+  it('names lubricant for a Bambu Lab printer', () => {
+    const p1s = { id: 'p1s', name: 'P1S', printType: 'filament' as const, presetId: 'filament-bambu-lab-p1s' }
+    expect(supplyPresetsUsedBy(SUPPLY_PRESETS, supplyUserIds([], [p1s])).map(({ id }) => id)).toContain('supply-bambu-lab-lubricant-grease')
+  })
+
+  it('leaves out archived printers and equipment', () => {
+    const p1s = { id: 'p1s', name: 'P1S', printType: 'filament' as const, presetId: 'filament-bambu-lab-p1s', archived: true }
+    expect(supplyUserIds([], [p1s])).toEqual([])
   })
 
   it('adds a catalogue supply under its brand, unit, and pack', () => {

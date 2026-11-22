@@ -25,7 +25,7 @@ import { DEFAULT_PRICE_CALCULATOR_SETTINGS, TYPICAL_RESIN_DENSITY_GRAMS_PER_ML }
 import { getPrinterPreset } from '../../../core/printerPresets'
 import { printTypeCopy } from '../../../core/printTypes'
 import { resinFromPreset, type ResinPreset } from '../../../core/resinPresets'
-import { supplyFromPreset, supplyPresetsFor, supplyPresetsForEquipment } from '../../../core/supplyPresets'
+import { supplyFromPreset, supplyPresetsFor, supplyPresetsUsedBy, supplyUserIds } from '../../../core/supplyPresets'
 import { partFromPreset, type PartSuggestion } from '../../../core/stock'
 import { PRINT_TYPES, type PrintType } from '../../../core/types'
 import type { StockLevel } from '../../../core/usage'
@@ -428,14 +428,7 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
       {picking?.kind === 'supply' && (
         <SupplyPicker
           presets={supplyCatalogue && supplyPresetsFor(supplyCatalogue, printTypes)}
-          suggested={
-            new Set(
-              supplyPresetsForEquipment(
-                supplyCatalogue ?? [],
-                activeItems(equipment ?? []).map(({ presetId }) => presetId),
-              ).map(({ id }) => id),
-            )
-          }
+          suggested={new Set(supplyPresetsUsedBy(supplyCatalogue ?? [], supplyUserIds(equipment ?? [], printers)).map(({ id }) => id))}
           added={presetIds(supplies.map(({ supplyPresetId }) => supplyPresetId))}
           onSelect={(preset) => setEditing(withConsumablePrice(supplyFromPreset(createId(), preset), Number.NaN))}
           onCustom={addCustomSupply}

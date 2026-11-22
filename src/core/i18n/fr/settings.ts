@@ -257,7 +257,7 @@ export const settings: typeof en = {
       addOwn: (query: string) => `Ajouter « ${query} » vous-même`,
       partsDescription: 'Choisissez une pièce que le catalogue connaît pour ces imprimantes, ou saisissez la vôtre.',
       suppliesDescription: 'Choisissez une fourniture que le catalogue connaît, ou saisissez la vôtre.',
-      forEquipment: 'Indiquées pour votre équipement',
+      forEquipment: 'Indiquées pour vos imprimantes et votre équipement',
       supplyCategories: {
         'wash-fluid': 'Liquides de lavage',
         gloves: 'Gants',

@@ -245,7 +245,7 @@ export const settings = {
       addOwn: (query: string) => `Add “${query}” as your own`,
       partsDescription: 'Pick a part the catalogue knows for these printers, or enter your own.',
       suppliesDescription: 'Pick a supply the catalogue knows, or enter your own.',
-      forEquipment: 'Named for your equipment',
+      forEquipment: 'Named for your printers and equipment',
       supplyCategories: {
         'wash-fluid': 'Wash fluids',
         gloves: 'Gloves',

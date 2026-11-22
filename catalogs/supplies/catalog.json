@@ -98,9 +98,10 @@
         "currency": "EUR",
         "url": "https://eu.store.bambulab.com/products/molecular-sieve-desiccant",
         "checked": "2026-11-22",
-        "note": "Including VAT. For every AMS model. A pack of six sachets."
+        "note": "Including VAT. For every enclosed AMS model; the open AMS lite takes none. A pack of six sachets."
       },
-      "usedBy": [],
+      "usedBy": ["accessory-bambu-lab-ams", "accessory-bambu-lab-ams-2-pro", "accessory-bambu-lab-ams-ht"],
+      "usedBySource": "https://eu.store.bambulab.com/products/molecular-sieve-desiccant",
       "source": {
         "id": "bambu-lab-store",
         "url": "https://eu.store.bambulab.com/products/molecular-sieve-desiccant"
@@ -119,9 +120,10 @@
         "currency": "EUR",
         "url": "https://eu.store.bambulab.com/products/silicone-desiccant",
         "checked": "2026-11-22",
-        "note": "Including VAT. For every AMS model. A pack of six sachets."
+        "note": "Including VAT. For every enclosed AMS model; the open AMS lite takes none. A pack of six sachets."
       },
-      "usedBy": [],
+      "usedBy": ["accessory-bambu-lab-ams", "accessory-bambu-lab-ams-2-pro", "accessory-bambu-lab-ams-ht"],
+      "usedBySource": "https://eu.store.bambulab.com/products/silicone-desiccant",
       "source": {
         "id": "bambu-lab-store",
         "url": "https://eu.store.bambulab.com/products/silicone-desiccant"
@@ -203,7 +205,23 @@
         "checked": "2026-11-22",
         "note": "Including VAT. A pack of six 3 g tubes."
       },
-      "usedBy": [],
+      "usedBy": [
+        "filament-bambu-lab-a1",
+        "filament-bambu-lab-a1-mini",
+        "filament-bambu-lab-a2l",
+        "filament-bambu-lab-h2c",
+        "filament-bambu-lab-h2d",
+        "filament-bambu-lab-h2d-pro",
+        "filament-bambu-lab-h2s",
+        "filament-bambu-lab-p1p",
+        "filament-bambu-lab-p1s",
+        "filament-bambu-lab-p2s",
+        "filament-bambu-lab-x1",
+        "filament-bambu-lab-x1-carbon",
+        "filament-bambu-lab-x1e",
+        "filament-bambu-lab-x2d"
+      ],
+      "usedBySource": "https://eu.store.bambulab.com/products/lubricant-oil",
       "source": {
         "id": "bambu-lab-store",
         "url": "https://eu.store.bambulab.com/products/lubricant-oil"
@@ -224,7 +242,23 @@
         "checked": "2026-11-22",
         "note": "Including VAT. 6 g a pack, as six 1 g or two 3 g sachets."
       },
-      "usedBy": [],
+      "usedBy": [
+        "filament-bambu-lab-a1",
+        "filament-bambu-lab-a1-mini",
+        "filament-bambu-lab-a2l",
+        "filament-bambu-lab-h2c",
+        "filament-bambu-lab-h2d",
+        "filament-bambu-lab-h2d-pro",
+        "filament-bambu-lab-h2s",
+        "filament-bambu-lab-p1p",
+        "filament-bambu-lab-p1s",
+        "filament-bambu-lab-p2s",
+        "filament-bambu-lab-x1",
+        "filament-bambu-lab-x1-carbon",
+        "filament-bambu-lab-x1e",
+        "filament-bambu-lab-x2d"
+      ],
+      "usedBySource": "https://eu.store.bambulab.com/products/lubricant-grease",
       "source": {
         "id": "bambu-lab-store",
         "url": "https://eu.store.bambulab.com/products/lubricant-grease"

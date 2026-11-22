@@ -252,7 +252,7 @@ export const settings: typeof en = {
       addOwn: (query: string) => `„${query}“ selbst hinzufügen`,
       partsDescription: 'Wählen Sie ein Teil, das der Katalog für diese Drucker kennt, oder geben Sie ein eigenes ein.',
       suppliesDescription: 'Wählen Sie Verbrauchsmaterial, das der Katalog kennt, oder geben Sie eigenes ein.',
-      forEquipment: 'Für Ihre Ausrüstung genannt',
+      forEquipment: 'Für Ihre Drucker und Ausrüstung genannt',
       supplyCategories: {
         'wash-fluid': 'Waschflüssigkeiten',
         gloves: 'Handschuhe',
