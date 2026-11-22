@@ -293,7 +293,7 @@ export const settings: typeof en = {
       price: (symbol: string) => `Prix par pièce (${symbol})`,
       lifespan: 'Durée de vie',
       lifespanHint:
-        'Donnée en couches ? Environ 1 000 couches font un plateau. Remplacée tous les quelques mois ? Saisissez les heures d’impression qu’elle tourne sur cette période.',
+        'Donnée en couches ? Environ 1 000 couches font un plateau. Remplacée au bout de quelques mois ? Saisissez les heures d’impression qu’elle tourne sur cette période.',
       lifespanUnit: 'Unité de durée de vie',
       units: { plates: 'plateaux', hours: 'heures d’impression' },
       perPlate: (cost: string) => `${cost} par plateau`,

@@ -211,7 +211,7 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
         <SupplyNeeds
           workspaceSlug={workspaceSlug}
           consumables={saved}
-          levels={levels}
+          levels={stock}
           printers={printers}
           printTypes={printTypes}
           onAddMaterial={addMaterial}

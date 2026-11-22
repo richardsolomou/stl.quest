@@ -23,7 +23,7 @@ const SHOWN_PER_LIST = 4
 export function SupplyNeeds({
   workspaceSlug,
   consumables: library,
-  levels,
+  levels: loadedLevels,
   printers,
   printTypes,
   onAddMaterial,
@@ -31,7 +31,8 @@ export function SupplyNeeds({
 }: {
   workspaceSlug: string
   consumables: Consumable[]
-  levels: StockLevel[]
+  /** Undefined while stock loads, so nothing claims what is or isn't tracked yet. */
+  levels?: StockLevel[]
   printers: PrinterProfile[]
   /** What the workspace prints; nothing is suggested for another type. */
   printTypes: readonly PrintType[]
@@ -42,6 +43,7 @@ export function SupplyNeeds({
   const consumables = t.settings.consumables
   const copy = consumables.needs
   const stock = consumables.stock
+  const levels = loadedLevels ?? []
   const runningOut = levels.flatMap((level) => {
     const consumable = library.find(({ id }) => id === level.consumableId)
     return consumable && !consumable.archived && (level.low || level.missing) ? [{ consumable, level }] : []
@@ -63,7 +65,7 @@ export function SupplyNeeds({
         <h2 id="supply-needs" className="font-heading text-base leading-tight font-bold tracking-[0.01em] uppercase">
           {copy.title}
         </h2>
-        {nothing && (
+        {nothing && loadedLevels && (
           <p className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
             {untracked ? (
               <Info aria-hidden="true" className="size-4 shrink-0" />

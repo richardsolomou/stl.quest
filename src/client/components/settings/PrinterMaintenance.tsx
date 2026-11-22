@@ -55,7 +55,13 @@ export function PrinterMaintenance({ printer }: { printer: PrinterProfile }) {
   const failed = () => void toast.error(t.settings.consumables.notSaved)
   const archive = (part: Consumable) => {
     setEditing(null)
-    setArchived(part.id, true).catch(failed)
+    setArchived(part.id, true).then(
+      () =>
+        toast(t.settings.consumables.archivedItem(part.name), {
+          action: { label: t.settings.consumables.undo, onClick: () => void setArchived(part.id, false).catch(failed) },
+        }),
+      failed,
+    )
   }
   return (
     <section className="grid gap-2" aria-labelledby="printer-maintenance">
