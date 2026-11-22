@@ -100,13 +100,15 @@ export type PlateSplit = {
 const MODEL_EXTENSION = /\.(stl|3mf|obj|step|stp|amf|ply|oltp)(?=$|[^a-z0-9])/i
 /** What slicers append to a cut or duplicated object: `_A`, `_B_A`, ` (2)`, `-1`. */
 const SLICER_SUFFIX = /(?:_[a-z]|\s*\(\d+\)|-\d+)+$/i
+/** The `SQ-<n> ` that downloads and plate files put in front of a model's name. */
+const REQUEST_TAG_PREFIX = /^SQ-\d+\s+/i
 
 /**
  * A slicer object's name reduced to the model it came from: lower case, without a folder, and without the extension
  * or anything a cut, connector, or copy added after it.
  */
 export function slicedObjectStem(label: string) {
-  const name = label.trim().split(/[\\/]/).at(-1) ?? ''
+  const name = (label.trim().split(/[\\/]/).at(-1) ?? '').replace(REQUEST_TAG_PREFIX, '')
   const extension = MODEL_EXTENSION.exec(name)
   const stem = extension ? name.slice(0, extension.index) : name.replace(SLICER_SUFFIX, '')
   return stem.trim().toLowerCase()
@@ -115,7 +117,7 @@ export function slicedObjectStem(label: string) {
 /**
  * The print each object belongs to: by the request tag its name carries, which every copy, cut, and split of a model
  * downloaded from STL Quest keeps, else by its model's file name, else the print's name. When several names fit, the
- * longest wins, so `Hull_Bolter` is not taken for `Hull`. A tag of a request not on the plate matches nothing.
+ * longest wins, so `Hull_Bolter` is not taken for `Hull`. A tag of a request not on the plate falls back to the names.
  */
 export function matchSlicedObjects(
   objects: { name?: string }[],
@@ -131,7 +133,8 @@ export function matchSlicedObjects(
   return objects.map(({ name }) => {
     if (!name) return undefined
     const tag = taggedRequestNumber(name)
-    if (tag !== undefined) return prints.find(({ number }) => number === tag)?.requestId
+    const tagged = tag === undefined ? undefined : prints.find(({ number }) => number === tag)
+    if (tagged) return tagged.requestId
     const stem = slicedObjectStem(name)
     return stems.find((candidate) => candidate.stem === stem)?.requestId
   })

@@ -98,8 +98,8 @@ describe('matchSlicedObjects', () => {
     ).toEqual(['hull'])
   })
 
-  it('leaves an object tagged with a request not on the plate unmatched', () => {
-    expect(matchSlicedObjects([{ name: 'SQ-99 Chrimera_Turret.stl' }], [{ ...turret, number: 8 }])).toEqual([undefined])
+  it('falls back to the file name when the tag names no print on the plate', () => {
+    expect(matchSlicedObjects([{ name: 'SQ-99 Chrimera_Turret.stl' }], [{ ...turret, number: 8 }])).toEqual(['turret'])
   })
 
   it('prefers the longest model name that fits', () => {
