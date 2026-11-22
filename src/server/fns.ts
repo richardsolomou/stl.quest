@@ -35,7 +35,7 @@ import { mailServerTestEmail } from '../core/notifications'
 import {
   app,
   deploymentSettings,
-  hashInviteToken,
+  hashToken,
   memberSeesOnlyOwnRequests,
   resetApp,
   resolveBoardConfig,
@@ -103,6 +103,7 @@ import {
   moveCopiesBatchSchema,
   recordStepUsageSchema,
   recordStockMovementSchema,
+  linkSpoolmanFilamentSchema,
   createPlateSchema,
   plateIdSchema,
   recordPlateSchema,
@@ -174,6 +175,7 @@ import { LOCALES } from '../core/i18n/locales'
 import { workspaceMutation } from './workspaceRpc'
 import { resolveSourceImage } from './sourcePreview'
 import { appPath } from '../basePath'
+import { SPOOLMAN_TOKEN_PREFIX } from '../core/spoolman'
 
 const INVITE_TTL = 7 * 24 * 60 * 60 * 1000
 
@@ -232,7 +234,7 @@ function assertSmtpMutable() {
 }
 
 async function inviteWorkspace(instance: Awaited<ReturnType<typeof app>>, token: string) {
-  const tokenHash = hashInviteToken(token)
+  const tokenHash = hashToken(token)
   const workspaceSlug = await instance.repository.workspaceSlugForInvite(tokenHash, Date.now())
   if (!workspaceSlug) return undefined
   const workspace = await instance.repository.workspaceBySlug(workspaceSlug)
@@ -944,7 +946,7 @@ export const createInvite = createServerFn({ method: 'POST' })
       const id = crypto.randomUUID()
       await context.repository.createInvite({
         id,
-        tokenHash: hashInviteToken(token),
+        tokenHash: hashToken(token),
         role: data.role,
         label: label || undefined,
         recipientEmail: data.email,
@@ -1000,13 +1002,13 @@ export const inviteInfo = createServerFn({ method: 'GET' })
   .handler(async ({ data }) =>
     rpc(async () => {
       const instance = await app()
-      const workspaceSlug = await instance.repository.workspaceSlugForInvite(hashInviteToken(data.token), Date.now())
+      const workspaceSlug = await instance.repository.workspaceSlugForInvite(hashToken(data.token), Date.now())
       if (!workspaceSlug) {
         return { valid: false, signedIn: false, joined: false, auth: await currentAuthCapabilities(instance) }
       }
       const workspace = (await instance.repository.workspaceBySlug(workspaceSlug))!
       const context = await instance.publicWorkspace(workspaceSlug)
-      const invite = await context.repository.findInvite(hashInviteToken(data.token))
+      const invite = await context.repository.findInvite(hashToken(data.token))
       const identity = await instance.identity(getRequestHeaders())
       const joined = identity ? (await instance.repository.workspaceForUser(identity.id, workspaceSlug)) !== undefined : false
       if (joined) await instance.setActiveWorkspace(workspace.id, getRequestHeaders())
@@ -1877,6 +1879,39 @@ export const getStockLevels = createServerFn({ method: 'GET' })
       return { stock: await context.service.stockLevels(context.identity) }
     }),
   )
+
+export const getSpoolman = createServerFn({ method: 'GET' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const context = await workspaceContext(await app(), data.workspaceSlug)
+      const spoolman = await context.service.spoolman(context.identity)
+      const origin = new URL(getRequest().url).origin
+      return { ...spoolman, appUrl: `${origin}${appPath('')}`, ingestUrl: `${origin}${appPath('/api/spoolman/spools')}` }
+    }),
+  )
+
+export const connectSpoolman = createServerFn({ method: 'POST' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) =>
+    workspaceMutation(data.workspaceSlug, async (context) => {
+      // The raw token exists only in this response; the database keeps a hash.
+      const token = `${SPOOLMAN_TOKEN_PREFIX}${crypto.randomBytes(32).toString('base64url')}`
+      await context.service.connectSpoolman(hashToken(token), context.identity)
+      return { token }
+    }),
+  )
+
+export const disconnectSpoolman = createServerFn({ method: 'POST' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) => workspaceMutation(data.workspaceSlug, (context) => context.service.disconnectSpoolman(context.identity)))
+
+export const linkSpoolmanFilament = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(linkSpoolmanFilamentSchema))
+  .handler(async ({ data }) => {
+    const { workspaceSlug, ...input } = data
+    return workspaceMutation(workspaceSlug, (context) => context.service.linkSpoolmanFilament(input, context.identity))
+  })
 
 export const getUsagePrefills = createServerFn({ method: 'GET' })
   .validator(workspaceInputSchema)

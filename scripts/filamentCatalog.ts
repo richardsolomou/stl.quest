@@ -1,3 +1,4 @@
+import { spoolmanDbStem, type SpoolmanCatalogue } from '../src/core/spoolman'
 import { encodePath, normalizeBrand, slug } from './resinCatalog'
 
 export type FilamentCatalogSource = {
@@ -9,6 +10,9 @@ export type FilamentCatalogSource = {
 
 export type FilamentColor = { hex: string; names: { en: string } }
 
+/** A colour as parsing finds it, with the SpoolmanDB ID stems of every entry it was gathered from. */
+type ParsedColor = FilamentColor & { spoolmanIds: string[] }
+
 export type GeneratedFilamentPreset = {
   id: string
   brand: string
@@ -19,6 +23,8 @@ export type GeneratedFilamentPreset = {
   colors?: FilamentColor[]
   source: { id: string; url: string }
 }
+
+type ParsedPreset = Omit<GeneratedFilamentPreset, 'colors'> & { colors?: ParsedColor[] }
 
 type SpoolmanFilament = {
   name: string
@@ -54,18 +60,24 @@ export function parseSpoolmanFilaments(files: { path: string; contents: string }
       const name = line.toLocaleLowerCase().includes(material.toLocaleLowerCase()) ? line : `${line} ${material}`.trim()
       // A block holding one colour flagged differently describes that colour, so only a range of colours makes a product.
       const variant = (filament.colors?.length ?? 0) > 1 ? variantWords(filament, name) : []
-      return name ? [{ file, filament, brand, material, name, variant }] : []
+      return name ? [{ file, manufacturer, filament, brand, material, name, variant }] : []
     })
   })
-  const presets = new Map<string, GeneratedFilamentPreset>()
-  for (const { file, filament, brand, material, name: lineName, variant } of entries) {
+  const presets = new Map<string, ParsedPreset>()
+  for (const { file, manufacturer, filament, brand, material, name: lineName, variant } of entries) {
     const siblings = entries.filter((entry) => entry.brand === brand && entry.name === lineName)
     const qualifier = variant.filter((word) => !siblings.every((sibling) => sibling.variant.includes(word)))
     const name = [...qualifier, lineName].join(' ')
     const id = `filament-${slug(`${brand}-${name}`)}`
     const colors = (filament.colors ?? []).flatMap((color) =>
       color.name && /^[0-9a-f]{6}/i.test(color.hex ?? '')
-        ? [{ hex: `#${color.hex!.slice(0, 6).toUpperCase()}`, names: { en: color.name } }]
+        ? [
+            {
+              hex: `#${color.hex!.slice(0, 6).toUpperCase()}`,
+              names: { en: color.name },
+              spoolmanIds: [spoolmanDbStem(manufacturer, filament.material, filament.name.replace('{color_name}', color.name))],
+            },
+          ]
         : [],
     )
     const existing = presets.get(id)
@@ -83,7 +95,34 @@ export function parseSpoolmanFilaments(files: { path: string; contents: string }
       source: { id: source.id, url: `${source.webRepository}/blob/${source.revision}/${encodePath(file.path)}` },
     })
   }
-  return [...presets.values()].sort((first, second) => first.brand.localeCompare(second.brand) || first.name.localeCompare(second.name))
+  const sorted = [...presets.values()].sort(
+    (first, second) => first.brand.localeCompare(second.brand) || first.name.localeCompare(second.name),
+  )
+  return {
+    presets: sorted.map((preset) =>
+      preset.colors ? { ...preset, colors: preset.colors.map(({ hex, names }) => ({ hex, names })) } : preset,
+    ) as GeneratedFilamentPreset[],
+    spoolman: spoolmanCatalogue(sorted),
+  }
+}
+
+/**
+ * What matching Spoolman filaments needs: each SpoolmanDB ID stem's product and colour, leaving out a stem two colours
+ * share, and each product's brand and material.
+ */
+function spoolmanCatalogue(presets: ParsedPreset[]): SpoolmanCatalogue {
+  const found = new Map<string, [string, string][]>()
+  for (const preset of presets)
+    for (const color of preset.colors ?? [])
+      for (const stem of new Set(color.spoolmanIds)) found.set(stem, [...(found.get(stem) ?? []), [preset.id, color.names.en]])
+  return {
+    colours: Object.fromEntries(
+      [...found]
+        .flatMap(([stem, owners]): [string, [string, string]][] => (owners.length === 1 ? [[stem, owners[0]]] : []))
+        .sort(([left], [right]) => left.localeCompare(right)),
+    ),
+    presets: Object.fromEntries(presets.flatMap((preset) => (preset.colors ? [[preset.id, [preset.brand, preset.type ?? '']]] : []))),
+  }
 }
 
 export function applyFilamentPatches(presets: GeneratedFilamentPreset[], patches: FilamentPatches) {
@@ -118,8 +157,12 @@ function productLine(template: string) {
     .trim()
 }
 
-function mergeColors(current: FilamentColor[] | undefined, added: FilamentColor[]) {
+function mergeColors(current: ParsedColor[] | undefined, added: ParsedColor[]) {
   const colors = [...(current ?? [])]
-  for (const color of added) if (!colors.some((existing) => existing.names.en === color.names.en)) colors.push(color)
+  for (const color of added) {
+    const existing = colors.find(({ names }) => names.en === color.names.en)
+    if (existing) existing.spoolmanIds.push(...color.spoolmanIds)
+    else colors.push({ ...color, spoolmanIds: [...color.spoolmanIds] })
+  }
   return colors.length ? colors : undefined
 }

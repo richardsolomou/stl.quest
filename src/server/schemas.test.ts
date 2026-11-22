@@ -9,6 +9,7 @@ import {
   moveCopiesBatchSchema,
   updatePrintCopyTagsSchema,
   acceptInviteSchema,
+  spoolmanIngestSchema,
   boardSettingsSchema,
   createConsumablesSchema,
   createLinkedRequestSchema,
@@ -489,5 +490,70 @@ describe('bulk board actions', () => {
 
   it.each(Object.entries(bulk))('refuses more than the limit to %s', (_, parse) => {
     expect(parse(MAX_BULK_CARDS + 1).success).toBe(false)
+  })
+})
+
+describe('Spoolman ingest schema', () => {
+  const spool = {
+    id: 4,
+    remaining_weight: 812.5,
+    used_weight: 187.5,
+    archived: false,
+    filament: {
+      id: 2,
+      name: 'Matte Charcoal',
+      material: 'PLA',
+      color_hex: '000000',
+      external_id: 'bambulab_pla_mattecharcoal_1000_175_n',
+      vendor: { id: 1, name: 'Bambu Lab' },
+    },
+  }
+
+  it('reads every spool as a replacement', () => {
+    expect(spoolmanIngestSchema.parse({ spools: [spool] })).toEqual({
+      replace: [
+        {
+          id: 4,
+          filamentId: 2,
+          filamentName: 'Matte Charcoal',
+          vendor: 'Bambu Lab',
+          material: 'PLA',
+          colourHex: '#000000',
+          externalId: 'bambulab_pla_mattecharcoal_1000_175_n',
+          remainingGrams: 812.5,
+          archived: false,
+        },
+      ],
+    })
+  })
+
+  it('reads a Spoolman websocket event for one spool', () => {
+    expect(spoolmanIngestSchema.parse({ type: 'updated', resource: 'spool', date: '2026-11-22T08:00:00Z', payload: spool })).toMatchObject({
+      upsert: { id: 4 },
+    })
+  })
+
+  it('reads a deleted spool event as a removal', () => {
+    expect(spoolmanIngestSchema.parse({ type: 'deleted', resource: 'spool', payload: spool })).toEqual({ remove: 4 })
+  })
+
+  it('takes a spool Spoolman sent without a weight or colour', () => {
+    expect(spoolmanIngestSchema.parse({ spools: [{ id: 5, filament: { id: 3 } }] })).toEqual({
+      replace: [{ id: 5, filamentId: 3, archived: false }],
+    })
+  })
+
+  it('rejects a colour that is not hex', () => {
+    expect(spoolmanIngestSchema.safeParse({ spools: [{ ...spool, filament: { ...spool.filament, color_hex: 'black' } }] }).success).toBe(
+      false,
+    )
+  })
+
+  it('rejects the same spool sent twice', () => {
+    expect(spoolmanIngestSchema.safeParse({ spools: [spool, spool] }).success).toBe(false)
+  })
+
+  it('rejects events for other resources', () => {
+    expect(spoolmanIngestSchema.safeParse({ type: 'updated', resource: 'vendor', payload: { id: 1 } }).success).toBe(false)
   })
 })

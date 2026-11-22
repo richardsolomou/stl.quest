@@ -192,7 +192,8 @@ export async function buildAssetStore(config: StorageConfig, repository?: Reposi
   return new LocalAssetStore(workspaceConfig.root)
 }
 
-export function hashInviteToken(token: string) {
+/** Invite and integration tokens are random, so a fast hash at rest is enough to keep a leaked database from using them. */
+export function hashToken(token: string) {
   return crypto.createHash('sha256').update(token).digest('hex')
 }
 
@@ -361,12 +362,11 @@ async function createApp() {
           throw error
         }
       },
-      claimInvite: async (token, recipientEmail) =>
-        await repository!.claimInviteGlobally(hashInviteToken(token), Date.now(), recipientEmail),
+      claimInvite: async (token, recipientEmail) => await repository!.claimInviteGlobally(hashToken(token), Date.now(), recipientEmail),
       completeInvite: async (id, userId) => await repository!.completeInviteGlobally(id, userId),
       selfSignupAllowed: async () => (await resolveSelfSignupConfig(settings)).enabled,
       inviteClaimable: async (token, recipientEmail) =>
-        await repository!.inviteClaimableGlobally(hashInviteToken(token), Date.now(), recipientEmail),
+        await repository!.inviteClaimableGlobally(hashToken(token), Date.now(), recipientEmail),
       auth: { ...authConfig, passwordReset: authConfig.password && Boolean(email && authUrl) },
       email,
       baseURL: authUrl,
@@ -634,6 +634,12 @@ async function createApp() {
       return runtime(found)
     }
 
+    const spoolmanWorkspace = async (tokenHash: string) => {
+      const found = await repository!.workspaceForSpoolmanToken(tokenHash)
+      if (!found) throw new Response(serverMessages().server.spoolman.notConnected, { status: 401 })
+      return runtime(found)
+    }
+
     const defaultWorkspaceRuntime = async () => {
       const defaultWorkspace = (await repository!.listWorkspaces())[0]
       if (!defaultWorkspace) throw new Error('no workspace is available')
@@ -692,6 +698,7 @@ async function createApp() {
       setActiveWorkspace,
       workspace,
       publicWorkspace,
+      spoolmanWorkspace,
       defaultWorkspaceRuntime,
       listWorkspaces: async (userId: string) => await repository!.listWorkspacesForUser(userId),
       close,

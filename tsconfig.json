@@ -8,5 +8,5 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "scripts", "e2e", "*.ts"]
+  "include": ["src", "scripts", "e2e", "spoolman-bridge", "*.ts"]
 }

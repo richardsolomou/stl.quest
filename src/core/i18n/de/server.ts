@@ -120,6 +120,14 @@ export const server: typeof en = {
     materialMismatch: 'dieses Material passt nicht zur Druckart',
     nothingToUndo: 'nichts rückgängig zu machen',
     trackingOff: 'Verbrauchs- und Bestandserfassung ist für diesen Arbeitsbereich aus',
+    managedBySpoolman: 'Den Bestand dieses Filaments verwaltet Spoolman',
+  },
+  spoolman: {
+    notConnected: 'dieses Spoolman-Token ist mit keinem Arbeitsbereich verbunden',
+    tooManySpools: (max: number) => `sende höchstens ${max} Spulen`,
+    tooLarge: (megabytes: number) => `sende höchstens ${megabytes} MB auf einmal`,
+    invalid: 'sende Spoolman-Spulen als JSON: {"spools": [...]} oder ein einzelnes Spoolman-Spulenereignis',
+    rateLimited: 'zu viele Aktualisierungen; warte eine Minute und sende erneut',
   },
   plates: {
     notFound: 'Druckplatte nicht gefunden',

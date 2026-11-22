@@ -120,6 +120,16 @@ describe('stockLevels', () => {
     expect(level).toMatchObject({ missing: true, low: false })
   })
 
+  it('takes stock Spoolman manages from Spoolman rather than the log', () => {
+    const [level] = stockLevels(
+      [ipa],
+      [{ consumableId: ipa.id, kind: 'restock', unit: 'ml', amount: 20 }],
+      new Map([[ipa.id, { onHand: 640, spools: 2 }]]),
+    )
+
+    expect(level).toMatchObject({ onHand: 640, tracked: true, spoolman: { spools: 2 } })
+  })
+
   it('does not start tracking from usage alone', () => {
     const [level] = stockLevels([{ ...ipa, minimumStock: undefined }], [{ consumableId: ipa.id, kind: 'use', unit: 'ml', amount: 20 }])
 

@@ -89,6 +89,35 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       : await DrizzleRepository.create(repository.database, { ownsDatabase: false })
   }
 
+  it('keeps Spoolman spools until the workspace disconnects', async () => {
+    const spool = { id: 1, filamentId: 10, material: 'PLA', remainingGrams: 600, archived: true }
+    await repository.connectSpoolman('hash', 1)
+    await repository.receiveSpoolman({ replace: [spool] }, 2, 10)
+    await repository.receiveSpoolman({ upsert: { ...spool, id: 2, archived: false } }, 3, 10)
+    // PostgreSQL stores the flag as an integer, so it is read for truthiness, as stock reads it.
+    expect((await repository.listSpoolmanSpools()).map(({ id, archived }) => [id, archived ? 'archived' : 'in use'])).toEqual([
+      [1, 'archived'],
+      [2, 'in use'],
+    ])
+    await repository.disconnectSpoolman()
+    expect(await repository.listSpoolmanSpools()).toEqual([])
+  })
+
+  it('finds the workspace of a Spoolman token only by its hash', async () => {
+    await repository.connectSpoolman('hash', 1)
+    expect([(await repository.workspaceForSpoolmanToken('hash'))?.id, await repository.workspaceForSpoolmanToken('other')]).toEqual([
+      'test-workspace',
+      undefined,
+    ])
+  })
+
+  it('drops a Spoolman link when its filament is deleted', async () => {
+    await stock(repository, 'consumables', [{ id: 'pla', kind: 'filament', name: 'PLA', pricePerKg: 20, archived: true }])
+    await repository.setSpoolmanLink(10, { consumableId: 'pla' }, 1)
+    await repository.deleteInventoryItem('consumables', 'pla', () => undefined)
+    expect(await repository.listSpoolmanLinks()).toEqual([])
+  })
+
   it('checks whether the workspace has requests', async () => {
     expect(await repository.hasRequests()).toBe(false)
     await repository.createRequest({
@@ -1946,7 +1975,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 42 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 43 })
     await migrated.close()
   })
 
