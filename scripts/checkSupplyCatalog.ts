@@ -8,7 +8,11 @@ import { isHttps, listPriceProblem } from './catalogChecks'
 const root = path.resolve(import.meta.dirname, '..')
 const read = <T>(file: string) => JSON.parse(readFileSync(path.join(root, file), 'utf8')) as T
 const catalog = read<{ sources: { id: string }[]; presets: SupplyPreset[] }>('catalogs/supplies/catalog.json')
-const equipment = new Set(read<{ presets: { id: string }[] }>('catalogs/equipment/catalog.json').presets.map(({ id }) => id))
+// Equipment, printers, and the add-on modules in the equipment catalogue can all name a supply they use.
+const models = new Set([
+  ...read<{ presets: { id: string }[] }>('catalogs/equipment/catalog.json').presets.map(({ id }) => id),
+  ...read<{ presets: { id: string }[] }>('catalogs/printers/index.generated.json').presets.map(({ id }) => id),
+])
 const sourceIds = new Set(catalog.sources.map((source) => source.id))
 const ids = new Set<string>()
 
@@ -27,8 +31,8 @@ for (const preset of catalog.presets) {
   if (preset.packSize !== undefined && !(Number.isFinite(preset.packSize) && preset.packSize > 0))
     fail(preset, 'pack size must be positive')
 
-  for (const equipmentId of preset.usedBy) if (!equipment.has(equipmentId)) fail(preset, `used by unknown equipment preset ${equipmentId}`)
-  if (preset.usedBy.length && !isHttps(preset.usedBySource)) fail(preset, 'equipment that uses it needs an https source URL')
+  for (const modelId of preset.usedBy) if (!models.has(modelId)) fail(preset, `used by unknown equipment or printer preset ${modelId}`)
+  if (preset.usedBy.length && !isHttps(preset.usedBySource)) fail(preset, 'a model that uses it needs an https source URL')
 
   const price = preset.listPrice
   if (price) {

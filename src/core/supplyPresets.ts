@@ -1,6 +1,7 @@
 import type { SupplyConsumable, SupplyUnit } from './consumables'
 import { enteredUnitScale } from './stock'
-import type { PrintType } from './types'
+import type { EquipmentItem } from './equipment'
+import type { PrinterProfile, PrintType } from './types'
 
 export const SUPPLY_CATEGORIES = [
   'wash-fluid',
@@ -27,7 +28,7 @@ export type SupplyPreset = {
   packSize?: number
   /** The manufacturer's store price for one pack on the checked date. */
   listPrice?: { amount: number; currency: string; url: string; checked: string; note?: string }
-  /** Equipment catalogue presets whose maker names this supply, as `usedBySource` shows. */
+  /** Equipment, printer, or add-on catalogue presets whose maker names this supply, as `usedBySource` shows. */
   usedBy: string[]
   usedBySource?: string
   note?: string
@@ -41,9 +42,23 @@ export function supplyPresetsFor(supplies: readonly SupplyPreset[], printTypes: 
   return supplies.filter((preset) => !preset.printType || printTypes.includes(preset.printType))
 }
 
-/** Catalogue supplies the makers of these equipment models name, in catalogue order. */
-export function supplyPresetsForEquipment(supplies: readonly SupplyPreset[], equipmentPresetIds: readonly (string | undefined)[]) {
-  return supplies.filter((preset) => preset.usedBy.some((id) => equipmentPresetIds.includes(id)))
+/** Catalogue supplies the makers of these equipment, printer, or add-on models name, in catalogue order. */
+export function supplyPresetsUsedBy(supplies: readonly SupplyPreset[], presetIds: readonly (string | undefined)[]) {
+  return supplies.filter((preset) => preset.usedBy.some((id) => presetIds.includes(id)))
+}
+
+/**
+ * The catalogue models in use that can name a supply: equipment, printers, and the modules bolted onto them, since an
+ * AMS takes desiccant and a printer takes lubricant without any equipment set up.
+ */
+export function supplyUserIds(
+  equipment: readonly Pick<EquipmentItem, 'presetId' | 'archived'>[],
+  printers: readonly Pick<PrinterProfile, 'presetId' | 'addOnPresetIds' | 'archived'>[],
+) {
+  return [
+    ...equipment.filter((item) => !item.archived).map(({ presetId }) => presetId),
+    ...printers.filter((printer) => !printer.archived).flatMap(({ presetId, addOnPresetIds = [] }) => [presetId, ...addOnPresetIds]),
+  ].filter((id): id is string => id !== undefined)
 }
 
 /** A library supply from the catalogue, with no price: the list price is only a hint for the user's own. */

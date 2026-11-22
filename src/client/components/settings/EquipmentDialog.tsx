@@ -22,7 +22,7 @@ import {
 } from '../../../core/equipment'
 import { equipmentFromPreset, equipmentPresetName, getEquipmentPreset, type EquipmentPreset } from '../../../core/equipmentPresets'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from '../../../core/priceCalculator'
-import { supplyPresetsForEquipment } from '../../../core/supplyPresets'
+import { supplyPresetsUsedBy } from '../../../core/supplyPresets'
 import { PRINT_TYPES } from '../../../core/types'
 import { useI18n } from '../../i18n'
 import { catalogueQuery, consumablesQuery, priceCalculatorSettingsQuery } from '../../queries'
@@ -289,7 +289,7 @@ function SupplyFields({
   const byId = new Map((consumables ?? []).map((consumable) => [consumable.id, consumable]))
   const listed = new Set(supplies.map((supply) => supply.consumableId))
   const catalogue = useQuery({ ...catalogueQuery('supplies'), enabled: !!preset }).data
-  const named = supplyPresetsForEquipment(catalogue ?? [], [preset?.id])
+  const named = supplyPresetsUsedBy(catalogue ?? [], [preset?.id])
   const isNamed = (consumable: Consumable) => consumable.kind === 'supply' && named.some(({ id }) => id === consumable.supplyPresetId)
   const unstocked = named.filter(
     ({ id }) =>
