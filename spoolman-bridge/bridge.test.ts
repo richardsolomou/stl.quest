@@ -618,7 +618,7 @@ describe('sendSlicedFiles', () => {
 
   it('waits as long as STL Quest asks', async () => {
     const reader = vi.fn(async (url: string | URL | Request) =>
-      href(url).startsWith('https://stl.quest')
+      new URL(href(url)).origin === 'https://stl.quest'
         ? new Response(null, { status: 429, headers: { 'retry-after': '30' } })
         : new Response(file),
     )
