@@ -18,8 +18,11 @@ async function ingest() {
   const handlers: Record<string, (request: Request) => Promise<Response>> = {
     '/api/bambuddy/usage': receivePrintUsageRequest,
     '/api/bambuddy/sliced': (request) =>
-      ({ GET: sendSlicedFilesWanted, DELETE: slicedFileUnavailableRequest })[request.method]?.(request) ??
-      receiveSlicedFileRequest(request),
+      (request.method === 'GET'
+        ? sendSlicedFilesWanted
+        : request.method === 'DELETE'
+          ? slicedFileUnavailableRequest
+          : receiveSlicedFileRequest)(request),
   }
   return (request: Request) =>
     (handlers[new URL(request.url).pathname] ?? receiveBambuddyRequest)(request).catch((error: unknown) => {
