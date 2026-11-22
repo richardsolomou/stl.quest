@@ -140,7 +140,11 @@ export function printFilaments(
     if (grams > 0) used.set(filament, (used.get(filament) ?? 0) + grams)
   }
   const trays = displayedTrays(job.filamentDetails)
-  for (const { material, grams } of trays) add(filaments.find((filament) => sameText(materialOf(filament), material)) ?? first, grams)
+  // Slicer profiles for PLA+ spools (eSUN, SUNLU) inherit plain PLA, so their trays say PLA: an exact material wins, else its "+" kind.
+  const forTray = (material: string | undefined) =>
+    filaments.find((filament) => sameText(materialOf(filament), material)) ??
+    (material ? filaments.find((filament) => sameText(materialOf(filament), `${material}+`)) : undefined)
+  for (const { material, grams } of trays) add(forTray(material) ?? first, grams)
   const measured = job.filamentDetails?.split('|').some((part) => TRAY_LABEL.test(part.trim()))
   if (!measured) {
     // Bambuddy rounds every figure to a tenth of a gram, so n slots can miss the rounded total by up to n × 0.05 g.

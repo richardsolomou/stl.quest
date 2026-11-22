@@ -67,16 +67,19 @@ export type SpoolmanFilament = {
 /** A Spoolman filament someone linked by hand; a null consumable keeps it linked to none. */
 export type SpoolmanLink = { filamentId: number; consumableId: string | null }
 
-/** How a Spoolman filament found its library filament: chosen by hand, by its SpoolmanDB ID, or by brand, material, and colour. */
-export type SpoolmanMatch = { consumableId: string; by: 'manual' | 'catalogue' | 'colour' }
+/**
+ * How a Spoolman filament found its library filament: chosen by hand, by its SpoolmanDB ID, by brand, material, and
+ * colour, or by its name among the filaments of its brand and material.
+ */
+export type SpoolmanMatch = { consumableId: string; by: 'manual' | 'catalogue' | 'colour' | 'name' }
 
 /**
  * The filament catalogue as matching reads it: each SpoolmanDB ID stem's catalogue product and colour name, and each
- * product's brand and material.
+ * product's brand, material, and name.
  */
 export type SpoolmanCatalogue = {
   colours: Record<string, readonly [presetId: string, colour: string]>
-  presets: Record<string, readonly [brand: string, material: string]>
+  presets: Record<string, readonly [brand: string, material: string, product: string]>
 }
 
 /**
@@ -125,8 +128,9 @@ export function spoolmanFilaments(spools: SpoolmanSpool[]): SpoolmanFilament[] {
 
 /**
  * The library filament each Spoolman filament is: the one linked by hand, else the catalogue colour its SpoolmanDB ID
- * names, else the only catalogued filament of its brand, material, and colour. A match that fits more than one library
- * filament is left for someone to link.
+ * names, else the only catalogued filament of its brand, material, and colour, else the only one of those (or, without
+ * a colour hex, of its brand and material) its name fits. A match that fits more than one library filament is left for
+ * someone to link.
  */
 export function matchSpoolmanFilaments(
   filaments: SpoolmanFilament[],
@@ -151,23 +155,82 @@ export function matchSpoolmanFilaments(
       matches.set(filament.id, { consumableId: byCatalogue, by: 'catalogue' })
       continue
     }
-    const byColour =
-      filament.vendor && filament.material && filament.colourHex
-        ? only(
-            library.filter(({ filamentPresetId, colour }) => {
-              const preset = filamentPresetId ? catalogue.presets[filamentPresetId] : undefined
-              return (
-                preset &&
-                sameText(preset[0], filament.vendor) &&
-                sameText(preset[1], filament.material) &&
-                colour?.hex.toUpperCase() === filament.colourHex!.toUpperCase()
-              )
-            }),
-          )
-        : undefined
-    if (byColour) matches.set(filament.id, { consumableId: byColour, by: 'colour' })
+    if (!filament.vendor || !filament.material) continue
+    const candidates = library.filter(({ filamentPresetId, colour }) => {
+      const preset = filamentPresetId ? catalogue.presets[filamentPresetId] : undefined
+      return (
+        preset &&
+        sameText(preset[0], filament.vendor) &&
+        sameText(preset[1], filament.material) &&
+        (!filament.colourHex || colour?.hex.toUpperCase() === filament.colourHex.toUpperCase())
+      )
+    })
+    const products = Object.entries(catalogue.presets).filter(
+      ([, [brand, material]]) => sameText(brand, filament.vendor) && sameText(material, filament.material),
+    )
+    const presetIds = new Set(products.map(([id]) => id))
+    const brandColours = Object.values(catalogue.colours).filter(([presetId]) => presetIds.has(presetId))
+    const colourNames = new Set(brandColours.map(([, colour]) => words(colour).join(' ')))
+    const byColour = filament.colourHex && only(candidates)
+    // A name that reads as another of the brand's catalogue filaments ("Matte Charcoal" beside a lone Basic Black) overrules a shared hex.
+    const contradicted =
+      byColour &&
+      filament.name &&
+      brandColours.some(
+        ([presetId, colour]) =>
+          namesFilament(filament.name!, catalogue.presets[presetId], colour, { bareColour: false, colourNames }) &&
+          !candidates.some((candidate) => candidate.filamentPresetId === presetId && sameText(candidate.colour?.name, colour)),
+      )
+    if (byColour && !contradicted) {
+      matches.set(filament.id, { consumableId: byColour, by: 'colour' })
+      continue
+    }
+    const byName =
+      filament.name &&
+      only(
+        candidates.filter(({ filamentPresetId, colour }) =>
+          namesFilament(filament.name!, catalogue.presets[filamentPresetId!], colour?.name, {
+            bareColour: !!filament.colourHex && products.length === 1,
+            colourNames,
+          }),
+        ),
+      )
+    if (byName) matches.set(filament.id, { consumableId: byName, by: 'name' })
   }
   return matches
+}
+
+/** A name's words in order, lowercased, with "+" kept as part of a word so "PLA+" stays apart from "PLA". */
+const words = (value: string) => value.toLowerCase().match(/[\p{L}\p{N}+]+/gu) ?? []
+
+/**
+ * Whether a name typed into Spoolman, such as "PLA Basic Black" or "Matte Charcoal", is this catalogue product in this
+ * colour: after an optional leading brand and material, it is the product and colour in order, where the product may
+ * leave out its material words. A rest that is itself one of the brand's colours for the material ("Wood Tone") reads
+ * only as that colour, and a bare colour fits only when `bareColour` allows it.
+ */
+function namesFilament(
+  name: string,
+  [brand, material, product]: readonly [string, string, string],
+  colour: string | undefined,
+  { bareColour, colourNames }: { bareColour: boolean; colourNames: Set<string> },
+) {
+  const colourName = words(colour ?? '').join(' ')
+  if (!colourName) return false
+  const materialWords = new Set(words(material))
+  const productNames = [words(product), words(product).filter((word) => !materialWords.has(word))].filter(
+    (productName) => productName.length > 0,
+  )
+  const given = words(name).join(' ')
+  return ['', brand, material, `${brand} ${material}`]
+    .map((prefix) => words(prefix).join(' '))
+    .filter((prefix) => !prefix || given.startsWith(`${prefix} `))
+    .map((prefix) => (prefix ? given.slice(prefix.length + 1) : given))
+    .some(
+      (rest) =>
+        (bareColour && rest === colourName) ||
+        (!colourNames.has(rest) && productNames.some((productName) => rest === `${productName.join(' ')} ${colourName}`)),
+    )
 }
 
 /** Stock per library filament from the Spoolman filaments matched to it. */
@@ -182,8 +245,8 @@ export function spoolmanStock(filaments: SpoolmanFilament[], matches: Map<number
   return stock
 }
 
-/** Whether two names read the same, ignoring case, spaces, and punctuation. */
+/** Whether two names read the same, ignoring case, spaces, and punctuation other than "+", so "PLA+" is not "PLA". */
 export function sameText(left: string | undefined, right: string | undefined) {
-  const normalize = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')
+  const normalize = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}+]/gu, '')
   return left !== undefined && right !== undefined && normalize(left) === normalize(right)
 }

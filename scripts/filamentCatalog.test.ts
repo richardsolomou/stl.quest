@@ -119,8 +119,8 @@ describe('SpoolmanDB IDs for matching Spoolman filaments', () => {
     expect(read([silk, silkBlue]).spoolman.colours['brand_pla_silkblue']).toBeUndefined()
   })
 
-  it('keeps each product’s brand and material', () => {
-    expect(read([basic]).spoolman.presets['filament-brand-pla']).toEqual(['Brand', 'PLA'])
+  it('keeps each product’s brand, material, and name', () => {
+    expect(read([basic]).spoolman.presets['filament-brand-pla']).toEqual(['Brand', 'PLA', 'PLA'])
   })
 })
 
