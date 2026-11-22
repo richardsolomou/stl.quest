@@ -2,7 +2,14 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import type { Consumable } from '../core/consumables'
 import type { InventoryItems, InventoryKind } from '../core/inventory'
-import { createConsumables, createInventoryItem, deleteInventoryItem, setInventoryItemArchived, shareFilamentPrice, updateInventoryItem } from '../server/fns'
+import {
+  createConsumables,
+  createInventoryItem,
+  deleteInventoryItem,
+  setInventoryItemArchived,
+  shareFilamentPrice,
+  updateInventoryItem,
+} from '../server/fns'
 import { consumablesQuery, equipmentQuery, printersQuery } from './queries'
 import { invalidateQueries } from './queryState'
 import { useWorkspaceSlug } from './workspace'
