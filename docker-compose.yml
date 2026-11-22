@@ -67,3 +67,6 @@ services:
   #     STLQUEST_URL: http://stlquest:3000
   #     STLQUEST_ALLOW_HTTP: 'true'
   #     STLQUEST_TOKEN: ${STLQUEST_SPOOLMAN_TOKEN:-}
+  #     # Optional: what each Bambuddy print charged to which spool; see docs/bambuddy.md.
+  #     BAMBUDDY_URL: http://bambuddy:8000
+  #     BAMBUDDY_API_KEY: ${BAMBUDDY_API_KEY:-}

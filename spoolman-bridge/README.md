@@ -1,5 +1,5 @@
 # STL Quest Spoolman bridge
 
-Sends a [Spoolman](https://github.com/Donkie/Spoolman)'s spools to STL Quest, so filament stock comes from Spoolman. It runs next to Spoolman and only connects out. Setup, settings, and the endpoint it sends to are in [docs/spoolman.md](../docs/spoolman.md).
+Sends a [Spoolman](https://github.com/Donkie/Spoolman)'s spools to STL Quest, so filament stock comes from Spoolman, and adds the spools STL Quest queues from pasted orders. Given a [Bambuddy](https://github.com/maziggy/bambuddy) API key, it also sends which spools each print used. It runs next to Spoolman and only connects out. Setup, settings, and the endpoints it uses are in [docs/spoolman.md](../docs/spoolman.md) and [docs/bambuddy.md](../docs/bambuddy.md#grams-per-spool).
 
 `bridge.ts` has no dependencies; Node 24 runs it directly. The image is published as `ghcr.io/richardsolomou/stl.quest-spoolman-bridge` by `.github/workflows/spoolman-bridge.yml`.

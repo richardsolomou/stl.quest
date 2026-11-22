@@ -421,7 +421,9 @@ export const settings: typeof en = {
       skip: 'Nicht auffüllen',
       add: (name: string) => `${name} zur Liste hinzufügen`,
       addShort: 'Zur Liste hinzufügen',
-      spoolman: 'Wird von Spoolman verwaltet, also fügen Sie diese Spule dort hinzu.',
+      spoolman: 'Wird von Spoolman verwaltet, also legt die Bridge die Spulen dort an und der Bestand folgt.',
+      spoolmanAdd: (count: number) => `${count} ${count === 1 ? 'Spule' : 'Spulen'} in Spoolman anlegen`,
+      spoolmanQueued: (count: number) => `${count} ${count === 1 ? 'Spule wartet' : 'Spulen warten'} auf die Spoolman-Bridge`,
       spoolmanLink: 'Spoolman-Verbindung',
       unmatched: 'Nicht in Ihrer Liste. Wählen Sie das Filament, das es auffüllt, oder lassen Sie es aus.',
       needsPrice: 'Nicht in Ihrer Liste, und diese Bestellung nennt keinen Preis in Ihrer Währung, um es hinzuzufügen.',
@@ -795,7 +797,7 @@ export const settings: typeof en = {
     connection: {
       title: 'Verbindung',
       description:
-        'Mit einem Token kann die Bridge oder jedes Werkzeug, das Webanfragen sendet, Spulen an diesen Arbeitsbereich schicken. Es kann nur senden, nie lesen.',
+        'Mit einem Token kann die Bridge oder jedes Werkzeug, das Webanfragen sendet, Spulen an diesen Arbeitsbereich schicken. Es sendet Spulen und Drucke und holt die Spulen ab, die du in Spoolman anlegen lässt; sonst liest es nichts.',
       name: 'Spoolman',
       status: { receiving: 'Empfängt', waiting: 'Wartet', off: 'Nicht verbunden' },
       off: 'Erstelle ein Token und starte dann die Bridge neben Spoolman.',
@@ -848,6 +850,18 @@ export const settings: typeof en = {
       },
       noLibrary: 'Füge die Filamente, die du kaufst, in Verbrauchsmaterial hinzu, um Spoolman-Bestand dazu zu zählen.',
       error: 'Die Verknüpfung konnte nicht gespeichert werden.',
+    },
+    restocks: {
+      title: 'Anzulegende Spulen',
+      description:
+        'Spulen aus eingefügten Bestellungen warten hier, bis die Bridge sie in Spoolman anlegt. Ihr Bestand kommt mit den nächsten Spulen, die sie sendet.',
+      queued: 'Wartet auf die Bridge',
+      created: (spoolId: number) => `In Spoolman als Spule #${spoolId} angelegt`,
+      failed: (error: string) => `Spoolman hat sie abgelehnt: ${error}`,
+      retry: 'Erneut versuchen',
+      remove: 'Entfernen',
+      removeLabel: (name: string) => `Spule ${name} entfernen`,
+      error: 'Die Spule konnte nicht geändert werden.',
     },
   },
   bambuddy: {

@@ -21,7 +21,8 @@ import { MAX_PRINT_GROUP_NAME_LENGTH } from '../core/printGroups'
 import { PRINT_TYPES, printGroupColors, REQUEST_SORTS } from '../core/types'
 import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
 import { MAX_SPOOLMAN_SPOOLS, type SpoolmanChange } from '../core/spoolman'
-import type { BambuddyEvent } from '../core/printJobs'
+import { MAX_PRINT_SPOOLS, type BambuddyEvent, type PrintUsageReport } from '../core/printJobs'
+import { MAX_RESTOCK_SPOOLS, type SpoolmanRestockResult } from '../core/spoolmanRestocks'
 import { workflow } from '../core/workflow'
 import { MAX_CONSUMABLES, SUPPLY_UNITS } from '../core/consumables'
 import { ORDER_VENDORS } from '../core/orders/orderEmail'
@@ -502,19 +503,33 @@ export const recordStockMovementSchema = z.discriminatedUnion('kind', [
   z.object({ consumableId: settingsItemId, kind: z.literal('correction'), counted: z.number().min(0).max(1_000_000) }),
 ]) satisfies z.ZodType<StockMovementInput>
 /** What confirming a pasted order stores; the email itself never reaches the server. */
-export const restockFromOrderSchema = z.object({
-  vendor: z.enum(ORDER_VENDORS),
-  added: z
-    .array(filamentConsumableSchema)
-    .max(MAX_CONSUMABLES)
-    .refine((items) => new Set(items.map((item) => item.id)).size === items.length, 'IDs must be unique'),
-  prices: z.array(z.object({ consumableId: settingsItemId, price: z.number().positive().max(100_000) })).max(MAX_CONSUMABLES),
-  restocks: z
-    .array(z.object({ consumableId: settingsItemId, amount: usageAmount }))
-    .min(1)
-    .max(MAX_CONSUMABLES)
-    .refine((items) => new Set(items.map(({ consumableId }) => consumableId)).size === items.length, 'one restock per consumable'),
-}) satisfies z.ZodType<OrderRestockInput>
+export const restockFromOrderSchema = z
+  .object({
+    vendor: z.enum(ORDER_VENDORS),
+    added: z
+      .array(filamentConsumableSchema)
+      .max(MAX_CONSUMABLES)
+      .refine((items) => new Set(items.map((item) => item.id)).size === items.length, 'IDs must be unique'),
+    prices: z.array(z.object({ consumableId: settingsItemId, price: z.number().positive().max(100_000) })).max(MAX_CONSUMABLES),
+    restocks: z
+      .array(z.object({ consumableId: settingsItemId, amount: usageAmount }))
+      .max(MAX_CONSUMABLES)
+      .refine((items) => new Set(items.map(({ consumableId }) => consumableId)).size === items.length, 'one restock per consumable'),
+    spoolman: z
+      .array(
+        z.object({
+          consumableId: settingsItemId,
+          spools: z.number().int().min(1).max(MAX_RESTOCK_SPOOLS),
+          grams: z.number().positive().max(100_000).optional(),
+        }),
+      )
+      .max(MAX_CONSUMABLES)
+      .optional(),
+  })
+  .refine(
+    (input) => input.restocks.length > 0 || Boolean(input.spoolman?.length),
+    'restock something',
+  ) satisfies z.ZodType<OrderRestockInput>
 export const undoUsageSchema = z.object({ transactionId: id })
 export const usageFiltersSchema = z.object({
   requestId: id.optional(),
@@ -694,6 +709,27 @@ export const spoolmanIngestSchema = z.union([
     .object({ type: z.enum(['added', 'updated', 'deleted']), resource: z.literal('spool'), payload: spoolmanSpool })
     .transform(({ type, payload }) => (type === 'deleted' ? { remove: payload.id } : { upsert: payload })),
 ]) satisfies z.ZodType<SpoolmanChange>
+/** What the bridge sends after trying to add a queued spool, in Spoolman's snake case. */
+export const spoolmanRestockResultSchema = z.union([
+  z.object({ id, spool_id: spoolmanKey }).transform(({ id, spool_id }) => ({ id, spoolId: spool_id })),
+  z.object({ id, error: z.string().trim().min(1).max(512) }),
+]) satisfies z.ZodType<SpoolmanRestockResult>
+export const spoolmanRestockIdSchema = z.object({ id })
+/** What the bridge read from Bambuddy that a print used per Spoolman spool. */
+export const bambuddyUsageSchema = z
+  .object({
+    event: z.literal('print_usage'),
+    run_id: z.string().trim().min(1).max(64),
+    spools: z
+      .array(z.object({ spool_id: spoolmanKey, grams: z.number().min(0).max(100_000) }))
+      .min(1)
+      .max(MAX_PRINT_SPOOLS)
+      .refine((spools) => new Set(spools.map(({ spool_id }) => spool_id)).size === spools.length, 'each spool once'),
+  })
+  .transform(({ run_id, spools }) => ({
+    runId: run_id,
+    spools: spools.map(({ spool_id, grams }) => ({ spoolId: spool_id, grams })),
+  })) satisfies z.ZodType<PrintUsageReport>
 export const linkSpoolmanFilamentSchema = z.object({
   filamentId: spoolmanKey,
   choice: z.union([z.literal('auto'), z.literal('none'), settingsItemId]),

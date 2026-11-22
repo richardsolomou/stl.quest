@@ -14,7 +14,7 @@ import {
   workspaceOnboarding,
 } from './auth'
 import { assetGenerationJobs } from './analysis'
-import { consumables, equipment, printers, stores, spoolmanConnections, spoolmanLinks, spoolmanSpools } from './inventory'
+import { consumables, equipment, printers, stores, spoolmanConnections, spoolmanLinks, spoolmanRestocks, spoolmanSpools } from './inventory'
 import {
   managedStorageAccounts,
   managedStorageEntitlements,
@@ -69,6 +69,7 @@ export const schema = {
   stores,
   spoolmanConnections,
   spoolmanLinks,
+  spoolmanRestocks,
   spoolmanSpools,
   subscription,
   twoFactor,

@@ -13,6 +13,7 @@ import type { PrintJob } from './printJobs'
 import type { PriceCalculatorCurrency } from './priceCalculator'
 import type { ChargedPrint } from './spend'
 import type { SpoolmanChange, SpoolmanLink, SpoolmanSpool } from './spoolman'
+import type { SpoolmanRestock, SpoolmanRestockResult } from './spoolmanRestocks'
 import type { SlicerId } from './slicers'
 
 export type Role = 'admin' | 'requester'
@@ -542,6 +543,18 @@ interface RepositoryShape {
   listSpoolmanLinks(): SpoolmanLink[]
   /** Links the Spoolman filament to a library filament or to none, or with no link hands it back to matching. */
   setSpoolmanLink(filamentId: number, link: { consumableId: string | null } | undefined, now: number): void
+  /** Spools to add to Spoolman, newest first. */
+  listSpoolmanRestocks(): SpoolmanRestock[]
+  /**
+   * Queues spools for the bridge to add to Spoolman, keeping at most `max` of those already added; false when the
+   * workspace is not connected or more than `max` would wait.
+   */
+  queueSpoolmanRestocks(restocks: SpoolmanRestock[], max: number): boolean
+  /** Records what the bridge did with a spool not yet added; false when there is none such. */
+  settleSpoolmanRestock(result: SpoolmanRestockResult, now: number): boolean
+  /** Queues a spool Spoolman refused again; false when it did not fail. */
+  retrySpoolmanRestock(id: string, now: number): boolean
+  deleteSpoolmanRestock(id: string): boolean
   getSetting<T>(key: string): T | undefined
   listAssetMigrations(): string[]
   recordAssetMigration(id: string): void
@@ -789,6 +802,7 @@ export type AppEvent =
   | 'plate.changed'
   | 'print.received'
   | 'spoolman.received'
+  | 'spoolman.restocksChanged'
 
 export interface EventBus {
   publish(event: AppEvent): void

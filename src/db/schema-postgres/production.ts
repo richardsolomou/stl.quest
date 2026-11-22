@@ -391,6 +391,8 @@ export const printJobs = pgTable(
     minutes: doublePrecision(),
     grams: doublePrecision(),
     filamentDetails: text('filament_details'),
+    /** JSON: what the print used per Spoolman spool, as `PrintSpoolUsage[]`. */
+    filamentUsage: text('filament_usage'),
     reason: text(),
     progress: doublePrecision(),
     archiveId: text('archive_id'),

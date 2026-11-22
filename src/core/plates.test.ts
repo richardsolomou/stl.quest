@@ -194,6 +194,28 @@ describe('splitPlate from typed totals', () => {
   })
 })
 
+describe('splitPlate from measured slot totals', () => {
+  const prints: PlatePrint[] = [
+    { requestId: 'a', copies: 1, volumeMm3: 3_000 },
+    { requestId: 'b', copies: 1, volumeMm3: 1_000 },
+  ]
+
+  it('splits each slot by the prints’ weights', () => {
+    expect(splitPlate({ slotTotals: [40, 8] }, 60, prints, 2).prints.map(({ amounts }) => amounts)).toEqual([
+      [30, 6],
+      [10, 2],
+    ])
+  })
+
+  it('splits time by each print’s share of every slot', () => {
+    expect(splitPlate({ slotTotals: [40, 8] }, 60, prints, 2).prints.map(({ minutes }) => minutes)).toEqual([45, 15])
+  })
+
+  it('names the method the weights used', () => {
+    expect(splitPlate({ slotTotals: [40, 8] }, 60, prints, 2).method).toBe('volume')
+  })
+})
+
 describe('plateUsageDrafts', () => {
   const printer: PrinterProfile = { id: 'x1', name: 'X1', printType: 'filament', powerWatts: 100 }
   const pla: Consumable = { id: 'pla', kind: 'filament', name: 'PLA', pricePerKg: 20 }

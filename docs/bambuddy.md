@@ -44,13 +44,36 @@ A print's start and end are one print: Bambuddy's end event continues the start 
 
 ## What a print records
 
-- **Finished**: the plate records Bambuddy's measured hours and grams, split across its prints by model volume, then estimate, then copies, just as typed plate totals are. The grams use the first filament in **Consumables**. A plate already recorded from a slicer file or typed totals keeps that recording, and a plate shared with things not in STL Quest is left for you to record, since Bambuddy cannot tell what share was yours.
+- **Finished**: the plate records Bambuddy's measured hours and grams, split across its prints by model volume, then estimate, then copies, just as typed plate totals are. The grams use the first filament in **Consumables** until the bridge reports which spools the print used (see [Grams per spool](#grams-per-spool)). A plate already recorded from a slicer file or typed totals keeps that recording, and a plate shared with things not in STL Quest is left for you to record, since Bambuddy cannot tell what share was yours.
 - **Failed** or **cancelled**: its hours and grams are recorded as failed usage on the plate's prints, which still wears the printer, and the plate's copies go back to Up next, flagged with the plate that failed, to be printed again.
 - Each printer's dialog under **Settings → Printers** shows its plate runs Bambuddy reported and how many failed or were cancelled.
 
 A repeated end event records nothing twice. The workspace keeps the newest 2,000 prints.
 
-Per-tray grams, Spoolman spool IDs, per-object splits from sliced files, and per-object failures need more than Bambuddy's webhook carries and are not read yet.
+Per-object splits from sliced files and per-object failures need more than Bambuddy reports and are not read yet.
+
+## Grams per spool
+
+Bambuddy's webhook describes the filament a print used only in words, so on its own each print's grams go to the first filament in **Consumables**. When Bambuddy charges your [Spoolman](spoolman.md) spools, the Spoolman bridge can read which spool each print used and send that instead:
+
+1. In Bambuddy, open **Settings → API Keys** and create a key with only **Read Status** allowed.
+2. Give the bridge Bambuddy's address and the key:
+
+   ```yaml
+   environment:
+     BAMBUDDY_URL: http://bambuddy:8000
+     BAMBUDDY_API_KEY: bb_…
+   ```
+
+Every `BAMBUDDY_POLL_SECONDS` (60 by default) the bridge reads Bambuddy's print log (`GET /api/v1/print-log/`) and its Spoolman usage history (`GET /api/v1/inventory/usage?spoolman=true`). That history names a spool, a printer, a print, and grams, but no run, so the bridge gives each charge to the run on the same printer, of the same print, that ended within ten minutes of it. It sends each run's spools to the webhook URL with the run ID Bambuddy's end event carried:
+
+```json
+{ "event": "print_usage", "run_id": "512", "spools": [{ "spool_id": 12, "grams": 30.4 }] }
+```
+
+STL Quest charges each spool's grams to the filament its Spoolman filament counts towards (**Settings → Spoolman → Filaments**), and anything else to the first filament. A finished print whose plate it recorded is recorded again from the spools; a plate recorded from a slicer file or typed totals keeps that. A failed or cancelled print's failed usage is recorded again from them, without moving its copies a second time. A print STL Quest has not received yet answers `404`, so the bridge sends it again on its next poll, for up to an hour after the run ended.
+
+The key and Bambuddy's address stay in the bridge; STL Quest never holds them, and the bridge only reads from Bambuddy. Bambuddy's built-in inventory keeps its own spools, which STL Quest cannot match, so their prints keep the first filament.
 
 ## The endpoint
 
@@ -60,7 +83,7 @@ Authorization: Bearer stlq_spoolman_…
 Content-Type: application/json
 ```
 
-The body is Bambuddy's generic webhook JSON. STL Quest reads `event`, `printer`, `filename`, `duration` (such as `1h 23m`), `filament_grams` (such as `12.3`), `filament_details`, `reason`, `progress`, `archive_id`, and `run_id`, and ignores the rest. It keeps `print_start`, `print_complete`, `print_failed`, and `print_stopped`, and accepts and drops every other event.
+The body is Bambuddy's generic webhook JSON, or the bridge's `print_usage` event above. STL Quest reads `event`, `printer`, `filename`, `duration` (such as `1h 23m`), `filament_grams` (such as `12.3`), `filament_details`, `reason`, `progress`, `archive_id`, and `run_id`, and ignores the rest. It keeps `print_start`, `print_complete`, `print_failed`, and `print_stopped`, and accepts and drops every other event.
 
 | Response | Meaning                                                                       |
 | -------- | ----------------------------------------------------------------------------- |

@@ -85,4 +85,30 @@ describe('Bambuddy ingest', () => {
 
     expect(response.status).toBe(415)
   })
+
+  it('keeps what a print used per Spoolman spool', async () => {
+    const receive = await ingest()
+    await receive(post(JSON.stringify(finished)))
+
+    const response = await receive(post(JSON.stringify({ event: 'print_usage', run_id: '3', spools: [{ spool_id: 4, grams: 12.5 }] })))
+
+    expect({ status: response.status, usage: (await storedPrints())[0].filamentUsage }).toEqual({
+      status: 204,
+      usage: [{ spoolId: 4, grams: 12.5 }],
+    })
+  })
+
+  it('asks the bridge to send spools again for a print not received yet', async () => {
+    const response = await (
+      await ingest()
+    )(post(JSON.stringify({ event: 'print_usage', run_id: '9', spools: [{ spool_id: 4, grams: 1 }] })))
+
+    expect(response.status).toBe(404)
+  })
+
+  it('refuses spools sent without a run', async () => {
+    const response = await (await ingest())(post(JSON.stringify({ event: 'print_usage', spools: [{ spool_id: 4, grams: 1 }] })))
+
+    expect(response.status).toBe(400)
+  })
 })

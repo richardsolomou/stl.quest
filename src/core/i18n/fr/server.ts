@@ -129,6 +129,10 @@ export const server: typeof en = {
     tooLarge: (megabytes: number) => `envoyez au plus ${megabytes} Mo à la fois`,
     invalid: 'envoyez les bobines Spoolman en JSON : {"spools": [...]} ou un événement de bobine Spoolman',
     rateLimited: 'trop de mises à jour ; attendez une minute avant de renvoyer',
+    notManaged: 'Spoolman ne gère pas ce filament, réapprovisionnez-le donc ici',
+    tooManyRestocks: (max: number) => `au plus ${max} bobines peuvent attendre Spoolman ; retirez-en ou attendez que le pont les ajoute`,
+    restockNotFound: 'aucune bobine de ce type n’attend Spoolman',
+    invalidRestock: 'envoyez {"id": "…", "spool_id": 1} ou {"id": "…", "error": "…"}',
   },
   plates: {
     notFound: 'plateau introuvable',
@@ -143,5 +147,6 @@ export const server: typeof en = {
     notFound: 'impression introuvable',
     alreadyLinked: 'cette impression est déjà reliée à un plateau',
     invalid: 'envoyez le JSON du webhook générique de Bambuddy avec un événement et une imprimante',
+    invalidUsage: 'envoyez {"event": "print_usage", "run_id": "…", "spools": [{"spool_id": 1, "grams": 1.5}]}',
   },
 }

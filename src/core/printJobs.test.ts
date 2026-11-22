@@ -8,6 +8,8 @@ import {
   printJobLink,
   printerNamed,
   printerRunCounts,
+  printSpoolMaterials,
+  sameSpoolUsage,
   taggedRequestNumber,
   type PrintJob,
 } from './printJobs'
@@ -220,5 +222,72 @@ describe('continuedPrintJob', () => {
 
   it('starts a new print for each start', () => {
     expect(continuedPrintJob([started], { outcome: 'printing', printerName: 'X2D', fileName: 'SQ-7 Hull' })).toBeUndefined()
+  })
+})
+
+describe('printSpoolMaterials', () => {
+  const black = { id: 'black' }
+  const white = { id: 'white' }
+  const context = {
+    spools: [
+      { id: 1, filamentId: 10 },
+      { id: 2, filamentId: 10 },
+      { id: 3, filamentId: 20 },
+      { id: 4, filamentId: 30 },
+    ],
+    matches: new Map([
+      [10, { consumableId: 'black' }],
+      [20, { consumableId: 'white' }],
+    ]),
+    library: [black, white],
+  }
+
+  it('charges each spool to the library filament its Spoolman filament counts towards', () => {
+    expect(printSpoolMaterials([{ spoolId: 3, grams: 4 }], context)).toEqual({ materials: [white], totals: [4] })
+  })
+
+  it('adds up spools of the same filament', () => {
+    expect(
+      printSpoolMaterials(
+        [
+          { spoolId: 1, grams: 10 },
+          { spoolId: 2, grams: 5 },
+        ],
+        context,
+      ).totals,
+    ).toEqual([15])
+  })
+
+  it('charges an unmatched spool to the fallback', () => {
+    expect(printSpoolMaterials([{ spoolId: 4, grams: 2 }], { ...context, fallback: black })).toEqual({ materials: [black], totals: [2] })
+  })
+
+  it('leaves out a spool STL Quest has not received when there is no fallback', () => {
+    expect(printSpoolMaterials([{ spoolId: 99, grams: 2 }], context).materials).toEqual([])
+  })
+})
+
+describe('sameSpoolUsage', () => {
+  it('ignores the order spools come in', () => {
+    expect(
+      sameSpoolUsage(
+        [
+          { spoolId: 1, grams: 2 },
+          { spoolId: 3, grams: 4 },
+        ],
+        [
+          { spoolId: 3, grams: 4 },
+          { spoolId: 1, grams: 2 },
+        ],
+      ),
+    ).toBe(true)
+  })
+
+  it('tells a changed amount apart', () => {
+    expect(sameSpoolUsage([{ spoolId: 1, grams: 2 }], [{ spoolId: 1, grams: 3 }])).toBe(false)
+  })
+
+  it('treats a print without a report as different', () => {
+    expect(sameSpoolUsage(undefined, [])).toBe(false)
   })
 })

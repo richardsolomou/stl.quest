@@ -58,9 +58,20 @@ import {
   type PlateMeasured,
   type PlateRecordInput,
   type PlateRecording,
+  type PlateSlotTotals,
   type PlateTotals,
 } from './plates'
-import { continuedPrintJob, printerNamed, printerRunCounts, printJobLink, type PrintJob, type PrintReport } from './printJobs'
+import {
+  continuedPrintJob,
+  printerNamed,
+  printerRunCounts,
+  printJobLink,
+  printSpoolMaterials,
+  sameSpoolUsage,
+  type PrintJob,
+  type PrintReport,
+  type PrintUsageReport,
+} from './printJobs'
 import {
   MAX_REQUEST_NAME_LENGTH,
   MAX_BULK_CARDS,
@@ -115,6 +126,13 @@ import {
   type SpoolmanMatch,
 } from './spoolman'
 import { SPOOLMAN_CATALOGUE } from './spoolmanCatalogue'
+import {
+  MAX_SPOOLMAN_RESTOCKS,
+  restockFilament,
+  SPOOLMAN_RESTOCK_BATCH,
+  type SpoolmanRestock,
+  type SpoolmanRestockResult,
+} from './spoolmanRestocks'
 
 export type NewRequestInput = Omit<NewPrintRequest, 'ownerUserId'> & { fileName: string; filePath: string }
 export type NewUploadedRequestInput = Omit<NewPrintRequest, 'ownerUserId' | 'filePath' | 'previewPath' | 'thumbnailPath'> & {
@@ -1357,7 +1375,7 @@ export class STLQuestService {
   /**
    * Records what an order confirmation brought as one undoable restock: catalogue colours join the library first, and
    * prices change only where the order gave them. A filament Spoolman manages, or that would be managed once added, is
-   * refused, since its spool is added in Spoolman instead.
+   * refused, since its stock is Spoolman's; its spools are queued for the Spoolman bridge to add there instead.
    */
   async restockFromOrder(input: OrderRestockInput, identity: Identity) {
     await this.requireUsageTracking(identity)
@@ -1370,6 +1388,7 @@ export class STLQuestService {
       throw new Response(this.text.usage.unknownConsumable, { status: 400 })
     if (input.restocks.some(({ consumableId }) => managed.has(consumableId)))
       throw new Response(this.text.usage.managedBySpoolman, { status: 409 })
+    const spoolman = await this.spoolmanRestocksFor(input.spoolman ?? [], prospective)
     const prices = new Map(input.prices.map(({ consumableId, price }) => [consumableId, price]))
     const library =
       added.length || prices.size
@@ -1385,13 +1404,74 @@ export class STLQuestService {
       }),
       identity,
     )
+    if (spoolman.length) {
+      if (!(await this.repository.queueSpoolmanRestocks(spoolman, MAX_SPOOLMAN_RESTOCKS)))
+        throw new Response(this.text.spoolman.tooManyRestocks(MAX_SPOOLMAN_RESTOCKS), { status: 409 })
+      this.changed('spoolman.restocksChanged')
+    }
     this.capture(identity.id, 'order_restock_recorded', {
       vendor: input.vendor,
       restock_count: input.restocks.length,
       added_count: added.length,
       price_count: prices.size,
+      ...(spoolman.length && { spoolman_spool_count: spoolman.length }),
     })
-    return recorded
+    return { ...recorded, spoolmanSpools: spoolman.length }
+  }
+
+  /** One spool to add per spool ordered, each of the Spoolman filament its library filament restocks. */
+  private async spoolmanRestocksFor(lines: NonNullable<OrderRestockInput['spoolman']>, consumables: Consumable[]) {
+    if (!lines.length) return []
+    const { filaments, matches } = await this.spoolmanMatches(consumables)
+    const now = Date.now()
+    return lines.flatMap(({ consumableId, spools, grams }) => {
+      const filament = restockFilament(consumableId, filaments, matches)
+      if (!filament) throw new Response(this.text.spoolman.notManaged, { status: 409 })
+      return Array.from({ length: spools }, (): SpoolmanRestock => ({
+        id: crypto.randomUUID(),
+        filamentId: filament.id,
+        ...(filament.name && { filamentName: filament.name }),
+        ...(grams && { grams }),
+        status: 'queued',
+        createdAt: now,
+        updatedAt: now,
+      }))
+    })
+  }
+
+  /** Spools queued for Spoolman, newest first, with what became of each. */
+  async spoolmanRestocks(identity: Identity) {
+    this.requireAdmin(identity)
+    return await this.repository.listSpoolmanRestocks()
+  }
+
+  /** The spools the bridge should add to Spoolman next, oldest first. */
+  async spoolmanRestocksToAdd() {
+    return (await this.repository.listSpoolmanRestocks())
+      .filter(({ status }) => status === 'queued')
+      .toReversed()
+      .slice(0, SPOOLMAN_RESTOCK_BATCH)
+  }
+
+  /** Records what the bridge did with a queued spool. */
+  async settleSpoolmanRestock(result: SpoolmanRestockResult) {
+    if (!(await this.repository.settleSpoolmanRestock(result, Date.now())))
+      throw new Response(this.text.spoolman.restockNotFound, { status: 404 })
+    this.changed('spoolman.restocksChanged')
+    this.capture('server', 'spoolman_spool_added', { added: 'spoolId' in result })
+  }
+
+  async retrySpoolmanRestock(id: string, identity: Identity) {
+    this.requireAdmin(identity)
+    if (!(await this.repository.retrySpoolmanRestock(id, Date.now())))
+      throw new Response(this.text.spoolman.restockNotFound, { status: 404 })
+    this.changed('spoolman.restocksChanged')
+  }
+
+  async removeSpoolmanRestock(id: string, identity: Identity) {
+    this.requireAdmin(identity)
+    if (!(await this.repository.deleteSpoolmanRestock(id))) throw new Response(this.text.spoolman.restockNotFound, { status: 404 })
+    this.changed('spoolman.restocksChanged')
   }
 
   async undoUsage(transactionId: string, identity: Identity) {
@@ -1434,6 +1514,7 @@ export class STLQuestService {
     const automatic = matchSpoolmanFilaments(filaments, consumables, [], SPOOLMAN_CATALOGUE)
     return {
       ...(connection && { connection }),
+      restocks: await this.repository.listSpoolmanRestocks(),
       filaments: filaments.map((filament) => {
         const link = links.find(({ filamentId }) => filamentId === filament.id)
         const match = matches.get(filament.id)
@@ -1782,7 +1863,7 @@ export class STLQuestService {
   private async plateRunUsage(
     plate: Plate,
     printType: PrintType,
-    input: PlateMeasured | PlateTotals,
+    input: PlateMeasured | PlateTotals | PlateSlotTotals,
     minutes: number,
     materials: Consumable[],
   ) {
@@ -1815,7 +1896,7 @@ export class STLQuestService {
   private async recordPlateUsage(
     plate: Plate,
     printType: PrintType,
-    input: PlateMeasured | PlateTotals,
+    input: PlateMeasured | PlateTotals | PlateSlotTotals,
     minutes: number,
     materials: Consumable[],
     source: PlateRecording['source'],
@@ -1892,33 +1973,86 @@ export class STLQuestService {
     if (!plate || !(await storedUsageTracking(this.repository))) return
     const printType = await this.platePrintType(plate).catch(() => undefined)
     if (!printType) return
-    const material = job.grams ? consumablesOfKind(await this.consumables(), printType)[0] : undefined
-    const totals: PlateTotals = { total: job.grams ?? 0, otherShare: 0 }
-    const minutes = job.minutes ?? 0
-    let transactionId: string | undefined
-    if (job.outcome === 'finished') {
-      if (plate.recording || plate.otherStuff || job.minutes === undefined) return
-      transactionId = (await this.recordPlateUsage(plate, printType, totals, minutes, material ? [material] : [], 'printer')).recorded
-        .recording!.transactionId
-      this.changed('usage.recorded')
-    } else {
-      const { drafts } = await this.plateRunUsage(plate, printType, totals, minutes, material ? [material] : [])
-      transactionId = (await this.appendUsage(drafts.map((draft) => ({ ...draft, outcome: 'failed' as const })))).transactionId
-      if (plate.stage) {
-        const requests = new Map((await this.repository.listRequests()).map((request) => [request.id, request]))
-        const { moves } = plateMoves(plate, PLATE_RETRY_STAGE, (id) => requests.get(id)?.counts)
-        const movedAt = Date.now()
-        await this.repository.movePlate(
-          plate.id,
-          moves.map((move) => ({ ...move, filePath: requests.get(move.id)?.filePath, movedAt })),
-          undefined,
-          movedAt,
-        )
-        this.changed('plate.changed')
-        this.changed('request.copiesMoved')
-      }
+    if (job.outcome === 'finished' && (plate.recording || plate.otherStuff || job.minutes === undefined)) return
+    const transactionId = await this.recordPrintUsage(job, plate, printType)
+    if (job.outcome !== 'finished' && plate.stage) {
+      const requests = new Map((await this.repository.listRequests()).map((request) => [request.id, request]))
+      const { moves } = plateMoves(plate, PLATE_RETRY_STAGE, (id) => requests.get(id)?.counts)
+      const movedAt = Date.now()
+      await this.repository.movePlate(
+        plate.id,
+        moves.map((move) => ({ ...move, filePath: requests.get(move.id)?.filePath, movedAt })),
+        undefined,
+        movedAt,
+      )
+      this.changed('plate.changed')
+      this.changed('request.copiesMoved')
     }
     if (transactionId) await this.repository.updatePrintJob({ ...job, transactionId })
+  }
+
+  /**
+   * Records what a print measured on its plate, as the plate's recording when it finished and as failed usage when it
+   * did not. Grams go to the filaments of the Spoolman spools it reported, else to the first material of its kind.
+   */
+  private async recordPrintUsage(job: PrintJob, plate: Plate, printType: PrintType) {
+    const consumables = await this.consumables()
+    const fallback = consumablesOfKind(consumables, printType)[0]
+    const bySpool =
+      printType === 'filament' && job.filamentUsage?.length
+        ? printSpoolMaterials(job.filamentUsage, {
+            spools: await this.repository.listSpoolmanSpools(),
+            matches: (await this.spoolmanMatches(consumables)).matches,
+            library: consumablesOfKind(consumables, 'filament'),
+            fallback,
+          })
+        : undefined
+    const input: PlateTotals | PlateSlotTotals = bySpool?.materials.length
+      ? { slotTotals: bySpool.totals }
+      : { total: job.grams ?? 0, otherShare: 0 }
+    const materials = bySpool?.materials.length ? bySpool.materials : job.grams && fallback ? [fallback] : []
+    const minutes = job.minutes ?? 0
+    if (job.outcome === 'finished') {
+      const { recorded } = await this.recordPlateUsage(plate, printType, input, minutes, materials, 'printer')
+      this.changed('usage.recorded')
+      return recorded.recording!.transactionId
+    }
+    const { drafts } = await this.plateRunUsage(plate, printType, input, minutes, materials)
+    return (await this.appendUsage(drafts.map((draft) => ({ ...draft, outcome: 'failed' as const })))).transactionId
+  }
+
+  /**
+   * Takes in what a Bambuddy print used per Spoolman spool, which the bridge sends once Bambuddy has charged its spools.
+   * A print already recorded from its own end event is recorded again by spool; a plate recorded from a slicer file or
+   * typed totals keeps that recording. A print not received yet is refused, so the bridge sends again later.
+   */
+  async receivePrintUsage(report: PrintUsageReport) {
+    const job = (await this.repository.listPrintJobs()).find(({ runId }) => runId === report.runId)
+    if (!job) throw new Response(this.text.prints.notFound, { status: 404 })
+    if (sameSpoolUsage(job.filamentUsage, report.spools)) return
+    let updated: PrintJob = { ...job, filamentUsage: report.spools }
+    let recorded = false
+    const plate = job.transactionId ? (await this.repository.listPlates()).find(({ id }) => id === job.plateId) : undefined
+    const printType = plate && (await this.platePrintType(plate).catch(() => undefined))
+    const ownRecording = job.outcome !== 'finished' || plate?.recording?.transactionId === job.transactionId
+    if (plate && printType && ownRecording && (await storedUsageTracking(this.repository))) {
+      if (job.outcome !== 'finished') await this.repository.undoUsageTransaction(job.transactionId!, Date.now())
+      const transactionId = await this.recordPrintUsage(updated, plate, printType)
+      updated = { ...updated, ...(transactionId && { transactionId }) }
+      recorded = true
+    }
+    await this.repository.updatePrintJob(updated)
+    this.changed('print.received')
+    const { matches } = await this.spoolmanMatches(await this.consumables())
+    const spools = await this.repository.listSpoolmanSpools()
+    this.capture('server', 'print_spools_received', {
+      spool_count: report.spools.length,
+      matched_count: report.spools.filter(({ spoolId }) => {
+        const filamentId = spools.find(({ id }) => id === spoolId)?.filamentId
+        return filamentId !== undefined && matches.has(filamentId)
+      }).length,
+      recorded,
+    })
   }
 
   /** Bambuddy's prints, newest first, each unlinked one with the request its name is tagged with, if any. */

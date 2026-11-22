@@ -4425,6 +4425,119 @@ describe('STLQuestService crash recovery', () => {
 
         expect(capture).toHaveBeenCalledWith('server', 'print_received', { outcome: 'finished', linked_by: 'printer', has_printer: true })
       })
+
+      describe('per spool', () => {
+        const petg: Consumable = { id: 'petg', kind: 'filament', name: 'PETG', pricePerKg: 25 }
+        const used = async (requestId: string) =>
+          (await service.listUsage({ requestId }, admin))
+            .filter((event) => event.unit === 'g' && !event.undoneAt)
+            .map(({ consumableId, amount }) => [consumableId, amount])
+            .toSorted()
+
+        beforeEach(async () => {
+          await stock('consumables', [petg])
+          await service.connectSpoolman('hash', admin)
+          await service.receiveSpoolman({
+            replace: [
+              { id: 1, filamentId: 10, archived: false },
+              { id: 2, filamentId: 20, archived: false },
+            ],
+          })
+          await service.linkSpoolmanFilament({ filamentId: 10, choice: filament.id }, admin)
+          await service.linkSpoolmanFilament({ filamentId: 20, choice: petg.id }, admin)
+        })
+
+        it('charges each spool’s grams to the filament its Spoolman filament counts towards', async () => {
+          const requestId = await queued()
+          await start(requestId)
+          await service.receivePrint({ ...finished, runId: '7' })
+
+          await service.receivePrintUsage({
+            runId: '7',
+            spools: [
+              { spoolId: 1, grams: 30 },
+              { spoolId: 2, grams: 10 },
+            ],
+          })
+
+          expect(await used(requestId)).toEqual([
+            [petg.id, 10],
+            [filament.id, 30],
+          ])
+        })
+
+        it('charges a spool Spoolman never sent to the first filament', async () => {
+          const requestId = await queued()
+          await start(requestId)
+          await service.receivePrint({ ...finished, runId: '7' })
+
+          await service.receivePrintUsage({ runId: '7', spools: [{ spoolId: 99, grams: 12 }] })
+
+          expect(await used(requestId)).toEqual([[filament.id, 12]])
+        })
+
+        it('uses spools reported before the print reached a plate once it is attached', async () => {
+          const requestId = await queued()
+          await service.receivePrint({ ...finished, runId: '7' })
+          await service.receivePrintUsage({ runId: '7', spools: [{ spoolId: 2, grams: 9 }] })
+          const [job] = await repository.listPrintJobs()
+
+          await service.attachPrintJob({ jobId: job.id, requestId }, admin)
+
+          expect(await used(requestId)).toEqual([[petg.id, 9]])
+        })
+
+        it('re-records a failed print’s usage by spool without moving its copies again', async () => {
+          const requestId = await queued()
+          await start(requestId)
+          await service.receivePrint({ ...finished, outcome: 'failed', runId: '7' })
+
+          await service.receivePrintUsage({ runId: '7', spools: [{ spoolId: 2, grams: 5 }] })
+
+          expect([await used(requestId), (await counts(requestId)).up_next]).toEqual([[[petg.id, 5]], 1])
+        })
+
+        it('keeps a plate recorded from a slicer file', async () => {
+          const requestId = await queued()
+          const { id } = await start(requestId)
+          await service.recordPlate(
+            { plateId: id, minutes: 60, materials: [{ consumableId: filament.id }], total: 20, otherShare: 0 },
+            admin,
+          )
+          await service.receivePrint({ ...finished, runId: '7' })
+
+          await service.receivePrintUsage({ runId: '7', spools: [{ spoolId: 2, grams: 5 }] })
+
+          expect(await used(requestId)).toEqual([[filament.id, 20]])
+        })
+
+        it('records a print’s spools reported twice once', async () => {
+          const requestId = await queued()
+          await start(requestId)
+          await service.receivePrint({ ...finished, runId: '7' })
+          const report = { runId: '7', spools: [{ spoolId: 1, grams: 30 }] }
+
+          await service.receivePrintUsage(report)
+          const { transactionId } = (await repository.listPrintJobs())[0]
+          await service.receivePrintUsage(report)
+
+          expect((await repository.listPrintJobs())[0].transactionId).toBe(transactionId)
+        })
+
+        it('asks to send spools again for a print it has not heard of yet', async () => {
+          await expect(service.receivePrintUsage({ runId: '8', spools: [{ spoolId: 1, grams: 1 }] })).rejects.toMatchObject({ status: 404 })
+        })
+
+        it('captures spools received with counts only', async () => {
+          await start(await queued())
+          await service.receivePrint({ ...finished, runId: '7' })
+          capture.mockClear()
+
+          await service.receivePrintUsage({ runId: '7', spools: [{ spoolId: 1, grams: 30 }] })
+
+          expect(capture).toHaveBeenCalledWith('server', 'print_spools_received', { spool_count: 1, matched_count: 1, recorded: true })
+        })
+      })
     })
 
     describe('what a print was charged', () => {
@@ -4682,6 +4795,114 @@ describe('STLQuestService crash recovery', () => {
       const otherService = new STLQuestService(other, assets, staging, eventBus(), telemetry, { remove: removeTusUpload })
 
       expect((await otherService.spoolman(admin)).filaments).toEqual([])
+    })
+
+    describe('adding spools', () => {
+      const order = { vendor: 'bambu-lab' as const, added: [], prices: [], restocks: [] }
+      const queue = (spools = 2) =>
+        service.restockFromOrder({ ...order, spoolman: [{ consumableId: black.id, spools, grams: 1_000 }] }, admin)
+
+      beforeEach(async () => {
+        await service.receiveSpoolman({ replace: [{ ...spool, filamentName: 'Black', remainingGrams: 600 }] })
+      })
+
+      it('queues a restock of a filament Spoolman manages for the bridge to add', async () => {
+        await queue()
+
+        expect((await service.spoolmanRestocks(admin)).map(({ filamentId, grams, status }) => [filamentId, grams, status])).toEqual([
+          [10, 1_000, 'queued'],
+          [10, 1_000, 'queued'],
+        ])
+      })
+
+      it('leaves the stock of a filament Spoolman manages to Spoolman', async () => {
+        await queue()
+
+        expect((await level(black.id))?.onHand).toBe(600)
+      })
+
+      it('refuses to queue a filament Spoolman does not manage', async () => {
+        await expect(
+          service.restockFromOrder({ ...order, spoolman: [{ consumableId: white.id, spools: 1 }] }, admin),
+        ).rejects.toMatchObject({ status: 409 })
+      })
+
+      it('refuses more spools than may wait at once', async () => {
+        await queue(50)
+        await queue(50)
+        await queue(50)
+        await queue(50)
+
+        await expect(queue(1)).rejects.toMatchObject({ status: 409 })
+      })
+
+      it('hands the bridge the spools waiting, oldest first', async () => {
+        await queue(1)
+
+        expect(await service.spoolmanRestocksToAdd()).toEqual([expect.objectContaining({ filamentId: 10, grams: 1_000 })])
+      })
+
+      it('stops handing the bridge a spool it added', async () => {
+        await queue(1)
+        const [restock] = await service.spoolmanRestocksToAdd()
+
+        await service.settleSpoolmanRestock({ id: restock.id, spoolId: 5 })
+
+        expect(await service.spoolmanRestocksToAdd()).toEqual([])
+      })
+
+      it('shows why Spoolman refused a spool', async () => {
+        await queue(1)
+        const [restock] = await service.spoolmanRestocksToAdd()
+
+        await service.settleSpoolmanRestock({ id: restock.id, error: 'filament not found' })
+
+        expect((await service.spoolmanRestocks(admin))[0]).toMatchObject({ status: 'failed', error: 'filament not found' })
+      })
+
+      it('hands the bridge a refused spool again once retried', async () => {
+        await queue(1)
+        const [restock] = await service.spoolmanRestocksToAdd()
+        await service.settleSpoolmanRestock({ id: restock.id, error: 'offline' })
+
+        await service.retrySpoolmanRestock(restock.id, admin)
+
+        expect(await service.spoolmanRestocksToAdd()).toHaveLength(1)
+      })
+
+      it('refuses a report for a spool it never queued', async () => {
+        await expect(service.settleSpoolmanRestock({ id: 'missing', spoolId: 5 })).rejects.toMatchObject({ status: 404 })
+      })
+
+      it('removes a waiting spool', async () => {
+        await queue(1)
+        const [restock] = await service.spoolmanRestocksToAdd()
+
+        await service.removeSpoolmanRestock(restock.id, admin)
+
+        expect(await service.spoolmanRestocks(admin)).toEqual([])
+      })
+
+      it('lets only admins remove a waiting spool', async () => {
+        await queue(1)
+        const [restock] = await service.spoolmanRestocksToAdd()
+
+        await expect(service.removeSpoolmanRestock(restock.id, requester)).rejects.toMatchObject({ status: 403 })
+      })
+
+      it('captures queued spools with counts only', async () => {
+        capture.mockClear()
+
+        await queue()
+
+        expect(capture).toHaveBeenCalledWith(admin.id, 'order_restock_recorded', {
+          vendor: 'bambu-lab',
+          restock_count: 0,
+          added_count: 0,
+          price_count: 0,
+          spoolman_spool_count: 2,
+        })
+      })
     })
   })
 

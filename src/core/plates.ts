@@ -69,6 +69,8 @@ export type PlateMaterialChoice = { consumableId: string } | { name: string; pri
 export type PlateMeasured = { objects: { requestId?: string; amounts: number[] }[]; overhead: number[] }
 /** A plate total typed from the slicer summary, with the share of it that went to things not in STL Quest. */
 export type PlateTotals = { total: number; otherShare: number }
+/** What a printer measured per filament slot for a plate run of nothing but STL Quest's prints. */
+export type PlateSlotTotals = { slotTotals: number[] }
 
 export type PlateRecordInput = { plateId: string; minutes: number; materials: PlateMaterialChoice[] } & (PlateMeasured | PlateTotals)
 
@@ -133,7 +135,13 @@ export function splitWeights(prints: PlatePrint[]): { method: Exclude<PlateSplit
 }
 
 /** Splits the plate's material per filament slot and its time across the prints, keeping other stuff's share apart. */
-export function splitPlate(input: PlateMeasured | PlateTotals, minutes: number, prints: PlatePrint[], slots: number): PlateSplit {
+export function splitPlate(
+  input: PlateMeasured | PlateTotals | PlateSlotTotals,
+  minutes: number,
+  prints: PlatePrint[],
+  slots: number,
+): PlateSplit {
+  if ('slotTotals' in input) return splitSlotTotals(input.slotTotals, minutes, prints, slots)
   const zero = () => Array.from({ length: slots }, () => 0)
   const amounts = prints.map(zero)
   const other = zero()
@@ -182,6 +190,19 @@ export function splitPlate(input: PlateMeasured | PlateTotals, minutes: number, 
     })),
     other: { amounts: other, minutes: minutesOf(sum(other), 0) },
     overhead,
+  }
+}
+
+/** Each print takes the share of every slot that it would take of the slots' sum, so its time follows its material. */
+function splitSlotTotals(slotTotals: number[], minutes: number, prints: PlatePrint[], slots: number): PlateSplit {
+  const totals = Array.from({ length: slots }, (_, slot) => Math.max(0, slotTotals[slot] ?? 0))
+  const whole = sum(totals)
+  const split = splitPlate({ total: whole, otherShare: 0 }, minutes, prints, slots)
+  const spread = (amount: number) => totals.map((total) => (whole > 0 ? (amount * total) / whole : 0))
+  return {
+    ...split,
+    prints: split.prints.map((print) => ({ ...print, amounts: spread(print.amounts[0]) })),
+    other: { ...split.other, amounts: spread(split.other.amounts[0]) },
   }
 }
 
