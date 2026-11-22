@@ -396,11 +396,14 @@ export const settings: typeof en = {
     },
     needs: {
       title: 'Ce qu’il vous faut',
-      description: 'Ce qui s’épuise, et ce que vos imprimantes utilisent mais qui manque dans la liste ci-dessous.',
-      allSet: 'Rien à prévoir. Tout ce qui est suivi dépasse son minimum, et vos imprimantes ont les pièces connues du catalogue.',
+      description: 'Ce qui s’épuise ou s’use, et ce que vos imprimantes utilisent mais qui manque dans la liste ci-dessous.',
+      allSet:
+        'Rien à prévoir. Tout ce qui est suivi dépasse son minimum, aucune pièce d’usure n’arrive en fin de vie, et vos imprimantes ont les pièces connues du catalogue.',
       untracked: (count: number) =>
         `Rien de suivi ne s’épuise, mais ${count} ${count === 1 ? 'article n’a' : 'articles n’ont'} aucun stock enregistré et ne ${count === 1 ? 'est' : 'sont'} donc pas vérifié${count === 1 ? '' : 's'}. Ajoutez du stock pour ${count === 1 ? 'le' : 'les'} suivre.`,
       runningOut: 'Bientôt épuisé',
+      wearingOut: 'En fin de vie',
+      wornOn: (printer: string) => `sur ${printer}`,
       missing: 'Absent de votre liste',
       partFits: (model: string, printers: number) => `${model} · ${printers} imprimante${printers > 1 ? 's' : ''}`,
       partGeneric: (printType: string, printers: number) => `Toute imprimante ${printType} · ${printers}`,
@@ -545,6 +548,14 @@ export const settings: typeof en = {
       archive: 'Archiver',
     },
   },
+  purchaseDate: {
+    label: 'Date d’achat',
+    placeholder: 'Choisir une date',
+    age: (years: number, months: number) => {
+      const parts = [years && `${years} an${years === 1 ? '' : 's'}`, months && `${months} mois`].filter(Boolean)
+      return parts.length ? `Acheté il y a ${parts.join(' et ')}.` : 'Acheté il y a moins d’un mois.'
+    },
+  },
   printers: {
     sections: { resin: 'Imprimantes résine', filament: 'Imprimantes filament' },
     addOfType: { resin: 'Ajouter une imprimante résine', filament: 'Ajouter une imprimante filament' },
@@ -600,6 +611,11 @@ export const settings: typeof en = {
     row: {
       open: (name: string) => `Modifier ${name}`,
       fallbackName: (position: number) => `Imprimante ${position}`,
+      hours: (run: string, lifespan?: string) => (lifespan ? `${run} / ${lifespan} h` : `${run} h`),
+      partDue: (part: string) => `${part} à remplacer`,
+      partNearlyWorn: (part: string) => `${part} bientôt en fin de vie`,
+      pastLifespan: 'Durée de vie dépassée',
+      nearLifespan: 'Bientôt en fin de vie',
     },
     dialog: {
       newTitle: 'Nouvelle imprimante',
@@ -628,6 +644,9 @@ export const settings: typeof en = {
       wearHint:
         'Saisissez ce que vous avez payé, taxes, livraison et modules compris, moins ce que vous comptez en tirer à la revente. La durée de vie couvre le châssis et la mécanique, les pièces d’usure étant comptées à part ; la plupart des machines durent 2 000 à 10 000 heures d’impression.',
       wearPerHour: (cost: string) => `Usure de ${cost} par heure d’impression.`,
+      lifetime: (run: string, lifespan?: string) =>
+        lifespan ? `${run} sur ${lifespan} heures d’impression effectuées` : `${run} heures d’impression effectuées`,
+      pastLifespan: 'Durée de vie dépassée',
       addOns: 'Modules ajoutés',
       addOnsHint:
         'Modules montés sur cette imprimante qui consomment de l’électricité pendant l’impression, comme un module de décollement pulsé ou un AMS.',

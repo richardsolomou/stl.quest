@@ -197,6 +197,13 @@
       "when": 1795328159545,
       "tag": "0027_deleted_inventory_items",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1795331436352,
+      "tag": "0028_lifetime_progress",
+      "breakpoints": true
     }
   ]
 }

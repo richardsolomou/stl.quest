@@ -364,7 +364,10 @@ export function HomePage() {
               Moving prints into Printing or Finishing opens a short sheet: what did you use? Prefilled, skippable, undoable.
             </Point>
             <Point title="Stock and reorder levels">Resin, filament, and supplies count down as they are used.</Point>
-            <Point title="Wear parts">Tanks, films, and nozzles show how close they are to due, with Replaced beside them.</Point>
+            <Point title="Wear and lifespan">
+              Tanks, films, and nozzles show how close they are to due, with Replaced beside them, and each printer its print hours against
+              its lifespan.
+            </Point>
             <Point title="Spend">What prints cost at the prices you paid then, including failed runs and waste.</Point>
           </ul>
           <figure className="mt-8">

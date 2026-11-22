@@ -390,11 +390,14 @@ export const settings: typeof en = {
     },
     needs: {
       title: 'Was Sie brauchen',
-      description: 'Was zur Neige geht und was Ihre Drucker nutzen, aber in der Liste unten fehlt.',
-      allSet: 'Nichts nötig. Alles Erfasste liegt über seinem Minimum, und Ihre Drucker haben die Teile, die der Katalog kennt.',
+      description: 'Was zur Neige geht oder verschleißt und was Ihre Drucker nutzen, aber in der Liste unten fehlt.',
+      allSet:
+        'Nichts nötig. Alles Erfasste liegt über seinem Minimum, kein Verschleißteil ist fast verbraucht, und Ihre Drucker haben die Teile, die der Katalog kennt.',
       untracked: (count: number) =>
         `Nichts Erfasstes wird knapp, aber für ${count} ${count === 1 ? 'Eintrag ist' : 'Einträge ist'} kein Bestand erfasst, daher ${count === 1 ? 'wird er' : 'werden sie'} nicht geprüft. Fügen Sie Bestand hinzu, um ${count === 1 ? 'ihn' : 'sie'} zu verfolgen.`,
       runningOut: 'Geht zur Neige',
+      wearingOut: 'Verschleißt',
+      wornOn: (printer: string) => `an ${printer}`,
       missing: 'Fehlt in Ihrer Liste',
       partFits: (model: string, printers: number) => `${model} · ${printers} Drucker`,
       partGeneric: (printType: string, printers: number) => `Jeder ${printType} · ${printers}`,
@@ -539,6 +542,17 @@ export const settings: typeof en = {
       archive: 'Archivieren',
     },
   },
+  purchaseDate: {
+    label: 'Kaufdatum',
+    placeholder: 'Datum wählen',
+    age: (years: number, months: number) => {
+      const parts = [
+        years && `${years} ${years === 1 ? 'Jahr' : 'Jahren'}`,
+        months && `${months} ${months === 1 ? 'Monat' : 'Monaten'}`,
+      ].filter(Boolean)
+      return parts.length ? `Vor ${parts.join(' und ')} gekauft.` : 'Vor weniger als einem Monat gekauft.'
+    },
+  },
   printers: {
     sections: { resin: 'Harzdrucker', filament: 'Filamentdrucker' },
     addOfType: { resin: 'Harzdrucker hinzufügen', filament: 'Filamentdrucker hinzufügen' },
@@ -594,6 +608,11 @@ export const settings: typeof en = {
     row: {
       open: (name: string) => `${name} bearbeiten`,
       fallbackName: (position: number) => `Drucker ${position}`,
+      hours: (run: string, lifespan?: string) => (lifespan ? `${run} / ${lifespan} h` : `${run} h`),
+      partDue: (part: string) => `${part} fällig`,
+      partNearlyWorn: (part: string) => `${part} fast verschlissen`,
+      pastLifespan: 'Lebensdauer überschritten',
+      nearLifespan: 'Lebensdauer bald erreicht',
     },
     dialog: {
       newTitle: 'Neuer Drucker',
@@ -622,6 +641,9 @@ export const settings: typeof en = {
       wearHint:
         'Tragen Sie ein, was Sie inklusive Steuer, Versand und Zusatzmodulen gezahlt haben, abzüglich dessen, was Sie beim Verkauf erwarten. Die Lebensdauer gilt für Rahmen und Mechanik, da Verschleißteile eigens berechnet werden; die meisten Geräte halten 2.000–10.000 Druckstunden.',
       wearPerHour: (cost: string) => `Verschleiß ${cost} pro Druckstunde.`,
+      lifetime: (run: string, lifespan?: string) =>
+        lifespan ? `${run} von ${lifespan} Druckstunden gelaufen` : `${run} Druckstunden gelaufen`,
+      pastLifespan: 'Lebensdauer überschritten',
       addOns: 'Zusatzmodule',
       addOnsHint: 'Am Drucker angebaute Module, die beim Drucken Strom ziehen, etwa ein Pulsing-Release-Modul oder ein AMS.',
       addOnSearch: 'Modul hinzufügen…',

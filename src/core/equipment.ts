@@ -33,6 +33,8 @@ export type EquipmentItem = {
   /** For wear: what it cost and how many hours it lasts. */
   purchasePrice?: number
   lifespanHours?: number
+  /** The calendar day it was bought (`YYYY-MM-DD`), for its age. */
+  purchasedOn?: string
   archived?: boolean
 }
 

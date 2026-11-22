@@ -32,7 +32,7 @@ STL Quest replaces spreadsheets and chat threads for hobbyists printing for frie
 - The board: the queue as a backlog, tickets hanging in firing order, printing grouped by printer with idle printers flagged, and finished prints grouped by who is collecting them. It works on phones as well as desktops.
 - Catalogues: printers, resins, filaments (from SpoolmanDB, with every colour), equipment, wear parts for each printer model, and supplies such as wash fluids and gloves ship with the app, so operators pick products instead of typing specifications and enter only their own prices.
 - Quotes: a calculator turns the slicer's material and print time into a suggested price from printer, material, wear-part, electricity, and labour costs, and prices a batch of prints selected on the board.
-- Usage and stock, off until an admin turns it on: the board asks what each print used as it moves into printing and finishing, and counts stock against reorder levels, wear-part maintenance, and spend.
+- Usage and stock, off until an admin turns it on: the board asks what each print used as it moves into printing and finishing, and counts stock against reorder levels, wear-part maintenance, each printer's print hours against its lifespan, and spend.
 
 ## Ways to run it
 
