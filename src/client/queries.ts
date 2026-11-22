@@ -236,6 +236,8 @@ function prefetchSettingsSection(queryClient: QueryClient, section: SettingsSect
         prefetch(storageMigrationQuery(workspaceSlug)),
         prefetch(cloudConnectionsQuery(workspaceSlug)),
       ]
+    case 'spoolman':
+      return [prefetch(spoolmanQuery(workspaceSlug)), prefetch(consumablesQuery(workspaceSlug))]
   }
 }
 
