@@ -811,6 +811,22 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       }).toMatchObject({ request: { printerId: undefined, requestedPrintType: 'resin' }, plate: undefined, printers: [] })
     })
 
+    it('ends a running plate whose last print is deleted', async () => {
+      const requestId = await assignedPrint()
+      await repository.createPlate({
+        id: 'plate',
+        printerId: saturn.id,
+        otherStuff: false,
+        items: [{ requestId, copies: 1 }],
+        stage: 'in_progress',
+        createdAt: 1,
+      })
+
+      await repository.deleteRequest(requestId)
+
+      expect((await repository.listPlates())[0]?.stage).toBeUndefined()
+    })
+
     it('keeps the name of a deleted item on what it was used for', async () => {
       await repository.appendUsageEvents([
         usageEvent({ id: 'restock' }),
@@ -2145,7 +2161,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 47 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 49 })
     await migrated.close()
   })
 

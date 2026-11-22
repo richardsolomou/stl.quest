@@ -34,6 +34,7 @@ import {
   getSpoolman,
   getPrinterLifetimes,
   getStores,
+  getPrintJobs,
   getUsagePrefills,
   getUsageBackfillPreview,
   getChargedPrints,
@@ -178,6 +179,9 @@ export const usagePrefillsQuery = (workspaceSlug: string) =>
 export const platesQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['plates', workspaceSlug], queryFn: () => getPlates({ data: { workspaceSlug } }) })
 export type PlateView = Awaited<ReturnType<typeof getPlates>>['plates'][number]
+export const printJobsQuery = (workspaceSlug: string) =>
+  queryOptions({ queryKey: ['print-jobs', workspaceSlug], queryFn: () => getPrintJobs({ data: { workspaceSlug } }) })
+export type PrintJobView = Awaited<ReturnType<typeof getPrintJobs>>['jobs'][number]
 export const chargedPrintsQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['usage', workspaceSlug, 'charged'], queryFn: () => getChargedPrints({ data: { workspaceSlug } }) })
 export const usageBackfillQuery = (workspaceSlug: string) =>
@@ -270,6 +274,11 @@ function prefetchSettingsSection(queryClient: QueryClient, section: SettingsSect
       ]
     case 'spoolman':
       return [prefetch(spoolmanQuery(workspaceSlug)), prefetch(consumablesQuery(workspaceSlug))]
+    case 'bambuddy':
+      return [
+        prefetch(spoolmanQuery(workspaceSlug)),
+        ...(usageTracking ? [prefetch(printJobsQuery(workspaceSlug)), prefetch(platesQuery(workspaceSlug))] : []),
+      ]
   }
 }
 

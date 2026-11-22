@@ -43,6 +43,7 @@ export const settings: typeof en = {
         spend: 'Sehen, was Ihre Drucke tatsächlich kosten',
         maintenance: 'Sehen, wann ein Verschleißteil fällig ist',
         spoolman: 'Spoolman-Bestand in Verbrauchsmaterial zeigen',
+        bambuddy: 'Was deine Drucker gedruckt haben, den Druckplatten zuordnen',
         turnOn: 'Einschalten',
         whatItDoes: 'Was das bewirkt',
         explanation:
@@ -97,6 +98,7 @@ export const settings: typeof en = {
     email: 'E-Mail',
     storage: 'Speicher',
     spoolman: 'Spoolman',
+    bambuddy: 'Bambuddy',
   },
   pricing: {
     title: 'Preise',
@@ -731,6 +733,8 @@ export const settings: typeof en = {
       wearPerHour: (cost: string) => `Verschleiß ${cost} pro Druckstunde.`,
       lifetime: (run: string, lifespan?: string) =>
         lifespan ? `${run} von ${lifespan} Druckstunden gelaufen` : `${run} Druckstunden gelaufen`,
+      runs: (runs, failed, rate) =>
+        `${runs} ${runs === 1 ? 'gemeldeter Plattenlauf' : 'gemeldete Plattenläufe'} · ${failed} fehlgeschlagen oder abgebrochen (${rate})`,
       pastLifespan: 'Lebensdauer überschritten',
       addOns: 'Zusatzmodule',
       addOnsHint: 'Am Drucker angebaute Module, die beim Drucken Strom ziehen, etwa ein Pulsing-Release-Modul oder ein AMS.',
@@ -845,6 +849,51 @@ export const settings: typeof en = {
       noLibrary: 'Füge die Filamente, die du kaufst, in Verbrauchsmaterial hinzu, um Spoolman-Bestand dazu zu zählen.',
       error: 'Die Verknüpfung konnte nicht gespeichert werden.',
     },
+  },
+  bambuddy: {
+    title: 'Bambuddy',
+    description:
+      'Lies aus Bambuddy, was deine Drucker wirklich gedruckt haben: echte Stunden, Gramm und ob jede Druckplatte fertig wurde, fehlschlug oder abgebrochen wurde. STL Quest hört nur zu und schickt nie einen Druck an Bambuddy.',
+    loading: 'Drucke werden geladen…',
+    loadError: 'Drucke konnten nicht geladen werden',
+    connect: {
+      title: 'Verbinden',
+      description: 'Bambuddy sendet einen Webhook, wenn ein Druck beginnt und endet, mit demselben Token wie die Spoolman-Bridge.',
+      needsToken: 'Erstelle zuerst ein Token in den Spoolman-Einstellungen. Bambuddy sendet mit demselben Token.',
+      tokenLink: 'Spoolman-Einstellungen',
+      steps: [
+        'Öffne in Bambuddy Einstellungen → Benachrichtigungen und füge einen Webhook-Anbieter mit dem Payload-Format „Generic“ hinzu.',
+        'Trage die URL unten ein und setze das Token in den Authorization-Header.',
+        'Schalte Druckstart, abgeschlossen, fehlgeschlagen und gestoppt ein und das Anhängen von Fotos aus.',
+        'Benenne jeden Drucker in Bambuddy und STL Quest gleich, damit Drucke ihren Drucker finden.',
+      ],
+      url: 'Webhook-URL',
+      urlHint: 'Bambuddy muss diese Adresse erreichen können.',
+      docs: 'Wie Drucke ihre Druckplatte finden',
+      last: (when) => `Letzter Druck gemeldet ${when}`,
+      none: 'Noch keine Drucke gemeldet.',
+    },
+    unlinked: {
+      title: 'Nicht zugeordnete Drucke',
+      description:
+        'Drucke ohne Druckplatte: Auf diesem Drucker lief hier nichts, und der Auftragsname hatte kein SQ-Kennzeichen. Ordne jeden einer Druckplatte oder einem Druck zu oder markiere ihn als privat.',
+      empty: 'Jeder Druck hat seine Druckplatte gefunden.',
+      attachTo: 'Einer Druckplatte zuordnen',
+      attachTag: (tag) => `${tag} zuordnen`,
+      personal: 'Als privat markieren',
+      notPersonal: 'Nicht privat',
+      error: 'Der Druck konnte nicht geändert werden.',
+    },
+    recent: {
+      title: 'Letzte Drucke',
+      description: 'Was Bambuddy gemeldet hat, die neuesten zuerst.',
+      empty: 'Noch nichts gemeldet.',
+      onPlate: (number) => `Druckplatte #${number}`,
+      personal: 'Privat',
+      unlinked: 'Nicht zugeordnet',
+    },
+    unknownPrinter: (name) => `${name} · kein Drucker hier hat diesen Namen`,
+    untitled: 'Unbenannter Druck',
   },
   email: {
     title: 'E-Mail',

@@ -8,7 +8,8 @@ import type { StockTotal, UsageEvent, UsageFilters } from './usage'
 import type { InventoryItems, InventoryKind } from './inventory'
 import type { RecentStockUse } from './shopping'
 import type { InventoryReferences } from './inventoryDeletion'
-import type { Plate, PlateItem, PlateRecording } from './plates'
+import type { Plate, PlateItem, PlateRecording, PlateRunStage } from './plates'
+import type { PrintJob } from './printJobs'
 import type { PriceCalculatorCurrency } from './priceCalculator'
 import type { ChargedPrint } from './spend'
 import type { SpoolmanChange, SpoolmanLink, SpoolmanSpool } from './spoolman'
@@ -378,6 +379,15 @@ export type RepeatOperation = {
 export type OperationPayload = MoveOperation | DeleteOperation | UploadOperation | AttachOperation | RepeatOperation
 export type PendingOperation = { id: string; state: 'prepared' | 'assets_moved' | 'committed'; payload: OperationPayload }
 
+export type NewPlate = {
+  id: string
+  printerId?: string
+  otherStuff: boolean
+  items: PlateItem[]
+  stage?: PlateRunStage
+  createdAt: number
+}
+
 /**
  * Moves `count` copies of a print between stages with the tags they carry. Naming `tagIds` moves copies of the board
  * card carrying exactly those tags (an empty list is the untagged card); omitting it moves copies of any cards, those
@@ -562,8 +572,20 @@ interface RepositoryShape {
   /** Every printing use of the prints, undone events included, so a plate can tell which of them it replaced. */
   printingUsage(requestIds: string[]): UsageEvent[]
   listPlates(): Plate[]
-  /** Numbers the plate after the workspace's last one. */
-  createPlate(plate: { id: string; printerId?: string; otherStuff: boolean; items: PlateItem[]; createdAt: number }): Plate
+  /**
+   * Numbers the plate after the workspace's last one. A running plate moves its copies with `moves` and puts its prints
+   * on its printer in the same transaction.
+   */
+  createPlate(plate: NewPlate, moves?: CopyMove[]): Plate
+  /** Moves a running plate's copies and sets the stage it runs in, none once the run is over. */
+  movePlate(id: string, moves: CopyMove[], stage: PlateRunStage | undefined, at: number): void
+  /** Ends every running plate, returning how many there were. */
+  endPlateRuns(at: number): number
+  /** The newest prints first, at most `MAX_PRINT_JOBS`. */
+  listPrintJobs(): PrintJob[]
+  /** Adds a print, dropping the oldest beyond `MAX_PRINT_JOBS`. */
+  insertPrintJob(job: PrintJob): void
+  updatePrintJob(job: PrintJob): void
   /** Undoes the plate's usage, if any, then deletes it; false when there is no such plate. */
   deletePlate(id: string, undoneAt: number): boolean
   /**
@@ -765,6 +787,7 @@ export type AppEvent =
   | 'inventory.changed'
   | 'inventory.deleted'
   | 'plate.changed'
+  | 'print.received'
   | 'spoolman.received'
 
 export interface EventBus {

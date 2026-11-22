@@ -1,4 +1,5 @@
 import { wearPartsFor, type Consumable, type PartConsumable } from './consumables'
+import type { PrinterRunCount } from './printJobs'
 import type { PrinterProfile } from './types'
 
 /** From this share of its lifespan something reads as nearly worn, so a replacement can be ordered in time. */
@@ -40,6 +41,8 @@ export type PartWear = {
 
 export type PrinterLifetime = {
   printerId: string
+  /** Its plate runs as Bambuddy reported them, when it has any. */
+  runs?: PrinterRunCount
   /**
    * Print hours run, estimates of past prints included: unlike a part, the printer was there for all of them, and their
    * cost already charged its wear.

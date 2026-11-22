@@ -21,6 +21,8 @@ import { MAX_PRINT_GROUP_NAME_LENGTH } from '../core/printGroups'
 import { PRINT_TYPES, printGroupColors, REQUEST_SORTS } from '../core/types'
 import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
 import { MAX_SPOOLMAN_SPOOLS, type SpoolmanChange } from '../core/spoolman'
+import type { BambuddyEvent } from '../core/printJobs'
+import { workflow } from '../core/workflow'
 import { MAX_CONSUMABLES, SUPPLY_UNITS } from '../core/consumables'
 import { ORDER_VENDORS } from '../core/orders/orderEmail'
 import type { OrderRestockInput } from '../core/orders/orderRestock'
@@ -534,10 +536,14 @@ export const createPlateSchema = z.object({
   printerId: settingsItemId.optional(),
   otherStuff: z.boolean(),
   items: z
-    .array(z.object({ requestId: id, copies: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY) }))
+    .array(z.object({ requestId: id, status: statusId, copies: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY) }))
     .min(1)
-    .max(MAX_PLATE_PRINTS),
+    .max(MAX_PLATE_PRINTS * workflow.statuses.length),
 })
+export const movePlateSchema = z.object({ plateId: id, to: statusId })
+export const printJobIdSchema = z.object({ jobId: id })
+export const attachPrintJobSchema = z.union([z.object({ jobId: id, plateId: id }), z.object({ jobId: id, requestId: id })])
+export const printJobPersonalSchema = z.object({ jobId: id, personal: z.boolean() })
 const plateRecordBase = {
   plateId: id,
   minutes: z.number().min(0).max(1_000_000),
@@ -619,6 +625,25 @@ export const repeatRequestSchema = z.object({
   id,
   quantity: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY),
 })
+
+// Bambuddy's generic webhook sends every value as a display string; anything else it adds, such as a photo, is dropped.
+const bambuddyText = (max: number) =>
+  z
+    .union([z.string().max(max), z.number().finite()])
+    .nullish()
+    .transform((value) => (value === null || value === undefined ? undefined : String(value)))
+export const bambuddyEventSchema = z.object({
+  event: z.string().min(1).max(64),
+  printer: bambuddyText(256),
+  filename: bambuddyText(512),
+  duration: bambuddyText(64),
+  filament_grams: bambuddyText(64),
+  filament_details: bambuddyText(2048),
+  reason: bambuddyText(1024),
+  progress: bambuddyText(16),
+  archive_id: bambuddyText(64),
+  run_id: bambuddyText(64),
+}) satisfies z.ZodType<BambuddyEvent>
 
 // Spoolman's own JSON, so its websocket events and REST responses can be forwarded as they are; it leaves out what is null.
 const spoolmanKey = z.number().int().min(0).max(2_147_483_647)

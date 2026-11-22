@@ -73,6 +73,9 @@ import { useUsageTracking, useWorkspacePrintTypes, useWorkspaceSlug } from '../w
 import { signalProductTourProgress } from '../productTour'
 import { platesQuery, removeRequestFromQueries, restoreRequestQueries, type PlateView } from '../queries'
 import { PlanPlateDialog } from './plates/PlanPlateDialog'
+import { useMovePlate } from './plates/useMovePlate'
+import { cardPlates } from '../boardPlates'
+import { plateBrokenBy } from '../../core/plates'
 import { PlateDialog, type PlateMode } from './plates/PlateDialog'
 import { RepeatRequestDialog } from './RepeatRequestDialog'
 import { TagPickerDialog } from './TagPickerDialog'
@@ -226,6 +229,7 @@ export function Board({
   const plates = useQuery({ ...platesQuery(workspaceSlug), enabled: plateTracking }).data?.plates
   const [planningPlate, setPlanningPlate] = useState(false)
   const [openPlate, setOpenPlate] = useState<{ id: string; mode: PlateMode }>()
+  const platesOfCard = useMemo(() => (plates ? cardPlates(plates) : undefined), [plates])
 
   const clearSelection = useCallback(() => {
     setSelection(null)
@@ -296,10 +300,24 @@ export function Board({
     })
   }, [])
 
+  const movePlate = useMovePlate((plateId, to) => {
+    const moved = plates?.find(({ id }) => id === plateId)
+    if (moved?.stage && to !== 'in_progress')
+      noteMoved(moved.items.map(({ requestId, copies }) => ({ id: requestId, from: moved.stage!, to, count: copies })))
+  })
+
   const performMove = useCallback(
     (requestId: string, from: StatusId, to: StatusId, count: number, tagIds: string[], printerId?: string) => {
       const request = requests.find((j) => j.id === requestId)
       if (!request) return
+      // Copies a running plate holds go with the whole plate, never on their own.
+      const plate = plateBrokenBy(plates ?? [], [{ id: requestId, from, count }], (id) =>
+        id === requestId ? countsOf(request) : undefined,
+      )
+      if (plate) {
+        movePlate(plate, to)
+        return
+      }
       setOverrides((current) => ({
         ...current,
         [requestId]: moveBoardOverride(request, current[requestId], from, to, count, tagIds, completedStatus),
@@ -316,7 +334,7 @@ export function Board({
         },
       )
     },
-    [requests, completedStatus, moveMutation, noteMoved, revertOverride, posthog, workspaceSlug],
+    [requests, completedStatus, countsOf, moveMutation, movePlate, noteMoved, plates, revertOverride, posthog, workspaceSlug],
   )
 
   // Starting on a picked printer assigns the print to it first, so the station it lands on is the one the operator chose.
@@ -402,6 +420,14 @@ export function Board({
     const copies = new Map<string, number>()
     for (const { request, max } of selectedEntries) copies.set(request.id, (copies.get(request.id) ?? 0) + max)
     return [...copies].map(([id, count]) => ({ id, copies: count }))
+  }, [selectedEntries])
+  const selectedStageCopies = useMemo(() => {
+    const copies = new Map<string, { request: PublicPrintRequest; status: StatusId; copies: number }>()
+    for (const { request, status, max } of selectedEntries) {
+      const key = `${request.id}:${status}`
+      copies.set(key, { request, status, copies: (copies.get(key)?.copies ?? 0) + max })
+    }
+    return [...copies.values()]
   }, [selectedEntries])
   const selectionCopyDownloadCount = copyDownloadIds(selectedCopies)?.length
   // Keep a stable identity while the selection is unchanged. A fresh array each render makes
@@ -692,6 +718,8 @@ export function Board({
         stations={layout === 'stations' || advanceTargets.get(status) === 'in_progress' ? stations : undefined}
         stationPlates={layout === 'stations' ? stationPlates : undefined}
         onOpenPlate={plateTracking ? (id, mode) => setOpenPlate({ id, mode }) : undefined}
+        onMovePlate={plateTracking ? movePlate : undefined}
+        plateOf={platesOfCard}
         total={totalOf(status)}
         onSelectAll={() =>
           setSelection(
@@ -882,10 +910,7 @@ export function Board({
       )}
       {planningPlate && selection && selectedEntries.length > 0 && (
         <PlanPlateDialog
-          prints={selectedCopies.flatMap(({ id, copies }) => {
-            const request = requests.find((candidate) => candidate.id === id)
-            return request ? [{ request, copies }] : []
-          })}
+          copies={selectedStageCopies}
           printers={printers}
           onDone={() => {
             setPlanningPlate(false)
@@ -1123,7 +1148,8 @@ export function Board({
 
 /**
  * The plates a station shows: those not recorded yet, and recorded ones while any of their prints is still printing, so
- * a plate leaves the station once its run is off the printer.
+ * a plate leaves the station once its run is off the printer. A plate whose print failed or was cancelled already
+ * recorded that run, so it leaves too.
  */
 function platesOnStations(
   plates: PlateView[],
@@ -1133,7 +1159,9 @@ function platesOnStations(
   const printing = new Set(requests.filter((request) => (countsOf(request).in_progress ?? 0) > 0).map(({ id }) => id))
   const byPrinter = new Map<string, PlateView[]>()
   for (const plate of plates) {
-    if (!plate.printerId || (plate.recording && !plate.items.some(({ requestId }) => printing.has(requestId)))) continue
+    const ended = plate.print?.outcome === 'failed' || plate.print?.outcome === 'cancelled'
+    if (!plate.printerId || (!plate.stage && ended) || (plate.recording && !plate.items.some(({ requestId }) => printing.has(requestId))))
+      continue
     byPrinter.set(plate.printerId, [...(byPrinter.get(plate.printerId) ?? []), plate])
   }
   return byPrinter

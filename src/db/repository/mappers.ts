@@ -1,8 +1,9 @@
 import type { PriceCalculatorCurrency } from '../../core/priceCalculator'
 import type { AssetGenerationJob, Invite, OperationPayload, PrintRequest } from '../../core/types'
 import type { Plate } from '../../core/plates'
+import type { PrintJob } from '../../core/printJobs'
 import type { UsageEvent } from '../../core/usage'
-import { assetGenerationJobs, invites, plateItems, plates, requests, requestStatuses, usageEvents, user } from '../schema'
+import { assetGenerationJobs, invites, plateItems, plates, printJobs, requests, requestStatuses, usageEvents, user } from '../schema'
 
 export type RequestRow = typeof requests.$inferSelect & {
   ownerEmail: string
@@ -93,8 +94,35 @@ export function mapPlate(row: typeof plates.$inferSelect, items: (typeof plateIt
           recordedAt,
         },
       }),
+    ...(row.statusId && { stage: row.statusId }),
+    ...(row.startedAt !== null && { startedAt: row.startedAt }),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+  }
+}
+
+export function mapPrintJob(row: typeof printJobs.$inferSelect): PrintJob {
+  const optional = <Key extends keyof typeof row>(key: Key) =>
+    (row[key] === null ? {} : { [key]: row[key] }) as Partial<Record<Key, NonNullable<(typeof row)[Key]>>>
+  return {
+    id: row.id,
+    printerName: row.printerName,
+    outcome: row.outcome,
+    personal: row.personal,
+    receivedAt: row.receivedAt,
+    ...optional('printerId'),
+    ...optional('fileName'),
+    ...optional('minutes'),
+    ...optional('grams'),
+    ...optional('filamentDetails'),
+    ...optional('reason'),
+    ...optional('progress'),
+    ...optional('archiveId'),
+    ...optional('runId'),
+    ...optional('plateId'),
+    ...optional('transactionId'),
+    ...optional('startedAt'),
+    ...optional('endedAt'),
   }
 }
 

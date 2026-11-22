@@ -63,7 +63,7 @@ import {
 import type { BoardConfig, Repository, Role, StorageMigration, Telemetry } from '../core/types'
 import { PRINTERS_SKIPPED_SETTING } from '../core/printers'
 import { PRINT_TYPE_SETTING, storedPrintTypeChoice, workspacePrintTypes } from '../core/printTypes'
-import { storedUsageTracking, USAGE_TRACKING_SETTING } from '../core/usageTracking'
+import { storedUsageTracking } from '../core/usageTracking'
 import { applyOnboardingProgressOperation, recordOnboardingTask } from '../core/onboarding'
 import { memberRequestVisibility, visiblePeople, withMemberRequestVisibility } from '../core/visibility'
 import {
@@ -106,6 +106,9 @@ import {
   recordStockMovementSchema,
   restockFromOrderSchema,
   linkSpoolmanFilamentSchema,
+  movePlateSchema,
+  attachPrintJobSchema,
+  printJobPersonalSchema,
   createPlateSchema,
   plateIdSchema,
   recordPlateSchema,
@@ -1512,7 +1515,7 @@ export const updateUsageTracking = createServerFn({ method: 'POST' })
     mutationRpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      await context.repository.setSetting(USAGE_TRACKING_SETTING, data.enabled)
+      await context.service.setUsageTracking(data.enabled, context.identity)
       // Every admin's board starts or stops asking what each step used on their next session refetch.
       context.events.publish('settings.changed')
       instance.telemetry.capture(context.identity.id, 'usage_tracking_changed', { enabled: data.enabled, source: data.source })
@@ -1912,7 +1915,11 @@ export const getStockLevels = createServerFn({ method: 'GET' })
 /** Where the bridge reaches this app and its ingest endpoint, from the public origin so a TLS proxy's https survives. */
 export function spoolmanUrls(request: Request) {
   const origin = publicOrigin(request)
-  return { appUrl: `${origin}${appPath('')}`, ingestUrl: `${origin}${appPath('/api/spoolman/spools')}` }
+  return {
+    appUrl: `${origin}${appPath('')}`,
+    ingestUrl: `${origin}${appPath('/api/spoolman/spools')}`,
+    printsUrl: `${origin}${appPath('/api/bambuddy/events')}`,
+  }
 }
 
 export const getSpoolman = createServerFn({ method: 'GET' })
@@ -2009,6 +2016,34 @@ export const recordPlate = createServerFn({ method: 'POST' })
     const { workspaceSlug, ...input } = data
     return workspaceMutation(workspaceSlug, (context) => context.service.recordPlate(input, context.identity))
   })
+
+export const movePlate = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(movePlateSchema))
+  .handler(async ({ data }) =>
+    workspaceMutation(data.workspaceSlug, (context) => context.service.movePlate(data.plateId, data.to, context.identity)),
+  )
+
+export const getPrintJobs = createServerFn({ method: 'GET' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const context = await workspaceContext(await app(), data.workspaceSlug)
+      return { jobs: await context.service.printJobs(context.identity), ...spoolmanUrls(getRequest()) }
+    }),
+  )
+
+export const attachPrintJob = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(attachPrintJobSchema))
+  .handler(async ({ data }) => {
+    const { workspaceSlug, ...input } = data
+    return workspaceMutation(workspaceSlug, (context) => context.service.attachPrintJob(input, context.identity))
+  })
+
+export const setPrintJobPersonal = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(printJobPersonalSchema))
+  .handler(async ({ data }) =>
+    workspaceMutation(data.workspaceSlug, (context) => context.service.setPrintJobPersonal(data.jobId, data.personal, context.identity)),
+  )
 
 export const deletePlate = createServerFn({ method: 'POST' })
   .validator(inWorkspace(plateIdSchema))

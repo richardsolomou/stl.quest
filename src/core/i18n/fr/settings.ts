@@ -42,6 +42,7 @@ export const settings: typeof en = {
         spend: 'Voir ce que coûtent vraiment vos impressions',
         maintenance: 'Savoir quand changer chaque pièce d’usure',
         spoolman: 'Afficher le stock Spoolman dans les consommables',
+        bambuddy: 'Relier ce que vos imprimantes ont imprimé à leurs plateaux',
         turnOn: 'Activer',
         whatItDoes: 'À quoi ça sert',
         explanation:
@@ -96,6 +97,7 @@ export const settings: typeof en = {
     email: 'E-mail',
     storage: 'Stockage',
     spoolman: 'Spoolman',
+    bambuddy: 'Bambuddy',
   },
   pricing: {
     title: 'Tarifs',
@@ -735,6 +737,8 @@ export const settings: typeof en = {
       wearPerHour: (cost: string) => `Usure de ${cost} par heure d’impression.`,
       lifetime: (run: string, lifespan?: string) =>
         lifespan ? `${run} sur ${lifespan} heures d’impression effectuées` : `${run} heures d’impression effectuées`,
+      runs: (runs, failed, rate) =>
+        `${runs} ${runs === 1 ? 'passage de plateau signalé' : 'passages de plateau signalés'} · ${failed} échoués ou annulés (${rate})`,
       pastLifespan: 'Durée de vie dépassée',
       addOns: 'Modules ajoutés',
       addOnsHint:
@@ -850,6 +854,51 @@ export const settings: typeof en = {
       noLibrary: 'Ajoutez les filaments que vous achetez dans les consommables pour y compter le stock Spoolman.',
       error: 'Le lien n’a pas pu être enregistré.',
     },
+  },
+  bambuddy: {
+    title: 'Bambuddy',
+    description:
+      'Lisez dans Bambuddy ce que vos imprimantes ont vraiment imprimé : les heures et grammes réels, et si chaque plateau a abouti, échoué ou été annulé. STL Quest ne fait qu’écouter et n’envoie jamais d’impression à Bambuddy.',
+    loading: 'Chargement des impressions…',
+    loadError: 'Impossible de charger les impressions',
+    connect: {
+      title: 'Connexion',
+      description: 'Bambuddy envoie un webhook au début et à la fin d’une impression, avec le même jeton que le pont Spoolman.',
+      needsToken: 'Créez d’abord un jeton dans les réglages Spoolman. Bambuddy envoie avec le même jeton.',
+      tokenLink: 'Réglages Spoolman',
+      steps: [
+        'Dans Bambuddy, ouvrez Paramètres → Notifications et ajoutez un fournisseur Webhook au format de contenu « Generic ».',
+        'Saisissez l’URL ci-dessous et mettez le jeton dans l’en-tête Authorization.',
+        'Activez le début, la fin, l’échec et l’arrêt d’impression, et désactivez l’ajout de photos.',
+        'Donnez à chaque imprimante le même nom dans Bambuddy et dans STL Quest, pour que les impressions trouvent leur imprimante.',
+      ],
+      url: 'URL du webhook',
+      urlHint: 'Bambuddy doit pouvoir joindre cette adresse.',
+      docs: 'Comment les impressions trouvent leur plateau',
+      last: (when) => `Dernière impression signalée ${when}`,
+      none: 'Aucune impression signalée pour l’instant.',
+    },
+    unlinked: {
+      title: 'Impressions non reliées',
+      description:
+        'Des impressions sans plateau : rien n’était en impression sur cette imprimante ici, et le nom de la tâche n’avait pas d’étiquette SQ. Reliez chacune à un plateau ou à une impression, ou marquez-la personnelle.',
+      empty: 'Chaque impression a trouvé son plateau.',
+      attachTo: 'Relier à un plateau',
+      attachTag: (tag) => `Relier à ${tag}`,
+      personal: 'Marquer personnelle',
+      notPersonal: 'Pas personnelle',
+      error: 'L’impression n’a pas pu être modifiée.',
+    },
+    recent: {
+      title: 'Impressions récentes',
+      description: 'Ce que Bambuddy a signalé, les plus récentes d’abord.',
+      empty: 'Rien de signalé pour l’instant.',
+      onPlate: (number) => `Plateau n° ${number}`,
+      personal: 'Personnelle',
+      unlinked: 'Non reliée',
+    },
+    unknownPrinter: (name) => `${name} · aucune imprimante ici ne porte ce nom`,
+    untitled: 'Impression sans titre',
   },
   email: {
     title: 'E-mail',

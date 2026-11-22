@@ -1,6 +1,26 @@
 import type { plates as en } from '../en/plates'
 
 export const plates: typeof en = {
+  startPlate: 'Lancer un plateau',
+  run: {
+    description: (prints, copies) =>
+      `${prints} ${prints === 1 ? 'impression' : 'impressions'}, ${copies} ${copies === 1 ? 'exemplaire' : 'exemplaires'}. Ils passent ensemble en impression et restent ensemble jusqu’à la finition.`,
+    choosePrinter: 'Choisir une imprimante',
+    printerHint: 'Le plateau tourne dessus, et ses impressions vont à son poste.',
+    start: (printer) => (printer ? `Lancer sur ${printer}` : 'Lancer le plateau'),
+    starting: 'Lancement…',
+    started: (number, printer) => `Plateau n° ${number} lancé sur ${printer}.`,
+    past: 'Toutes ces impressions ont dépassé l’impression, donc ceci enregistre un passage déjà fait.',
+    mixed:
+      'Certaines de ces impressions ont dépassé l’impression. Lancez un plateau avec des impressions pas encore imprimées, ou choisissez seulement des terminées pour enregistrer un passage passé.',
+  },
+  moveTo: (stage) => `Déplacer le plateau vers ${stage}`,
+  moved: (number, stage) => `Plateau n° ${number} déplacé vers ${stage}.`,
+  moveFailed: 'Le plateau n’a pas pu être déplacé.',
+  failedBadge: (number) => `Plateau n° ${number} échoué`,
+  sharedHint: (number) => `Sur le plateau n° ${number}. Ses exemplaires se déplacent ensemble.`,
+  failedHint: (number) => `Le plateau n° ${number} a échoué ou a été annulé, donc ses exemplaires sont revenus pour être réimprimés.`,
+  outcome: { printing: 'En impression', finished: 'Terminé', failed: 'Échoué', cancelled: 'Annulé' },
   putOnPlate: 'Mettre sur un plateau',
   name: (number) => `Plateau n° ${number}`,
   station: (prints) => `${prints} ${prints === 1 ? 'impression' : 'impressions'}`,
@@ -36,8 +56,10 @@ export const plates: typeof en = {
     source: {
       file: 'D’après le fichier du trancheur',
       totals: 'D’après les totaux saisis',
+      printer: 'D’après l’imprimante, via Bambuddy',
     },
     recordedAt: (when) => `Enregistré ${when}`,
+    reported: (outcome, when) => `${outcome} · signalé ${when}`,
     replaceFile: 'Importer à nouveau',
     replaceTotals: 'Saisir à nouveau les totaux',
     delete: 'Supprimer le plateau',

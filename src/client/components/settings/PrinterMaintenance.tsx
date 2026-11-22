@@ -147,6 +147,17 @@ export function PrinterLifetimeLine({ printerId, lifespanHours }: { printerId: s
         {copy.lifetime(formatNumber(lifetime.hours, locale, 1), lifespanHours ? formatNumber(lifespanHours, locale) : undefined)}
       </p>
       {lifespanHours && <WearBar used={lifetime.hours} lifespan={lifespanHours} level={level} />}
+      {lifetime.runs && (
+        <p className="font-mono text-xs text-muted-foreground tabular-nums">
+          {copy.runs(
+            lifetime.runs.runs,
+            lifetime.runs.failed + lifetime.runs.cancelled,
+            new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 }).format(
+              (lifetime.runs.failed + lifetime.runs.cancelled) / lifetime.runs.runs,
+            ),
+          )}
+        </p>
+      )}
     </div>
   )
 }

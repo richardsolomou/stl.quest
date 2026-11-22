@@ -1,6 +1,7 @@
 import { wearPartsFor, type Consumable } from './consumables'
 import { printerCostPerMinute, type CostedPrinter, type PriceCalculatorSettings } from './priceCalculator'
 import { consumed, priced, supplied, type UsageDraft, type UsageEvent } from './usage'
+import { workflow, type StatusId } from './workflow'
 
 /**
  * A plate is what went on one run of a printer. The slicer knows the run's totals, and a labelled slicer file knows what
@@ -8,6 +9,9 @@ import { consumed, priced, supplied, type UsageDraft, type UsageEvent } from './
  * when the file has them, otherwise by each print's model volume, then its material estimate, then evenly by copies.
  * Print time follows each print's share of the material. What the plate's prints did not use (objects that are not in
  * STL Quest) is recorded without a print, so stock and spend still count it but no print is charged for it.
+ *
+ * A plate started from the board is a run: its copies move to Printing together, then through Finishing as one, and
+ * copies it holds only leave with it. Copies the run does not hold, even of the same print, move on their own.
  */
 
 export const MAX_PLATE_PRINTS = 100
@@ -16,10 +20,19 @@ export const MAX_PLATE_FILAMENTS = 32
 
 export const PLATE_SPLIT_METHODS = ['measured', 'volume', 'estimate', 'even'] as const
 export type PlateSplitMethod = (typeof PLATE_SPLIT_METHODS)[number]
-export const PLATE_SOURCES = ['file', 'totals'] as const
+/** Where a recording came from: a slicer file, totals typed from its summary, or what the printer reported. */
+export const PLATE_SOURCES = ['file', 'totals', 'printer'] as const
 export type PlateSource = (typeof PLATE_SOURCES)[number]
 
 export type PlateItem = { requestId: string; copies: number; amount?: number; minutes?: number }
+
+/** The stages a running plate's copies sit in together; the run ends when they move anywhere else. */
+export const PLATE_RUN_STAGES = ['in_progress', 'post_processing'] as const
+export type PlateRunStage = (typeof PLATE_RUN_STAGES)[number]
+
+export function isPlateRunStage(status: string): status is PlateRunStage {
+  return (PLATE_RUN_STAGES as readonly string[]).includes(status)
+}
 
 export type PlateRecording = {
   transactionId: string
@@ -42,6 +55,9 @@ export type Plate = {
   otherStuff: boolean
   items: PlateItem[]
   recording?: PlateRecording
+  /** Where its copies are while it runs; absent once the run is over, or for a plate recorded after the fact. */
+  stage?: PlateRunStage
+  startedAt?: number
   createdAt: number
   updatedAt: number
 }
@@ -263,6 +279,92 @@ export function coveringPlateTransaction(plates: Plate[], events: UsageEvent[], 
       const item = plate.items.find((candidate) => candidate.requestId === requestId)
       return transactionId && item && item.copies - coveredCopies(events, requestId, transactionId) >= copies ? [transactionId] : []
     })[0]
+}
+
+export type PlateCopies = { requestId: string; status: StatusId; copies: number }
+export type PlateCopyMove = { id: string; from: StatusId; to: StatusId; count: number }
+
+const printing = 'in_progress' satisfies PlateRunStage
+/** Where a plate's copies go back to when its print fails or is cancelled, to be printed again. */
+export const PLATE_RETRY_STAGE: StatusId = 'up_next'
+const stageIndex = (status: StatusId) => workflow.statuses.findIndex(({ id }) => id === status)
+
+/**
+ * What starting a plate from selected copies does: copies not past Printing start a run there, and a plate of copies
+ * all past it records a run that already happened. A mix of both is refused, as is a stage the workflow lacks.
+ */
+export function plateStart(copies: PlateCopies[]): { items: PlateItem[]; moves: PlateCopyMove[]; stage?: PlateRunStage } | undefined {
+  const indexes = copies.map(({ status }) => stageIndex(status))
+  if (copies.length === 0 || indexes.some((index) => index < 0)) return undefined
+  const runs = indexes.map((index) => index <= stageIndex(printing))
+  if (runs.some((value) => value !== runs[0])) return undefined
+  const items = new Map<string, number>()
+  for (const { requestId, copies: count } of copies) items.set(requestId, (items.get(requestId) ?? 0) + count)
+  return {
+    items: [...items].map(([requestId, count]) => ({ requestId, copies: count })),
+    moves: runs[0]
+      ? copies
+          .filter(({ status }) => status !== printing)
+          .map(({ requestId, status, copies: count }) => ({ id: requestId, from: status, to: printing, count }))
+      : [],
+    ...(runs[0] && { stage: printing }),
+  }
+}
+
+/** Copies of a print that running plates hold in a stage. */
+export function heldByPlates(plates: Plate[], requestId: string, status: StatusId) {
+  return sum(
+    plates.flatMap((plate) =>
+      plate.stage === status ? plate.items.filter((item) => item.requestId === requestId).map(({ copies }) => copies) : [],
+    ),
+  )
+}
+
+/** The running plate that moving these copies on their own would take copies from, so it has to move as one instead. */
+export function plateBrokenBy(
+  plates: Plate[],
+  moves: Omit<PlateCopyMove, 'to'>[],
+  countsOf: (requestId: string) => Record<StatusId, number> | undefined,
+) {
+  const taken = new Map<string, number>()
+  for (const { id, from, count } of moves) taken.set(`${id}\0${from}`, (taken.get(`${id}\0${from}`) ?? 0) + count)
+  for (const [key, count] of taken) {
+    const [requestId, status] = key.split('\0')
+    const left = (countsOf(requestId)?.[status] ?? 0) - count
+    if (left < heldByPlates(plates, requestId, status))
+      return plates.find((plate) => plate.stage === status && plate.items.some((item) => item.requestId === requestId))
+  }
+  return undefined
+}
+
+/**
+ * Moving a running plate: each print's copies on it, or as many as are left where it runs, and the stage it runs in
+ * after, none once its prints leave Printing and Finishing.
+ */
+export function plateMoves(
+  plate: Plate,
+  to: StatusId,
+  countsOf: (requestId: string) => Record<StatusId, number> | undefined,
+): { moves: PlateCopyMove[]; stage?: PlateRunStage } {
+  const from = plate.stage
+  if (!from || from === to) return { moves: [] }
+  return {
+    moves: plate.items.flatMap(({ requestId, copies }) => {
+      const count = Math.min(copies, countsOf(requestId)?.[from] ?? 0)
+      return count > 0 ? [{ id: requestId, from, to, count }] : []
+    }),
+    ...(isPlateRunStage(to) && { stage: to }),
+  }
+}
+
+/**
+ * The plate printing on a printer now: the one started last of those in Printing that no print is linked to yet, since
+ * a plate's run is one print and a later one on the printer is a different run.
+ */
+export function printingPlate(plates: Plate[], printerId: string, linked: ReadonlySet<string>) {
+  return plates
+    .filter((plate) => plate.stage === printing && plate.printerId === printerId && !linked.has(plate.id))
+    .sort((left, right) => (right.startedAt ?? 0) - (left.startedAt ?? 0))[0]
 }
 
 function sum(values: number[]) {

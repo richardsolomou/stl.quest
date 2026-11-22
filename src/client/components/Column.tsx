@@ -30,6 +30,7 @@ import { railStretch } from './EmptyZone'
 import { StationPlates } from './plates/StationPlates'
 import type { PlateMode } from './plates/PlateDialog'
 import type { PlateView } from '../queries'
+import type { CardPlate } from '../boardPlates'
 
 /**
  * How a stage lays out its copies: the queue as a dense backlog `list`, up next as tickets on a `rail`, printing as
@@ -59,6 +60,8 @@ export function Column({
   stations,
   stationPlates,
   onOpenPlate,
+  onMovePlate,
+  plateOf,
   groupShelfByRequester = false,
   countsOf,
   advanceTo,
@@ -107,6 +110,10 @@ export function Column({
   /** The plates each printer's station shows, by printer. */
   stationPlates?: ReadonlyMap<string, PlateView[]>
   onOpenPlate?: (plateId: string, mode: PlateMode) => void
+  /** Moves a running plate's copies on together. */
+  onMovePlate?: (plate: PlateView, to: StatusId) => void
+  /** The plate a card's copies are on, which it wears so cards sharing one read as one. */
+  plateOf?: (requestId: string, status: StatusId) => CardPlate | undefined
   groupShelfByRequester?: boolean
   countsOf: (request: PublicPrintRequest) => Record<string, number>
   /** The stage a card's advance action moves its copies to, when it has one. */
@@ -300,6 +307,7 @@ export function Column({
         showRequester={showRequesters}
         tagPaths={tagPaths}
         tagCopyCounts={tagCopyCounts}
+        plate={plateOf?.(request.id, cardStatus)}
         groupId={actionGroupId}
         onSelectTag={(tagId) => onSelectTag(cardStatus, tagId)}
         onOpen={() => onOpenRequest(request.id)}
@@ -470,7 +478,9 @@ export function Column({
                 .filter(Boolean)
                 .join(' · ')
               const plates = (station.printer && stationPlates?.get(station.printer.id)) || []
-              const platesLine = plates.length > 0 && onOpenPlate && <StationPlates plates={plates} onOpen={onOpenPlate} />
+              const platesLine = plates.length > 0 && onOpenPlate && (
+                <StationPlates plates={plates} onOpen={onOpenPlate} onMove={onMovePlate} />
+              )
               // An idle printer with nothing waiting for it is one line, so a large fleet stays scannable.
               if (copies === 0 && !station.next && !platesLine)
                 return (

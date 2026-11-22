@@ -2,8 +2,13 @@ import { describe, expect, it } from 'vitest'
 import type { Consumable } from './consumables'
 import {
   coveringPlateTransaction,
+  heldByPlates,
   matchSlicedObjects,
+  plateBrokenBy,
+  plateMoves,
+  plateStart,
   plateUsageDrafts,
+  printingPlate,
   slicedObjectStem,
   splitPlate,
   splitWeights,
@@ -331,5 +336,142 @@ describe('coveringPlateTransaction', () => {
 
   it('leaves a step for more copies than the plate holds alone', () => {
     expect(coveringPlateTransaction([plate('p', 2, 'plate-tx')], [], 'a', 3)).toBeUndefined()
+  })
+})
+
+const run = (fields: Partial<Plate> = {}): Plate => ({
+  id: 'run',
+  number: 4,
+  printerId: 'x2d',
+  otherStuff: false,
+  items: [
+    { requestId: 'hull', copies: 2 },
+    { requestId: 'turret', copies: 1 },
+  ],
+  stage: 'in_progress',
+  startedAt: 1,
+  createdAt: 1,
+  updatedAt: 1,
+  ...fields,
+})
+
+describe('plateStart', () => {
+  it('runs copies from the queue in Printing', () => {
+    expect(plateStart([{ requestId: 'hull', status: 'todo', copies: 2 }])?.stage).toBe('in_progress')
+  })
+
+  it('moves copies that are not printing yet', () => {
+    expect(
+      plateStart([
+        { requestId: 'hull', status: 'up_next', copies: 2 },
+        { requestId: 'turret', status: 'in_progress', copies: 1 },
+      ])?.moves,
+    ).toEqual([{ id: 'hull', from: 'up_next', to: 'in_progress', count: 2 }])
+  })
+
+  it('adds up a print’s copies from different stages', () => {
+    expect(
+      plateStart([
+        { requestId: 'hull', status: 'todo', copies: 2 },
+        { requestId: 'hull', status: 'up_next', copies: 1 },
+      ])?.items,
+    ).toEqual([{ requestId: 'hull', copies: 3 }])
+  })
+
+  it('records a plate of finished copies without running it', () => {
+    expect(plateStart([{ requestId: 'hull', status: 'done', copies: 1 }])).toEqual({
+      items: [{ requestId: 'hull', copies: 1 }],
+      moves: [],
+    })
+  })
+
+  it('refuses a plate of finished and unfinished copies', () => {
+    expect(
+      plateStart([
+        { requestId: 'hull', status: 'done', copies: 1 },
+        { requestId: 'turret', status: 'todo', copies: 1 },
+      ]),
+    ).toBeUndefined()
+  })
+})
+
+describe('heldByPlates', () => {
+  it('counts the copies running plates hold in a stage', () => {
+    expect(heldByPlates([run(), run({ id: 'other', items: [{ requestId: 'hull', copies: 3 }] })], 'hull', 'in_progress')).toBe(5)
+  })
+
+  it('ignores plates running in another stage', () => {
+    expect(heldByPlates([run({ stage: 'post_processing' })], 'hull', 'in_progress')).toBe(0)
+  })
+
+  it('ignores plates that are not running', () => {
+    expect(heldByPlates([run({ stage: undefined })], 'hull', 'in_progress')).toBe(0)
+  })
+})
+
+describe('plateBrokenBy', () => {
+  const counts = { hull: { in_progress: 3 }, turret: { in_progress: 1 } }
+
+  it('finds the plate a move would take copies from', () => {
+    expect(plateBrokenBy([run()], [{ id: 'hull', from: 'in_progress', count: 2 }], (id) => counts[id as keyof typeof counts])?.id).toBe(
+      'run',
+    )
+  })
+
+  it('lets copies off a plate move on their own', () => {
+    expect(
+      plateBrokenBy([run()], [{ id: 'hull', from: 'in_progress', count: 1 }], (id) => counts[id as keyof typeof counts]),
+    ).toBeUndefined()
+  })
+
+  it('adds up several moves of the same print', () => {
+    expect(
+      plateBrokenBy(
+        [run()],
+        [
+          { id: 'hull', from: 'in_progress', count: 1 },
+          { id: 'hull', from: 'in_progress', count: 1 },
+        ],
+        (id) => counts[id as keyof typeof counts],
+      )?.id,
+    ).toBe('run')
+  })
+})
+
+describe('plateMoves', () => {
+  const counts = { hull: { in_progress: 3 }, turret: { in_progress: 1 } }
+  const countsOf = (id: string) => counts[id as keyof typeof counts]
+
+  it('moves every print on the plate', () => {
+    expect(plateMoves(run(), 'post_processing', countsOf).moves).toEqual([
+      { id: 'hull', from: 'in_progress', to: 'post_processing', count: 2 },
+      { id: 'turret', from: 'in_progress', to: 'post_processing', count: 1 },
+    ])
+  })
+
+  it('keeps the plate running in Finishing', () => {
+    expect(plateMoves(run(), 'post_processing', countsOf).stage).toBe('post_processing')
+  })
+
+  it('ends the run once its prints are ready', () => {
+    expect(plateMoves(run({ stage: 'post_processing' }), 'done', () => ({ post_processing: 2 })).stage).toBeUndefined()
+  })
+
+  it('moves only the copies still there', () => {
+    expect(plateMoves(run(), 'post_processing', () => ({ in_progress: 1 })).moves.map(({ count }) => count)).toEqual([1, 1])
+  })
+})
+
+describe('printingPlate', () => {
+  it('finds the plate printing on the printer', () => {
+    expect(printingPlate([run({ stage: 'post_processing' }), run({ id: 'now' })], 'x2d', new Set())?.id).toBe('now')
+  })
+
+  it('takes the plate started last', () => {
+    expect(printingPlate([run({ id: 'old', startedAt: 1 }), run({ id: 'new', startedAt: 2 })], 'x2d', new Set())?.id).toBe('new')
+  })
+
+  it('skips a plate a print is already linked to', () => {
+    expect(printingPlate([run({ id: 'done' })], 'x2d', new Set(['done']))).toBeUndefined()
   })
 })

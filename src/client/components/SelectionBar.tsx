@@ -59,7 +59,7 @@ export function SelectionBar({
     )
   const more = [
     { action: tags, icon: <Layers3 />, label: actions.manageTags },
-    { action: plate, icon: <Layers />, label: t.plates.putOnPlate },
+    { action: plate, icon: <Layers />, label: t.plates.startPlate },
     { action: estimate, icon: <Calculator />, label: actions.estimate },
     { action: repeat, icon: <RotateCcw />, label: actions.printAgain },
     { action: download, icon: <Download />, label: actions.downloadModels(prints) },

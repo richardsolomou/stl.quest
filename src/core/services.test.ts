@@ -3762,7 +3762,7 @@ describe('STLQuestService crash recovery', () => {
 
       async function plate(...requestIds: string[]) {
         return await service.createPlate(
-          { printerId: fdm.id, otherStuff: false, items: requestIds.map((requestId) => ({ requestId, copies: 1 })) },
+          { printerId: fdm.id, otherStuff: false, items: requestIds.map((requestId) => ({ requestId, status: 'todo', copies: 1 })) },
           admin,
         )
       }
@@ -3784,7 +3784,9 @@ describe('STLQuestService crash recovery', () => {
       it('lets only admins plan a plate', async () => {
         const requestId = await filamentPrint()
 
-        await expect(service.createPlate({ otherStuff: false, items: [{ requestId, copies: 1 }] }, requester)).rejects.toMatchObject({
+        await expect(
+          service.createPlate({ otherStuff: false, items: [{ requestId, status: 'todo', copies: 1 }] }, requester),
+        ).rejects.toMatchObject({
           status: 403,
         })
       })
@@ -3806,7 +3808,7 @@ describe('STLQuestService crash recovery', () => {
         const requestId = await filamentPrint()
 
         await expect(
-          service.createPlate({ printerId: fdm.id, otherStuff: false, items: [{ requestId, copies: 2 }] }, admin),
+          service.createPlate({ printerId: fdm.id, otherStuff: false, items: [{ requestId, status: 'todo', copies: 2 }] }, admin),
         ).rejects.toMatchObject({ status: 400 })
       })
 
@@ -3861,7 +3863,10 @@ describe('STLQuestService crash recovery', () => {
         const requestId = await filamentPrint()
         await repository.moveCopies({ id: requestId, from: 'todo', to: 'done', count: 1 })
         await service.backfillUsage(admin)
-        const { id } = await plate(requestId)
+        const { id } = await service.createPlate(
+          { printerId: fdm.id, otherStuff: false, items: [{ requestId, status: 'done', copies: 1 }] },
+          admin,
+        )
 
         const { transactionId } = await service.recordPlate(measured(id, [{ requestId, amount: 30 }]), admin)
 
@@ -4005,8 +4010,8 @@ describe('STLQuestService crash recovery', () => {
             printerId: slaPrinter.id,
             otherStuff: false,
             items: [
-              { requestId: modelled, copies: 1 },
-              { requestId: adjusted, copies: 1 },
+              { requestId: modelled, status: 'todo', copies: 1 },
+              { requestId: adjusted, status: 'todo', copies: 1 },
             ],
           },
           admin,
@@ -4043,7 +4048,10 @@ describe('STLQuestService crash recovery', () => {
 
       it('refuses slicer amounts for a resin plate, which only takes typed totals', async () => {
         const requestId = await estimatedPrint()
-        const { id } = await service.createPlate({ printerId: slaPrinter.id, otherStuff: false, items: [{ requestId, copies: 1 }] }, admin)
+        const { id } = await service.createPlate(
+          { printerId: slaPrinter.id, otherStuff: false, items: [{ requestId, status: 'todo', copies: 1 }] },
+          admin,
+        )
 
         await expect(
           service.recordPlate(
@@ -4070,6 +4078,352 @@ describe('STLQuestService crash recovery', () => {
           has_other: true,
           replaced: false,
         })
+      })
+    })
+
+    describe('plate runs', () => {
+      const x2d: PrinterProfile = { id: 'x2d', name: 'X2D', printType: 'filament' }
+
+      beforeEach(async () => {
+        await stock('printers', [x2d])
+      })
+
+      async function queued() {
+        const id = await request()
+        await repository.updateRequest(id, { estimatedMaterialOverride: 12, estimatedPrintMinutesOverride: 90 })
+        return id
+      }
+
+      async function start(...requestIds: string[]) {
+        return await service.createPlate(
+          { printerId: x2d.id, otherStuff: false, items: requestIds.map((requestId) => ({ requestId, status: 'todo', copies: 1 })) },
+          admin,
+        )
+      }
+
+      const counts = async (requestId: string) => (await repository.getRequest(requestId))!.counts
+      const plateOf = async (id: string) => (await service.listPlates(admin)).find((plate) => plate.id === id)!
+      const finished = { outcome: 'finished' as const, printerName: 'X2D', minutes: 120, grams: 40 }
+
+      it('moves a started plate’s copies to Printing', async () => {
+        const requestId = await queued()
+
+        await start(requestId)
+
+        expect((await counts(requestId)).in_progress).toBe(1)
+      })
+
+      it('puts a started plate’s prints on its printer', async () => {
+        const requestId = await queued()
+
+        await start(requestId)
+
+        expect((await repository.getRequest(requestId))?.printerId).toBe(x2d.id)
+      })
+
+      it('runs a started plate in Printing', async () => {
+        const { stage } = await start(await queued())
+
+        expect(stage).toBe('in_progress')
+      })
+
+      it('refuses to start a plate without a printer', async () => {
+        const requestId = await queued()
+
+        await expect(
+          service.createPlate({ otherStuff: false, items: [{ requestId, status: 'todo', copies: 1 }] }, admin),
+        ).rejects.toMatchObject({ status: 400 })
+      })
+
+      it('refuses to start a plate with copies another running plate holds', async () => {
+        const requestId = await queued()
+        await start(requestId)
+
+        await expect(
+          service.createPlate({ printerId: x2d.id, otherStuff: false, items: [{ requestId, status: 'in_progress', copies: 1 }] }, admin),
+        ).rejects.toMatchObject({ status: 409 })
+      })
+
+      it('keeps a plate’s copy from moving on its own', async () => {
+        const requestId = await queued()
+        await start(requestId)
+
+        await expect(
+          service.moveCopies({ id: requestId, from: 'in_progress', to: 'post_processing', count: 1 }, admin),
+        ).rejects.toMatchObject({
+          status: 409,
+        })
+      })
+
+      it('keeps a plate’s copy out of a batch move', async () => {
+        const requestId = await queued()
+        await start(requestId)
+
+        await expect(
+          service.moveCopiesBatch([{ id: requestId, from: 'in_progress', to: 'up_next', count: 1 }], admin),
+        ).rejects.toMatchObject({ status: 409 })
+      })
+
+      it('moves every print on a plate together', async () => {
+        const first = await queued()
+        const second = await queued()
+        const { id } = await start(first, second)
+
+        await service.movePlate(id, 'post_processing', admin)
+
+        expect([(await counts(first)).post_processing, (await counts(second)).post_processing]).toEqual([1, 1])
+      })
+
+      it('ends a plate’s run once its prints are ready', async () => {
+        const { id } = await start(await queued())
+        await service.movePlate(id, 'post_processing', admin)
+
+        await service.movePlate(id, 'done', admin)
+
+        expect((await plateOf(id)).stage).toBeUndefined()
+      })
+
+      it('captures a plate move with counts only', async () => {
+        const { id } = await start(await queued())
+        capture.mockClear()
+
+        await service.movePlate(id, 'post_processing', admin)
+
+        expect(capture).toHaveBeenCalledWith(admin.id, 'plate_moved', {
+          from_status: 'in_progress',
+          to_status: 'post_processing',
+          print_count: 1,
+          copy_count: 1,
+        })
+      })
+
+      it('links a reported print to the plate printing on its printer', async () => {
+        const { id } = await start(await queued())
+
+        await service.receivePrint(finished)
+
+        expect((await repository.listPrintJobs())[0].plateId).toBe(id)
+      })
+
+      it('records a finished print’s measured time on its plate', async () => {
+        const { id } = await start(await queued())
+
+        await service.receivePrint(finished)
+
+        expect((await plateOf(id)).recording).toMatchObject({ source: 'printer', minutes: 120 })
+      })
+
+      it('records a finished print’s grams against the prints', async () => {
+        const requestId = await queued()
+        await start(requestId)
+
+        await service.receivePrint(finished)
+
+        expect((await service.listUsage({ requestId }, admin)).find((event) => event.consumableId === filament.id)?.amount).toBe(40)
+      })
+
+      it('records a print reported twice once', async () => {
+        await start(await queued())
+
+        await service.receivePrint({ ...finished, runId: '7' })
+        await service.receivePrint({ ...finished, runId: '7' })
+
+        expect((await service.listUsage({}, admin)).filter((event) => event.unit === 'minute' && !event.undoneAt)).toHaveLength(1)
+      })
+
+      it('continues the print its start reported', async () => {
+        await start(await queued())
+
+        await service.receivePrint({ outcome: 'printing', printerName: 'X2D', fileName: 'Hull' })
+        await service.receivePrint({ ...finished, fileName: 'Hull' })
+
+        expect((await repository.listPrintJobs()).map(({ outcome }) => outcome)).toEqual(['finished'])
+      })
+
+      it('sends a failed plate’s copies back to Up next', async () => {
+        const requestId = await queued()
+        await start(requestId)
+
+        await service.receivePrint({ ...finished, outcome: 'failed' })
+
+        expect((await counts(requestId)).up_next).toBe(1)
+      })
+
+      it('records a failed print’s hours as failed usage', async () => {
+        const requestId = await queued()
+        await start(requestId)
+
+        await service.receivePrint({ ...finished, outcome: 'failed' })
+
+        expect((await service.listUsage({ requestId }, admin)).find((event) => event.unit === 'minute')?.outcome).toBe('failed')
+      })
+
+      it('ends a failed plate’s run', async () => {
+        const { id } = await start(await queued())
+
+        await service.receivePrint({ ...finished, outcome: 'cancelled' })
+
+        expect((await plateOf(id)).stage).toBeUndefined()
+      })
+
+      it('shows the outcome on the plate', async () => {
+        const { id } = await start(await queued())
+
+        await service.receivePrint({ ...finished, outcome: 'failed' })
+
+        expect((await plateOf(id)).print?.outcome).toBe('failed')
+      })
+
+      it('links a later print on the printer to no plate whose own print already ended', async () => {
+        await start(await queued())
+        await service.receivePrint({ ...finished, fileName: 'First' })
+
+        await service.receivePrint({ ...finished, outcome: 'failed', fileName: 'Second' })
+
+        expect((await repository.listPrintJobs()).find(({ fileName }) => fileName === 'Second')?.plateId).toBeUndefined()
+      })
+
+      it('keeps a plate’s copies when a later print on its printer fails', async () => {
+        const requestId = await queued()
+        await start(requestId)
+        await service.receivePrint({ ...finished, fileName: 'First' })
+
+        await service.receivePrint({ ...finished, outcome: 'failed', fileName: 'Second' })
+
+        expect((await counts(requestId)).in_progress).toBe(1)
+      })
+
+      it('links a reprint by its tag to no plate whose run already failed', async () => {
+        const requestId = await queued()
+        await start(requestId)
+        await service.receivePrint({ ...finished, outcome: 'failed' })
+        const { number } = (await repository.getRequest(requestId))!
+
+        await service.receivePrint({ ...finished, printerName: 'Somewhere else', fileName: `SQ-${number} Hull` })
+
+        expect((await repository.listPrintJobs()).find(({ printerName }) => printerName === 'Somewhere else')?.plateId).toBeUndefined()
+      })
+
+      it('refuses to delete a request a running plate holds', async () => {
+        const requestId = await queued()
+        await start(requestId)
+
+        await expect(service.remove(requestId, admin)).rejects.toMatchObject({ status: 409 })
+      })
+
+      it('refuses to move a running plate’s print to another printer', async () => {
+        await stock('printers', [{ id: 'a1', name: 'A1', printType: 'filament' }])
+        const requestId = await queued()
+        await start(requestId)
+
+        await expect(service.update(requestId, { printerId: 'a1' }, admin)).rejects.toMatchObject({ status: 409 })
+      })
+
+      it('refuses a bulk printer assignment that would split a running plate', async () => {
+        await stock('printers', [{ id: 'a1', name: 'A1', printType: 'filament' }])
+        const free = await queued()
+        const held = await queued()
+        await start(held)
+
+        await expect(service.assignRequests([free, held], 'a1', admin)).rejects.toMatchObject({ status: 409 })
+      })
+
+      it('leaves every print where it was when a bulk assignment is refused', async () => {
+        await stock('printers', [{ id: 'a1', name: 'A1', printType: 'filament' }])
+        const free = await queued()
+        const held = await queued()
+        await start(held)
+
+        await service.assignRequests([free, held], 'a1', admin).catch(() => undefined)
+
+        expect((await repository.getRequest(free))?.printerId).not.toBe('a1')
+      })
+
+      it('ends running plates when usage tracking is switched off', async () => {
+        const { id } = await start(await queued())
+
+        await service.setUsageTracking(false, admin)
+
+        expect((await repository.listPlates()).find((plate) => plate.id === id)?.stage).toBeUndefined()
+      })
+
+      it('links a print by the request tag in its name', async () => {
+        const requestId = await queued()
+        const { id } = await start(requestId)
+        const { number } = (await repository.getRequest(requestId))!
+
+        await service.receivePrint({ ...finished, printerName: 'Somewhere else', fileName: `SQ-${number} Hull` })
+
+        expect((await repository.listPrintJobs())[0].plateId).toBe(id)
+      })
+
+      it('leaves a print with no plate unlinked', async () => {
+        await service.receivePrint(finished)
+
+        expect((await service.printJobs(admin))[0].plateId).toBeUndefined()
+      })
+
+      it('suggests the request an unlinked print is tagged with', async () => {
+        const requestId = await queued()
+        const { number } = (await repository.getRequest(requestId))!
+
+        await service.receivePrint({ ...finished, fileName: `SQ-${number} Hull` })
+
+        expect((await service.printJobs(admin))[0].suggested?.requestId).toBe(requestId)
+      })
+
+      it('records an unlinked print once attached to a request', async () => {
+        const requestId = await queued()
+        await service.receivePrint(finished)
+
+        await service.attachPrintJob({ jobId: (await repository.listPrintJobs())[0].id, requestId }, admin)
+
+        expect((await service.listPlates(admin))[0].recording?.minutes).toBe(120)
+      })
+
+      it('marks an unlinked print personal', async () => {
+        await service.receivePrint(finished)
+        const [{ id }] = await repository.listPrintJobs()
+
+        await service.setPrintJobPersonal(id, true, admin)
+
+        expect((await repository.listPrintJobs())[0].personal).toBe(true)
+      })
+
+      it('lets only admins attach a print', async () => {
+        await service.receivePrint(finished)
+        const [{ id }] = await repository.listPrintJobs()
+
+        await expect(service.attachPrintJob({ jobId: id, requestId: await queued() }, requester)).rejects.toMatchObject({ status: 403 })
+      })
+
+      it('counts a printer’s failed plate runs', async () => {
+        await start(await queued())
+        await service.receivePrint({ ...finished, outcome: 'failed' })
+
+        expect((await service.printerLifetimes(admin)).find(({ printerId }) => printerId === x2d.id)?.runs).toEqual({
+          printerId: x2d.id,
+          runs: 1,
+          failed: 1,
+          cancelled: 0,
+        })
+      })
+
+      it('counts a plate run of several prints as one plate', async () => {
+        await start(await queued(), await queued())
+
+        await service.receivePrint(finished)
+
+        expect((await repository.maintenanceTotals()).printers.find(({ printerId }) => printerId === x2d.id)?.recorded.plates).toBe(1)
+      })
+
+      it('captures a received print without its names', async () => {
+        await start(await queued())
+        capture.mockClear()
+
+        await service.receivePrint({ ...finished, fileName: 'Secret project' })
+
+        expect(capture).toHaveBeenCalledWith('server', 'print_received', { outcome: 'finished', linked_by: 'printer', has_printer: true })
       })
     })
 
