@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import { setImmediate } from 'node:timers/promises'
-import { Worker } from 'node:worker_threads'
+import { type ResourceLimits, Worker } from 'node:worker_threads'
 import { fileURLToPath } from 'node:url'
 import PQueue from 'p-queue'
 import { errorMessage } from '../../core/error'
@@ -40,6 +40,12 @@ function positiveInteger(value: string | undefined, fallback: number, name: stri
   if (!Number.isSafeInteger(parsed) || parsed < 1) throw new Error(`${name} must be a positive integer`)
   return parsed
 }
+
+/**
+ * The heap a sliced file's worker may grow to, and what it reserves of the memory budget: the parser streams its
+ * G-code, so this holds the largest inflated chunk and its lines whatever the file's size.
+ */
+export const SLICED_WORKER_HEAP_MB = 256
 
 class ByteBudget {
   private used = 0
@@ -427,27 +433,33 @@ export class AssetGenerationQueue {
   }
 
   /**
-   * Reads a sliced file off the request thread and within the same deadline and memory budget as visual assets, so a
-   * file that inflates without end can't stall or exhaust the server. One it cannot read, or not in time, is logged and
-   * thrown as a `SlicedFileError`.
+   * Reads a sliced file off the request thread, within the same deadline as visual assets and a capped heap reserved
+   * from their memory budget, so a file that inflates or amplifies without end can't stall or exhaust the server. Any
+   * way its worker fails, it is logged and thrown as a `SlicedFileError`, so the file is refused rather than retried.
    */
   async readSlicedFile(file: Uint8Array, stoppedAt?: number): Promise<SlicedPlate[]> {
     // The worker takes the file's buffer, so its size is read first.
     const bytes = file.byteLength
-    const release = await this.sourceBytes.acquire(bytes * ASSET_GENERATION_MEMORY_MULTIPLIER)
+    const heapMb = Math.max(SLICED_WORKER_HEAP_MB, Math.ceil((bytes * ASSET_GENERATION_MEMORY_MULTIPLIER) / (1 << 20)))
+    const release = await this.sourceBytes.acquire(heapMb << 20)
     try {
       await setImmediate()
       if (!this.workerConfig) return readSlicedFile(file, 'print.gcode.3mf', stoppedAt)
       let plates: SlicedPlate[] | undefined
-      await this.inWorker({ mode: 'sliced', file, stoppedAt }, file, (reply: { stage: 'complete'; plates: SlicedPlate[] }) => {
-        plates = reply.plates
-      })
+      await this.inWorker(
+        { mode: 'sliced', file, stoppedAt },
+        file,
+        (reply: { stage: 'complete'; plates: SlicedPlate[] }) => {
+          plates = reply.plates
+        },
+        { maxOldGenerationSizeMb: heapMb },
+      )
       if (!plates) throw new Error('asset worker exited without plates')
       return plates
     } catch (error) {
-      const unreadable = error instanceof InvalidMeshError ? new SlicedFileError(error.message, { cause: error }) : error
-      if (unreadable instanceof SlicedFileError)
-        logger.warn({ event: 'sliced_file_unreadable', reason: unreadable.message, bytes }, 'sliced file unreadable')
+      const unreadable =
+        error instanceof SlicedFileError ? error : new SlicedFileError(errorMessage(error, String(error)), { cause: error })
+      logger.warn({ event: 'sliced_file_unreadable', reason: unreadable.message, bytes }, 'sliced file unreadable')
       throw unreadable
     } finally {
       release()
@@ -478,12 +490,14 @@ export class AssetGenerationQueue {
     workerData: Record<string, unknown>,
     file: Uint8Array,
     onReply: (reply: Reply) => void | Promise<void>,
+    resourceLimits?: ResourceLimits,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const worker = new Worker(this.workerConfig!.path, {
         workerData,
         transferList: [file.buffer as ArrayBuffer],
         execArgv: this.workerConfig!.execArgv,
+        resourceLimits,
       })
       let failure: unknown
       let handled = Promise.resolve()

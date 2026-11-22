@@ -10,7 +10,7 @@ import { user } from '../../db/schema'
 import type { AppEvent, EventBus, Telemetry } from '../../core/types'
 import { exportBinaryStl } from '../../core/mesh/stl'
 import { MAX_UPLOAD_BYTES } from '../../core/uploadLimits'
-import { AssetGenerationQueue } from './queue'
+import { AssetGenerationQueue, SLICED_WORKER_HEAP_MB } from './queue'
 import { STLQuestService } from '../../core/services'
 import { UploadStaging } from '../../adapters/staging'
 import { SlicedFileError } from '../../core/slicedPlate'
@@ -155,6 +155,40 @@ describe('asset generation queue', () => {
     const worker = path.join(root, 'waiting-worker.mjs')
     await fs.promises.writeFile(worker, 'setInterval(() => {}, 1000)')
     queue = new AssetGenerationQueue(repository, assets, events, telemetry, { workerConfig: { path: worker, timeoutMs: 50 } })
+    await expect(queue.readSlicedFile(new Uint8Array(8))).rejects.toBeInstanceOf(SlicedFileError)
+  })
+
+  it('fails a sliced file whose worker crashes as unreadable', async () => {
+    const worker = path.join(root, 'crashing-worker.mjs')
+    await fs.promises.writeFile(worker, 'throw new RangeError("Maximum call stack size exceeded")')
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { workerConfig: { path: worker } })
+    await expect(queue.readSlicedFile(new Uint8Array(8))).rejects.toBeInstanceOf(SlicedFileError)
+  })
+
+  it('logs a sliced file whose worker crashes', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined)
+    const worker = path.join(root, 'crashing-worker.mjs')
+    await fs.promises.writeFile(worker, 'process.exit(1)')
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { workerConfig: { path: worker } })
+    await queue.readSlicedFile(new Uint8Array(8)).catch(() => undefined)
+    expect(warn).toHaveBeenCalledWith(expect.objectContaining({ event: 'sliced_file_unreadable' }), 'sliced file unreadable')
+  })
+
+  it('caps the heap of a sliced file worker', async () => {
+    const worker = path.join(root, 'limits-worker.mjs')
+    await fs.promises.writeFile(
+      worker,
+      `import { parentPort, resourceLimits } from 'node:worker_threads'
+      parentPort.postMessage({ ok: true, stage: 'complete', plates: [resourceLimits.maxOldGenerationSizeMb] })`,
+    )
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { workerConfig: { path: worker } })
+    expect(await queue.readSlicedFile(new Uint8Array(8))).toEqual([SLICED_WORKER_HEAP_MB])
+  })
+
+  it('fails a sliced file whose worker runs out of memory as unreadable', async () => {
+    const worker = path.join(root, 'hungry-worker.mjs')
+    await fs.promises.writeFile(worker, 'const held = []; for (;;) held.push(new Array(1 << 16).fill({}))')
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { workerConfig: { path: worker } })
     await expect(queue.readSlicedFile(new Uint8Array(8))).rejects.toBeInstanceOf(SlicedFileError)
   })
 

@@ -208,6 +208,54 @@ describe('readSlicedFile', () => {
   it('rejects a G-code line too long to hold in memory', () => {
     expect(() => readSlicedFile(new TextEncoder().encode(';'.repeat(4 << 20)), 'plate.gcode')).toThrow(SlicedFileError)
   })
+
+  it('rejects a G-code line too long to hold in memory that ends inside one inflated chunk', () => {
+    const file = slicedFileBomb([{ name: 'Metadata/plate_1.gcode', text: `; ${'a'.repeat(4 << 20)}\nM83\nG1 E1\n` }])
+    expect(() => readSlicedFile(file, 'plate.gcode.3mf')).toThrow('G-code line too long')
+  })
+
+  it('reads the most filament slots a slicer can declare', () => {
+    const densities = Array.from({ length: 64 }, () => '1.24').join(',')
+    const read = gcodePlate(`; filament_density: ${densities}\nM83\nT63\nG1 E10\n`)
+    expect(read.overhead[63]).toBeCloseTo(filamentGrams(10, PLA), 6)
+  })
+
+  it('rejects a file declaring more filament slots than a slicer can', () => {
+    const densities = Array.from({ length: 65 }, () => '1').join(',')
+    expect(() => gcodePlate(`; filament_density: ${densities}\nM83\nG1 E1\n`)).toThrow('too many filament slots')
+  })
+
+  it('sizes each object to the filament slots it used, not the ones declared', () => {
+    const read = gcodePlate(
+      `${header}M83\n; start printing object, unique label id: 1\nG1 E10\n; stop printing object, unique label id: 1\n`,
+    )
+    expect(read.objects[0].grams).toHaveLength(1)
+  })
+
+  it('rejects a file labelling more objects than a plate can hold', () => {
+    const objects = Array.from({ length: 4097 }, (_, id) => `; start printing object, unique label id: ${id}\nG1 E1`).join('\n')
+    expect(() => gcodePlate(`M83\n${objects}\n`)).toThrow('too many objects')
+  })
+
+  it('rejects a tiny file declaring hundreds of thousands of slots, quickly and within bounded memory', () => {
+    const densities = Array.from({ length: 400_000 }, () => '1').join(',')
+    const objects = Array.from(
+      { length: 300 },
+      (_, id) => `; start printing object, unique label id: ${id}\nT399999\nG1 E1\n; stop printing object, unique label id: ${id}`,
+    ).join('\n')
+    const file = slicedFileBomb([{ name: 'Metadata/plate_1.gcode', text: `; filament_density = ${densities}\nM83\n${objects}\n` }])
+    const before = process.memoryUsage()
+    const startedAt = performance.now()
+
+    expect(() => readSlicedFile(file, 'plate.gcode.3mf', 50)).toThrow(SlicedFileError)
+
+    const after = process.memoryUsage()
+    expect([
+      file.length < 8_192,
+      performance.now() - startedAt < 1_000,
+      after.heapUsed + after.arrayBuffers - before.heapUsed - before.arrayBuffers < 64 * 1024 * 1024,
+    ]).toEqual([true, true, true])
+  })
 })
 
 describe('readSlicedFile up to a progress', () => {

@@ -65,8 +65,13 @@ const MAX_LINE_LENGTH = 1 << 20
 /** Nominal PLA, for G-code that never states its filament. */
 const DEFAULT_DENSITY = 1.24
 const DEFAULT_DIAMETER = 1.75
-/** Bambu firmware takes T255, T65279, and T65535 as commands rather than tools, so only a loaded slot switches. */
-const MAX_SLOTS_UNSTATED = 64
+/**
+ * More filament slots than any Bambu Studio or OrcaSlicer printer loads (an H2D's four AMS units and eight AMS HTs
+ * plus two external spools come to 26), so a file declaring more is not one they sliced.
+ */
+const MAX_SLOTS = 64
+/** Well past the objects a plate holds, so labels can't grow the per-object sums without end. */
+const MAX_LABELLED_OBJECTS = 4096
 
 /**
  * Reads a Bambu Studio or OrcaSlicer `.gcode.3mf` (every plate G-code it holds) or a plain `.gcode`, and with
@@ -222,7 +227,10 @@ class GcodeReader {
     const lines = (this.rest + text).split('\n')
     this.rest = lines.pop() ?? ''
     if (this.rest.length > MAX_LINE_LENGTH) throw new SlicedFileError('G-code line too long')
-    for (const line of lines) this.line(line)
+    for (const line of lines) {
+      if (line.length > MAX_LINE_LENGTH) throw new SlicedFileError('G-code line too long')
+      this.line(line)
+    }
   }
 
   plate(index: number, info?: PlateInfo): SlicedPlate {
@@ -231,7 +239,8 @@ class GcodeReader {
     const used = new Set(
       [...this.objects.values(), this.overhead].flatMap((lengths) => lengths.flatMap((length, slot) => (length ? [slot] : []))),
     )
-    const slots = Math.max(this.densities.length, ...[...used].map((slot) => slot + 1), 1)
+    let slots = 1
+    for (const slot of used) slots = Math.max(slots, slot + 1)
     const grams = (lengths: number[]) => Array.from({ length: slots }, (_, slot) => (lengths[slot] ?? 0) * this.gramsPerMm(slot))
     const named = info?.objects.filter(({ skipped }) => !skipped)
     const skipped = new Set(info?.objects.filter((object) => object.skipped).map(({ id }) => id))
@@ -294,7 +303,8 @@ class GcodeReader {
       if (e !== undefined) this.lastE = e
     } else if (/^T\d+$/.test(command)) {
       const tool = Number(command.slice(1))
-      if (tool < (this.densities.length || MAX_SLOTS_UNSTATED)) this.slot = tool
+      // Bambu firmware takes T255, T65279, and T65535 as commands rather than tools, so only a loaded slot switches.
+      if (tool < (this.densities.length || MAX_SLOTS)) this.slot = tool
     } else if (/^G0*[0-3]$/.test(command)) {
       const e = extrusion(code)
       if (e === undefined) return
@@ -317,7 +327,10 @@ class GcodeReader {
 
   private objectLengths(label: string) {
     let lengths = this.objects.get(label)
-    if (!lengths) this.objects.set(label, (lengths = []))
+    if (!lengths) {
+      if (this.objects.size === MAX_LABELLED_OBJECTS) throw new SlicedFileError('too many objects')
+      this.objects.set(label, (lengths = []))
+    }
     return lengths
   }
 
@@ -328,7 +341,8 @@ class GcodeReader {
     const setting = /^;\s*(filament_density|filament_diameter|filament_type|filament_colour)\s*[:=]\s*(.*)$/.exec(line)
     if (setting) {
       const [, key, value] = setting
-      const list = value.split(/[,;]/).map((item) => item.trim())
+      const list = value.split(/[,;]/, MAX_SLOTS + 1).map((item) => item.trim())
+      if (list.length > MAX_SLOTS) throw new SlicedFileError('too many filament slots')
       if (key === 'filament_density') this.densities = list.map(Number)
       else if (key === 'filament_diameter') this.diameters = list.map(Number)
       else if (key === 'filament_type') this.types = list
