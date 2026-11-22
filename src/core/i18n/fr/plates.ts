@@ -78,7 +78,7 @@ export const plates: typeof en = {
     unlabelled: 'Ce fichier n’indique pas ce que chaque objet a consommé ; son total est donc réparti selon le volume des modèles.',
     plateInFile: 'Plateau du fichier',
     objects: 'Objets',
-    objectsHint: 'Associés par nom de fichier du modèle. Corrigez ceux qui sont faux.',
+    objectsHint: 'Associés par numéro de demande, comme SQ-142, sinon par nom de fichier du modèle. Corrigez ceux qui sont faux.',
     unnamed: (id) => `Objet ${id}`,
     filament: (index) => `Filament ${index + 1}`,
     check: (measured, slicer) => `${measured} dans les objets et la purge ; le trancheur indique ${slicer}.`,

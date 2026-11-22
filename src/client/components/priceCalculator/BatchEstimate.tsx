@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import type { Consumable } from '../../../core/consumables'
 import { defaultFinishing, type EquipmentItem } from '../../../core/equipment'
 import { costBasis, priceRequest, roundQuote, type PriceCalculatorSettings } from '../../../core/priceCalculator'
+import type { PrinterRunCount } from '../../../core/printJobs'
 import type { PrinterProfile, PrintType, PublicPrintRequest } from '../../../core/types'
 import { useI18n } from '../../i18n'
 import { requestsQuery } from '../../queries'
@@ -27,6 +28,7 @@ function priceLines(
   requests: PublicPrintRequest[],
   rates: PriceCalculatorSettings,
   printers: PrinterProfile[],
+  printerRuns: PrinterRunCount[],
   consumables: Consumable[],
   equipment: EquipmentItem[],
 ) {
@@ -38,7 +40,7 @@ function priceLines(
     const quote =
       request.printType && estimate
         ? priceRequest(
-            { rates, consumables, printer, equipment },
+            { rates, consumables, printer, equipment, printerRuns },
             { ...estimate, printType: request.printType, quantity: request.quantity },
           )
         : undefined
@@ -70,6 +72,7 @@ export function BatchEstimate({
   settings,
   saved,
   printers,
+  printerRuns,
   consumables,
   equipment,
 }: {
@@ -77,6 +80,7 @@ export function BatchEstimate({
   settings: PriceCalculatorSettings
   saved: boolean
   printers: PrinterProfile[]
+  printerRuns: PrinterRunCount[]
   consumables: Consumable[]
   equipment: EquipmentItem[]
 }) {
@@ -108,7 +112,7 @@ export function BatchEstimate({
   }
   const wanted = new Set(requestIds)
   const requests = query.data.requests.filter((request) => wanted.has(request.id))
-  const { priced, unpriced } = priceLines(requests, settings, printers, consumables, equipment)
+  const { priced, unpriced } = priceLines(requests, settings, printers, printerRuns, consumables, equipment)
   const copies = priced.reduce((sum, { request }) => sum + request.quantity, 0)
   const cost = priced.reduce((sum, line) => sum + line.cost, 0)
   const price = priced.reduce((sum, line) => sum + line.price, 0)

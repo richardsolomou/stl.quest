@@ -8,6 +8,7 @@ import {
   normalizeRequestQuantity,
   requestAssetPaths,
   sourceCoverChange,
+  taggedRequestNumber,
   validRequestQuantity,
   validRequestUpdate,
   validSourceUrl,
@@ -129,5 +130,23 @@ describe('request tags', () => {
 
   it('keeps a file name that already carries its tag', () => {
     expect(taggedFileName(142, 'SQ-142 Plasma.3mf')).toBe('SQ-142 Plasma.3mf')
+  })
+})
+
+describe('taggedRequestNumber', () => {
+  it('finds the tag a downloaded file carries', () => {
+    expect(taggedRequestNumber('SQ-142 Plasma')).toBe(142)
+  })
+
+  it('finds a tag after underscores became spaces', () => {
+    expect(taggedRequestNumber('Plate 1 SQ-7 Hull')).toBe(7)
+  })
+
+  it('ignores a tag inside another word', () => {
+    expect(taggedRequestNumber('XSQ-7')).toBeUndefined()
+  })
+
+  it('takes no tag when the name has two', () => {
+    expect(taggedRequestNumber('SQ-7 SQ-8 plate')).toBeUndefined()
   })
 })

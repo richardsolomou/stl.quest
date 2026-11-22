@@ -734,7 +734,8 @@ export const settings: typeof en = {
       lifetime: (run: string, lifespan?: string) =>
         lifespan ? `${run} von ${lifespan} Druckstunden gelaufen` : `${run} Druckstunden gelaufen`,
       runs: (runs, failed, rate) =>
-        `${runs} ${runs === 1 ? 'gemeldeter Plattenlauf' : 'gemeldete Plattenläufe'} · ${failed} fehlgeschlagen oder abgebrochen (${rate})`,
+        `${runs} ${runs === 1 ? 'Plattenlauf' : 'Plattenläufe'} fertig oder fehlgeschlagen · ${failed} fehlgeschlagen (${rate})`,
+      runsPricing: (minimum, used) => (used ? 'Angebote nutzen diese Quote' : `Angebote nutzen sie ab ${minimum} Läufen`),
       pastLifespan: 'Lebensdauer überschritten',
       addOns: 'Zusatzmodule',
       addOnsHint: 'Am Drucker angebaute Module, die beim Drucken Strom ziehen, etwa ein Pulsing-Release-Modul oder ein AMS.',

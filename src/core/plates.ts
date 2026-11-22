@@ -1,5 +1,6 @@
 import { wearPartsFor, type Consumable } from './consumables'
 import { printerCostPerMinute, type CostedPrinter, type PriceCalculatorSettings } from './priceCalculator'
+import { taggedRequestNumber } from './request'
 import { consumed, priced, supplied, type UsageDraft, type UsageEvent } from './usage'
 import { workflow, type StatusId } from './workflow'
 
@@ -67,8 +68,11 @@ export type PlateMaterialChoice = { consumableId: string } | { name: string; pri
 
 /** A slicer file's amounts: each object's material per filament slot, assigned to a print or to none. */
 export type PlateMeasured = { objects: { requestId?: string; amounts: number[] }[]; overhead: number[] }
-/** A plate total typed from the slicer summary, with the share of it that went to things not in STL Quest. */
-export type PlateTotals = { total: number; otherShare: number }
+/**
+ * A plate's total per filament slot, typed from the slicer summary or reported by the printer, with the share of it that
+ * went to things not in STL Quest.
+ */
+export type PlateTotals = { totals: number[]; otherShare: number }
 
 export type PlateRecordInput = { plateId: string; minutes: number; materials: PlateMaterialChoice[] } & (PlateMeasured | PlateTotals)
 
@@ -77,7 +81,14 @@ export function isMeasured(input: PlateMeasured | PlateTotals): input is PlateMe
 }
 
 /** What a print on the plate can be weighed by when the slicer did not say what it used. */
-export type PlatePrint = { requestId: string; copies: number; volumeMm3?: number; estimatedMaterial?: number }
+export type PlatePrint = {
+  requestId: string
+  copies: number
+  /** What a slicer file recorded on the plate measured for this print's copies there. */
+  measuredAmount?: number
+  volumeMm3?: number
+  estimatedMaterial?: number
+}
 
 export type PlateSplit = {
   method: PlateSplitMethod
@@ -89,25 +100,28 @@ export type PlateSplit = {
 const MODEL_EXTENSION = /\.(stl|3mf|obj|step|stp|amf|ply|oltp)(?=$|[^a-z0-9])/i
 /** What slicers append to a cut or duplicated object: `_A`, `_B_A`, ` (2)`, `-1`. */
 const SLICER_SUFFIX = /(?:_[a-z]|\s*\(\d+\)|-\d+)+$/i
+/** The `SQ-<n> ` that downloads and plate files put in front of a model's name. */
+const REQUEST_TAG_PREFIX = /^SQ-\d+\s+/i
 
 /**
  * A slicer object's name reduced to the model it came from: lower case, without a folder, and without the extension
  * or anything a cut, connector, or copy added after it.
  */
 export function slicedObjectStem(label: string) {
-  const name = label.trim().split(/[\\/]/).at(-1) ?? ''
+  const name = (label.trim().split(/[\\/]/).at(-1) ?? '').replace(REQUEST_TAG_PREFIX, '')
   const extension = MODEL_EXTENSION.exec(name)
   const stem = extension ? name.slice(0, extension.index) : name.replace(SLICER_SUFFIX, '')
   return stem.trim().toLowerCase()
 }
 
 /**
- * The print each object belongs to, by its model's file name, or else the print's name; when several fit, the longest
- * name wins, so `Hull_Bolter` is not taken for `Hull`.
+ * The print each object belongs to: by the request tag its name carries, which every copy, cut, and split of a model
+ * downloaded from STL Quest keeps, else by its model's file name, else the print's name. When several names fit, the
+ * longest wins, so `Hull_Bolter` is not taken for `Hull`. A tag of a request not on the plate falls back to the names.
  */
 export function matchSlicedObjects(
   objects: { name?: string }[],
-  prints: { requestId: string; name: string; fileName?: string }[],
+  prints: { requestId: string; name: string; fileName?: string; number?: number }[],
 ): (string | undefined)[] {
   const stems = prints
     .flatMap(({ requestId, name, fileName }) => [
@@ -118,13 +132,21 @@ export function matchSlicedObjects(
     .sort((left, right) => right.stem.length - left.stem.length)
   return objects.map(({ name }) => {
     if (!name) return undefined
+    const tag = taggedRequestNumber(name)
+    const tagged = tag === undefined ? undefined : prints.find(({ number }) => number === tag)
+    if (tagged) return tagged.requestId
     const stem = slicedObjectStem(name)
     return stems.find((candidate) => candidate.stem === stem)?.requestId
   })
 }
 
-/** How the prints share a plate total: by model volume when all have one, else by estimate, else by copies. */
-export function splitWeights(prints: PlatePrint[]): { method: Exclude<PlateSplitMethod, 'measured'>; weights: number[] } {
+/**
+ * How the prints share a plate total: by what a slicer file measured when all have it, else by model volume, else by
+ * estimate, else by copies.
+ */
+export function splitWeights(prints: PlatePrint[]): { method: PlateSplitMethod; weights: number[] } {
+  if (prints.every(({ measuredAmount }) => positive(measuredAmount)))
+    return { method: 'measured', weights: prints.map(({ measuredAmount }) => measuredAmount!) }
   if (prints.every(({ volumeMm3 }) => positive(volumeMm3)))
     return { method: 'volume', weights: prints.map(({ volumeMm3, copies }) => volumeMm3! * copies) }
   if (prints.every(({ estimatedMaterial }) => positive(estimatedMaterial)))
@@ -163,10 +185,13 @@ export function splitPlate(input: PlateMeasured | PlateTotals, minutes: number, 
   } else {
     const { method: weighed, weights } = splitWeights(prints)
     method = weighed
-    const attributed = input.total * (1 - input.otherShare)
     const weight = sum(weights)
-    weights.forEach((share, position) => (amounts[position][0] = weight > 0 ? (attributed * share) / weight : 0))
-    other[0] = input.total - (weight > 0 ? attributed : 0)
+    for (let slot = 0; slot < slots; slot++) {
+      const total = Math.max(0, input.totals[slot] ?? 0)
+      const attributed = weight > 0 ? total * (1 - input.otherShare) : 0
+      weights.forEach((share, position) => (amounts[position][slot] = weight > 0 ? (attributed * share) / weight : 0))
+      other[slot] = total - attributed
+    }
   }
   const material = amounts.reduce((total, print) => total + sum(print), sum(other))
   const copies = sum(prints.map((print) => print.copies))
