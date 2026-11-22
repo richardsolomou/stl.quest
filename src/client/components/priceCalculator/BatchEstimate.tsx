@@ -4,6 +4,7 @@ import { ArrowLeft, Copy } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { Consumable } from '../../../core/consumables'
+import { defaultFinishing, type EquipmentItem } from '../../../core/equipment'
 import { costBasis, priceRequest, roundQuote, type PriceCalculatorSettings } from '../../../core/priceCalculator'
 import type { PrinterProfile, PrintType, PublicPrintRequest } from '../../../core/types'
 import { useI18n } from '../../i18n'
@@ -22,7 +23,13 @@ import { RatesLink } from './PricingSections'
 type Line = { request: PublicPrintRequest; printType: PrintType; printer?: PrinterProfile; cost: number; price: number }
 
 /** Prices each print on the printer it is assigned to, in the workspace's first material of its type, rounded as listed so the totals add up. */
-function priceLines(requests: PublicPrintRequest[], rates: PriceCalculatorSettings, printers: PrinterProfile[], consumables: Consumable[]) {
+function priceLines(
+  requests: PublicPrintRequest[],
+  rates: PriceCalculatorSettings,
+  printers: PrinterProfile[],
+  consumables: Consumable[],
+  equipment: EquipmentItem[],
+) {
   const priced: Line[] = []
   const unpriced: PublicPrintRequest[] = []
   for (const request of requests) {
@@ -30,7 +37,10 @@ function priceLines(requests: PublicPrintRequest[], rates: PriceCalculatorSettin
     const printer = printers.find(({ id, printType }) => id === request.printer?.id && printType === request.printType)
     const quote =
       request.printType && estimate
-        ? priceRequest({ rates, consumables, printer }, { ...estimate, printType: request.printType, quantity: request.quantity })
+        ? priceRequest(
+            { rates, consumables, printer, equipment },
+            { ...estimate, printType: request.printType, quantity: request.quantity },
+          )
         : undefined
     if (quote && request.printType) {
       const rounded = roundQuote(quote.result, rates.currency)
@@ -41,12 +51,16 @@ function priceLines(requests: PublicPrintRequest[], rates: PriceCalculatorSettin
 }
 
 /** One cost basis per printer the prints run on, or per print type for prints with no printer. */
-function basisEntries(priced: Line[], rates: PriceCalculatorSettings, consumables: Consumable[]) {
+function basisEntries(priced: Line[], rates: PriceCalculatorSettings, consumables: Consumable[], equipment: EquipmentItem[]) {
   const entries = new Map<string, CostBasisEntry>()
   for (const { printType, printer } of priced) {
     const key = printer?.id ?? printType
     if (!entries.has(key))
-      entries.set(key, { key, printerName: printer?.name, basis: costBasis({ rates, printType, consumables, printer }) })
+      entries.set(key, {
+        key,
+        printerName: printer?.name,
+        basis: costBasis({ rates, printType, consumables, printer, equipment: defaultFinishing(equipment, printType) }),
+      })
   }
   return [...entries.values()]
 }
@@ -57,12 +71,14 @@ export function BatchEstimate({
   saved,
   printers,
   consumables,
+  equipment,
 }: {
   requestIds: string[]
   settings: PriceCalculatorSettings
   saved: boolean
   printers: PrinterProfile[]
   consumables: Consumable[]
+  equipment: EquipmentItem[]
 }) {
   const i18n = useI18n()
   const { t, locale } = i18n
@@ -92,7 +108,7 @@ export function BatchEstimate({
   }
   const wanted = new Set(requestIds)
   const requests = query.data.requests.filter((request) => wanted.has(request.id))
-  const { priced, unpriced } = priceLines(requests, settings, printers, consumables)
+  const { priced, unpriced } = priceLines(requests, settings, printers, consumables, equipment)
   const copies = priced.reduce((sum, { request }) => sum + request.quantity, 0)
   const cost = priced.reduce((sum, line) => sum + line.cost, 0)
   const price = priced.reduce((sum, line) => sum + line.price, 0)
@@ -153,7 +169,7 @@ export function BatchEstimate({
             </div>
             <p className="text-xs text-muted-foreground">{copy.basis}</p>
             {priced.length > 0 && (
-              <CostBasisList entries={basisEntries(priced, settings, consumables)} currency={settings.currency} compact />
+              <CostBasisList entries={basisEntries(priced, settings, consumables, equipment)} currency={settings.currency} compact />
             )}
             <RatesLink settings={settings} saved={saved} />
           </Docket>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Consumable } from './consumables'
 import {
+  defaultFinishing,
   equipmentForStage,
   equipmentPrintType,
   kindPrintType,
@@ -109,5 +110,26 @@ describe('equipment', () => {
 
   it('offers an oven to any workspace', () => {
     expect(kindServesAny('oven', ['filament'])).toBe(true)
+  })
+})
+
+describe('default finishing', () => {
+  const cure: EquipmentItem = { ...wash, id: 'cure', kind: 'cure', supplies: [] }
+  const station: EquipmentItem = { ...wash, id: 'station', kind: 'wash-cure' }
+
+  it('washes and cures a resin print on the workspace’s first combined station', () => {
+    expect(defaultFinishing([wash, station, cure], 'resin').map(({ id }) => id)).toEqual(['station'])
+  })
+
+  it('pairs the first wash with the first cure without a combined station', () => {
+    expect(defaultFinishing([dryer, wash, { ...wash, id: 'wash-2' }, cure], 'resin').map(({ id }) => id)).toEqual(['wash', 'cure'])
+  })
+
+  it('leaves archived stations out', () => {
+    expect(defaultFinishing([{ ...station, archived: true }], 'resin')).toEqual([])
+  })
+
+  it('assumes no finishing for filament', () => {
+    expect(defaultFinishing([wash, dryer], 'filament')).toEqual([])
   })
 })

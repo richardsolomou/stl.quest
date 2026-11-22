@@ -118,7 +118,7 @@ export const requests = {
   cost: {
     label: 'Estimated cost',
     suggested: (price: string, quantity: number) => (quantity > 1 ? `${price} suggested for all ${quantity} copies` : `${price} suggested`),
-    hint: 'From your pricing rates and the assigned printer, with typical material and finishing, one plate per copy, and no hands-on time.',
+    hint: 'From your pricing rates and the assigned printer, with your first material and your own wash and cure, or typical ones where you have none, one plate per copy, and no hands-on time.',
     openCalculator: 'Open in calculator',
     onPrinter: (printer: string) => `on ${printer}`,
     compare: (count: number, range: string) => `${range} across ${count} printers`,

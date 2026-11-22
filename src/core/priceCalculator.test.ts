@@ -368,6 +368,16 @@ describe('request quotes', () => {
     expect(priceRequest({ rates, consumables: [pla] }, request)?.result.material).toEqual({ cost: 5, typical: true })
   })
 
+  it('washes and cures a resin request on the workspace’s own station', () => {
+    expect(priceRequest({ rates, consumables: [], equipment: [wash] }, request)?.result.equipment.map(({ item }) => item.id)).toEqual([
+      wash.id,
+    ])
+  })
+
+  it('counts a typical wash and cure when the workspace has none', () => {
+    expect(priceRequest({ rates, consumables: [], equipment: [] }, request)?.result.equipment[0].typical).toBe(true)
+  })
+
   it('does not price a request missing its material estimate', () => {
     expect(priceRequest({ rates, consumables: [] }, { ...request, material: undefined })).toBeUndefined()
   })

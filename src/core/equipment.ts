@@ -63,6 +63,18 @@ export function equipmentForStage(items: EquipmentItem[], stage: EquipmentStage,
   return items.filter((item) => !item.archived && item.stage === stage && servesPrintType(item, printType))
 }
 
+/**
+ * The workspace's own wash and cure a resin quote counts when none is picked: its first combined station, else its first
+ * wash with its first cure. Filament prints have no finishing to assume.
+ */
+export function defaultFinishing(items: EquipmentItem[], printType: PrintType) {
+  if (printType !== 'resin') return []
+  const finishing = equipmentForStage(items, 'finishing', printType)
+  const combined = finishing.find(({ kind }) => kind === 'wash-cure')
+  if (combined) return [combined]
+  return (['wash', 'cure'] as const).flatMap((kind) => finishing.find((item) => item.kind === kind) ?? [])
+}
+
 /** A typical run when nothing else is known: a wash cycle, a cure, a combined cycle, or a filament drying session. */
 export const DEFAULT_MINUTES_PER_USE: Record<EquipmentKind, number> = {
   wash: 10,

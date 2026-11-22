@@ -84,7 +84,7 @@ export const calculator: typeof en = {
     basis: 'Ohne manuelle Arbeitszeit: Fügen Sie Arbeit im Einzelrechner hinzu, wenn der Auftrag sie braucht.',
     defaults: 'Kein Drucker',
     description:
-      'Jeder Druck wird nach seiner eigenen Schätzung auf dem zugewiesenen Drucker kalkuliert, mit typischem Material und typischer Nachbearbeitung.',
+      'Jeder Druck wird nach seiner eigenen Schätzung auf dem zugewiesenen Drucker kalkuliert, mit Ihrem ersten Material und Ihrer eigenen Wasch- und Härtestation, sonst typischen Werten.',
   },
   basis: {
     title: 'Kostenbasis',

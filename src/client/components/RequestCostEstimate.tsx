@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { priceRequest, priceRequestOnPrinters } from '../../core/priceCalculator'
 import type { PublicPrintRequest } from '../../core/types'
 import { calculatorSearch } from '../calculatorSearch'
-import { consumablesQuery, priceCalculatorSettingsQuery, printersQuery } from '../queries'
+import { consumablesQuery, equipmentQuery, priceCalculatorSettingsQuery, printersQuery } from '../queries'
 import { useWorkspaceSlug } from '../workspace'
 import { DetailRow } from './DetailRow'
 import { requestPrintEstimate } from '../../core/printEstimates'
@@ -19,14 +19,15 @@ export function RequestCostEstimate({ request }: { request: PublicPrintRequest }
   const query = useQuery(priceCalculatorSettingsQuery(workspaceSlug))
   const printers = useQuery(printersQuery(workspaceSlug)).data?.profiles ?? []
   const consumables = useQuery(consumablesQuery(workspaceSlug)).data?.consumables ?? []
+  const equipment = useQuery(equipmentQuery(workspaceSlug)).data?.equipment ?? []
   const estimate = requestPrintEstimate(request)
   if (!request.printType || !estimate || !query.data?.saved) return null
   const { settings } = query.data
   const input = { ...estimate, printType: request.printType, quantity: request.quantity }
   const assigned = printers.find((printer) => printer.id === request.printer?.id && printer.printType === request.printType)
-  const quote = priceRequest({ rates: settings, consumables, printer: assigned }, input)
+  const quote = priceRequest({ rates: settings, consumables, printer: assigned, equipment }, input)
   if (!quote) return null
-  const comparison = priceRequestOnPrinters(settings, printers, input, consumables)
+  const comparison = priceRequestOnPrinters(settings, printers, input, consumables, equipment)
   const money = (value: number) => formatMoney(value, settings.currency, locale)
   const others = comparison
     .flatMap(({ printer, quote: printerQuote }) => (printerQuote ? [{ printer, cost: printerQuote.result.estimatedCost }] : []))

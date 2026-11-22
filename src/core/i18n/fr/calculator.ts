@@ -84,7 +84,7 @@ export const calculator: typeof en = {
     basis: 'Sans temps de manipulation : ajoutez la main-d’œuvre dans le calculateur d’un seul travail si nécessaire.',
     defaults: 'Aucune imprimante',
     description:
-      'Chaque impression est chiffrée à partir de sa propre estimation sur l’imprimante attribuée, avec une matière et une finition typiques.',
+      'Chaque impression est chiffrée à partir de sa propre estimation sur l’imprimante attribuée, avec votre première matière et votre propre station de lavage et de polymérisation, ou des valeurs typiques à défaut.',
   },
   basis: {
     title: 'Base de coût',
