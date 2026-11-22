@@ -159,6 +159,7 @@ function OrderReview({
       await invalidateQueries(queryClient, 'stock', 'usage', 'consumables')
       const count = input!.restocks.length
       toast(copy.done(count), {
+        ...((input!.added.length > 0 || input!.prices.length > 0) && { description: copy.undoKeeps }),
         ...(transactionId && {
           action: {
             label: copy.undo,
@@ -195,7 +196,8 @@ function OrderReview({
         <Spinner />
       ) : (
         <>
-          <ul className="grid divide-y rounded-md border" data-order-lines>
+          {/* Order lines can carry an address line the parser mistook for a product, so replays never record them. */}
+          <ul className="ph-no-capture grid divide-y rounded-md border" data-order-lines>
             {rows.map((row) => (
               <OrderLineRow
                 key={row.key}

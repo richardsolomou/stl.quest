@@ -429,6 +429,7 @@ export const settings: typeof en = {
       submit: (count: number) => (count ? `Réapprovisionner ${count}` : 'Réapprovisionner'),
       cancel: 'Annuler',
       done: (count: number) => `${count} ${count === 1 ? 'filament réapprovisionné' : 'filaments réapprovisionnés'}`,
+      undoKeeps: 'Annuler retire le stock ; les filaments ajoutés et les changements de prix restent.',
       undo: 'Annuler',
       error: 'Réapprovisionnement impossible. Réessayez.',
     },

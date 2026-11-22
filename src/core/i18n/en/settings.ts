@@ -415,6 +415,7 @@ export const settings = {
       submit: (count: number) => (count ? `Restock ${count}` : 'Restock'),
       cancel: 'Cancel',
       done: (count: number) => `Restocked ${count} ${count === 1 ? 'filament' : 'filaments'}`,
+      undoKeeps: 'Undo takes back the stock; added filaments and price changes stay.',
       undo: 'Undo',
       error: 'Could not restock. Try again.',
     },

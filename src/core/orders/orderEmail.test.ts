@@ -67,6 +67,10 @@ describe('parseOrderEmail', () => {
 })
 
 describe('orderEmailLines', () => {
+  it('drops a line far longer than any order line, so parsing stays fast', () => {
+    expect(orderEmailLines(`${'1'.repeat(40_000)}\nGray 10103`)).toEqual(['Gray 10103'])
+  })
+
   it('keeps text after characters whose lower case is longer', () => {
     expect(orderEmailLines('<div>İstanbul</div><div>Gray 10103</div>')).toEqual(['İstanbul', 'Gray 10103'])
   })

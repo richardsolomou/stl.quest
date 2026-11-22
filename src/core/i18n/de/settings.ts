@@ -423,6 +423,7 @@ export const settings: typeof en = {
       submit: (count: number) => (count ? `${count} auffüllen` : 'Auffüllen'),
       cancel: 'Abbrechen',
       done: (count: number) => `${count} ${count === 1 ? 'Filament' : 'Filamente'} aufgefüllt`,
+      undoKeeps: 'Rückgängig nimmt nur den Bestand zurück; hinzugefügte Filamente und Preisänderungen bleiben.',
       undo: 'Rückgängig',
       error: 'Auffüllen fehlgeschlagen. Versuchen Sie es erneut.',
     },

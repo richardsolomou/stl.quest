@@ -1,7 +1,9 @@
 import { PRICE_CALCULATOR_CURRENCIES, type PriceCalculatorCurrency } from '../priceCalculator'
 
 /** A pasted email this long is refused before it is read; order confirmations are far smaller. */
-export const MAX_ORDER_EMAIL_LENGTH = 500_000
+export const MAX_ORDER_EMAIL_LENGTH = 200_000
+// Order lines are short; anything longer is markup or noise, and the money and colour patterns slow down on it.
+const MAX_ORDER_LINE_LENGTH = 1_000
 
 // Tags that start a new line in the text an email shows, and elements whose content it never shows.
 const BLOCK_TAGS = new Set([
@@ -63,7 +65,7 @@ export function orderEmailLines(pasted: string) {
   return text
     .split(/\r?\n/)
     .map((line) => line.replaceAll(ZERO_WIDTH, '').replace(/\s+/g, ' ').trim())
-    .filter(Boolean)
+    .filter((line) => line && line.length <= MAX_ORDER_LINE_LENGTH)
 }
 
 /**
