@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.4.0
+
+### Minor Changes
+
+- dfdca3a: Count the workspace's own wash and cure stations in quotes and request estimates when none is picked, so that a resin quote uses the stations you set up instead of a typical one.
+- 33d79da: Delete archived printers, equipment, and consumables for good from their Archived section, after a confirmation that says what still uses them, so the library only keeps what you might use again while spend and usage keep the deleted item's name and cost.
+- fc92118: Add several colours of a catalogue filament in one go with a shared price, give a filament's price to its other colours, group colours of one product in the Consumables list, and enter the amount on hand while adding a filament, resin, or supply, so that stocking a whole filament range takes one dialog instead of one per colour.
+- 53f1af5: Add and edit a printer's wear parts from its own Maintenance section, show what to include in purchase prices and lifespans, label wear-part prices as per part, show sub-cent wear rates instead of €0.00, and say when consumables have no stock recorded rather than that nothing is needed.
+
+### Patch Changes
+
+- 0288daf: Add wear parts for the Form Studio 1, Bambu Lab X2D, P2S and H2 series, and Reflex RS Turbo, list Bambu Lab's marble, gradient, dual-colour silk and translucent filaments as their own products with PLA Basic and PETG Basic named as Bambu Lab sells them, and correct the Form Studio Wash+Cure's power, the X2D's and P2S's printing power, and PAS10's density, so that costs match the hardware and materials you pick.
+
 ## 2.3.1
 
 ### Patch Changes
