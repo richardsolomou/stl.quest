@@ -237,7 +237,8 @@ function StoreOrder({
                     <>
                       {level.low && <LowMarker />}
                       <span>{stock.left(formatStock(level.onHand, consumable, locale, stock))}</span>
-                      {daysLeft !== undefined && (
+                      {/* Under a day says nothing the amount left does not already. */}
+                      {daysLeft !== undefined && Math.round(daysLeft) > 0 && (
                         <span>· {copy.daysLeft(Math.round(daysLeft), formatNumber(Math.round(daysLeft), locale))}</span>
                       )}
                       {level.minimum !== undefined && (
