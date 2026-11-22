@@ -5,6 +5,7 @@ import type { OnboardingProgress } from './onboarding'
 import type { Locale } from './i18n/locales'
 import type { StockTotal, UsageEvent, UsageFilters } from './usage'
 import type { InventoryItems, InventoryKind } from './inventory'
+import type { InventoryReferences } from './inventoryDeletion'
 import type { Plate, PlateItem, PlateRecording } from './plates'
 import type { PriceCalculatorCurrency } from './priceCalculator'
 import type { ChargedPrint } from './spend'
@@ -591,12 +592,23 @@ export type Repository = Omit<AsyncRepositoryShape, 'getSetting'> & {
   /**
    * Stores what `change` makes of the items of `kind` while no other change to them can interleave, so edits to
    * different items never undo each other: new items join the end, changed ones are updated in place, and none may go
-   * missing, since items are archived instead. `change` may throw a `Response` to refuse.
+   * missing, since only `deleteInventoryItem` removes one. `change` may throw a `Response` to refuse.
    */
   changeInventory<Kind extends InventoryKind>(
     kind: Kind,
     change: (items: InventoryItems[Kind][]) => InventoryItems[Kind][],
   ): Promise<{ previous: InventoryItems[Kind][]; items: InventoryItems[Kind][] }>
+  /** What names one item of `kind`; see `InventoryReferences`. */
+  inventoryReferences(kind: InventoryKind, id: string): Promise<InventoryReferences>
+  /**
+   * Deletes one item once `check` accepts it under the same lock as `changeInventory`, unlinking what names it as
+   * `InventoryReferences` describes, and returns it with what named it and the items left. `check` may throw a `Response`.
+   */
+  deleteInventoryItem<Kind extends InventoryKind>(
+    kind: Kind,
+    id: string,
+    check: (item: InventoryItems[Kind] | undefined, references: InventoryReferences) => void,
+  ): Promise<{ item: InventoryItems[Kind]; references: InventoryReferences; items: InventoryItems[Kind][] }>
 }
 
 // Final print-file storage. Keys are '/'-separated paths from core/assetKeys;
@@ -717,6 +729,7 @@ export type AppEvent =
   | 'usage.recorded'
   | 'usage.undone'
   | 'inventory.changed'
+  | 'inventory.deleted'
   | 'plate.changed'
 
 export interface EventBus {

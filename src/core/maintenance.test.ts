@@ -36,6 +36,11 @@ describe('part wear', () => {
     expect(partWear([event({ copies: 3 }), event({ copies: 2 })], 'form-4-a', tank).used).toBe(5)
   })
 
+  it('leaves out the wear a deleted part recorded, which no longer names it', () => {
+    const deletedPartWear = event({ amount: 90, deletedItemName: 'FEP', deletedItemKind: 'part' })
+    expect(partWear([event({ amount: 90 }), deletedPartWear], 'form-4-a', screen).used).toBe(1.5)
+  })
+
   it('counts printing minutes as hours', () => {
     expect(partWear([event({ amount: 90 }), event({ amount: 30 })], 'form-4-a', screen).used).toBe(2)
   })

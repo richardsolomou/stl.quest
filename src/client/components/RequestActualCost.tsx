@@ -102,7 +102,7 @@ export function RequestActualCost({ requestId, people }: { requestId: string; pe
                 {step.events.map((event) => (
                   <div key={event.id} className="flex items-baseline gap-3">
                     <dt className="min-w-0 flex-1 break-words">
-                      {usedItemName(event, library) ?? copy.print.removed}{' '}
+                      {usedItemName(event, library, copy) ?? copy.print.removed}{' '}
                       <span className="whitespace-nowrap text-muted-foreground tabular-nums">
                         · {formatUsageAmount(event.amount, event.unit, copy, locale)}
                       </span>

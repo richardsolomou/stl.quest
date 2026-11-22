@@ -56,9 +56,30 @@ describe('spendCategory', () => {
   it('files a removed consumable used in finishing as a supply', () => {
     expect(spendCategory(event({ consumableId: 'gone', stage: 'finishing', equipmentId: 'wash' }), library)).toBe('supply')
   })
+
+  it('files a deleted filament as material', () => {
+    expect(spendCategory(event({ printerId: 'x1c', deletedItemName: 'PLA', deletedItemKind: 'filament' }), library)).toBe('material')
+  })
+
+  it('files a deleted supply used in equipment as a supply', () => {
+    expect(
+      spendCategory(event({ stage: 'finishing', equipmentId: 'wash', deletedItemName: 'IPA', deletedItemKind: 'supply' }), library),
+    ).toBe('supply')
+  })
 })
 
 describe('summariseSpend', () => {
+  it('lists a deleted item under the name it kept', () => {
+    const deleted = { printerId: 'x1c', deletedItemName: 'PLA · Beige', deletedItemKind: 'filament' } as const
+    const summary = summariseSpend(
+      [event({ ...deleted, amount: 10, unitPrice: 0.02 }), event({ ...deleted, amount: 5, unitPrice: 0.02 })],
+      [],
+      'EUR',
+    )
+
+    expect(summary.items).toEqual([{ category: 'material', deletedName: 'PLA · Beige', unit: 'ml', amount: 15, cost: expect.closeTo(0.3) }])
+  })
+
   it('adds up uses at the price each recorded', () => {
     const summary = summariseSpend(
       [event({ consumableId: resin.id, amount: 100, unitPrice: 0.04 }), event({ consumableId: resin.id, amount: 50, unitPrice: 0.05 })],

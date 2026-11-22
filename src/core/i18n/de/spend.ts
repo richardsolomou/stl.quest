@@ -7,6 +7,7 @@ export const spend: typeof en = {
     spend: 'Ausgaben',
   },
   title: 'Ausgaben',
+  deletedItem: (name: string) => `${name} (gelöscht)`,
   description:
     'Was Ihre Drucke verbraucht haben, zu den Preisen zum Zeitpunkt des Verbrauchs. Spätere Preisänderungen schreiben das nie um.',
   loading: 'Ausgaben werden geladen…',
@@ -84,6 +85,7 @@ export const spend: typeof en = {
     used: 'Verbraucht',
     cost: 'Ausgegeben',
     removed: 'Aus Ihrer Bibliothek entfernt',
+    deleted: 'Gelöscht',
   },
   prints: {
     title: 'Nach Druck',

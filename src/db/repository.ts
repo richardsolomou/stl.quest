@@ -22,6 +22,7 @@ import type {
   ModelDimensions,
   PrintCharge,
   PrintType,
+  PrinterProfile,
   WorkspaceRole,
   WorkspaceSummary,
 } from '../core/types'
@@ -40,6 +41,7 @@ import { highestStoragePlan, storagePlans, type StoragePlan } from '../core/plan
 import { ACTIVE_SUBSCRIPTION_STATUSES, BILLABLE_SUBSCRIPTION_STATUSES } from '../core/subscription'
 import { automaticallyAssignedPrinter } from '../core/printers'
 import type { InventoryItems, InventoryKind } from '../core/inventory'
+import { deletedItemKind, keepsDeletedName, NO_REFERENCES, withoutSupply, type InventoryReferences } from '../core/inventoryDeletion'
 import { supportsDatabaseBackup, type DatabaseBackend } from './backend'
 import type { MigrationLog } from './dataMigrations/types'
 import { SQLiteBackend } from './backends/sqlite'
@@ -66,6 +68,8 @@ import {
   plateItems,
   plates,
   printers,
+  consumables,
+  equipment,
   managedStorageAccounts,
   managedStorageUsage,
   managedStorageEntitlements,
@@ -102,6 +106,8 @@ type InventoryTable = typeof printers
 const MANAGED_STORAGE_DELETION_QUEUE = 'managed-storage-deletion-queue'
 const MANAGED_STORAGE_HOLDER_ATTEMPTS = 5
 const USAGE_INSERT_BATCH = 500
+/** The usage-event column that names an item of each kind. */
+const usageInventoryFields = { printers: 'printerId', equipment: 'equipmentId', consumables: 'consumableId' } as const
 const UNRECORDED_PLATE = {
   transactionId: null,
   source: null,
@@ -2847,6 +2853,151 @@ export class DrizzleRepository implements Repository {
     })
   }
 
+  async inventoryReferences(kind: InventoryKind, id: string) {
+    return await this.inventoryReferencesWith(this.database, await this.workspace(), kind, id)
+  }
+
+  /**
+   * Deletes one item once `check` accepts it (it may throw a `Response`), with everything naming it unlinked in the same
+   * transaction under the workspace lock: usage keeps the item's name and kind where it was what the event used
+   * (`keepsDeletedName`), prints and plates lose their printer but keep its print type, and equipment stops using a
+   * deleted supply. Wear parts bound to a deleted printer keep their `printer_id`, which has no foreign key.
+   */
+  async deleteInventoryItem<Kind extends InventoryKind>(
+    kind: Kind,
+    id: string,
+    check: (item: InventoryItems[Kind] | undefined, references: InventoryReferences) => void,
+  ) {
+    const workspaceId = await this.workspace()
+    const table = inventoryTables[kind] as InventoryTable
+    return await this.database.transaction(async (tx) => {
+      await this.lockWorkspace(tx, workspaceId)
+      const row = await tx
+        .select()
+        .from(table)
+        .where(and(eq(table.workspaceId, workspaceId), eq(table.id, id)))
+        .get()
+      const item = row && inventoryItem(kind, row as (typeof inventoryTables)[Kind]['$inferSelect'])
+      const references = await this.inventoryReferencesWith(tx, workspaceId, kind, id)
+      check(item, references)
+      if (!item) throw new Error('a deleted inventory item must exist')
+
+      const field = usageInventoryFields[kind]
+      const named = and(eq(usageEvents.workspaceId, workspaceId), eq(usageEvents[field], id))
+      const events = await tx
+        .select({
+          id: usageEvents.id,
+          consumableId: usageEvents.consumableId,
+          equipmentId: usageEvents.equipmentId,
+          deletedItemName: usageEvents.deletedItemName,
+        })
+        .from(usageEvents)
+        .where(named)
+        .all()
+      const keeping = events
+        .filter((event) =>
+          keepsDeletedName(
+            {
+              consumableId: event.consumableId ?? undefined,
+              equipmentId: event.equipmentId ?? undefined,
+              deletedItemName: event.deletedItemName ?? undefined,
+            },
+            kind,
+          ),
+        )
+        .map((event) => event.id)
+      for (let start = 0; start < keeping.length; start += USAGE_INSERT_BATCH)
+        await tx
+          .update(usageEvents)
+          .set({ deletedItemName: item.name, deletedItemKind: deletedItemKind(kind, item) })
+          .where(and(eq(usageEvents.workspaceId, workspaceId), inArray(usageEvents.id, keeping.slice(start, start + USAGE_INSERT_BATCH))))
+          .run()
+      await tx
+        .update(usageEvents)
+        .set({ [field]: null })
+        .where(named)
+        .run()
+
+      if (kind === 'printers') {
+        const { printType } = item as PrinterProfile
+        await tx
+          .update(requests)
+          .set({ printerId: null, printType: sql`coalesce(${requests.printType}, ${printType})` })
+          .where(and(eq(requests.workspaceId, workspaceId), eq(requests.printerId, id)))
+          .run()
+        await tx
+          .update(plates)
+          .set({ printerId: null })
+          .where(and(eq(plates.workspaceId, workspaceId), eq(plates.printerId, id)))
+          .run()
+      }
+      if (kind === 'consumables') {
+        const now = Date.now()
+        for (const equipmentItem of await this.inventoryWith(tx, 'equipment')) {
+          if (!equipmentItem.supplies.some(({ consumableId }) => consumableId === id)) continue
+          await tx
+            .update(equipment)
+            .set({ suppliesJson: JSON.stringify(withoutSupply(equipmentItem, id).supplies), updatedAt: now })
+            .where(and(eq(equipment.workspaceId, workspaceId), eq(equipment.id, equipmentItem.id)))
+            .run()
+        }
+      }
+
+      await tx
+        .delete(table)
+        .where(and(eq(table.workspaceId, workspaceId), eq(table.id, id)))
+        .run()
+      return { item, references, items: await this.inventoryWith(tx, kind) }
+    })
+  }
+
+  private async inventoryReferencesWith(
+    database: DatabaseExecutor,
+    workspaceId: string,
+    kind: InventoryKind,
+    id: string,
+  ): Promise<InventoryReferences> {
+    const usage = await database
+      .select({ stage: usageEvents.stage, count: count() })
+      .from(usageEvents)
+      .where(and(eq(usageEvents.workspaceId, workspaceId), eq(usageEvents[usageInventoryFields[kind]], id)))
+      .groupBy(usageEvents.stage)
+      .all()
+    const events = (stock: boolean) =>
+      usage.filter(({ stage }) => (stage === 'stock') === stock).reduce((total, row) => total + row.count, 0)
+    const references = { ...NO_REFERENCES, usage: events(false), stock: events(true) }
+    if (kind === 'consumables') {
+      const supplied = (await this.inventoryWith(database, 'equipment')).filter((item) =>
+        item.supplies.some(({ consumableId }) => consumableId === id),
+      )
+      return { ...references, supplies: supplied.length }
+    }
+    if (kind !== 'printers') return references
+    const [assigned, plated, parts] = await Promise.all([
+      database
+        .select({ count: count() })
+        .from(requests)
+        .where(and(eq(requests.workspaceId, workspaceId), eq(requests.printerId, id)))
+        .get(),
+      database
+        .select({ count: count() })
+        .from(plates)
+        .where(and(eq(plates.workspaceId, workspaceId), eq(plates.printerId, id)))
+        .get(),
+      database
+        .select({ count: count() })
+        .from(consumables)
+        .where(and(eq(consumables.workspaceId, workspaceId), eq(consumables.kind, 'part'), eq(consumables.printerId, id)))
+        .get(),
+    ])
+    return {
+      ...references,
+      requests: assigned?.count ?? 0,
+      plates: plated?.count ?? 0,
+      parts: parts?.count ?? 0,
+    }
+  }
+
   private async inventoryWith<Kind extends InventoryKind>(database: DatabaseExecutor, kind: Kind) {
     return (await this.inventoryRows(database, kind)).map((row) => inventoryItem(kind, row))
   }
@@ -3545,7 +3696,7 @@ export class DrizzleRepository implements Repository {
       const completed = await this.getCompletedUploadFrom(tx, operation.payload.uploadId, operation.payload.ownerId)
       if (completed) return completed
       await this.insertRequest(tx, operation.payload.requestId, {
-        ...operation.payload.request,
+        ...(await this.withStoredPrinter(tx, operation.payload.request)),
         filePath: operation.payload.destinationPath,
       })
       await tx
@@ -3641,7 +3792,7 @@ export class DrizzleRepository implements Repository {
       const existing = await this.getRequestFrom(tx, operation.payload.newRequestId)
       if (!existing) {
         await this.insertRequest(tx, operation.payload.newRequestId, {
-          ...operation.payload.request,
+          ...(await this.withStoredPrinter(tx, operation.payload.request)),
           filePath: operation.payload.destinationPath,
         })
       }
@@ -3747,6 +3898,17 @@ export class DrizzleRepository implements Repository {
     const profiles = filters.printType ? await this.listInventory('printers') : []
     return requestConditions(await this.workspace(), filters, query, profiles, options)
   }
+  /** A journaled request without its printer once that was deleted, so replaying the journal lands it unassigned. */
+  private async withStoredPrinter<Request extends Pick<NewPrintRequest, 'printerId'>>(db: DatabaseExecutor, request: Request) {
+    if (!request.printerId) return request
+    const stored = await db
+      .select({ id: printers.id })
+      .from(printers)
+      .where(and(eq(printers.workspaceId, await this.workspace()), eq(printers.id, request.printerId)))
+      .get()
+    return stored ? request : { ...request, printerId: undefined }
+  }
+
   private async insertRequest(db: DatabaseExecutor, id: string, request: NewPrintRequest) {
     const now = Date.now()
     const workspaceId = await this.workspace()

@@ -259,11 +259,11 @@ export const inventoryItemSchema = z.discriminatedUnion('inventory', [
   z.object({ inventory: z.literal('equipment'), item: equipmentItemSchema }),
   z.object({ inventory: z.literal('consumables'), item: consumableSchema }),
 ])
-export const inventoryArchiveSchema = z.object({
+export const inventoryItemRefSchema = z.object({
   inventory: z.enum(INVENTORY_KINDS),
   id: z.string().trim().min(1).max(200),
-  archived: z.boolean(),
 })
+export const inventoryArchiveSchema = inventoryItemRefSchema.extend({ archived: z.boolean() })
 
 export const passwordAuthSettingsSchema = z.object({ enabled: z.boolean() })
 export const setOwnPasswordSchema = z.object({ password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH) })

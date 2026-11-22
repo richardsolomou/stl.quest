@@ -975,6 +975,25 @@ export const settings = {
     description:
       'Deployment-wide sign-in methods, cloud storage apps, and outbound email. Workspace access is granted by invitation or direct addition by a super admin.',
   },
+  inventoryDelete: {
+    title: (name: string) => `Delete ${name}?`,
+    description: 'This can’t be undone. Spend and usage keep its name and cost, marked as deleted.',
+    counting: 'Checking what uses it…',
+    unused: 'Nothing else uses it.',
+    countFailed: 'Couldn’t check what uses it.',
+    used: 'Deleting it also changes:',
+    requests: (count: number) => `${count} ${count === 1 ? 'print loses its' : 'prints lose their'} printer`,
+    plates: (count: number) => `${count} ${count === 1 ? 'plate loses its' : 'plates lose their'} printer`,
+    usage: (count: number) =>
+      `${count} usage ${count === 1 ? 'record keeps its cost but no longer links' : 'records keep their cost but no longer link'} to it`,
+    stock: (count: number) => `${count} stock ${count === 1 ? 'movement no longer links' : 'movements no longer link'} to it`,
+    supplies: (count: number) => `${count} ${count === 1 ? 'piece of equipment stops' : 'pieces of equipment stop'} using it`,
+    parts: (count: number) => `${count} wear ${count === 1 ? 'part stays' : 'parts stay'} in Consumables, without a printer`,
+    pending: 'Deleting…',
+    failed: 'Not deleted',
+    failedHint: 'Nothing was deleted. Try again.',
+    deleted: (name: string) => `${name} deleted.`,
+  },
   unsavedChanges: {
     title: 'Leave without saving?',
     description: 'Your unsaved settings changes will be lost.',

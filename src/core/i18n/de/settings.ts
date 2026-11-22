@@ -992,6 +992,32 @@ export const settings: typeof en = {
     description:
       'Anmeldemethoden, Cloud-Speicher-Apps und ausgehende E-Mail für die gesamte Bereitstellung. Der Zugriff auf Arbeitsbereiche wird per Einladung oder durch direktes Hinzufügen durch einen Super-Admin gewährt.',
   },
+  inventoryDelete: {
+    title: (name: string) => `${name} löschen?`,
+    description: 'Das lässt sich nicht rückgängig machen. Ausgaben und Verbrauch behalten Namen und Kosten, als gelöscht markiert.',
+    counting: 'Verwendung wird geprüft…',
+    unused: 'Nichts anderes verwendet diesen Eintrag.',
+    countFailed: 'Die Verwendung konnte nicht geprüft werden.',
+    used: 'Das Löschen ändert außerdem:',
+    requests: (count: number) => (count === 1 ? `${count} Druck verliert seinen Drucker` : `${count} Drucke verlieren ihren Drucker`),
+    plates: (count: number) => (count === 1 ? `${count} Platte verliert ihren Drucker` : `${count} Platten verlieren ihren Drucker`),
+    usage: (count: number) =>
+      count === 1
+        ? `${count} Verbrauchseintrag behält seine Kosten, verweist aber nicht mehr darauf`
+        : `${count} Verbrauchseinträge behalten ihre Kosten, verweisen aber nicht mehr darauf`,
+    stock: (count: number) =>
+      count === 1 ? `${count} Lagerbewegung verweist nicht mehr darauf` : `${count} Lagerbewegungen verweisen nicht mehr darauf`,
+    supplies: (count: number) =>
+      count === 1 ? `${count} Gerät verwendet den Eintrag nicht mehr` : `${count} Geräte verwenden den Eintrag nicht mehr`,
+    parts: (count: number) =>
+      count === 1
+        ? `${count} Verschleißteil bleibt ohne Drucker in den Verbrauchsmaterialien`
+        : `${count} Verschleißteile bleiben ohne Drucker in den Verbrauchsmaterialien`,
+    pending: 'Wird gelöscht…',
+    failed: 'Nicht gelöscht',
+    failedHint: 'Es wurde nichts gelöscht. Versuchen Sie es erneut.',
+    deleted: (name: string) => `${name} gelöscht.`,
+  },
   unsavedChanges: {
     title: 'Ohne Speichern verlassen?',
     description: 'Ihre nicht gespeicherten Änderungen an den Einstellungen gehen verloren.',

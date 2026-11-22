@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import type { InventoryItems, InventoryKind } from '../core/inventory'
-import { createInventoryItem, setInventoryItemArchived, updateInventoryItem } from '../server/fns'
+import { createInventoryItem, deleteInventoryItem, setInventoryItemArchived, updateInventoryItem } from '../server/fns'
 import { consumablesQuery, equipmentQuery, printersQuery } from './queries'
 import { useWorkspaceSlug } from './workspace'
 
@@ -13,8 +13,8 @@ type Change<Kind extends InventoryKind> = { item: InventoryItems[Kind] } | { id:
 
 /**
  * Saves one printer, piece of equipment, or consumable at a time, so admins editing different items never undo each
- * other: `save` creates an item the list does not have yet and updates one it does, and `setArchived` archives or
- * restores one. Each result replaces the cached list straight away; the workspace channel refreshes everyone else.
+ * other: `save` creates an item the list does not have yet and updates one it does, `setArchived` archives or
+ * restores one, and `remove` deletes an archived one. Each result replaces the cached list straight away; the workspace channel refreshes everyone else.
  */
 export function useInventory<Kind extends InventoryKind>(kind: Kind) {
   const workspaceSlug = useWorkspaceSlug()
@@ -22,6 +22,7 @@ export function useInventory<Kind extends InventoryKind>(kind: Kind) {
   const create = useServerFn(createInventoryItem)
   const update = useServerFn(updateInventoryItem)
   const archive = useServerFn(setInventoryItemArchived)
+  const destroy = useServerFn(deleteInventoryItem)
   const { queryKey } = queries[kind](workspaceSlug)
   const stored = (): InventoryItems[Kind][] =>
     queryClient.getQueryData<Record<string, InventoryItems[Kind][]>>(queryKey)?.[listField[kind]] ?? []
@@ -34,9 +35,15 @@ export function useInventory<Kind extends InventoryKind>(kind: Kind) {
     },
     onSuccess: ({ items }) => queryClient.setQueryData(queryKey, { [listField[kind]]: items } as never),
   })
+  // Kept apart from `mutation`, so a failed delete is told in its confirmation rather than the page's notice.
+  const deletion = useMutation({
+    mutationFn: async (id: string) => await destroy({ data: { workspaceSlug, inventory: kind, id } }),
+    onSuccess: ({ items }) => queryClient.setQueryData(queryKey, { [listField[kind]]: items } as never),
+  })
   return {
     mutation,
     save: async (item: InventoryItems[Kind]) => void (await mutation.mutateAsync({ item })),
     setArchived: async (id: string, archived: boolean) => void (await mutation.mutateAsync({ id, archived })),
+    remove: async (id: string) => void (await deletion.mutateAsync(id)),
   }
 }

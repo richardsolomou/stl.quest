@@ -989,6 +989,31 @@ export const settings: typeof en = {
     description:
       'Méthodes de connexion, applications de stockage cloud et e-mail sortant pour tout le déploiement. L’accès à un espace de travail est accordé sur invitation ou par ajout direct par un super administrateur.',
   },
+  inventoryDelete: {
+    title: (name: string) => `Supprimer ${name} ?`,
+    description: 'Cette action est irréversible. Les dépenses et la consommation gardent son nom et son coût, marqués comme supprimés.',
+    counting: 'Vérification de ce qui l’utilise…',
+    unused: 'Rien d’autre ne l’utilise.',
+    countFailed: 'Impossible de vérifier ce qui l’utilise.',
+    used: 'La suppression modifie aussi :',
+    requests: (count: number) => (count <= 1 ? `${count} impression perd son imprimante` : `${count} impressions perdent leur imprimante`),
+    plates: (count: number) => (count <= 1 ? `${count} plateau perd son imprimante` : `${count} plateaux perdent leur imprimante`),
+    usage: (count: number) =>
+      count <= 1
+        ? `${count} relevé de consommation garde son coût mais n’y renvoie plus`
+        : `${count} relevés de consommation gardent leur coût mais n’y renvoient plus`,
+    stock: (count: number) =>
+      count <= 1 ? `${count} mouvement de stock n’y renvoie plus` : `${count} mouvements de stock n’y renvoient plus`,
+    supplies: (count: number) => (count <= 1 ? `${count} équipement cesse de l’utiliser` : `${count} équipements cessent de l’utiliser`),
+    parts: (count: number) =>
+      count <= 1
+        ? `${count} pièce d’usure reste dans les consommables, sans imprimante`
+        : `${count} pièces d’usure restent dans les consommables, sans imprimante`,
+    pending: 'Suppression…',
+    failed: 'Non supprimé',
+    failedHint: 'Rien n’a été supprimé. Réessayez.',
+    deleted: (name: string) => `${name} supprimé.`,
+  },
   unsavedChanges: {
     title: 'Quitter sans enregistrer ?',
     description: 'Vos modifications de paramètres non enregistrées seront perdues.',

@@ -116,6 +116,7 @@ import {
   updatePrintCopyTagsSchema,
   reorderPrintGroupItemSchema,
   inventoryArchiveSchema,
+  inventoryItemRefSchema,
   inventoryItemSchema,
   reorderRequestSchema,
   requestFiltersSchema,
@@ -444,6 +445,24 @@ export const setInventoryItemArchived = createServerFn({ method: 'POST' })
       if (inventory === 'printers' && !archived) await recordPrinterSetup(context)
       return { items }
     }),
+  )
+
+/** What names an item, which the confirmation before deleting it states. */
+export const getInventoryReferences = createServerFn({ method: 'GET' })
+  .validator(inWorkspace(inventoryItemRefSchema))
+  .handler(async ({ data: { workspaceSlug, inventory, id } }) =>
+    rpc(async () => {
+      const context = await workspaceContext(await app(), workspaceSlug)
+      return await context.service.inventoryReferences(inventory, id, context.identity)
+    }),
+  )
+
+export const deleteInventoryItem = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(inventoryItemRefSchema))
+  .handler(async ({ data: { workspaceSlug, inventory, id } }) =>
+    workspaceMutation(workspaceSlug, async (context) => ({
+      items: await context.service.deleteInventoryItem(inventory, id, context.identity),
+    })),
   )
 
 /** Finishes printer setup without a printer, so it is not offered again; adding one later works as usual. */

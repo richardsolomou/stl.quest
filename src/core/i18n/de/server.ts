@@ -112,6 +112,7 @@ export const server: typeof en = {
     notFound: 'dieser Eintrag existiert nicht mehr; laden Sie die Seite neu',
     exists: 'ein Eintrag mit dieser ID existiert bereits',
     full: (limit: number) => `ein Arbeitsbereich kann bis zu ${limit} davon gleichzeitig nutzen; archivieren Sie zuerst einen`,
+    notArchived: 'archivieren Sie diesen Eintrag, bevor Sie ihn löschen',
   },
   usage: {
     unknownConsumable: 'unbekanntes Verbrauchsmaterial',

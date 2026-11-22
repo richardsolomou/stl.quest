@@ -19,9 +19,14 @@ export function formatUsageAmount(amount: number, unit: UsageUnit, t: Messages['
 
 export type UsageLibrary = { consumables: Consumable[]; equipment: EquipmentItem[]; printers: PrinterProfile[] }
 
-/** The name of what an event used, or undefined when it has left the library since. */
-export function usedItemName(event: Pick<UsageEvent, 'consumableId' | 'equipmentId' | 'printerId'>, library: UsageLibrary) {
-  const { consumableId, equipmentId, printerId } = event
+/** The name of what an event used, marked when it was deleted, or undefined when it has left the library unnamed. */
+export function usedItemName(
+  event: Pick<UsageEvent, 'consumableId' | 'equipmentId' | 'printerId' | 'deletedItemName'>,
+  library: UsageLibrary,
+  t: Messages['spend'],
+) {
+  const { consumableId, equipmentId, printerId, deletedItemName } = event
+  if (deletedItemName !== undefined) return t.deletedItem(deletedItemName)
   if (consumableId) return library.consumables.find(({ id }) => id === consumableId)?.name
   if (equipmentId) return library.equipment.find(({ id }) => id === equipmentId)?.name
   return library.printers.find(({ id }) => id === printerId)?.name

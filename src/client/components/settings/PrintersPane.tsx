@@ -1,11 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { ArrowLeft, ChevronRight, Printer, RotateCcw, Search } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Printer, Search } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { FieldError } from '@/components/ui/field'
-import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
 import {
   newPrinterProfile,
   nextPrinterPrintType,
@@ -28,6 +27,7 @@ import { useWorkspacePrintTypes, useWorkspaceSlug } from '../../workspace'
 import { signalProductTourProgress } from '../../productTour'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { AlsoPrints } from './AlsoPrints'
+import { ArchivedInventory } from './ArchivedInventory'
 import { QueryState } from '../QueryState'
 import { SettingNotice } from '../SettingNotice'
 import { PrinterDialog } from './PrinterDialog'
@@ -61,7 +61,7 @@ export function PrintersPane({
   const { t } = useI18n()
   const copy = t.settings.printers
   const printTypes = useWorkspacePrintTypes()
-  const { mutation, save, setArchived } = useInventory('printers')
+  const { mutation, save, setArchived, remove } = useInventory('printers')
   const callSkip = useServerFn(skipPrinterSetup)
   // Finishing onboarding creates each printer it collected, or records that setup was skipped when there are none.
   const finishSetup = useMutation({
@@ -292,33 +292,16 @@ export function PrintersPane({
         ))}
       <FieldError>{error}</FieldError>
 
-      {archivedProfiles.length > 0 && (
-        <SettingsSection layout="stacked" title={copy.archived.title} description={copy.archived.description}>
-          <div className="@container overflow-hidden rounded-lg border">
-            <Table>
-              <TableBody>
-                {archivedProfiles.map((profile) => (
-                  <TableRow key={profile.id}>
-                    <TableCell className="w-full max-w-0">
-                      <span className="block truncate font-medium" title={profile.name}>
-                        {profile.name}
-                      </span>
-                      <span className="block text-xs text-muted-foreground @sm:hidden">{copy.printTypes[profile.printType]}</span>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground @max-sm:hidden">{copy.printTypes[profile.printType]}</TableCell>
-                    <TableCell className="text-right">
-                      <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => archive(profile.id, false)}>
-                        <RotateCcw />
-                        <span className="@max-sm:sr-only">{copy.archived.restore}</span>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </SettingsSection>
-      )}
+      <ArchivedInventory
+        kind="printers"
+        title={copy.archived.title}
+        description={copy.archived.description}
+        restoreLabel={copy.archived.restore}
+        items={archivedProfiles.map((profile) => ({ id: profile.id, name: profile.name, detail: copy.printTypes[profile.printType] }))}
+        pending={pending}
+        onRestore={(id) => archive(id, false)}
+        onDelete={(id) => remove(id).then(refreshFleet)}
+      />
 
       <SettingNotice notice={failure ? { tone: 'error', title: copy.notSaved, hint: copy.notSavedHint, detail: failure } : undefined} />
       {failure && mutation.variables ? (
