@@ -25,6 +25,15 @@ describe('slicer links', () => {
     expect(verifySlicerLink(secret, payload, signature, now + SLICER_LINK_TTL_MS)).toBeDefined()
   })
 
+  it('refuses a signature spelt differently that decodes to the same bytes', () => {
+    const { payload, signature } = link()
+    // A 32-byte signature's last base64url character carries two unused bits, which a lenient decoder ignores.
+    const last = signature.at(-1)!
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+    const sibling = alphabet[alphabet.indexOf(last) ^ 1]
+    expect(verifySlicerLink(secret, payload, `${signature.slice(0, -1)}${sibling}`, now)).toBeUndefined()
+  })
+
   it('stops working once it expires', () => {
     const { payload, signature } = link()
     expect(verifySlicerLink(secret, payload, signature, now + SLICER_LINK_TTL_MS + 1)).toBeUndefined()
