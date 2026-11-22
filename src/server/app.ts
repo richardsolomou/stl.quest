@@ -57,6 +57,7 @@ import {
   type LegacyCloudStorageCleanup,
 } from './storageMigration'
 import { organization } from '../db/schema'
+import { publicOrigin } from './origins'
 import { currentRequest, setRequestIdentity } from './requestContext'
 import { serverMessages, setRequestLocale } from './locale'
 import { isLocale } from '../core/i18n/locales'
@@ -740,7 +741,7 @@ function appUrl(origin: string | undefined) {
 
 function currentRequestOrigin() {
   const request = currentRequest()
-  return request ? new URL(request.url).origin : undefined
+  return request ? publicOrigin(request) : undefined
 }
 
 async function closeRealtime(realtime: Pick<ReturnType<typeof createRealtime>, 'close'>) {

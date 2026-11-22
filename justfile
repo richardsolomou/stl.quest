@@ -64,7 +64,7 @@ e2e-install:
     pnpm exec playwright install chromium
 
 e2e-build:
-    sh scripts/e2eLock.sh docker build -t stlquest-e2e .
+    sh scripts/e2eLock.sh sh -c 'docker build -t "$(sh scripts/e2eImage.sh)" .'
 
 e2e *args:
     sh scripts/e2eLock.sh sh -c 'just e2e-build && just e2e-run "$@"' e2e {{ args }}
@@ -75,8 +75,9 @@ e2e-run *args:
 e2e-distributed:
     sh scripts/e2eLock.sh sh -c 'just e2e-build && just e2e-distributed-run'
 
+# The distributed stack uses fixed ports and names, so it also holds one machine-wide lock.
 e2e-distributed-run:
-    sh scripts/e2eLock.sh pnpm exec playwright test --config playwright.distributed.config.ts
+    sh scripts/e2eLock.sh env STLQUEST_E2E_LOCKED= STLQUEST_E2E_LOCK=/tmp/stlquest-e2e-distributed.lock sh scripts/e2eLock.sh pnpm exec playwright test --config playwright.distributed.config.ts
 
 e2e-ci:
     sh scripts/e2eLock.sh sh -c 'just e2e-run && just e2e-distributed-run'
