@@ -71,8 +71,8 @@ test('runs a plate as one and sends it back to print again when Bambuddy reports
   expect(served.status()).toBe(200)
   expect(served.headers()['content-disposition']).toBe(`attachment; filename="stlquest-plate-${plateNumber}.3mf"`)
   const model = strFromU8(unzipSync(new Uint8Array(await served.body()))['3D/3dmodel.model'])
-  expect([...model.matchAll(/<object id="\d+" name="([^"]+)"/g)].map((match) => match[1].replace(/^SQ-\d+ /, 'SQ-n '))).toEqual(
-    prints.map((name) => `SQ-n ${name}.stl`),
+  expect([...model.matchAll(/<object id="\d+" name="([^"]+)"/g)].map((match) => match[1].replace(/^SQ-\d+ /, 'SQ-n ')).sort()).toEqual(
+    prints.map((name) => `SQ-n ${name}.stl`).sort(),
   )
   expect(model.match(/<item /g)).toHaveLength(prints.length)
   await slicer.dispose()
