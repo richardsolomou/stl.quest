@@ -10,7 +10,7 @@ import { DrizzleRepository } from '../db/repository'
 import { organization, requests, requestStatuses, user } from '../db/schema'
 import type { EventBus, Identity, Notifier, PrinterProfile, Telemetry } from './types'
 import { STLQuestService } from './services'
-import { consumablesOfKind, type Consumable } from './consumables'
+import { consumablePrice, consumablesOfKind, MAX_CONSUMABLES, type Consumable } from './consumables'
 import { MAX_EQUIPMENT, type EquipmentItem } from './equipment'
 import { PRINTERS_SKIPPED_SETTING } from './printers'
 import { summariseSpend } from './spend'
@@ -2802,6 +2802,132 @@ describe('STLQuestService crash recovery', () => {
         [admin.id, 'consumables_saved', { resin_count: 1, filament_count: 0, part_count: 0, supply_count: 0 }],
         [admin.id, 'equipment_saved', { equipment_count: 1, catalogue_count: 1, with_supplies_count: 0 }],
       ])
+    })
+
+    describe('adding several consumables', () => {
+      const pla = { kind: 'filament', filamentPresetId: 'bambu-pla', pricePerKg: 24 } as const
+      const black: Consumable = { ...pla, id: 'black', name: 'PLA · Black', colour: { name: 'Black', hex: '#000000' } }
+      const white: Consumable = { ...pla, id: 'white', name: 'PLA · White', colour: { name: 'White', hex: '#ffffff' } }
+
+      it('adds them after the others and announces the change once', async () => {
+        await stock('consumables', [grey])
+
+        await inventory.createConsumables([black, white], undefined, admin)
+
+        expect({
+          library: (await repository.listInventory('consumables')).map(({ id }) => id),
+          published: publish.mock.calls,
+        }).toEqual({ library: [grey.id, black.id, white.id], published: [['inventory.changed']] })
+      })
+
+      it('keeps one already stored, as a retried add left it, and adds the rest', async () => {
+        await stock('consumables', [{ ...white, pricePerKg: 30 }])
+
+        await inventory.createConsumables([black, white], undefined, admin)
+
+        expect((await repository.listInventory('consumables')).map((item) => ({ id: item.id, pricePerKg: consumablePrice(item) }))).toEqual(
+          [
+            { id: white.id, pricePerKg: 30 },
+            { id: black.id, pricePerKg: 24 },
+          ],
+        )
+      })
+
+      it('counts stock once when the same add is retried', async () => {
+        await repository.setSetting(USAGE_TRACKING_SETTING, true)
+        await inventory.createConsumables([black, white], 1_000, admin)
+
+        await inventory.createConsumables([black, white], 1_000, admin)
+
+        expect((await inventory.stockLevels(admin)).map(({ onHand }) => onHand)).toEqual([1_000, 1_000])
+      })
+
+      it('adds none when they would pass the limit', async () => {
+        await stock(
+          'consumables',
+          Array.from({ length: MAX_CONSUMABLES - 1 }, (_, index) => ({ ...grey, id: `grey-${index}` })),
+        )
+
+        await expect(inventory.createConsumables([black, white], undefined, admin)).rejects.toMatchObject({ status: 409 })
+        expect(await repository.listInventory('consumables')).toHaveLength(MAX_CONSUMABLES - 1)
+      })
+
+      it('counts each at the amount on hand while stock is tracked', async () => {
+        await repository.setSetting(USAGE_TRACKING_SETTING, true)
+
+        await inventory.createConsumables([black, white], 1_000, admin)
+
+        expect((await inventory.stockLevels(admin)).map(({ onHand, tracked }) => ({ onHand, tracked }))).toEqual([
+          { onHand: 1_000, tracked: true },
+          { onHand: 1_000, tracked: true },
+        ])
+      })
+
+      it('counts them in one step that undoes together', async () => {
+        await repository.setSetting(USAGE_TRACKING_SETTING, true)
+        await inventory.createConsumables([black, white], 1_000, admin)
+        const [{ transactionId }] = await inventory.listUsage({}, admin)
+
+        await inventory.undoUsage(transactionId, admin)
+
+        expect((await inventory.stockLevels(admin)).map(({ tracked }) => tracked)).toEqual([false, false])
+      })
+
+      it('refuses an amount on hand while stock is not tracked, adding nothing', async () => {
+        await expect(inventory.createConsumables([black], 1_000, admin)).rejects.toMatchObject({ status: 409 })
+        expect(await repository.listInventory('consumables')).toEqual([])
+      })
+
+      it('lets only admins add them', async () => {
+        await expect(inventory.createConsumables([black], undefined, requester)).rejects.toMatchObject({ status: 403 })
+      })
+
+      it('reports how many were added and whether they were counted', async () => {
+        await inventory.createConsumables([black, white], undefined, admin)
+
+        expect(capture.mock.calls.at(-1)).toEqual([
+          admin.id,
+          'consumables_added',
+          { item_count: 2, consumable_kind: 'filament', has_stock: false },
+        ])
+      })
+    })
+
+    describe('sharing a filament price', () => {
+      const pla = { kind: 'filament', filamentPresetId: 'bambu-pla' } as const
+      const black: Consumable = { ...pla, id: 'black', name: 'PLA · Black', pricePerKg: 26 }
+      const white: Consumable = { ...pla, id: 'white', name: 'PLA · White', pricePerKg: 20 }
+      const petg: Consumable = { kind: 'filament', id: 'petg', name: 'PETG', filamentPresetId: 'bambu-petg', pricePerKg: 20 }
+
+      it('gives the other colours of the product its price', async () => {
+        await stock('consumables', [black, white, petg])
+
+        await inventory.shareFilamentPrice(black.id, admin)
+
+        expect((await repository.listInventory('consumables')).map((item) => item.kind === 'filament' && item.pricePerKg)).toEqual([
+          26, 26, 20,
+        ])
+      })
+
+      it('refuses a consumable that is not a filament', async () => {
+        await stock('consumables', [grey])
+
+        await expect(inventory.shareFilamentPrice(grey.id, admin)).rejects.toMatchObject({ status: 404 })
+      })
+
+      it('lets only admins share it', async () => {
+        await stock('consumables', [black, white])
+
+        await expect(inventory.shareFilamentPrice(black.id, requester)).rejects.toMatchObject({ status: 403 })
+      })
+
+      it('reports how many colours took the price', async () => {
+        await stock('consumables', [black, white, petg])
+
+        await inventory.shareFilamentPrice(black.id, admin)
+
+        expect(capture.mock.calls.at(-1)).toEqual([admin.id, 'filament_price_shared', { colour_count: 1 }])
+      })
     })
 
     it('remembers printer setup finished without a printer', async () => {

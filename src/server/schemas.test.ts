@@ -10,6 +10,7 @@ import {
   updatePrintCopyTagsSchema,
   acceptInviteSchema,
   boardSettingsSchema,
+  createConsumablesSchema,
   createLinkedRequestSchema,
   requestCoverSchema,
   createPrintGroupSchema,
@@ -37,6 +38,27 @@ describe('board settings schema', () => {
 
   it('rejects an update that changes nothing', () => {
     expect(boardSettingsSchema.safeParse({}).success).toBe(false)
+  })
+})
+
+describe('create consumables schema', () => {
+  const filament = (id: string) => ({ id, kind: 'filament', name: id, pricePerKg: 20 })
+
+  it('accepts several filaments counted at one amount', () => {
+    expect(createConsumablesSchema.safeParse({ items: [filament('a'), filament('b')], onHand: 1_000 }).success).toBe(true)
+  })
+
+  it('rejects two items with the same ID', () => {
+    expect(createConsumablesSchema.safeParse({ items: [filament('a'), filament('a')] }).success).toBe(false)
+  })
+
+  it('rejects items of different kinds', () => {
+    const ipa = { id: 'ipa', kind: 'supply', name: 'IPA', unit: 'ml', price: 10 }
+    expect(createConsumablesSchema.safeParse({ items: [filament('a'), ipa] }).success).toBe(false)
+  })
+
+  it('rejects an empty list', () => {
+    expect(createConsumablesSchema.safeParse({ items: [] }).success).toBe(false)
   })
 })
 

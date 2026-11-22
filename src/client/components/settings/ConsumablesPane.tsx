@@ -1,10 +1,11 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronRight, Plus, Search } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu'
+import { cn } from '@/lib/utils'
 import {
   consumablePrice,
   consumablesOfKind,
@@ -14,9 +15,10 @@ import {
   wearPartGroups,
   withConsumablePrice,
   type Consumable,
+  type FilamentConsumable,
   type WearPartGroup,
 } from '../../../core/consumables'
-import { filamentFromPreset, type FilamentPreset } from '../../../core/filamentPresets'
+import { filamentConsumableName, filamentFromPreset, filamentProductGroups, type FilamentPreset } from '../../../core/filamentPresets'
 import { partPresetsForGroup } from '../../../core/partPresets'
 import { findPreset } from '../../../core/presets'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS, TYPICAL_RESIN_DENSITY_GRAMS_PER_ML } from '../../../core/priceCalculator'
@@ -27,7 +29,7 @@ import { partFromPreset, type PartSuggestion } from '../../../core/stock'
 import { PRINT_TYPES, type PrintType } from '../../../core/types'
 import type { StockLevel } from '../../../core/usage'
 import { useI18n } from '../../i18n'
-import { useInventory } from '../../inventory'
+import { useConsumableBatch, useInventory } from '../../inventory'
 import { activeItems } from '../../../core/inventory'
 import { createId } from '../../id'
 import { matchesListSearch, showsListSearch } from '../../listSearch'
@@ -37,18 +39,25 @@ import { useUsageTracking, useWorkspacePrintTypes, useWorkspaceSlug } from '../.
 import { UsageTrackingInvite } from '../UsageTracking'
 import { currencySymbol, formatMoney, formatNumber, formatRate } from '../priceCalculator/format'
 import { QueryState } from '../QueryState'
+import { ColourSwatch } from '../ColourSwatch'
 import { AlsoPrints } from './AlsoPrints'
 import { ArchivedInventory } from './ArchivedInventory'
 import { ConsumableDialog } from './ConsumableDialog'
 import { ConsumableIcon } from './ConsumableIcon'
 import { materialFacts, MaterialPicker, PartPicker } from './ConsumablePicker'
-import { StockSummary } from './ConsumableStock'
+import { LowMarker, StockSummary } from './ConsumableStock'
 import { VirtualList } from './VirtualList'
 import { PrinterPresetImage } from './PrinterPresetImage'
 import { PageHeader, SettingsPage, SettingsSection } from './SettingsLayout'
 import { SupplyNeeds } from './SupplyNeeds'
 
 type LabelledGroup = WearPartGroup & { label: string }
+type ProductEntry = { type: 'product'; presetId: string; filaments: FilamentConsumable[]; open: boolean }
+type ListEntry = ProductEntry | { type: 'item'; consumable: Consumable; nested?: boolean }
+
+// A product line shows this many swatches, fewer on a phone, beside its colour count.
+const PRODUCT_SWATCHES = 12
+const NARROW_PRODUCT_SWATCHES = 3
 type Picking = { kind: PrintType } | { kind: 'part'; group: LabelledGroup }
 
 export function ConsumablesPane() {
@@ -96,6 +105,7 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
   const stock = useQuery({ ...stockQuery(workspaceSlug), enabled: tracking }).data?.stock
   const levels = useMemo(() => stock ?? [], [stock])
   const { mutation, save, setArchived, remove } = useInventory('consumables')
+  const batch = useConsumableBatch()
   // A new item scrolls into view once it is stored, so it is found where it landed when its dialog closes.
   const [added, setAdded] = useState<string>()
   const saveItem = async (item: Consumable) => {
@@ -104,6 +114,19 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
     if (isNew) setAdded(item.id)
     if (isNew && (item.kind === 'resin' || item.kind === 'filament')) signalProductTourProgress('stock')
   }
+  const addColours = async (items: FilamentConsumable[], onHand?: number) => {
+    await batch.add.mutateAsync({ items, onHand })
+    setAdded(items[0].id)
+    signalProductTourProgress('stock')
+  }
+  // Products whose colours are listed under them; the rest show as one line with their swatches.
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
+  const toggleProduct = (presetId: string) =>
+    setExpanded((current) => {
+      const next = new Set(current)
+      if (!next.delete(presetId)) next.add(presetId)
+      return next
+    })
   // A new item is kept here, not in the list, until its dialog has what it needs and stores it.
   const [editing, setEditing] = useState<Consumable | null>(null)
   const [picking, setPicking] = useState<Picking | null>(null)
@@ -157,30 +180,58 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
     filament: { items: consumablesOfKind(saved, 'filament'), addLabel: copy.filaments.add },
   }
   const shows = (printType: PrintType) => printTypes.includes(printType) || materials[printType].items.length > 0
-  const rows = (items: Consumable[]) =>
-    items.length > 0 && (
-      <VirtualList
-        items={items}
-        getKey={({ id }) => id}
-        scrollToKey={added}
-        renderItem={(consumable) => (
-          <ConsumableRow
-            consumable={consumable}
-            preset={
-              consumable.kind === 'resin'
-                ? findPreset(resins, consumable.resinPresetId)
-                : consumable.kind === 'filament'
-                  ? findPreset(filaments, consumable.filamentPresetId)
-                  : undefined
-            }
-            level={levels.find(({ consumableId }) => consumableId === consumable.id)}
-            money={money}
-            rate={rate}
-            onOpen={() => setEditing(consumable)}
-          />
-        )}
-      />
+  const level = (consumable: Consumable) => levels.find(({ consumableId }) => consumableId === consumable.id)
+  const rows = (items: Consumable[]) => {
+    // A filament product with several colours is one line that opens to its colours; a search shows the colours it found.
+    const entries = filamentProductGroups(consumablesOfKind(items, 'filament')).flatMap(({ presetId, filaments: colours }): ListEntry[] => {
+      if (!presetId) return [{ type: 'item', consumable: colours[0] }]
+      const open = search.trim() !== '' || expanded.has(presetId)
+      return [
+        { type: 'product', presetId, filaments: colours, open },
+        ...(open ? colours.map((consumable) => ({ type: 'item' as const, consumable, nested: true })) : []),
+      ]
+    })
+    entries.push(...items.filter((item) => item.kind !== 'filament').map((consumable) => ({ type: 'item' as const, consumable })))
+    const hidden = entries.find(
+      (entry): entry is ProductEntry => entry.type === 'product' && !entry.open && entry.filaments.some(({ id }) => id === added),
     )
+    return (
+      entries.length > 0 && (
+        <VirtualList
+          items={entries}
+          getKey={(entry) => (entry.type === 'product' ? `product:${entry.presetId}` : entry.consumable.id)}
+          scrollToKey={hidden ? `product:${hidden.presetId}` : added}
+          renderItem={(entry) =>
+            entry.type === 'product' ? (
+              <FilamentProductRow
+                entry={entry}
+                preset={findPreset(filaments, entry.presetId)}
+                levels={entry.filaments.flatMap((filament) => level(filament) ?? [])}
+                money={money}
+                onToggle={() => toggleProduct(entry.presetId)}
+              />
+            ) : (
+              <ConsumableRow
+                consumable={entry.consumable}
+                nested={entry.nested}
+                preset={
+                  entry.consumable.kind === 'resin'
+                    ? findPreset(resins, entry.consumable.resinPresetId)
+                    : entry.consumable.kind === 'filament'
+                      ? findPreset(filaments, entry.consumable.filamentPresetId)
+                      : undefined
+                }
+                level={level(entry.consumable)}
+                money={money}
+                rate={rate}
+                onOpen={() => setEditing(entry.consumable)}
+              />
+            )
+          }
+        />
+      )
+    )
+  }
   const supplies = consumablesOfKind(saved, 'supply')
   const kindTitles = { resin: copy.resins.title, filament: copy.filaments.title, supply: copy.supplies.title, part: copy.parts.title }
 
@@ -337,12 +388,14 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
           key={editing.id}
           consumable={editing}
           isNew={!saved.some(({ id }) => id === editing.id)}
+          library={saved}
           workspaceSlug={workspaceSlug}
           level={levels.find(({ consumableId }) => consumableId === editing.id)}
           printers={printers}
           symbol={symbol}
           rate={rate}
           onSave={saveItem}
+          onAddColours={addColours}
           onArchive={() => archive(editing)}
           onClose={() => setEditing(null)}
         />
@@ -417,6 +470,7 @@ function PartGroup({ group, onAdd, children }: { group: LabelledGroup; onAdd: ()
 /** One consumable as a line: what it is, what the catalogue says of it, its stock and price; it opens its dialog. */
 function ConsumableRow({
   consumable,
+  nested = false,
   preset,
   level,
   money,
@@ -424,6 +478,8 @@ function ConsumableRow({
   onOpen,
 }: {
   consumable: Consumable
+  /** Listed under its product's line, so it reads as its colour alone. */
+  nested?: boolean
   /** The catalogue product a resin or filament is. */
   preset?: ResinPreset | FilamentPreset
   level?: StockLevel
@@ -433,7 +489,8 @@ function ConsumableRow({
 }) {
   const { t, locale } = useI18n()
   const copy = t.settings.consumables
-  const facts = rowFacts(consumable)
+  const facts = nested ? undefined : rowFacts(consumable)
+  const name = (nested && consumable.kind === 'filament' && consumable.colour?.name) || consumable.name
   const price = consumablePrice(consumable)
   const priced =
     consumable.kind === 'resin'
@@ -467,12 +524,12 @@ function ConsumableRow({
     <button
       type="button"
       aria-label={copy.edit(consumable.name)}
-      className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none focus-visible:ring-inset"
+      className={cn(rowClassName, nested && 'bg-muted/20 pl-8 @sm:pl-14')}
       onClick={onOpen}
     >
-      <ConsumableIcon consumable={consumable} />
+      <ConsumableIcon consumable={consumable} className={cn(nested && 'size-8')} />
       <span className="min-w-0 flex-1">
-        <span className="block font-medium @max-sm:line-clamp-2 @sm:truncate">{consumable.name}</span>
+        <span className="block font-medium @max-sm:line-clamp-2 @sm:truncate">{name}</span>
         {facts && <span className="block truncate text-xs text-muted-foreground">{facts}</span>}
         <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-xs text-muted-foreground *:whitespace-nowrap @sm:hidden">
           {figures}
@@ -480,6 +537,72 @@ function ConsumableRow({
       </span>
       <span className="flex shrink-0 items-center gap-4 font-mono text-xs text-muted-foreground @max-sm:hidden">{figures}</span>
       <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+    </button>
+  )
+}
+
+const rowClassName =
+  'flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none focus-visible:ring-inset'
+
+/** A catalogue filament stocked in several colours as one line: its swatches, how many run low, and its price or range. */
+function FilamentProductRow({
+  entry,
+  preset,
+  levels,
+  money,
+  onToggle,
+}: {
+  entry: ProductEntry
+  preset?: FilamentPreset
+  levels: StockLevel[]
+  money: (value: number) => string
+  onToggle: () => void
+}) {
+  const { t, locale } = useI18n()
+  const copy = t.settings.consumables
+  const name = preset ? filamentConsumableName(preset) : entry.filaments[0].name
+  const prices = entry.filaments.map(({ pricePerKg }) => pricePerKg)
+  const [lowest, highest] = [Math.min(...prices), Math.max(...prices)]
+  const priced = lowest === highest ? `${money(lowest)}/kg` : `${money(lowest)}–${money(highest)}/kg`
+  const low = levels.filter((level) => level.low || level.missing).length
+  const swatches = entry.filaments.flatMap(({ id, colour }) => (colour ? [{ id, hex: colour.hex }] : []))
+  const Chevron = entry.open ? ChevronDown : ChevronRight
+  const figures = (
+    <>
+      {low > 0 && (
+        <span className="inline-flex items-center gap-1.5">
+          <LowMarker />
+          {copy.stock.lowCount(low)}
+        </span>
+      )}
+      <span className="@sm:min-w-24 @sm:text-right">{priced}</span>
+    </>
+  )
+  return (
+    <button type="button" aria-expanded={entry.open} className={rowClassName} onClick={onToggle}>
+      <ConsumableIcon consumable={{ kind: 'filament' }} />
+      <span className="min-w-0 flex-1">
+        <span className="block font-medium @max-sm:line-clamp-2 @sm:truncate">{name}</span>
+        <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="flex shrink-0 -space-x-1" aria-hidden="true">
+            {swatches.slice(0, PRODUCT_SWATCHES).map(({ id, hex }, index) => (
+              <ColourSwatch
+                key={id}
+                hex={hex}
+                className={cn('size-3.5 border-foreground/35 ring-1 ring-card', index >= NARROW_PRODUCT_SWATCHES && '@max-sm:hidden')}
+              />
+            ))}
+          </span>
+          <span className="truncate">
+            {[copy.filaments.colourCount(entry.filaments.length), preset && materialFacts(preset, locale)].filter(Boolean).join(' · ')}
+          </span>
+        </span>
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-xs text-muted-foreground *:whitespace-nowrap @sm:hidden">
+          {figures}
+        </span>
+      </span>
+      <span className="flex shrink-0 items-center gap-4 font-mono text-xs text-muted-foreground @max-sm:hidden">{figures}</span>
+      <Chevron className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
     </button>
   )
 }

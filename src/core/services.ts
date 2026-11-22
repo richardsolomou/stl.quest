@@ -67,6 +67,7 @@ import { modelFormat, sourceImageKey } from './assetKeys'
 import { imageContentType, MAX_COVER_BYTES } from './coverImage'
 import { automaticEstimateFields, requestPrintEstimate, type MaterialEstimateSettings } from './printEstimates'
 import { consumablesOfKind, type Consumable } from './consumables'
+import { sameFilamentProduct, withSharedFilamentPrice } from './filamentPresets'
 import type { EquipmentItem } from './equipment'
 import { activeItems, INVENTORY_LIMITS, type InventoryItems, type InventoryKind } from './inventory'
 import { canDeleteInventoryItem, deletedItemKind } from './inventoryDeletion'
@@ -1587,6 +1588,47 @@ export class STLQuestService {
       if (items.some(({ id }) => id === item.id)) throw new Response(this.text.inventory.exists, { status: 409 })
       return [...items, { ...item, archived: undefined }]
     })
+  }
+
+  /**
+   * Adds several consumables under one lock, such as the colours of one filament, so they land together or not at all.
+   * While stock is tracked, each is counted at `onHand`, in its own unit, as one undoable step. A retry of the same add
+   * is safe: items already stored under the same IDs are kept as they are, and each count records only the difference.
+   */
+  async createConsumables(items: Consumable[], onHand: number | undefined, identity: Identity) {
+    if (onHand !== undefined) await this.requireUsageTracking(identity)
+    const library = await this.changeInventory('consumables', identity, (current) => [
+      ...current,
+      ...items.filter((item) => !current.some(({ id }) => id === item.id)).map((item) => ({ ...item, archived: undefined })),
+    ])
+    if (onHand !== undefined) {
+      const stored = items.map((item) => library.find(({ id }) => id === item.id) ?? item)
+      const levels = stockLevels(stored, await this.repository.stockTotals())
+      const corrections = stored.flatMap((item, index) => {
+        const amount = onHand - levels[index].onHand
+        return amount ? [{ stage: 'stock' as const, kind: 'correction' as const, ...consumed(item), amount }] : []
+      })
+      if (corrections.length) await this.appendUsage(corrections, identity)
+    }
+    this.capture(identity.id, 'consumables_added', {
+      item_count: items.length,
+      consumable_kind: items[0].kind,
+      has_stock: onHand !== undefined,
+    })
+    return library
+  }
+
+  /** Gives a catalogued filament's price to the other active colours of its product. */
+  async shareFilamentPrice(consumableId: string, identity: Identity) {
+    let colours = 0
+    const library = await this.changeInventory('consumables', identity, (current) => {
+      const source = current.find(({ id }) => id === consumableId)
+      if (source?.kind !== 'filament') throw new Response(this.text.inventory.notFound, { status: 404 })
+      colours = sameFilamentProduct(current, source).length
+      return withSharedFilamentPrice(current, consumableId)
+    })
+    this.capture(identity.id, 'filament_price_shared', { colour_count: colours })
+    return library
   }
 
   /** Stores an edit to one item; archiving has its own action, so the item stays archived or active as it is. */

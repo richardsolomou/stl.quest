@@ -265,6 +265,18 @@ export const inventoryItemRefSchema = z.object({
 })
 export const inventoryArchiveSchema = inventoryItemRefSchema.extend({ archived: z.boolean() })
 
+/** Several new consumables of one kind, such as the colours of one filament, each optionally counted at the same amount. */
+export const createConsumablesSchema = z.object({
+  items: z
+    .array(consumableSchema)
+    .min(1)
+    .max(MAX_CONSUMABLES)
+    .refine((items) => new Set(items.map((item) => item.id)).size === items.length, 'IDs must be unique')
+    .refine((items) => items.every(({ kind }) => kind === items[0].kind), 'items must be of one kind'),
+  onHand: z.number().positive().max(1_000_000).optional(),
+})
+export const shareFilamentPriceSchema = z.object({ consumableId: z.string().trim().min(1).max(200) })
+
 export const passwordAuthSettingsSchema = z.object({ enabled: z.boolean() })
 export const setOwnPasswordSchema = z.object({ password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH) })
 export const changeOwnEmailSchema = z.object({
