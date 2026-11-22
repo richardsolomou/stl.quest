@@ -8,7 +8,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { newWearPart, wearPartsFor, withConsumablePrice, type Consumable, type PartConsumable } from '../../../core/consumables'
 import { partPresetsForGroup } from '../../../core/partPresets'
-import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from '../../../core/priceCalculator'
+import { DEFAULT_PRICE_CALCULATOR_SETTINGS, measuredFailurePercent, MIN_MEASURED_FAILURE_RUNS } from '../../../core/priceCalculator'
 import { partFromPreset } from '../../../core/stock'
 import { wearLevel, type PartWear, type WearLevel } from '../../../core/maintenance'
 import type { PrinterProfile } from '../../../core/types'
@@ -151,11 +151,12 @@ export function PrinterLifetimeLine({ printerId, lifespanHours }: { printerId: s
         <p className="font-mono text-xs text-muted-foreground tabular-nums">
           {copy.runs(
             lifetime.runs.runs,
-            lifetime.runs.failed + lifetime.runs.cancelled,
+            lifetime.runs.failed,
             new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 }).format(
-              (lifetime.runs.failed + lifetime.runs.cancelled) / lifetime.runs.runs,
+              measuredFailurePercent(lifetime.runs) / 100,
             ),
           )}
+          {` · ${copy.runsPricing(MIN_MEASURED_FAILURE_RUNS, lifetime.runs.runs >= MIN_MEASURED_FAILURE_RUNS)}`}
         </p>
       )}
     </div>

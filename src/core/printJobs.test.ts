@@ -1,16 +1,18 @@
 import { describe, expect, it } from 'vitest'
+import type { FilamentConsumable } from './consumables'
 import type { Plate } from './plates'
 import {
   bambuddyReport,
   continuedPrintJob,
   displayedGrams,
   displayedMinutes,
+  displayedTrays,
+  printFilaments,
   printJobLink,
   printerNamed,
   printerRunCounts,
   printSpoolMaterials,
   sameSpoolUsage,
-  taggedRequestNumber,
   type PrintJob,
 } from './printJobs'
 
@@ -64,21 +66,87 @@ describe('displayedGrams', () => {
   })
 })
 
-describe('taggedRequestNumber', () => {
-  it('finds the tag a downloaded file carries', () => {
-    expect(taggedRequestNumber('SQ-142 Plasma')).toBe(142)
+describe('displayedTrays', () => {
+  it('reads each AMS tray’s material and grams', () => {
+    expect(displayedTrays('AMS-A T1 PLA: 12.3g | AMS-A T2 PETG: 4.0g')).toEqual([
+      { material: 'PLA', grams: 12.3 },
+      { material: 'PETG', grams: 4 },
+    ])
   })
 
-  it('finds a tag after underscores became spaces', () => {
-    expect(taggedRequestNumber('Plate 1 SQ-7 Hull')).toBe(7)
+  it('reads the external spool', () => {
+    expect(displayedTrays('Ext PLA Basic: 3.0g')).toEqual([{ material: 'PLA Basic', grams: 3 }])
   })
 
-  it('ignores a tag inside another word', () => {
-    expect(taggedRequestNumber('XSQ-7')).toBeUndefined()
+  it('reads an AMS unit named with a space', () => {
+    expect(displayedTrays('AMS 3H T2 ABS: 1.5g')).toEqual([{ material: 'ABS', grams: 1.5 }])
   })
 
-  it('takes no tag when the name has two', () => {
-    expect(taggedRequestNumber('SQ-7 SQ-8 plate')).toBeUndefined()
+  it('reads slots the slicer file listed', () => {
+    expect(displayedTrays('PLA: 12.3g | PETG-CF: 1.0g')).toEqual([
+      { material: 'PLA', grams: 12.3 },
+      { material: 'PETG-CF', grams: 1 },
+    ])
+  })
+
+  it('leaves an unknown material out', () => {
+    expect(displayedTrays('AMS-A T1 Unknown: 2.0g')).toEqual([{ grams: 2 }])
+  })
+
+  it('skips parts it cannot read', () => {
+    expect(displayedTrays('AMS-A T1 PLA | PETG: 4.0g')).toEqual([{ material: 'PETG', grams: 4 }])
+  })
+})
+
+describe('printFilaments', () => {
+  const pla: FilamentConsumable = { id: 'pla', kind: 'filament', name: 'Bambu PLA Basic', pricePerKg: 20 }
+  const petg: FilamentConsumable = { id: 'petg', kind: 'filament', name: 'Bambu PETG HF', pricePerKg: 25 }
+  const materials: Record<string, string> = { pla: 'PLA', petg: 'PETG' }
+  const materialOf = (filament: FilamentConsumable) => materials[filament.id]
+
+  it('puts each tray on the first filament of its material', () => {
+    expect(printFilaments({ grams: 16, filamentDetails: 'AMS-A T1 PETG: 4.0g | AMS-A T2 PLA: 12.0g' }, [pla, petg], materialOf)).toEqual([
+      { filament: petg, grams: 4 },
+      { filament: pla, grams: 12 },
+    ])
+  })
+
+  it('puts a tray of a material the library lacks on the first filament', () => {
+    expect(printFilaments({ grams: 3, filamentDetails: 'Ext TPU: 3.0g' }, [pla, petg], materialOf)).toEqual([{ filament: pla, grams: 3 }])
+  })
+
+  it('adds trays of the same filament together', () => {
+    expect(printFilaments({ filamentDetails: 'AMS-A T1 PLA: 2.0g | AMS-A T2 PLA: 3.0g' }, [pla, petg], materialOf)).toEqual([
+      { filament: pla, grams: 5 },
+    ])
+  })
+
+  it('takes measured trays as the whole print', () => {
+    expect(printFilaments({ grams: 12, filamentDetails: 'AMS-A T1 PETG: 4.0g' }, [pla, petg], materialOf)).toEqual([
+      { filament: petg, grams: 4 },
+    ])
+  })
+
+  it('puts grams the slicer slots do not account for on the first filament', () => {
+    expect(printFilaments({ grams: 10, filamentDetails: 'PETG: 4.0g' }, [pla, petg], materialOf)).toEqual([
+      { filament: petg, grams: 4 },
+      { filament: pla, grams: 6 },
+    ])
+  })
+
+  it('ignores slicer slots missing the total only by rounding', () => {
+    expect(printFilaments({ grams: 10, filamentDetails: 'PLA: 3.3g | PETG: 6.6g' }, [pla, petg], materialOf)).toEqual([
+      { filament: pla, grams: 3.3 },
+      { filament: petg, grams: 6.6 },
+    ])
+  })
+
+  it('puts every gram on the first filament without trays', () => {
+    expect(printFilaments({ grams: 10 }, [pla, petg], materialOf)).toEqual([{ filament: pla, grams: 10 }])
+  })
+
+  it('uses nothing without a library filament', () => {
+    expect(printFilaments({ grams: 10, filamentDetails: 'PLA: 10.0g' }, [], materialOf)).toEqual([])
   })
 })
 
@@ -189,7 +257,7 @@ describe('printJobLink', () => {
 describe('printerRunCounts', () => {
   const linked = { printerId: 'x2d', plateId: 'plate' }
 
-  it('counts ended plate runs and failures per printer', () => {
+  it('counts finished and failed plate runs per printer', () => {
     expect(
       printerRunCounts([
         job(linked),
@@ -197,7 +265,7 @@ describe('printerRunCounts', () => {
         job({ ...linked, outcome: 'cancelled' }),
         job({ ...linked, outcome: 'printing' }),
       ]),
-    ).toEqual([{ printerId: 'x2d', runs: 3, failed: 1, cancelled: 1 }])
+    ).toEqual([{ printerId: 'x2d', runs: 2, failed: 1 }])
   })
 
   it('leaves out prints on no plate', () => {

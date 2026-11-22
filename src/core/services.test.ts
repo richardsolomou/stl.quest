@@ -3973,7 +3973,7 @@ describe('STLQuestService crash recovery', () => {
         const { id } = await plate(large, small)
 
         const { plate: recorded } = await service.recordPlate(
-          { plateId: id, minutes: 60, materials: [{ consumableId: filament.id }], total: 40, otherShare: 0 },
+          { plateId: id, minutes: 60, materials: [{ consumableId: filament.id }], totals: [40], otherShare: 0 },
           admin,
         )
 
@@ -4019,7 +4019,7 @@ describe('STLQuestService crash recovery', () => {
         )
 
         const { plate: recorded } = await service.recordPlate(
-          { plateId: id, minutes: 60, materials: [{ consumableId: resin.id }], total: 51, otherShare: 0 },
+          { plateId: id, minutes: 60, materials: [{ consumableId: resin.id }], totals: [51], otherShare: 0 },
           admin,
         )
 
@@ -4259,6 +4259,49 @@ describe('STLQuestService crash recovery', () => {
         expect((await service.listUsage({ requestId }, admin)).find((event) => event.unit === 'minute')?.outcome).toBe('failed')
       })
 
+      it('records each tray a finished print reports against the filament of its material', async () => {
+        const petg: Consumable = {
+          id: 'petg',
+          kind: 'filament',
+          name: 'PETG',
+          filamentPresetId: 'filament-3dhojor-basic-petg',
+          pricePerKg: 25,
+        }
+        await stock('consumables', [petg])
+        const requestId = await queued()
+        await start(requestId)
+
+        await service.receivePrint({ ...finished, grams: 40, filamentDetails: 'AMS-A T1 PLA: 30.0g | AMS-A T2 PETG: 10.0g' })
+
+        const used = (await service.listUsage({ requestId }, admin)).filter((event) => event.unit === 'g')
+        expect(Object.fromEntries(used.map((event) => [event.consumableId, event.amount]))).toEqual({ [filament.id]: 30, [petg.id]: 10 })
+      })
+
+      it('splits a failed print’s grams by what the plate’s slicer file measured for each print', async () => {
+        const first = await queued()
+        const second = await queued()
+        const { id } = await start(first, second)
+        await service.recordPlate(
+          {
+            plateId: id,
+            minutes: 60,
+            materials: [{ consumableId: filament.id }],
+            objects: [
+              { requestId: first, amounts: [30] },
+              { requestId: second, amounts: [10] },
+            ],
+            overhead: [0],
+          },
+          admin,
+        )
+
+        await service.receivePrint({ ...finished, outcome: 'failed', grams: 8 })
+
+        const failed = async (requestId: string) =>
+          (await service.listUsage({ requestId }, admin)).find((event) => event.outcome === 'failed' && event.unit === 'g')?.amount
+        expect([await failed(first), await failed(second)]).toEqual([6, 2])
+      })
+
       it('ends a failed plate’s run', async () => {
         const { id } = await start(await queued())
 
@@ -4406,7 +4449,6 @@ describe('STLQuestService crash recovery', () => {
           printerId: x2d.id,
           runs: 1,
           failed: 1,
-          cancelled: 0,
         })
       })
 
@@ -4547,7 +4589,7 @@ describe('STLQuestService crash recovery', () => {
           const listSpools = repository.listSpoolmanSpools.bind(repository)
           vi.spyOn(repository, 'listSpoolmanSpools').mockImplementationOnce(async () => {
             await service.recordPlate(
-              { plateId: id, minutes: 60, materials: [{ consumableId: filament.id }], total: 20, otherShare: 0 },
+              { plateId: id, minutes: 60, materials: [{ consumableId: filament.id }], totals: [20], otherShare: 0 },
               admin,
             )
             return await listSpools()
@@ -4566,7 +4608,7 @@ describe('STLQuestService crash recovery', () => {
           spy.mockImplementation(async (kind) => {
             if (kind === 'consumables' && spy.mock.calls.filter(([called]) => called === 'consumables').length === 1) {
               await service.recordPlate(
-                { plateId: id, minutes: 60, materials: [{ consumableId: filament.id }], total: 20, otherShare: 0 },
+                { plateId: id, minutes: 60, materials: [{ consumableId: filament.id }], totals: [20], otherShare: 0 },
                 admin,
               )
             }
@@ -4582,7 +4624,7 @@ describe('STLQuestService crash recovery', () => {
           const requestId = await queued()
           const { id } = await start(requestId)
           await service.recordPlate(
-            { plateId: id, minutes: 60, materials: [{ consumableId: filament.id }], total: 20, otherShare: 0 },
+            { plateId: id, minutes: 60, materials: [{ consumableId: filament.id }], totals: [20], otherShare: 0 },
             admin,
           )
           await service.receivePrint({ ...finished, runId: '7' })

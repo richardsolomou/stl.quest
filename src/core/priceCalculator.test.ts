@@ -5,6 +5,7 @@ import {
   costBasis,
   costPrint,
   DEFAULT_PRICE_CALCULATOR_SETTINGS,
+  MIN_MEASURED_FAILURE_RUNS,
   priceRequest,
   priceRequestOnPrinters,
   profitSharePercent,
@@ -212,6 +213,52 @@ describe('quote totals', () => {
 
   it('doubles the cost at a 100% markup', () => {
     expect(cost({ material: grey, job: materialOnly, rates: { ...rates, markupPercent: 100 } }).suggestedPrice).toBeCloseTo(26.4)
+  })
+})
+
+describe('measured failure rate', () => {
+  const materialOnly = { ...job, printHours: 0, plates: 0 }
+  const runs = (count: number) => [{ printerId: reflex.id, runs: count, failed: 4 }]
+
+  it('prices from the flat allowance while the printer has too few reported runs', () => {
+    expect(
+      cost({ material: grey, job: materialOnly, printer: reflex, printerRuns: runs(MIN_MEASURED_FAILURE_RUNS - 1) }).failureAllowance,
+    ).toBeCloseTo(1.2)
+  })
+
+  it('prices from the printer’s failed share once it has enough runs', () => {
+    expect(
+      cost({ material: grey, job: materialOnly, printer: reflex, printerRuns: runs(MIN_MEASURED_FAILURE_RUNS) }).failureAllowance,
+    ).toBeCloseTo(2.4)
+  })
+
+  it('says the quote used the measured rate and over how many runs', () => {
+    expect(cost({ printer: reflex, printerRuns: runs(MIN_MEASURED_FAILURE_RUNS) }).failureRate).toEqual({
+      percent: 20,
+      runs: MIN_MEASURED_FAILURE_RUNS,
+    })
+  })
+
+  it('says the quote used the flat allowance', () => {
+    expect(cost({ printer: reflex, printerRuns: runs(MIN_MEASURED_FAILURE_RUNS - 1) }).failureRate).toEqual({ percent: 10 })
+  })
+
+  it('keeps a zero allowance', () => {
+    expect(
+      cost({ printer: reflex, printerRuns: runs(MIN_MEASURED_FAILURE_RUNS), rates: { ...rates, failureAllowancePercent: 0 } }).failureRate,
+    ).toEqual({ percent: 0 })
+  })
+
+  it('ignores the runs of another printer', () => {
+    expect(cost({ printer: { ...reflex, id: 'other' }, printerRuns: runs(MIN_MEASURED_FAILURE_RUNS) }).failureRate).toEqual({
+      percent: 10,
+    })
+  })
+
+  it('prices each compared printer from its own runs', () => {
+    const request = { printType: 'resin' as const, material: 50, materialUnit: 'ml' as const, minutes: 0, quantity: 1 }
+    const quotes = priceRequestOnPrinters(rates, [reflex], request, [], [], runs(MIN_MEASURED_FAILURE_RUNS))
+    expect(quotes[0].quote?.result.failureRate.percent).toBe(20)
   })
 })
 

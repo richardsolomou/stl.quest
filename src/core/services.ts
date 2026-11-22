@@ -58,13 +58,13 @@ import {
   type PlateMeasured,
   type PlateRecordInput,
   type PlateRecording,
-  type PlateSlotTotals,
   type PlateTotals,
 } from './plates'
 import {
   continuedPrintJob,
   printerNamed,
   printerRunCounts,
+  printFilaments,
   printJobLink,
   printSpoolMaterials,
   sameSpoolUsage,
@@ -1665,6 +1665,7 @@ export class STLQuestService {
           return {
             ...item,
             name: request?.name ?? '',
+            ...(request?.number && { number: request.number }),
             ...(request?.fileName && { fileName: request.fileName }),
             ...(request?.modelVolumeMm3 && { volumeMm3: request.modelVolumeMm3 }),
             ...(estimate && { estimatedMaterial: estimate }),
@@ -1866,14 +1867,17 @@ export class STLQuestService {
   private async plateRunUsage(
     plate: Plate,
     printType: PrintType,
-    input: PlateMeasured | PlateTotals | PlateSlotTotals,
+    input: PlateMeasured | PlateTotals,
     minutes: number,
     materials: Consumable[],
+    /** Weighs the prints by what the plate's slicer file measured for them, when it was recorded from one. */
+    byRecording = false,
   ) {
     const printers = await this.repository.listInventory('printers')
     const printer = printers.find(({ id }) => id === plate.printerId)
     const requests = await Promise.all(plate.items.map(({ requestId }) => this.repository.getRequest(requestId)))
     const rates = await this.rates()
+    const measured = byRecording && plate.recording?.method === 'measured'
     const split = splitPlate(
       input,
       minutes,
@@ -1883,6 +1887,7 @@ export class STLQuestService {
         return {
           requestId: item.requestId,
           copies: item.copies,
+          ...(measured && item.amount && { measuredAmount: item.amount }),
           ...(request?.modelVolumeMm3 && { volumeMm3: request.modelVolumeMm3 }),
           ...(estimate && { estimatedMaterial: estimate }),
         }
@@ -1899,7 +1904,7 @@ export class STLQuestService {
   private async recordPlateUsage(
     plate: Plate,
     printType: PrintType,
-    input: PlateMeasured | PlateTotals | PlateSlotTotals,
+    input: PlateMeasured | PlateTotals,
     minutes: number,
     materials: Consumable[],
     source: PlateRecording['source'],
@@ -2004,25 +2009,26 @@ export class STLQuestService {
 
   /**
    * Records what a print measured on its plate, as the plate's recording when it finished and as failed usage when it
-   * did not. Grams go to the filaments of the Spoolman spools it reported, else to the first material of its kind. A
+   * did not. Grams go to the filaments of the Spoolman spools it reported, else by its trays' materials. A
    * recording replaces the plate's only while `replaces` holds for the plate under the recording's lock.
    */
   private async recordPrintUsage(job: PrintJob, plate: Plate, printType: PrintType, replaces?: (current: Plate) => boolean) {
     const consumables = await this.consumables()
-    const fallback = consumablesOfKind(consumables, printType)[0]
     const bySpool =
       printType === 'filament' && job.filamentUsage?.length
         ? printSpoolMaterials(job.filamentUsage, {
             spools: await this.repository.listSpoolmanSpools(),
             matches: (await this.spoolmanMatches(consumables)).matches,
             library: consumablesOfKind(consumables, 'filament'),
-            fallback,
+            fallback: consumablesOfKind(consumables, 'filament')[0],
           })
         : undefined
-    const input: PlateTotals | PlateSlotTotals = bySpool?.materials.length
-      ? { slotTotals: bySpool.totals }
-      : { total: job.grams ?? 0, otherShare: 0 }
-    const materials = bySpool?.materials.length ? bySpool.materials : job.grams && fallback ? [fallback] : []
+    const used = this.printMaterials(job, printType, consumables)
+    const input: PlateTotals = {
+      totals: bySpool?.materials.length ? bySpool.totals : used.map(({ amount }) => amount),
+      otherShare: 0,
+    }
+    const materials = bySpool?.materials.length ? bySpool.materials : used.map(({ material }) => material)
     const minutes = job.minutes ?? 0
     if (job.outcome === 'finished') {
       const { recorded } = await this.recordPlateUsage(plate, printType, input, minutes, materials, 'printer', undefined, replaces)
@@ -2030,7 +2036,8 @@ export class STLQuestService {
       this.changed('usage.recorded')
       return recorded.recording!.transactionId
     }
-    const { drafts } = await this.plateRunUsage(plate, printType, input, minutes, materials)
+    // Bambuddy already scales a stopped print's grams to its progress, so they are what each print had used by then.
+    const { drafts } = await this.plateRunUsage(plate, printType, input, minutes, materials, true)
     return (await this.appendUsage(drafts.map((draft) => ({ ...draft, outcome: 'failed' as const })))).transactionId
   }
 
@@ -2072,6 +2079,19 @@ export class STLQuestService {
       }).length,
       recorded,
     })
+  }
+
+  /**
+   * What a reported print used of each library material: a filament print's trays by their material, a resin one's
+   * grams in the first resin.
+   */
+  private printMaterials(job: PrintJob, printType: PrintType, consumables: Consumable[]) {
+    if (printType === 'filament')
+      return printFilaments(job, consumablesOfKind(consumables, 'filament'), ({ filamentPresetId }) =>
+        filamentPresetId ? SPOOLMAN_CATALOGUE.presets[filamentPresetId]?.[1] : undefined,
+      ).map(({ filament, grams }): { material: Consumable; amount: number } => ({ material: filament, amount: grams }))
+    const resin = consumablesOfKind(consumables, 'resin')[0]
+    return resin && job.grams ? [{ material: resin, amount: job.grams }] : []
   }
 
   /** Bambuddy's prints, newest first, each unlinked one with the request its name is tagged with, if any. */
@@ -2161,7 +2181,11 @@ export class STLQuestService {
           input.overhead.length === slots &&
           input.overhead.every(amount) &&
           input.objects.every((object) => object.amounts.length === slots && object.amounts.every(amount))
-        : slots === 1 && amount(input.total) && input.total > 0 && input.otherShare >= 0 && input.otherShare < 1)
+        : input.totals.length === slots &&
+          input.totals.every((total) => amount(total) && total >= 0) &&
+          input.totals.some((total) => total > 0) &&
+          input.otherShare >= 0 &&
+          input.otherShare < 1)
     if (!valid) throw new Response(this.text.plates.invalid, { status: 400 })
     if (isMeasured(input) && input.objects.some(({ requestId }) => requestId !== undefined && !onPlate.has(requestId)))
       throw new Response(this.text.plates.notOnPlate, { status: 400 })

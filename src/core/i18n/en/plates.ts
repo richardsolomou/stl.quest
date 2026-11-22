@@ -76,7 +76,7 @@ export const plates = {
     unlabelled: 'This file doesn’t say what each object used, so its total is split by model volume.',
     plateInFile: 'Plate in the file',
     objects: 'Objects',
-    objectsHint: 'Matched by model file name. Change any that are wrong.',
+    objectsHint: 'Matched by request tag, such as SQ-142, else by model file name. Change any that are wrong.',
     unnamed: (id: string) => `Object ${id}`,
     filament: (index: number) => `Filament ${index + 1}`,
     check: (measured: string, slicer: string) => `${measured} in objects and purge; the slicer says ${slicer}.`,

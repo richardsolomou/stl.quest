@@ -1,7 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { type QueryClient, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import type { Consumable } from '../core/consumables'
-import type { InventoryItems, InventoryKind } from '../core/inventory'
+import type { InventoryItem, InventoryItems, InventoryKind } from '../core/inventory'
 import {
   createConsumables,
   createInventoryItem,
@@ -17,6 +17,12 @@ import { useWorkspaceSlug } from './workspace'
 const queries = { printers: printersQuery, equipment: equipmentQuery, consumables: consumablesQuery, stores: storesQuery }
 /** Where each kind's list sits in what its query returns. */
 const listField = { printers: 'profiles', equipment: 'equipment', consumables: 'consumables', stores: 'stores' } as const
+
+/** Puts a changed list in its query's cache, keeping whatever else the query returned (a printer's runs). */
+export function storeInventory(queryClient: QueryClient, workspaceSlug: string, kind: InventoryKind, items: InventoryItem[]) {
+  const { queryKey } = queries[kind](workspaceSlug)
+  queryClient.setQueryData(queryKey, (data) => data && { ...data, [listField[kind]]: items })
+}
 
 type Change<Kind extends InventoryKind> = { item: InventoryItems[Kind] } | { id: string; archived: boolean }
 
@@ -42,12 +48,12 @@ export function useInventory<Kind extends InventoryKind>(kind: Kind) {
       const data = { workspaceSlug, inventory: kind, item: change.item } as Parameters<typeof create>[0]['data']
       return await (known ? update({ data }) : create({ data }))
     },
-    onSuccess: ({ items }) => queryClient.setQueryData(queryKey, { [listField[kind]]: items } as never),
+    onSuccess: ({ items }) => storeInventory(queryClient, workspaceSlug, kind, items),
   })
   // Kept apart from `mutation`, so a failed delete is told in its confirmation rather than the page's notice.
   const deletion = useMutation({
     mutationFn: async (id: string) => await destroy({ data: { workspaceSlug, inventory: kind, id } }),
-    onSuccess: ({ items }) => queryClient.setQueryData(queryKey, { [listField[kind]]: items } as never),
+    onSuccess: ({ items }) => storeInventory(queryClient, workspaceSlug, kind, items),
   })
   return {
     mutation,
@@ -67,8 +73,7 @@ export function useConsumableBatch() {
   const queryClient = useQueryClient()
   const create = useServerFn(createConsumables)
   const share = useServerFn(shareFilamentPrice)
-  const store = ({ items }: { items: Consumable[] }) =>
-    queryClient.setQueryData(consumablesQuery(workspaceSlug).queryKey, { consumables: items })
+  const store = ({ items }: { items: Consumable[] }) => storeInventory(queryClient, workspaceSlug, 'consumables', items)
   const add = useMutation({
     mutationFn: ({ items, onHand }: { items: Consumable[]; onHand?: number }) => create({ data: { workspaceSlug, items, onHand } }),
     onSuccess: async (result, { onHand }) => {

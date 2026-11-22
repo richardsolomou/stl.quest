@@ -740,7 +740,8 @@ export const settings: typeof en = {
       lifetime: (run: string, lifespan?: string) =>
         lifespan ? `${run} sur ${lifespan} heures d’impression effectuées` : `${run} heures d’impression effectuées`,
       runs: (runs, failed, rate) =>
-        `${runs} ${runs === 1 ? 'passage de plateau signalé' : 'passages de plateau signalés'} · ${failed} échoués ou annulés (${rate})`,
+        `${runs} ${runs === 1 ? 'passage de plateau terminé ou échoué' : 'passages de plateau terminés ou échoués'} · ${failed} échoués (${rate})`,
+      runsPricing: (minimum, used) => (used ? 'Les devis utilisent ce taux' : `Les devis l’utilisent dès ${minimum} passages`),
       pastLifespan: 'Durée de vie dépassée',
       addOns: 'Modules ajoutés',
       addOnsHint:

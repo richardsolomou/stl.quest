@@ -8,6 +8,7 @@ import { getElectricityPricePreset } from '../../../core/electricityPresets'
 import {
   electricityPresetsAvailable,
   PRICE_CALCULATOR_CURRENCIES,
+  MIN_MEASURED_FAILURE_RUNS,
   PRICE_CALCULATOR_MAXIMUMS,
   profitSharePercent,
   selectPriceCalculatorCurrency,
@@ -266,6 +267,7 @@ function LabourSection({
         />
         <NumberSetting
           label={copy.failureAllowance}
+          description={copy.failureAllowanceHint(MIN_MEASURED_FAILURE_RUNS)}
           value={settings.failureAllowancePercent}
           min={0}
           max={PRICE_CALCULATOR_MAXIMUMS.failureAllowancePercent}
