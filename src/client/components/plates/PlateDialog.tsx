@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type ComponentProps, type ReactNode } from 'react'
+import { useId, useLayoutEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { FileUp, Plus, X } from 'lucide-react'
@@ -141,11 +141,11 @@ function PlateSummary({ plate, onRecord, onClose }: { plate: PlateView; onRecord
                   {recording &&
                     materials.length > 1 &&
                     materials.map((material) => (
-                      <span key={material.name}>
+                      <span key={material.key}>
                         {' · '}
-                        {material.name}{' '}
-                        <span className="whitespace-nowrap tabular-nums">
-                          {amount(material.prints[item.requestId] ?? 0, recording.unit)}
+                        <span className="whitespace-nowrap">
+                          {material.name}{' '}
+                          <span className="tabular-nums">{amount(material.prints[item.requestId] ?? 0, recording.unit)}</span>
                         </span>
                       </span>
                     ))}
@@ -180,7 +180,7 @@ function PlateSummary({ plate, onRecord, onClose }: { plate: PlateView; onRecord
         <Section title={copy.dialog.materials}>
           <ul className="flex flex-col text-sm" data-plate-materials>
             {materials.map((material) => (
-              <li key={material.name} className="flex items-center gap-2 border-b border-border/60 py-1 last:border-0">
+              <li key={material.key} className="flex items-center gap-2 border-b border-border/60 py-1 last:border-0">
                 {material.hex && <ColourSwatch hex={material.hex} />}
                 <span className="min-w-0 flex-1 truncate">{material.name}</span>
                 <span className="font-mono whitespace-nowrap tabular-nums">{amount(material.amount, recording.unit)}</span>
@@ -261,6 +261,20 @@ function PlateRecorder({
   const [hours, setHours] = useState('')
   const [minutes, setMinutes] = useState('')
   const [amounts, setAmounts] = useState<string[]>([''])
+  // Typed rows keep an identity of their own so that removing one moves neither focus nor fields onto another.
+  const rowCount = useRef(1)
+  const [rowKeys, setRowKeys] = useState([0])
+  const totalsSection = useRef<HTMLElement>(null)
+  const pendingFocus = useRef<string[]>([])
+  useLayoutEffect(() => {
+    const selectors = pendingFocus.current
+    if (selectors.length === 0) return
+    pendingFocus.current = []
+    for (const selector of selectors) {
+      const target = totalsSection.current?.querySelector<HTMLElement>(selector)
+      if (target) return target.focus()
+    }
+  })
   const [otherShare, setOtherShare] = useState('')
   const sliced = parsed?.plates[parsed.index]
 
@@ -285,6 +299,7 @@ function PlateRecorder({
     if (!labelled) {
       setAmounts([chosen.slicerGrams === undefined ? '' : String(chosen.slicerGrams)])
       setMaterials([{}])
+      setRowKeys([rowCount.current++])
       onModeChange('totals')
     }
   }
@@ -306,7 +321,11 @@ function PlateRecorder({
   const choices = materials.map((draft) => plateMaterialChoice(draft))
   const measuredInput: PlateMeasured | undefined =
     mode === 'file' && sliced && parsed ? measuredRecord(plate.id, sliced, parsed.assignments, [], time) : undefined
-  const totalsProblem = plateTotalsProblem(choices.map((material, slot) => ({ material, amount: Number(amounts[slot]) })))
+  const totalsProblem = plateTotalsProblem(
+    choices.map((material, slot) => ({ material, amount: Number(amounts[slot]) })),
+    library,
+    printType,
+  )
   const totalsInput: PlateTotals | undefined =
     mode === 'totals' && !totalsProblem
       ? {
@@ -367,9 +386,23 @@ function PlateRecorder({
     const draft = materials[index]
     return library.find((consumable) => consumable.id === draft?.consumableId)?.name ?? draft?.name?.trim() ?? copy.file.filament(index)
   }
+  const inRow = (key: number | undefined, selector: string) => `[data-total-row="${key}"] ${selector}`
+  const addSlot = () => {
+    const key = rowCount.current++
+    setMaterials([...materials, {}])
+    setAmounts([...amounts, ''])
+    setRowKeys([...rowKeys, key])
+    pendingFocus.current = [inRow(key, '[data-slot="select-trigger"]')]
+  }
   const removeSlot = (index: number) => {
     setMaterials(materials.filter((_, position) => position !== index))
     setAmounts(amounts.filter((_, position) => position !== index))
+    setRowKeys(rowKeys.filter((_, position) => position !== index))
+    pendingFocus.current = [
+      inRow(rowKeys[index + 1], '[data-total-remove]'),
+      inRow(rowKeys[index - 1], '[data-total-remove]'),
+      '[data-total-add]',
+    ]
   }
   const assignmentOptions = [
     ...plate.items.map((item) => ({ value: item.requestId, label: item.name })),
@@ -500,62 +533,55 @@ function PlateRecorder({
       )}
 
       {mode === 'totals' && (
-        <section className="flex flex-col gap-3" data-plate-totals>
+        <section ref={totalsSection} className="flex flex-col gap-3" data-plate-totals>
           <div className="flex items-center justify-between gap-2">
             <h3 className="font-heading text-xs font-bold tracking-[0.015em] text-muted-foreground uppercase">{copy.totals.material}</h3>
             {printType === 'filament' && materials.length < MAX_PLATE_FILAMENTS && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setMaterials([...materials, {}])
-                  setAmounts([...amounts, ''])
-                }}
-              >
+              <Button type="button" variant="ghost" size="sm" data-total-add onClick={addSlot}>
                 <Plus />
                 {copy.totals.addFilament}
               </Button>
             )}
           </div>
           {materials.map((draft, index) => (
-            <PlateMaterialField
-              // eslint-disable-next-line react/no-array-index-key -- rows have no identity of their own until a material is chosen
-              key={index}
-              label={slotLabel(index)}
-              printType={printType}
-              library={library}
-              value={draft}
-              onChange={(next) => setMaterials(materials.map((current, position) => (position === index ? next : current)))}
-              trailing={
-                <>
-                  <UnitInput
-                    unit={unit === 'ml' ? 'mL' : 'g'}
-                    className="w-28"
-                    aria-label={copy.totals.amount(slotLabel(index))}
-                    type="number"
-                    inputMode="decimal"
-                    min={0}
-                    step="any"
-                    value={amounts[index] ?? ''}
-                    onChange={(event) =>
-                      setAmounts(amounts.map((current, position) => (position === index ? event.target.value : current)))
-                    }
-                  />
-                  {materials.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={copy.totals.remove(slotLabel(index))}
-                      onClick={() => removeSlot(index)}
-                    >
-                      <X />
-                    </Button>
-                  )}
-                </>
-              }
-            />
+            <div key={rowKeys[index]} data-total-row={rowKeys[index]}>
+              <PlateMaterialField
+                label={slotLabel(index)}
+                printType={printType}
+                library={library}
+                value={draft}
+                onChange={(next) => setMaterials(materials.map((current, position) => (position === index ? next : current)))}
+                trailing={
+                  <>
+                    <UnitInput
+                      unit={unit === 'ml' ? 'mL' : 'g'}
+                      className="w-28"
+                      aria-label={copy.totals.amount(slotLabel(index))}
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step="any"
+                      value={amounts[index] ?? ''}
+                      onChange={(event) =>
+                        setAmounts(amounts.map((current, position) => (position === index ? event.target.value : current)))
+                      }
+                    />
+                    {materials.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={copy.totals.remove(slotLabel(index))}
+                        data-total-remove
+                        onClick={() => removeSlot(index)}
+                      >
+                        <X />
+                      </Button>
+                    )}
+                  </>
+                }
+              />
+            </div>
           ))}
           {totalsProblem === 'duplicate' && <p className="text-sm text-destructive">{copy.totals.duplicate}</p>}
         </section>
@@ -631,7 +657,12 @@ function PlateRecorder({
                   <span className="block truncate">{plate.items.find(({ requestId }) => requestId === print.requestId)?.name}</span>
                   {mode === 'totals' && print.amounts.length > 1 && (
                     <span className="block text-xs text-muted-foreground">
-                      {print.amounts.map((value, slot) => `${materialName(slot)} ${amount(value)}`).join(' · ')}
+                      {print.amounts.map((value, slot) => (
+                        <span key={rowKeys[slot]}>
+                          {slot > 0 && ' · '}
+                          <span className="whitespace-nowrap">{`${materialName(slot)} ${amount(value)}`}</span>
+                        </span>
+                      ))}
                     </span>
                   )}
                 </span>

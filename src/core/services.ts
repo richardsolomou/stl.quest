@@ -1874,6 +1874,15 @@ export class STLQuestService {
     const printType = await this.platePrintType(plate)
     // Slicer files weigh filament per object; a resin slicer's summary is typed in as totals.
     if (isMeasured(input) && printType === 'resin') throw new Response(this.text.plates.invalid, { status: 400 })
+    if (
+      !isMeasured(input) &&
+      plateTotalsProblem(
+        input.materials.map((material, slot) => ({ material, amount: input.totals[slot] })),
+        await this.consumables(),
+        printType,
+      )
+    )
+      throw new Response(this.text.plates.invalid, { status: 400 })
     const materials = await this.plateMaterials(input.materials, printType, identity)
     const { split, recorded } = await this.recordPlateUsage(
       plate,
@@ -2249,11 +2258,7 @@ export class STLQuestService {
           input.overhead.length === slots &&
           input.overhead.every(amount) &&
           input.objects.every((object) => object.amounts.length === slots && object.amounts.every(amount))
-        : input.totals.length === slots &&
-          input.totals.every(amount) &&
-          !plateTotalsProblem(input.materials.map((material, slot) => ({ material, amount: input.totals[slot] }))) &&
-          input.otherShare >= 0 &&
-          input.otherShare < 1)
+        : input.totals.length === slots && input.totals.every(amount) && input.otherShare >= 0 && input.otherShare < 1)
     if (!valid) throw new Response(this.text.plates.invalid, { status: 400 })
     if (isMeasured(input) && input.objects.some(({ requestId }) => requestId !== undefined && !onPlate.has(requestId)))
       throw new Response(this.text.plates.notOnPlate, { status: 400 })

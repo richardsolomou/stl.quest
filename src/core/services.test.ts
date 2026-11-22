@@ -4169,6 +4169,17 @@ describe('STLQuestService crash recovery', () => {
           ).rejects.toMatchObject({ status: 400 })
         })
 
+        it('refuses a filament named on the spot that the library filament beside it has', async () => {
+          const { id } = await plate(await filamentPrint())
+
+          await expect(
+            service.recordPlate(
+              { plateId: id, minutes: 60, materials: [{ consumableId: white.id }, { name: 'white pla' }], totals: [30, 8], otherShare: 0 },
+              admin,
+            ),
+          ).rejects.toMatchObject({ status: 400 })
+        })
+
         it('refuses a filament without grams', async () => {
           const { id } = await plate(await filamentPrint())
 
@@ -4198,8 +4209,8 @@ describe('STLQuestService crash recovery', () => {
           )
 
           expect((await service.listPlates(admin)).find((listed) => listed.id === id)?.recording?.materials).toEqual([
-            { name: 'PLA', amount: 40, prints: { [large]: 30, [small]: 10 } },
-            { name: 'White PLA', amount: 8, prints: { [large]: 6, [small]: 2 } },
+            { key: filament.id, name: 'PLA', amount: 40, prints: { [large]: 30, [small]: 10 } },
+            { key: white.id, name: 'White PLA', amount: 8, prints: { [large]: 6, [small]: 2 } },
           ])
         })
 
@@ -4210,7 +4221,7 @@ describe('STLQuestService crash recovery', () => {
           await service.recordPlate(typed(id, [[filament.id, 30]]), admin)
 
           expect((await service.listPlates(admin)).find((listed) => listed.id === id)?.recording?.materials).toEqual([
-            { name: 'PLA', amount: 30, prints: { [requestId]: 30 } },
+            { key: filament.id, name: 'PLA', amount: 30, prints: { [requestId]: 30 } },
           ])
         })
       })

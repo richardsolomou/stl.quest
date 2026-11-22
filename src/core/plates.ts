@@ -3,6 +3,7 @@ import { wearPartsFor, type Consumable } from './consumables'
 import { printerCostPerMinute, type CostedPrinter, type PriceCalculatorSettings } from './priceCalculator'
 import { taggedRequestNumber } from './request'
 import { consumed, priced, supplied, type UsageDraft, type UsageEvent } from './usage'
+import type { PrintType } from './types'
 import { workflow, type StatusId } from './workflow'
 
 /**
@@ -95,14 +96,24 @@ export type PlateRecordInput = { plateId: string; minutes: number; materials: Pl
 /** Why typed totals cannot be recorded: no material, one without a material or a positive amount, or one twice. */
 export type PlateTotalsProblem = 'empty' | 'material' | 'amount' | 'duplicate'
 
-/** Checks typed totals, one row per material on the plate. */
-export function plateTotalsProblem(rows: { material?: PlateMaterialChoice; amount: number }[]): PlateTotalsProblem | undefined {
+/**
+ * Checks typed totals, one row per material on the plate. A material named on the spot counts as the library material
+ * of the plate's print type with the same name, whatever its case or spacing.
+ */
+export function plateTotalsProblem(
+  rows: { material?: PlateMaterialChoice; amount: number }[],
+  library: Consumable[],
+  printType: PrintType,
+): PlateTotalsProblem | undefined {
   if (rows.length === 0) return 'empty'
   if (rows.some(({ material }) => !material)) return 'material'
   if (rows.some(({ amount }) => !positive(amount))) return 'amount'
-  const keys = rows.map(({ material }) =>
-    material && 'consumableId' in material ? `id:${material.consumableId}` : `name:${material?.name.trim().toLowerCase()}`,
-  )
+  const normalized = (name: string) => name.trim().replace(/\s+/g, ' ').toLowerCase()
+  const keys = rows.map(({ material }) => {
+    if (!material || 'consumableId' in material) return material?.consumableId
+    const name = normalized(material.name)
+    return library.find(({ kind, name: other }) => kind === printType && normalized(other) === name)?.id ?? `name:${name}`
+  })
   return new Set(keys).size < keys.length ? 'duplicate' : undefined
 }
 
@@ -116,7 +127,7 @@ export type PlateMaterialUse = {
 }
 
 /** A material a recorded plate used, in total and per print; what no print used counts only in the total. */
-export type PlateMaterialTotal = { name: string; hex?: string; amount: number; prints: Record<string, number> }
+export type PlateMaterialTotal = { key: string; name: string; hex?: string; amount: number; prints: Record<string, number> }
 
 /**
  * Totals a recording's material events per material, most used first; a material deleted from the library keeps the
@@ -130,7 +141,7 @@ export function plateMaterialTotals(uses: Omit<PlateMaterialUse, 'transactionId'
     if (!name) continue
     const key = consumableId ?? `deleted:${name}`
     const hex = consumable?.kind === 'filament' ? consumable.colour?.hex : undefined
-    const total = totals.get(key) ?? { name, ...(hex && { hex }), amount: 0, prints: {} }
+    const total = totals.get(key) ?? { key, name, ...(hex && { hex }), amount: 0, prints: {} }
     total.amount += amount
     if (requestId) total.prints[requestId] = (total.prints[requestId] ?? 0) + amount
     totals.set(key, total)
