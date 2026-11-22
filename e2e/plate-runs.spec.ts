@@ -36,7 +36,7 @@ test('runs a plate as one and sends it back to print again when Bambuddy reports
   await page.goto('/')
   for (const name of prints) await upload(page, name)
   await select(page, prints)
-  await page.getByRole('toolbar', { name: 'Selection actions' }).getByRole('button', { name: 'Start a plate' }).click()
+  await startPlateFromSelection(page)
   const start = page.getByRole('dialog', { name: 'Start a plate' })
   await choose(start.getByLabel('Printer'), printer)
   await start.getByRole('button', { name: `Start on ${printer}` }).click()
@@ -76,7 +76,7 @@ test('runs a plate as one and sends it back to print again when Bambuddy reports
   await page.goto('/')
   for (const name of retries) await upload(page, name)
   await select(page, retries)
-  await page.getByRole('toolbar', { name: 'Selection actions' }).getByRole('button', { name: 'Start a plate' }).click()
+  await startPlateFromSelection(page)
   await choose(start.getByLabel('Printer'), printer)
   await start.getByRole('button', { name: `Start on ${printer}` }).click()
   const retried = plateNumber + 1
@@ -166,4 +166,9 @@ async function screenshot(page: Page, name: string) {
   const directory = path.join(process.cwd(), 'test-results/manual-inspection')
   await fs.mkdir(directory, { recursive: true })
   await page.screenshot({ path: path.join(directory, `${name}.png`) })
+}
+
+async function startPlateFromSelection(page: Page) {
+  await page.getByRole('toolbar', { name: 'Selection actions' }).getByRole('button', { name: 'More' }).click()
+  await page.getByRole('menuitem', { name: 'Start a plate' }).click()
 }
