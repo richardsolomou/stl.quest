@@ -142,6 +142,22 @@ describe('part category', () => {
   it('reads an air filter in a compound word', () => {
     expect(partCategory(part({ name: 'Aktivkohlefilter X2D' }), parts)).toBe('air-filter')
   })
+
+  it('reads a screen protector as a protector, not a screen', () => {
+    expect(partCategory(part({ name: 'LCD screen protector' }), parts)).toBe('lcd-protector')
+  })
+
+  it('reads a nozzle wiping pad as a pad, not a nozzle', () => {
+    expect(partCategory(part({ name: 'Nozzle wiping pad' }), parts)).toBe('wiping-pad')
+  })
+
+  it('reads a belt', () => {
+    expect(partCategory(part({ name: 'XY belt' }), parts)).toBe('belt')
+  })
+
+  it('reads a filament cutter', () => {
+    expect(partCategory(part({ name: 'Filament cutter blade' }), parts)).toBe('cutter')
+  })
 })
 
 describe('untracked consumables', () => {

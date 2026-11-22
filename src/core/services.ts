@@ -1737,6 +1737,7 @@ export class STLQuestService {
         filament_count: consumablesOfKind(library, 'filament').length,
         part_count: consumablesOfKind(library, 'part').length,
         supply_count: consumablesOfKind(library, 'supply').length,
+        catalogue_supply_count: consumablesOfKind(library, 'supply').filter((supply) => supply.supplyPresetId).length,
       })
     }
   }

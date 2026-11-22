@@ -42,6 +42,7 @@ import type { FilamentPreset } from '../core/filamentPresets'
 import type { PartPreset } from '../core/partPresets'
 import { estimatePending } from '../core/printEstimates'
 import type { ResinPreset } from '../core/resinPresets'
+import type { SupplyPreset } from '../core/supplyPresets'
 import type { PublicRequestQueryResult, RequestFilters } from '../core/types'
 import { MAX_USAGE_LIST, type UsageEvent, type UsageFilters } from '../core/usage'
 import type { SettingsSection } from './settingsSections'
@@ -189,7 +190,13 @@ export const diagnosticsQuery = (workspaceSlug: string) =>
 export const systemDiagnosticsQuery = () =>
   queryOptions({ queryKey: ['system-diagnostics'], queryFn: () => getSystemDiagnostics(), refetchInterval: 30_000 })
 export const integrationsQuery = () => queryOptions({ queryKey: ['integrations'], queryFn: () => getIntegrationSettings() })
-type Catalogues = { electricity: ElectricityPricePreset[]; filaments: FilamentPreset[]; parts: PartPreset[]; resins: ResinPreset[] }
+type Catalogues = {
+  electricity: ElectricityPricePreset[]
+  filaments: FilamentPreset[]
+  parts: PartPreset[]
+  resins: ResinPreset[]
+  supplies: SupplyPreset[]
+}
 // Each catalogue is its own chunk, fetched the first time something shows it, so pages that never do stay small.
 const catalogues: { [Name in keyof Catalogues]: () => Promise<Catalogues[Name]> } = {
   electricity: () => import('../../catalogs/electricity/catalog.generated.json').then(({ default: catalogue }) => catalogue.presets),
@@ -197,6 +204,7 @@ const catalogues: { [Name in keyof Catalogues]: () => Promise<Catalogues[Name]> 
     import('../../catalogs/filaments/catalog.generated.json').then(({ default: catalogue }) => catalogue.presets as FilamentPreset[]),
   parts: () => import('../../catalogs/parts/catalog.json').then(({ default: catalogue }) => catalogue.presets as PartPreset[]),
   resins: () => import('../../catalogs/resins/catalog.generated.json').then(({ default: catalogue }) => catalogue.presets as ResinPreset[]),
+  supplies: () => import('../../catalogs/supplies/catalog.json').then(({ default: catalogue }) => catalogue.presets as SupplyPreset[]),
 }
 export const catalogueQuery = <Name extends keyof Catalogues>(name: Name) =>
   queryOptions({ queryKey: ['catalogue', name], queryFn: (): Promise<Catalogues[Name]> => catalogues[name](), staleTime: Infinity })

@@ -84,7 +84,7 @@ function consumable(row: Row<'consumables'>, archived: { archived?: boolean }): 
       ...(row.printerId !== null && { printerId: row.printerId }),
       ...preset('partPresetId'),
     }
-  return { ...shared, kind: 'supply', unit: row.unit ?? 'item', price: row.price }
+  return { ...shared, kind: 'supply', unit: row.unit ?? 'item', price: row.price, ...preset('supplyPresetId') }
 }
 
 export function inventoryColumns<Kind extends InventoryKind>(kind: Kind, item: InventoryItems[Kind]): InventoryColumns<Kind> {
@@ -158,6 +158,6 @@ export function inventoryColumns<Kind extends InventoryKind>(kind: Kind, item: I
               printerPresetId: library.printerPresetId ?? null,
               printerId: library.printerId ?? null,
             }
-          : { ...shared, price: library.price, unit: library.unit }
+          : { ...shared, presetId: library.supplyPresetId ?? null, price: library.price, unit: library.unit }
   return columns as InventoryColumns<Kind>
 }

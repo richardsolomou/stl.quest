@@ -129,7 +129,8 @@ const catalogues = [
   ['Filaments', 'Every product and colour in SpoolmanDB, picked as a swatch.'],
   ['Resins', 'Manufacturer resins with their type and density.'],
   ['Equipment', 'Wash, cure, drying, and other kit, with its power draw.'],
-  ['Wear parts', 'Tanks, films, screens, nozzles, and build sheets for each printer model, with sourced lifespans.'],
+  ['Wear parts', 'Tanks, films, screens, nozzles, plates, filters, belts, and cutters for each printer model, with sourced lifespans.'],
+  ['Supplies', 'Wash fluids, gloves, glue, desiccant, and lubricant, with the ones your equipment’s maker names first.'],
   ['Electricity', 'Household prices by country, so running costs start from a real figure.'],
 ] as const
 

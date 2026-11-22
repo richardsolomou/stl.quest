@@ -1,0 +1,230 @@
+{
+  "sources": [
+    {
+      "id": "formlabs-store",
+      "repository": "https://formlabs.com/de/",
+      "revision": "2026-11-22",
+      "license": "manufacturer product data"
+    },
+    {
+      "id": "bambu-lab-store",
+      "repository": "https://eu.store.bambulab.com/",
+      "revision": "2026-11-22",
+      "license": "manufacturer product data"
+    }
+  ],
+  "presets": [
+    {
+      "id": "supply-formlabs-resin-washing-solution",
+      "brand": "Formlabs",
+      "name": "Resin Washing Solution",
+      "category": "wash-fluid",
+      "unit": "ml",
+      "printType": "resin",
+      "packSize": 5000,
+      "listPrice": {
+        "amount": 89.25,
+        "currency": "EUR",
+        "url": "https://formlabs.com/de/products/resin-washing-solution/",
+        "checked": "2026-11-22",
+        "note": "Including 19% German VAT. A 5 L container."
+      },
+      "usedBy": [
+        "postprocess-formlabs-form-studio-wash-cure",
+        "postprocess-formlabs-form-wash-v2",
+        "postprocess-formlabs-form-wash-l-v1",
+        "postprocess-formlabs-form-wash-l-v2"
+      ],
+      "usedBySource": "https://formlabs.com/de/products/resin-washing-solution/",
+      "source": {
+        "id": "formlabs-store",
+        "url": "https://formlabs.com/de/products/resin-washing-solution/"
+      }
+    },
+    {
+      "id": "supply-isopropyl-alcohol",
+      "name": "Isopropyl alcohol (IPA)",
+      "category": "wash-fluid",
+      "unit": "ml",
+      "usedBy": ["postprocess-formlabs-form-studio-wash-cure"],
+      "usedBySource": "https://formlabs.com/de/products/form-studio-wash-cure/",
+      "note": "Sold by chemists and hardware stores rather than printer makers, so it has no list price."
+    },
+    {
+      "id": "supply-tpm",
+      "name": "Tripropylene glycol monomethyl ether (TPM)",
+      "category": "wash-fluid",
+      "unit": "ml",
+      "printType": "resin",
+      "usedBy": ["postprocess-formlabs-form-studio-wash-cure"],
+      "usedBySource": "https://formlabs.com/de/products/form-studio-wash-cure/",
+      "note": "Sold by chemical suppliers rather than printer makers, so it has no list price."
+    },
+    {
+      "id": "supply-nitrile-gloves",
+      "name": "Nitrile gloves",
+      "category": "gloves",
+      "unit": "item",
+      "usedBy": [],
+      "note": "Sold in boxes by many suppliers, so it has no list price."
+    },
+    {
+      "id": "supply-paper-towels",
+      "name": "Paper towels",
+      "category": "paper-towels",
+      "unit": "item",
+      "usedBy": [],
+      "note": "Sold by the roll everywhere, so it has no list price."
+    },
+    {
+      "id": "supply-resin-filter-funnels",
+      "name": "Resin filter funnels",
+      "category": "filter-funnel",
+      "unit": "item",
+      "printType": "resin",
+      "usedBy": [],
+      "note": "Disposable paper funnels for straining resin back into its bottle, sold by many suppliers, so they have no list price."
+    },
+    {
+      "id": "supply-bambu-lab-molecular-sieve-desiccant",
+      "brand": "Bambu Lab",
+      "name": "Molecular Sieve Desiccant",
+      "category": "desiccant",
+      "unit": "item",
+      "printType": "filament",
+      "listPrice": {
+        "amount": 3.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/molecular-sieve-desiccant",
+        "checked": "2026-11-22",
+        "note": "Including VAT. For every AMS model."
+      },
+      "usedBy": [],
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/molecular-sieve-desiccant"
+      }
+    },
+    {
+      "id": "supply-bambu-lab-silicone-desiccant",
+      "brand": "Bambu Lab",
+      "name": "Silicone Desiccant",
+      "category": "desiccant",
+      "unit": "item",
+      "printType": "filament",
+      "listPrice": {
+        "amount": 4.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/silicone-desiccant",
+        "checked": "2026-11-22",
+        "note": "Including VAT. For every AMS model."
+      },
+      "usedBy": [],
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/silicone-desiccant"
+      }
+    },
+    {
+      "id": "supply-bambu-lab-cleaning-wipes",
+      "brand": "Bambu Lab",
+      "name": "Cleaning Wipes",
+      "category": "plate-cleaner",
+      "unit": "item",
+      "printType": "filament",
+      "packSize": 50,
+      "listPrice": {
+        "amount": 9.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/cleaning-wipes-50-pcs",
+        "checked": "2026-11-22",
+        "note": "Including VAT. A pack of 50, for the build plate and the rest of the printer; sold out on the checked date."
+      },
+      "usedBy": [],
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/cleaning-wipes-50-pcs"
+      }
+    },
+    {
+      "id": "supply-bambu-lab-glue-stick",
+      "brand": "Bambu Lab",
+      "name": "Glue Stick",
+      "category": "plate-adhesive",
+      "unit": "item",
+      "printType": "filament",
+      "listPrice": {
+        "amount": 4.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/glue-stick-for-build-plate",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "usedBy": [],
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/glue-stick-for-build-plate"
+      }
+    },
+    {
+      "id": "supply-bambu-lab-liquid-glue",
+      "brand": "Bambu Lab",
+      "name": "Liquid Glue",
+      "category": "plate-adhesive",
+      "unit": "item",
+      "printType": "filament",
+      "listPrice": {
+        "amount": 19.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/liquid-glue-for-build-plate",
+        "checked": "2026-11-22",
+        "note": "Including VAT. Regular price; €15.99 in a sale on the checked date."
+      },
+      "usedBy": [],
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/liquid-glue-for-build-plate"
+      }
+    },
+    {
+      "id": "supply-bambu-lab-lubricant-oil",
+      "brand": "Bambu Lab",
+      "name": "Lubricant Oil",
+      "category": "lubricant",
+      "unit": "item",
+      "printType": "filament",
+      "listPrice": {
+        "amount": 6.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/lubricant-oil",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "usedBy": [],
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/lubricant-oil"
+      }
+    },
+    {
+      "id": "supply-bambu-lab-lubricant-grease",
+      "brand": "Bambu Lab",
+      "name": "Lubricant Grease",
+      "category": "lubricant",
+      "unit": "item",
+      "printType": "filament",
+      "listPrice": {
+        "amount": 4.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/lubricant-grease",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "usedBy": [],
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/lubricant-grease"
+      }
+    }
+  ]
+}

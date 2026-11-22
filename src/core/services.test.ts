@@ -2799,7 +2799,7 @@ describe('STLQuestService crash recovery', () => {
       expect(capture.mock.calls).toEqual([
         [admin.id, 'printer_saved', { printer_count: 1, added_count: 1, updated_count: 0, removed_count: 0 }],
         [admin.id, 'printer_saved', { printer_count: 0, added_count: 0, updated_count: 0, removed_count: 1 }],
-        [admin.id, 'consumables_saved', { resin_count: 1, filament_count: 0, part_count: 0, supply_count: 0 }],
+        [admin.id, 'consumables_saved', { resin_count: 1, filament_count: 0, part_count: 0, supply_count: 0, catalogue_supply_count: 0 }],
         [admin.id, 'equipment_saved', { equipment_count: 1, catalogue_count: 1, with_supplies_count: 0 }],
       ])
     })
@@ -2928,6 +2928,20 @@ describe('STLQuestService crash recovery', () => {
 
         expect(capture.mock.calls.at(-1)).toEqual([admin.id, 'filament_price_shared', { colour_count: 1 }])
       })
+    })
+
+    it('counts the supplies added from the catalogue', async () => {
+      await inventory.createInventoryItem(
+        'consumables',
+        { id: 'ipa', kind: 'supply', name: 'IPA', unit: 'ml', price: 8, supplyPresetId: 'supply-isopropyl-alcohol' },
+        admin,
+      )
+
+      expect(capture).toHaveBeenCalledWith(
+        admin.id,
+        'consumables_saved',
+        expect.objectContaining({ supply_count: 1, catalogue_supply_count: 1 }),
+      )
     })
 
     it('remembers printer setup finished without a printer', async () => {

@@ -1,6 +1,23 @@
 import type { PrintType } from './types'
 
-export type PartCategory = 'resin-tank' | 'release-film' | 'lcd-screen' | 'nozzle' | 'build-sheet' | 'air-filter' | 'wash-solvent'
+export const PART_CATEGORIES = [
+  'resin-tank',
+  'release-film',
+  'lcd-screen',
+  'lcd-protector',
+  'flex-platform',
+  'nozzle',
+  'build-sheet',
+  'air-filter',
+  'belt',
+  'purge-wiper',
+  'wiping-pad',
+  'cutter',
+  'ptfe-tube',
+  // Never catalogued; it keeps a library part named like IPA from reading as another kind.
+  'wash-solvent',
+] as const
+export type PartCategory = (typeof PART_CATEGORIES)[number]
 
 /** `stated` is the manufacturer's own figure, `derived` converts its layer count to plates, and `typical` is STL Quest's labelled estimate. */
 export type PartLifespanBasis = 'stated' | 'derived' | 'typical'
@@ -38,4 +55,24 @@ export function genericPartPresets(parts: readonly PartPreset[], printType: Prin
 export function partPresetUnitPrice(preset: PartPreset) {
   if (!preset.listPrice) return undefined
   return Math.round((preset.listPrice.amount / (preset.listPrice.packSize ?? 1)) * 100) / 100
+}
+
+/** Catalogue parts one wear-part group can take, kept with the printer model a part chosen from them belongs to. */
+export type PartPresetChoice = { printerPresetId?: string; presets: PartPreset[] }
+
+/**
+ * What adding a part to a group offers: a model's own parts, or for a print type or custom printer the generic parts
+ * of its type. A print type also offers each fleet model's own, so a part added from there joins that model's group.
+ */
+export function partPresetChoices(
+  parts: readonly PartPreset[],
+  group: { printType: PrintType; printerPresetId?: string; printerId?: string },
+  fleetModels: readonly { printType: PrintType; printerPresetId: string }[],
+): PartPresetChoice[] {
+  const choices: PartPresetChoice[] = [{ printerPresetId: group.printerPresetId, presets: partPresetsForGroup(parts, group) }]
+  if (group.printerPresetId === undefined && group.printerId === undefined)
+    for (const model of fleetModels)
+      if (model.printType === group.printType)
+        choices.push({ printerPresetId: model.printerPresetId, presets: partPresetsForPrinter(parts, model.printerPresetId) })
+  return choices.filter(({ presets }) => presets.length)
 }

@@ -220,11 +220,12 @@ export const settings = {
       },
       changeTitle: 'Change product',
       changeDescription: 'Pick the product it is, or keep it as your own.',
-      custom: { resin: 'Custom resin', filament: 'Custom filament', part: 'Custom part' },
+      custom: { resin: 'Custom resin', filament: 'Custom filament', part: 'Custom part', supply: 'Custom supply' },
       customDescription: {
         resin: 'A resin the catalogue does not list.',
         filament: 'A filament the catalogue does not list.',
         part: 'A part the catalogue does not list.',
+        supply: 'A supply the catalogue does not list.',
       },
       customChange: 'Not from the catalogue',
       customChangeDescription: 'Keep its details and enter them yourself.',
@@ -235,6 +236,18 @@ export const settings = {
       noMatch: (query: string) => `Nothing in the catalogue matches “${query}”.`,
       addOwn: (query: string) => `Add “${query}” as your own`,
       partsDescription: 'Pick a part the catalogue knows for these printers, or enter your own.',
+      suppliesDescription: 'Pick a supply the catalogue knows, or enter your own.',
+      forEquipment: 'Named for your equipment',
+      supplyCategories: {
+        'wash-fluid': 'Wash fluids',
+        gloves: 'Gloves',
+        'paper-towels': 'Paper towels',
+        'filter-funnel': 'Filter funnels',
+        'plate-cleaner': 'Plate cleaners',
+        'plate-adhesive': 'Plate adhesives',
+        desiccant: 'Desiccants',
+        lubricant: 'Lubricants',
+      },
     },
     dialog: {
       newTitle: { resin: 'New resin', filament: 'New filament', supply: 'New supply', part: 'New wear part' },
@@ -324,6 +337,8 @@ export const settings = {
     listPrice: (seller: string, price: string, date: string) => `${seller} listed it at ${price} on ${date}.`,
     listPackPrice: (seller: string, pack: number, price: string, each: string, date: string) =>
       `${seller} listed a pack of ${pack} at ${price} (${each} each) on ${date}.`,
+    listSupplyPrice: (seller: string, pack: string, price: string, unitPrice: string, date: string) =>
+      `${seller} listed ${pack} at ${price} (${unitPrice}) on ${date}.`,
     listPriceHint: 'Enter what you pay, tax and shipping included.',
     listPriceSource: 'Store page',
     stock: {
@@ -502,6 +517,8 @@ export const settings = {
       addSupplyEmpty: 'No other consumables.',
       notInLibrary: 'Not listed?',
       addToConsumables: 'Add it to Consumables',
+      suggested: 'Named by its maker',
+      makerNames: (maker: string, supplies: string) => `${maker} names ${supplies} for it.`,
       noConsumables: 'Your consumables library is empty.',
       units: { ml: 'ml', g: 'g', item: 'items', plate: 'plates', minute: 'min' },
       wear: 'Wear',

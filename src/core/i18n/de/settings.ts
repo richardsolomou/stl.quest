@@ -227,11 +227,12 @@ export const settings: typeof en = {
       },
       changeTitle: 'Produkt ändern',
       changeDescription: 'Wählen Sie das passende Produkt oder behalten Sie Ihre eigenen Angaben.',
-      custom: { resin: 'Eigenes Harz', filament: 'Eigenes Filament', part: 'Eigenes Teil' },
+      custom: { resin: 'Eigenes Harz', filament: 'Eigenes Filament', part: 'Eigenes Teil', supply: 'Eigenes Verbrauchsmaterial' },
       customDescription: {
         resin: 'Ein Harz, das der Katalog nicht führt.',
         filament: 'Ein Filament, das der Katalog nicht führt.',
         part: 'Ein Teil, das der Katalog nicht führt.',
+        supply: 'Verbrauchsmaterial, das der Katalog nicht führt.',
       },
       customChange: 'Nicht aus dem Katalog',
       customChangeDescription: 'Angaben behalten und selbst eintragen.',
@@ -242,6 +243,18 @@ export const settings: typeof en = {
       noMatch: (query: string) => `Nichts im Katalog passt zu „${query}“.`,
       addOwn: (query: string) => `„${query}“ selbst hinzufügen`,
       partsDescription: 'Wählen Sie ein Teil, das der Katalog für diese Drucker kennt, oder geben Sie ein eigenes ein.',
+      suppliesDescription: 'Wählen Sie Verbrauchsmaterial, das der Katalog kennt, oder geben Sie eigenes ein.',
+      forEquipment: 'Für Ihre Ausrüstung genannt',
+      supplyCategories: {
+        'wash-fluid': 'Waschflüssigkeiten',
+        gloves: 'Handschuhe',
+        'paper-towels': 'Papiertücher',
+        'filter-funnel': 'Filtertrichter',
+        'plate-cleaner': 'Plattenreiniger',
+        'plate-adhesive': 'Haftmittel für Druckplatten',
+        desiccant: 'Trockenmittel',
+        lubricant: 'Schmiermittel',
+      },
     },
     dialog: {
       newTitle: { resin: 'Neues Harz', filament: 'Neues Filament', supply: 'Neues Hilfsmittel', part: 'Neues Verschleißteil' },
@@ -332,6 +345,8 @@ export const settings: typeof en = {
     listPrice: (seller: string, price: string, date: string) => `${seller} listete es am ${date} für ${price}.`,
     listPackPrice: (seller: string, pack: number, price: string, each: string, date: string) =>
       `${seller} listete am ${date} eine Packung mit ${pack} Stück für ${price} (${each} pro Stück).`,
+    listSupplyPrice: (seller: string, pack: string, price: string, unitPrice: string, date: string) =>
+      `${seller} listete am ${date} ${pack} für ${price} (${unitPrice}).`,
     listPriceHint: 'Tragen Sie ein, was Sie zahlen, inklusive Steuer und Versand.',
     listPriceSource: 'Shopseite',
     stock: {
@@ -512,6 +527,8 @@ export const settings: typeof en = {
       addSupplyEmpty: 'Kein weiteres Verbrauchsmaterial.',
       notInLibrary: 'Nicht dabei?',
       addToConsumables: 'Im Verbrauchsmaterial anlegen',
+      suggested: 'Vom Hersteller genannt',
+      makerNames: (maker: string, supplies: string) => `${maker} nennt dafür ${supplies}.`,
       noConsumables: 'Dein Verbrauchsmaterial ist noch leer.',
       units: { ml: 'ml', g: 'g', item: 'Stück', plate: 'Platten', minute: 'Min.' },
       wear: 'Verschleiß',

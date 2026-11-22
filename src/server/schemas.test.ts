@@ -413,6 +413,12 @@ describe('consumables schema', () => {
     expect(consumable({ id: 'ipa', kind: 'supply', name: 'IPA', unit: 'ml', price: 8 }).success).toBe(true)
   })
 
+  it('keeps the catalogue supply a supply was added from', () => {
+    expect(
+      consumable({ id: 'ipa', kind: 'supply', name: 'IPA', unit: 'ml', price: 8, supplyPresetId: 'supply-isopropyl-alcohol' }).data?.item,
+    ).toMatchObject({ supplyPresetId: 'supply-isopropyl-alcohol' })
+  })
+
   it('rejects a supply without a unit', () => {
     expect(consumable({ id: 'ipa', kind: 'supply', name: 'IPA', price: 8 }).success).toBe(false)
   })

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import type { PartPreset } from '../src/core/partPresets'
+import { PART_CATEGORIES, type PartPreset } from '../src/core/partPresets'
+import { isHttps, listPriceProblem } from './catalogChecks'
 
 const root = path.resolve(import.meta.dirname, '..')
 const read = <T>(file: string) => JSON.parse(readFileSync(path.join(root, file), 'utf8')) as T
@@ -12,23 +13,18 @@ const printers = new Map(
   ]),
 )
 const sourceIds = new Set(catalog.sources.map((source) => source.id))
-const currencies = new Set(Intl.supportedValuesOf('currency'))
-const today = new Date().toISOString().slice(0, 10)
 const ids = new Set<string>()
 
 function fail(preset: PartPreset, problem: string): never {
   throw new Error(`Part preset ${preset.id}: ${problem}`)
 }
 
-function isHttps(url: string | undefined) {
-  return url !== undefined && URL.canParse(url) && new URL(url).protocol === 'https:'
-}
-
 for (const preset of catalog.presets) {
   if (!/^part-[a-z0-9]+(-[a-z0-9]+)*$/.test(preset.id)) fail(preset, 'ID must be part-<slug>')
   if (ids.has(preset.id)) fail(preset, 'duplicate ID')
   ids.add(preset.id)
-  if (!preset.brand || !preset.name || !preset.category) fail(preset, 'missing brand, name, or category')
+  if (!preset.brand || !preset.name || !PART_CATEGORIES.includes(preset.category) || preset.category === 'wash-solvent')
+    fail(preset, 'missing brand or name, or unknown category')
   if (preset.printType !== 'resin' && preset.printType !== 'filament') fail(preset, `unknown print type ${String(preset.printType)}`)
   if (new Set(preset.fits).size !== preset.fits.length) fail(preset, 'duplicate fitted printer')
   for (const printerId of preset.fits) {
@@ -51,14 +47,10 @@ for (const preset of catalog.presets) {
 
   const price = preset.listPrice
   if (price) {
-    if (!Number.isFinite(price.amount) || price.amount <= 0 || Math.abs(price.amount * 100 - Math.round(price.amount * 100)) > 1e-6)
-      fail(preset, 'list price must be a positive amount in cents')
-    if (!currencies.has(price.currency)) fail(preset, `unknown ISO 4217 currency ${price.currency}`)
+    const problem = listPriceProblem(price)
+    if (problem) fail(preset, problem)
     if (price.packSize !== undefined && (!Number.isInteger(price.packSize) || price.packSize < 2))
       fail(preset, 'pack size must be an integer above one')
-    if (!isHttps(price.url)) fail(preset, 'invalid list price URL')
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(price.checked) || Number.isNaN(Date.parse(price.checked)) || price.checked > today)
-      fail(preset, 'list price checked date must be a past YYYY-MM-DD date')
   }
 
   if (!sourceIds.has(preset.source.id)) fail(preset, `unknown source ${preset.source.id}`)

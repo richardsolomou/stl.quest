@@ -93,12 +93,19 @@ export function partFromPreset(
 
 const CATEGORY_WORDS: [PartCategory, RegExp][] = [
   ['wash-solvent', /\b(ipa|isopropyl|alcohol|alcool|alkohol)|isopropanol/i],
+  ['lcd-protector', /protect|tempered|schutz/i],
   ['lcd-screen', /\b(lcd|screen|display|bildschirm)|écran/i],
   ['release-film', /\b(n?fep|pfa|acf|film|liner|release)|folie/i],
   ['resin-tank', /\b(tank|vat|cuve|bac)|wanne/i],
+  ['wiping-pad', /\b(wiping|pad|tampon)/i],
+  ['purge-wiper', /\b(purge|wiper|abstreifer)/i],
+  ['cutter', /\b(cutter|blade|klinge|messer|lame|coupe)/i],
   ['nozzle', /\b(nozzle|hotend|buse)|düse/i],
+  ['flex-platform', /\bflex|build platform|plateforme|druckplattform/i],
   ['build-sheet', /\b(sheet|pei|plaque|plateau)|platte/i],
   ['air-filter', /filt(er|re)/i],
+  ['belt', /\b(belt|riemen|courroie)/i],
+  ['ptfe-tube', /\b(ptfe|bowden|tube|schlauch)/i],
 ]
 
 /** The kind of wear part a library part is: its catalogue part's, or else the one its name suggests. */

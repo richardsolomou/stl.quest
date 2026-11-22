@@ -70,7 +70,7 @@ export const equipment = pgTable(
 
 /**
  * Resins, filaments, wear parts, and supplies in one table: `price` is per litre, per kilogram, or per unit as the kind
- * is bought, `preset_id` is the resin, filament, or part catalogue entry, and the remaining columns belong to one kind.
+ * is bought, `preset_id` is the resin, filament, part, or supply catalogue entry, and the remaining columns belong to one kind.
  * A part's `printer_id` is the custom printer it belongs to; it has no foreign key, since a part may name a printer that
  * no longer exists, which the library shows as a group of its own.
  */
