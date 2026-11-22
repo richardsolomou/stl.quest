@@ -70,6 +70,7 @@ import {
   sameSpoolUsage,
   type PrintJob,
   type PrintReport,
+  type PrintSpoolUsage,
   type PrintUsageReport,
 } from './printJobs'
 import {
@@ -1389,28 +1390,38 @@ export class STLQuestService {
     if (input.restocks.some(({ consumableId }) => managed.has(consumableId)))
       throw new Response(this.text.usage.managedBySpoolman, { status: 409 })
     const spoolman = await this.spoolmanRestocksFor(input.spoolman ?? [], prospective)
-    // Queued first, so an order whose spools cannot wait records nothing and can simply be sent again.
+    const prices = new Map(input.prices.map(({ consumableId, price }) => [consumableId, price]))
+    const changesLibrary = added.length > 0 || prices.size > 0
+    const changeLibrary = (items: Consumable[]) => [
+      ...items.map((item) => (prices.has(item.id) ? withConsumablePrice(item, prices.get(item.id)!) : item)),
+      ...added.filter((item) => !items.some(({ id }) => id === item.id)).map((item) => ({ ...item, archived: undefined })),
+    ]
+    // The library change is checked before the spools queue and the spools leave the queue if it still fails, so an
+    // order refused at any step records nothing and sending it again queues each spool once.
+    if (changesLibrary) this.validateInventory('consumables', current, changeLibrary(current), await this.inventoryStores('consumables'))
     if (spoolman.length) {
       const queued = await this.repository.queueSpoolmanRestocks(spoolman, MAX_SPOOLMAN_RESTOCKS)
       if (queued === 'disconnected') throw new Response(this.text.spoolman.restockNotConnected, { status: 409 })
       if (queued === 'full') throw new Response(this.text.spoolman.tooManyRestocks(MAX_SPOOLMAN_RESTOCKS), { status: 409 })
       this.changed('spoolman.restocksChanged')
     }
-    const prices = new Map(input.prices.map(({ consumableId, price }) => [consumableId, price]))
-    const library =
-      added.length || prices.size
-        ? await this.changeInventory('consumables', identity, (items) => [
-            ...items.map((item) => (prices.has(item.id) ? withConsumablePrice(item, prices.get(item.id)!) : item)),
-            ...added.filter((item) => !items.some(({ id }) => id === item.id)).map((item) => ({ ...item, archived: undefined })),
-          ])
-        : current
-    const recorded = await this.appendUsage(
-      input.restocks.flatMap(({ consumableId, amount }) => {
-        const consumable = library.find(({ id }) => id === consumableId)
-        return consumable ? [{ stage: 'stock' as const, kind: 'restock' as const, ...consumed(consumable), amount }] : []
-      }),
-      identity,
-    )
+    const restock = async () => {
+      const library = changesLibrary ? await this.changeInventory('consumables', identity, changeLibrary) : current
+      return await this.appendUsage(
+        input.restocks.flatMap(({ consumableId, amount }) => {
+          const consumable = library.find(({ id }) => id === consumableId)
+          return consumable ? [{ stage: 'stock' as const, kind: 'restock' as const, ...consumed(consumable), amount }] : []
+        }),
+        identity,
+      )
+    }
+    const recorded = await restock().catch(async (error: unknown) => {
+      if (spoolman.length) {
+        for (const { id } of spoolman) await this.repository.deleteSpoolmanRestock(id)
+        this.changed('spoolman.restocksChanged')
+      }
+      throw error
+    })
     this.capture(identity.id, 'order_restock_recorded', {
       vendor: input.vendor,
       restock_count: input.restocks.length,
@@ -1990,7 +2001,7 @@ export class STLQuestService {
     const printType = await this.platePrintType(plate).catch(() => undefined)
     if (!printType) return
     if (job.outcome === 'finished' && (plate.recording || plate.otherStuff || job.minutes === undefined)) return
-    const transactionId = await this.recordPrintUsage(job, plate, printType, (current) => !current.recording)
+    const transactionId = await this.recordPrintUsage(job, plate, printType)
     if (job.outcome !== 'finished' && plate.stage) {
       const requests = new Map((await this.repository.listRequests()).map((request) => [request.id, request]))
       const { moves } = plateMoves(plate, PLATE_RETRY_STAGE, (id) => requests.get(id)?.counts)
@@ -2004,15 +2015,21 @@ export class STLQuestService {
       this.changed('plate.changed')
       this.changed('request.copiesMoved')
     }
-    if (transactionId) await this.repository.updatePrintJob(job.id, { transactionId })
+    if (!transactionId) return
+    await this.repository.updatePrintJob(job.id, { transactionId })
+    // Spools the bridge stored while this was recording were not part of it, and the bridge will not send them again.
+    const stored = (await this.repository.listPrintJobs()).find(({ id }) => id === job.id)
+    if (stored?.filamentUsage && !sameSpoolUsage(job.filamentUsage, stored.filamentUsage))
+      await this.recordPrintSpools({ ...job, transactionId }, stored.filamentUsage)
   }
 
   /**
    * Records what a print measured on its plate, as the plate's recording when it finished and as failed usage when it
-   * did not. Grams go to the filaments of the Spoolman spools it reported, else by its trays' materials. A
-   * recording replaces the plate's only while `replaces` holds for the plate under the recording's lock.
+   * did not. Grams go to the filaments of the Spoolman spools it reported, else by its trays' materials. With
+   * `replacing`, what the print recorded before, it replaces that while it is still live, and otherwise records only
+   * on a plate with no recording.
    */
-  private async recordPrintUsage(job: PrintJob, plate: Plate, printType: PrintType, replaces?: (current: Plate) => boolean) {
+  private async recordPrintUsage(job: PrintJob, plate: Plate, printType: PrintType, replacing?: string) {
     const consumables = await this.consumables()
     const bySpool =
       printType === 'filament' && job.filamentUsage?.length
@@ -2031,14 +2048,32 @@ export class STLQuestService {
     const materials = bySpool?.materials.length ? bySpool.materials : used.map(({ material }) => material)
     const minutes = job.minutes ?? 0
     if (job.outcome === 'finished') {
-      const { recorded } = await this.recordPlateUsage(plate, printType, input, minutes, materials, 'printer', undefined, replaces)
+      const { recorded } = await this.recordPlateUsage(plate, printType, input, minutes, materials, 'printer', undefined, (current) =>
+        replacing ? current.recording?.transactionId === replacing : !current.recording,
+      )
       if (!recorded) return undefined
       this.changed('usage.recorded')
       return recorded.recording!.transactionId
     }
     // Bambuddy already scales a stopped print's grams to its progress, so they are what each print had used by then.
     const { drafts } = await this.plateRunUsage(plate, printType, input, minutes, materials, true)
-    return (await this.appendUsage(drafts.map((draft) => ({ ...draft, outcome: 'failed' as const })))).transactionId
+    const failed = drafts.map((draft) => ({ ...draft, outcome: 'failed' as const }))
+    if (!replacing) return (await this.appendUsage(failed)).transactionId
+    const { transactionId, events } = await this.stampUsage(failed)
+    // Failed usage someone already undid stays undone.
+    if (!events.length || !(await this.repository.replaceUsageTransaction(replacing, events, Date.now()))) return undefined
+    this.changed('usage.recorded')
+    return transactionId
+  }
+
+  /** Records an ended print again by the spools it reported, in place of what it recorded before, and stores the new recording. */
+  private async recordPrintSpools(job: PrintJob & { transactionId: string }, spools: PrintSpoolUsage[]) {
+    const plate = (await this.repository.listPlates()).find(({ id }) => id === job.plateId)
+    const printType = plate && (await this.platePrintType(plate).catch(() => undefined))
+    if (!plate || !printType || !(await storedUsageTracking(this.repository))) return false
+    const transactionId = await this.recordPrintUsage({ ...job, filamentUsage: spools }, plate, printType, job.transactionId)
+    if (transactionId) await this.repository.updatePrintJob(job.id, { transactionId })
+    return Boolean(transactionId)
   }
 
   /**
@@ -2050,24 +2085,12 @@ export class STLQuestService {
     const job = (await this.repository.listPrintJobs()).find(({ runId }) => runId === report.runId)
     if (!job) throw new Response(this.text.prints.notFound, { status: 404 })
     if (sameSpoolUsage(job.filamentUsage, report.spools)) return
-    const updated: PrintJob = { ...job, filamentUsage: report.spools }
-    const plate = job.transactionId ? (await this.repository.listPlates()).find(({ id }) => id === job.plateId) : undefined
-    const printType = plate && (await this.platePrintType(plate).catch(() => undefined))
-    let transactionId: string | undefined
-    if (plate && printType && (await storedUsageTracking(this.repository))) {
-      if (job.outcome === 'finished')
-        transactionId = await this.recordPrintUsage(
-          updated,
-          plate,
-          printType,
-          (current) => current.recording?.transactionId === job.transactionId,
-        )
-      // Failed usage someone already undid stays undone.
-      else if (await this.repository.undoUsageTransaction(job.transactionId!, Date.now()))
-        transactionId = await this.recordPrintUsage(updated, plate, printType)
-    }
-    const recorded = Boolean(transactionId)
-    await this.repository.updatePrintJob(job.id, { filamentUsage: report.spools, ...(transactionId && { transactionId }) })
+    // Stored once recorded, so a send that fails to record is taken in again when the bridge retries.
+    let recorded = job.transactionId ? await this.recordPrintSpools({ ...job, transactionId: job.transactionId }, report.spools) : false
+    await this.repository.updatePrintJob(job.id, { filamentUsage: report.spools })
+    // An end event that recorded after the read above could not see these spools, so they replace its recording too.
+    const recordedMeanwhile = !job.transactionId && (await this.repository.listPrintJobs()).find(({ id }) => id === job.id)?.transactionId
+    if (recordedMeanwhile) recorded = await this.recordPrintSpools({ ...job, transactionId: recordedMeanwhile }, report.spools)
     this.changed('print.received')
     const { matches } = await this.spoolmanMatches(await this.consumables())
     const spools = await this.repository.listSpoolmanSpools()
@@ -2336,7 +2359,7 @@ export class STLQuestService {
   ) {
     this.requireAdmin(identity)
     // Read outside the lock, so a store deleted in that moment is still refused, by the foreign key instead.
-    const stores = kind === 'consumables' ? new Set((await this.repository.listInventory('stores')).map(({ id }) => id)) : undefined
+    const stores = await this.inventoryStores(kind)
     const { previous, items } = await this.repository.changeInventory(kind, (current) => {
       const next = change(current)
       this.validateInventory(kind, current, next, stores)
@@ -2345,6 +2368,10 @@ export class STLQuestService {
     this.changed('inventory.changed')
     this.captureInventory(kind, identity.id, previous, items)
     return items
+  }
+
+  private async inventoryStores(kind: InventoryKind) {
+    return kind === 'consumables' ? new Set((await this.repository.listInventory('stores')).map(({ id }) => id)) : undefined
   }
 
   /** Checks only what the change touched, so an item stored before a rule existed never blocks editing another. */

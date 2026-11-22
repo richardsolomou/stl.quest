@@ -582,6 +582,11 @@ interface RepositoryShape {
    * count again, and the plate goes back to unrecorded.
    */
   undoUsageTransaction(transactionId: string, undoneAt: number): number
+  /**
+   * Undoes the transaction's live events and appends `events` in its place, in one transaction under the workspace lock;
+   * appends nothing and returns false when none of its events were live.
+   */
+  replaceUsageTransaction(transactionId: string, events: UsageEvent[], undoneAt: number): boolean
   /** Every printing use of the prints, undone events included, so a plate can tell which of them it replaced. */
   printingUsage(requestIds: string[]): UsageEvent[]
   listPlates(): Plate[]

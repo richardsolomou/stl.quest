@@ -4540,6 +4540,34 @@ describe('STLQuestService crash recovery', () => {
           expect([await used(requestId), (await counts(requestId)).up_next]).toEqual([[[petg.id, 5]], 1])
         })
 
+        it('keeps a failed print’s usage when recording it again by spool fails', async () => {
+          const requestId = await queued()
+          await start(requestId)
+          await service.receivePrint({ ...finished, outcome: 'failed', runId: '7' })
+          const before = await used(requestId)
+          vi.spyOn(repository as unknown as { insertUsageEvents: () => Promise<void> }, 'insertUsageEvents').mockRejectedValueOnce(
+            new Error('disk full'),
+          )
+
+          await service.receivePrintUsage({ runId: '7', spools: [{ spoolId: 2, grams: 5 }] }).catch(() => undefined)
+
+          expect(await used(requestId)).toEqual(before)
+        })
+
+        it('records a failed print again by spool once a failed attempt is retried', async () => {
+          const requestId = await queued()
+          await start(requestId)
+          await service.receivePrint({ ...finished, outcome: 'failed', runId: '7' })
+          vi.spyOn(repository as unknown as { insertUsageEvents: () => Promise<void> }, 'insertUsageEvents').mockRejectedValueOnce(
+            new Error('disk full'),
+          )
+          await service.receivePrintUsage({ runId: '7', spools: [{ spoolId: 2, grams: 5 }] }).catch(() => undefined)
+
+          await service.receivePrintUsage({ runId: '7', spools: [{ spoolId: 2, grams: 5 }] })
+
+          expect(await used(requestId)).toEqual([[petg.id, 5]])
+        })
+
         it('leaves a failed print’s usage undone once its user undid it', async () => {
           const requestId = await queued()
           await start(requestId)
@@ -4564,7 +4592,22 @@ describe('STLQuestService crash recovery', () => {
 
           await service.receivePrint({ ...finished, runId: '7' })
 
-          expect((await repository.listPrintJobs())[0].filamentUsage).toEqual(spools)
+          expect([(await repository.listPrintJobs())[0].filamentUsage, await used(requestId)]).toEqual([spools, [[petg.id, 9]]])
+        })
+
+        it('records a failed print by the spools it reported while its end was being recorded', async () => {
+          const requestId = await queued()
+          await start(requestId)
+          await service.receivePrint({ ...finished, outcome: 'printing', runId: '7' })
+          const listPlates = repository.listPlates.bind(repository)
+          vi.spyOn(repository, 'listPlates').mockImplementationOnce(async () => {
+            await service.receivePrintUsage({ runId: '7', spools: [{ spoolId: 2, grams: 5 }] })
+            return await listPlates()
+          })
+
+          await service.receivePrint({ ...finished, outcome: 'failed', runId: '7' })
+
+          expect(await used(requestId)).toEqual([[petg.id, 5]])
         })
 
         it('keeps an end that arrived while the bridge’s spools were being taken in', async () => {
@@ -4580,6 +4623,22 @@ describe('STLQuestService crash recovery', () => {
           await service.receivePrintUsage({ runId: '7', spools: [{ spoolId: 2, grams: 9 }] })
 
           expect((await repository.listPrintJobs())[0].outcome).toBe('finished')
+        })
+
+        it('records by spool an end that arrived while the bridge’s spools were being taken in', async () => {
+          const requestId = await queued()
+          await start(requestId)
+          await service.receivePrint({ ...finished, outcome: 'printing', runId: '7' })
+          const listPrintJobs = repository.listPrintJobs.bind(repository)
+          vi.spyOn(repository, 'listPrintJobs').mockImplementationOnce(async () => {
+            const read = await listPrintJobs()
+            await service.receivePrint({ ...finished, runId: '7' })
+            return read
+          })
+
+          await service.receivePrintUsage({ runId: '7', spools: [{ spoolId: 2, grams: 9 }] })
+
+          expect(await used(requestId)).toEqual([[petg.id, 9]])
         })
 
         it('keeps a plate recorded from typed totals while the bridge’s spools were on their way', async () => {
@@ -4982,6 +5041,39 @@ describe('STLQuestService crash recovery', () => {
         const refused = (await queue(1).catch((error: unknown) => error)) as Response
 
         expect([refused.status, await refused.text()]).toEqual([409, messagesFor().server.spoolman.restockNotConnected])
+      })
+
+      it('queues an order’s spools once when it is sent again after its library change failed', async () => {
+        const resend = () =>
+          service.restockFromOrder(
+            { ...order, prices: [{ consumableId: black.id, price: 22 }], spoolman: [{ consumableId: black.id, spools: 1 }] },
+            admin,
+          )
+        vi.spyOn(repository, 'changeInventory').mockRejectedValueOnce(new Response(null, { status: 409 }))
+        await resend().catch(() => undefined)
+
+        await resend()
+
+        expect(await service.spoolmanRestocks(admin)).toHaveLength(1)
+      })
+
+      it('queues no spools for an order the library has no room for', async () => {
+        await stock(
+          'consumables',
+          Array.from({ length: MAX_CONSUMABLES - 2 }, (_, index): Consumable => ({
+            id: `own-${index}`,
+            kind: 'filament',
+            name: `Own ${index}`,
+            pricePerKg: 18,
+          })),
+        )
+        const queueSpools = vi.spyOn(repository, 'queueSpoolmanRestocks')
+
+        await service
+          .restockFromOrder({ ...order, added: [{ ...white, id: 'extra' }], spoolman: [{ consumableId: black.id, spools: 1 }] }, admin)
+          .catch(() => undefined)
+
+        expect(queueSpools).not.toHaveBeenCalled()
       })
 
       it('hands the bridge the spools waiting, oldest first', async () => {

@@ -2792,6 +2792,16 @@ export class DrizzleRepository implements Repository {
     return await this.database.transaction(async (tx) => await this.undoUsageWith(tx, workspaceId, transactionId, undoneAt))
   }
 
+  async replaceUsageTransaction(transactionId: string, events: UsageEvent[], undoneAt: number) {
+    const workspaceId = await this.workspace()
+    return await this.database.transaction(async (tx) => {
+      await this.lockWorkspace(tx, workspaceId)
+      if (!(await this.undoUsageWith(tx, workspaceId, transactionId, undoneAt))) return false
+      await this.insertUsageEvents(tx, workspaceId, events)
+      return true
+    })
+  }
+
   private async undoUsageWith(tx: DatabaseExecutor, workspaceId: string, transactionId: string, undoneAt: number) {
     const undone = (
       await tx
