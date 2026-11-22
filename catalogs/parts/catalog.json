@@ -1103,6 +1103,58 @@
       }
     },
     {
+      "id": "part-bambu-lab-air-filter-p2s",
+      "brand": "Bambu Lab",
+      "name": "Air Filter - P2S",
+      "category": "air-filter",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-p2s"],
+      "lifespan": 1440,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "stated",
+        "url": "https://wiki.bambulab.com/en/p2s/maintenance/replace-air-filter",
+        "note": "Bambu Lab says to replace the activated-carbon filter after about 1,440 hours of printing, or sooner when it is heavily contaminated."
+      },
+      "listPrice": {
+        "amount": 14.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/air-filter-p2s",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/air-filter-p2s"
+      }
+    },
+    {
+      "id": "part-bambu-lab-air-filter-h2-series",
+      "brand": "Bambu Lab",
+      "name": "Air Filter - H2 Series",
+      "category": "air-filter",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-h2d", "filament-bambu-lab-h2d-pro", "filament-bambu-lab-h2s", "filament-bambu-lab-h2c"],
+      "lifespan": 1440,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "stated",
+        "url": "https://eu.store.bambulab.com/products/air-filter-h2-series",
+        "note": "Bambu Lab advises replacing the filter after a total printing time of 1,440 hours, or 60 days."
+      },
+      "listPrice": {
+        "amount": 19.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/air-filter-h2-series",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/air-filter-h2-series"
+      }
+    },
+    {
       "id": "part-bambu-lab-dual-texture-pei-plate",
       "brand": "Bambu Lab",
       "name": "Bambu Dual-Texture PEI Plate",
