@@ -126,7 +126,7 @@ import type { MaintenanceTotals } from '../core/maintenance'
 import { MAX_USAGE_LIST, type UsageEvent, type UsageFilters } from '../core/usage'
 import type { PriceCalculatorCurrency } from '../core/priceCalculator'
 import type { Plate, PlateItem, PlateRecording, PlateRunStage } from '../core/plates'
-import { MAX_PRINT_JOBS, type PrintJob } from '../core/printJobs'
+import { MAX_PRINT_JOBS, type PrintJob, type PrintJobChanges } from '../core/printJobs'
 import { inventoryColumns, inventoryItem, inventoryTables } from './repository/inventory'
 import { requestConditions, requestOrderBy, requestSelection, type RequestFilterOptions } from './repository/requestQuery'
 
@@ -2984,11 +2984,12 @@ export class DrizzleRepository implements Repository {
     })
   }
 
-  async updatePrintJob(job: PrintJob) {
+  async updatePrintJob(id: string, changes: PrintJobChanges) {
+    const columns = { ...printJobRow(changes), printerName: changes.printerName, outcome: changes.outcome, receivedAt: changes.receivedAt }
     await this.database
       .update(printJobs)
-      .set({ ...printJobRow(job), printerName: job.printerName, outcome: job.outcome, receivedAt: job.receivedAt })
-      .where(and(eq(printJobs.workspaceId, await this.workspace()), eq(printJobs.id, job.id)))
+      .set(Object.fromEntries(Object.keys(changes).map((key) => [key, columns[key as keyof typeof columns]])))
+      .where(and(eq(printJobs.workspaceId, await this.workspace()), eq(printJobs.id, id)))
       .run()
   }
 
@@ -3018,13 +3019,14 @@ export class DrizzleRepository implements Repository {
       plate: Plate,
       printing: UsageEvent[],
     ) => { recording: PlateRecording; items: PlateItem[]; events: UsageEvent[]; superseded: string[] },
+    when?: (plate: Plate) => boolean,
   ) {
     const workspaceId = await this.workspace()
     return await this.database.transaction(async (tx) => {
       // Recording reads the prints' usage and replaces some of it, so two recordings must not interleave.
       await this.lockWorkspace(tx, workspaceId)
       let [plate] = await this.platesWith(tx, workspaceId, id)
-      if (!plate) return undefined
+      if (!plate || (when && !when(plate))) return undefined
       if (plate.recording) {
         await this.undoUsageWith(tx, workspaceId, plate.recording.transactionId, at)
         ;[plate] = await this.platesWith(tx, workspaceId, id)
@@ -4017,7 +4019,7 @@ export class DrizzleRepository implements Repository {
         .from(spoolmanConnections)
         .where(eq(spoolmanConnections.workspaceId, workspaceId))
         .get()
-      if (!connected) return false
+      if (!connected) return 'disconnected' as const
       const waiting =
         (
           await tx
@@ -4026,7 +4028,7 @@ export class DrizzleRepository implements Repository {
             .where(and(eq(spoolmanRestocks.workspaceId, workspaceId), ne(spoolmanRestocks.status, 'created')))
             .get()
         )?.total ?? 0
-      if (waiting + restocks.length > limit) return false
+      if (waiting + restocks.length > limit) return 'full' as const
       await tx
         .insert(spoolmanRestocks)
         .values(
@@ -4053,7 +4055,7 @@ export class DrizzleRepository implements Repository {
           and(eq(spoolmanRestocks.workspaceId, workspaceId), eq(spoolmanRestocks.status, 'created'), notInArray(spoolmanRestocks.id, kept)),
         )
         .run()
-      return true
+      return 'queued' as const
     })
   }
 
@@ -4702,7 +4704,7 @@ function uniqueBy<T>(items: T[], key: (item: T) => string) {
 }
 
 /** A print's optional fields as columns, null where it has none, so an update clears what it no longer has. */
-function printJobRow(job: PrintJob) {
+function printJobRow(job: PrintJobChanges) {
   return {
     printerId: job.printerId ?? null,
     fileName: job.fileName ?? null,
@@ -4715,7 +4717,7 @@ function printJobRow(job: PrintJob) {
     archiveId: job.archiveId ?? null,
     runId: job.runId ?? null,
     plateId: job.plateId ?? null,
-    personal: job.personal,
+    personal: job.personal ?? false,
     transactionId: job.transactionId ?? null,
     startedAt: job.startedAt ?? null,
     endedAt: job.endedAt ?? null,

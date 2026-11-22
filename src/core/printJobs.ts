@@ -61,6 +61,8 @@ export type PrintJob = Omit<PrintReport, 'outcome'> & {
   receivedAt: number
 }
 
+export type PrintJobChanges = Partial<Omit<PrintJob, 'id'>>
+
 /** Bambuddy's generic webhook JSON, as far as STL Quest reads it; every value is a display string. */
 export type BambuddyEvent = {
   event: string

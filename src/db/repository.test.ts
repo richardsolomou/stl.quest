@@ -105,9 +105,9 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
 
   it('keeps spools to add to Spoolman until the workspace disconnects', async () => {
     const restock = { id: 'r1', filamentId: 10, filamentName: 'Black', grams: 1000, status: 'queued' as const, createdAt: 1, updatedAt: 1 }
-    expect(await repository.queueSpoolmanRestocks([restock], 10)).toBe(false)
+    expect(await repository.queueSpoolmanRestocks([restock], 10)).toBe('disconnected')
     await repository.connectSpoolman('hash', 1)
-    expect(await repository.queueSpoolmanRestocks([restock], 10)).toBe(true)
+    expect(await repository.queueSpoolmanRestocks([restock], 10)).toBe('queued')
     expect(await repository.listSpoolmanRestocks()).toEqual([restock])
     await repository.disconnectSpoolman()
     expect(await repository.listSpoolmanRestocks()).toEqual([])
@@ -117,7 +117,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     await repository.connectSpoolman('hash', 1)
     const restock = (id: string) => ({ id, filamentId: 10, status: 'queued' as const, createdAt: 1, updatedAt: 1 })
     await repository.queueSpoolmanRestocks([restock('r1')], 2)
-    expect(await repository.queueSpoolmanRestocks([restock('r2'), restock('r3')], 2)).toBe(false)
+    expect(await repository.queueSpoolmanRestocks([restock('r2'), restock('r3')], 2)).toBe('full')
   })
 
   it('records the spool the bridge added to Spoolman', async () => {
@@ -146,8 +146,21 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
   it('keeps what a print used per Spoolman spool', async () => {
     await repository.insertPrintJob({ id: 'job', printerName: 'X1C', outcome: 'finished', personal: false, receivedAt: 1 })
     const [job] = await repository.listPrintJobs()
-    await repository.updatePrintJob({ ...job, filamentUsage: [{ spoolId: 3, grams: 12.5 }] })
+    await repository.updatePrintJob(job.id, { filamentUsage: [{ spoolId: 3, grams: 12.5 }] })
     expect((await repository.listPrintJobs())[0].filamentUsage).toEqual([{ spoolId: 3, grams: 12.5 }])
+  })
+
+  it('leaves the fields a print update does not name', async () => {
+    await repository.insertPrintJob({
+      id: 'job',
+      printerName: 'X1C',
+      outcome: 'finished',
+      personal: false,
+      transactionId: 't1',
+      receivedAt: 1,
+    })
+    await repository.updatePrintJob('job', { filamentUsage: [{ spoolId: 3, grams: 12.5 }] })
+    expect((await repository.listPrintJobs())[0].transactionId).toBe('t1')
   })
 
   it('finds the workspace of a Spoolman token only by its hash', async () => {

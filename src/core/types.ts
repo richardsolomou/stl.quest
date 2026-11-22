@@ -9,7 +9,7 @@ import type { InventoryItems, InventoryKind } from './inventory'
 import type { RecentStockUse } from './shopping'
 import type { InventoryReferences } from './inventoryDeletion'
 import type { Plate, PlateItem, PlateRecording, PlateRunStage } from './plates'
-import type { PrintJob } from './printJobs'
+import type { PrintJob, PrintJobChanges } from './printJobs'
 import type { PriceCalculatorCurrency } from './priceCalculator'
 import type { ChargedPrint } from './spend'
 import type { SpoolmanChange, SpoolmanLink, SpoolmanSpool } from './spoolman'
@@ -546,10 +546,10 @@ interface RepositoryShape {
   /** Spools to add to Spoolman, newest first. */
   listSpoolmanRestocks(): SpoolmanRestock[]
   /**
-   * Queues spools for the bridge to add to Spoolman, keeping at most `limit` of those already added; false when the
-   * workspace is not connected or more than `limit` would wait.
+   * Queues spools for the bridge to add to Spoolman, keeping at most `limit` of those already added; queues none when
+   * the workspace is not connected or more than `limit` would wait.
    */
-  queueSpoolmanRestocks(restocks: SpoolmanRestock[], limit: number): boolean
+  queueSpoolmanRestocks(restocks: SpoolmanRestock[], limit: number): 'queued' | 'disconnected' | 'full'
   /** Records what the bridge did with a spool not yet added; false when there is none such. */
   settleSpoolmanRestock(result: SpoolmanRestockResult, now: number): boolean
   /** Queues a spool Spoolman refused again; false when it did not fail. */
@@ -598,12 +598,14 @@ interface RepositoryShape {
   listPrintJobs(): PrintJob[]
   /** Adds a print, dropping the oldest beyond `MAX_PRINT_JOBS`. */
   insertPrintJob(job: PrintJob): void
-  updatePrintJob(job: PrintJob): void
+  /** Writes only the fields given, so a concurrent change to the others survives; an undefined one clears its column. */
+  updatePrintJob(id: string, changes: PrintJobChanges): void
   /** Undoes the plate's usage, if any, then deletes it; false when there is no such plate. */
   deletePlate(id: string, undoneAt: number): boolean
   /**
    * Replaces the plate's recorded usage in one transaction: undoes what it recorded before, then lets `record` read the
-   * prints' printing usage as it stands and append new events, marking the events it replaces undone by it.
+   * prints' printing usage as it stands and append new events, marking the events it replaces undone by it. Undefined
+   * when there is no such plate or `when` does not hold for it as it stands under the lock.
    */
   recordPlate(
     id: string,
@@ -612,6 +614,7 @@ interface RepositoryShape {
       plate: Plate,
       printing: UsageEvent[],
     ) => { recording: PlateRecording; items: PlateItem[]; events: UsageEvent[]; superseded: string[] },
+    when?: (plate: Plate) => boolean,
   ): Plate | undefined
   setRequestCharge(id: string, charged: PrintCharge | null): void
   countUsers(): number

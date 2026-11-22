@@ -7,6 +7,7 @@ import { LocalAssetStore } from '../adapters/filesystem'
 import { UploadStaging } from '../adapters/staging'
 import { createDatabase } from '../db'
 import { DrizzleRepository } from '../db/repository'
+import { messagesFor } from './i18n'
 import { organization, requests, requestStatuses, user } from '../db/schema'
 import type { EventBus, Identity, Notifier, PrinterProfile, Telemetry } from './types'
 import { STLQuestService } from './services'
@@ -4497,6 +4498,86 @@ describe('STLQuestService crash recovery', () => {
           expect([await used(requestId), (await counts(requestId)).up_next]).toEqual([[[petg.id, 5]], 1])
         })
 
+        it('leaves a failed print’s usage undone once its user undid it', async () => {
+          const requestId = await queued()
+          await start(requestId)
+          await service.receivePrint({ ...finished, outcome: 'failed', runId: '7' })
+          await service.undoUsage((await repository.listPrintJobs())[0].transactionId!, admin)
+
+          await service.receivePrintUsage({ runId: '7', spools: [{ spoolId: 2, grams: 5 }] })
+
+          expect(await used(requestId)).toEqual([])
+        })
+
+        it('keeps the spools a print reported while its end was being recorded', async () => {
+          const requestId = await queued()
+          await start(requestId)
+          await service.receivePrint({ ...finished, outcome: 'printing', runId: '7' })
+          const spools = [{ spoolId: 2, grams: 9 }]
+          const listPlates = repository.listPlates.bind(repository)
+          vi.spyOn(repository, 'listPlates').mockImplementationOnce(async () => {
+            await service.receivePrintUsage({ runId: '7', spools })
+            return await listPlates()
+          })
+
+          await service.receivePrint({ ...finished, runId: '7' })
+
+          expect((await repository.listPrintJobs())[0].filamentUsage).toEqual(spools)
+        })
+
+        it('keeps an end that arrived while the bridge’s spools were being taken in', async () => {
+          await start(await queued())
+          await service.receivePrint({ ...finished, outcome: 'printing', runId: '7' })
+          const listPrintJobs = repository.listPrintJobs.bind(repository)
+          vi.spyOn(repository, 'listPrintJobs').mockImplementationOnce(async () => {
+            const read = await listPrintJobs()
+            await service.receivePrint({ ...finished, runId: '7' })
+            return read
+          })
+
+          await service.receivePrintUsage({ runId: '7', spools: [{ spoolId: 2, grams: 9 }] })
+
+          expect((await repository.listPrintJobs())[0].outcome).toBe('finished')
+        })
+
+        it('keeps a plate recorded from typed totals while the bridge’s spools were on their way', async () => {
+          const requestId = await queued()
+          const { id } = await start(requestId)
+          await service.receivePrint({ ...finished, runId: '7' })
+          const listSpools = repository.listSpoolmanSpools.bind(repository)
+          vi.spyOn(repository, 'listSpoolmanSpools').mockImplementationOnce(async () => {
+            await service.recordPlate(
+              { plateId: id, minutes: 60, materials: [{ consumableId: filament.id }], total: 20, otherShare: 0 },
+              admin,
+            )
+            return await listSpools()
+          })
+
+          await service.receivePrintUsage({ runId: '7', spools: [{ spoolId: 2, grams: 5 }] })
+
+          expect(await used(requestId)).toEqual([[filament.id, 20]])
+        })
+
+        it('keeps a plate recorded from typed totals while its end was being recorded', async () => {
+          const requestId = await queued()
+          const { id } = await start(requestId)
+          const consumables = repository.listInventory.bind(repository)
+          const spy = vi.spyOn(repository, 'listInventory')
+          spy.mockImplementation(async (kind) => {
+            if (kind === 'consumables' && spy.mock.calls.filter(([called]) => called === 'consumables').length === 1) {
+              await service.recordPlate(
+                { plateId: id, minutes: 60, materials: [{ consumableId: filament.id }], total: 20, otherShare: 0 },
+                admin,
+              )
+            }
+            return await consumables(kind)
+          })
+
+          await service.receivePrint({ ...finished, runId: '7' })
+
+          expect(await used(requestId)).toEqual([[filament.id, 20]])
+        })
+
         it('keeps a plate recorded from a slicer file', async () => {
           const requestId = await queued()
           const { id } = await start(requestId)
@@ -4834,6 +4915,31 @@ describe('STLQuestService crash recovery', () => {
         await queue(50)
 
         await expect(queue(1)).rejects.toMatchObject({ status: 409 })
+      })
+
+      it('restocks nothing else from an order whose spools cannot wait', async () => {
+        for (let full = 0; full < 4; full++) await queue(50)
+
+        await service
+          .restockFromOrder(
+            { ...order, restocks: [{ consumableId: white.id, amount: 1_000 }], spoolman: [{ consumableId: black.id, spools: 1 }] },
+            admin,
+          )
+          .catch(() => undefined)
+
+        expect((await level(white.id))?.onHand).toBe(0)
+      })
+
+      it('says Spoolman is not connected when it disconnects as spools are ordered', async () => {
+        const spools = await repository.listSpoolmanSpools()
+        vi.spyOn(repository, 'listSpoolmanSpools').mockImplementation(async () => {
+          await service.disconnectSpoolman(admin)
+          return spools
+        })
+
+        const refused = (await queue(1).catch((error: unknown) => error)) as Response
+
+        expect([refused.status, await refused.text()]).toEqual([409, messagesFor().server.spoolman.restockNotConnected])
       })
 
       it('hands the bridge the spools waiting, oldest first', async () => {
