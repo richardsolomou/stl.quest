@@ -245,6 +245,13 @@
       "url": "https://eu.store.bambulab.com/products/petg-basic",
       "note": "PETG Basic refill."
     },
+    "filament-bambu-lab-translucent-petg": {
+      "amount": 16.99,
+      "currency": "EUR",
+      "packAmount": 1000,
+      "url": "https://eu.store.bambulab.com/products/petg-translucent",
+      "note": "PETG Translucent refill."
+    },
     "filament-bambu-lab-pla-cf": {
       "amount": 26.99,
       "currency": "EUR",

@@ -305,12 +305,12 @@
       "brand": "Formlabs",
       "model": "Form Studio Wash+Cure",
       "powerProfiles": [
-        { "phase": "washing", "watts": 60, "basis": "maximum adapter output (24 V DC, 60 W)" },
-        { "phase": "curing", "watts": 60, "basis": "maximum adapter output (24 V DC, 60 W)" }
+        { "phase": "washing", "watts": 200, "basis": "rated input (100–240 VAC, 1 A, 200 W); impeller draw is not published" },
+        { "phase": "curing", "watts": 48, "basis": "LED power; the unit has no heater" }
       ],
       "source": {
-        "url": "https://formlabs.com/global/products/form-cure/",
-        "accessedAt": "2026-11-19"
+        "url": "https://formlabs.com/global/products/form-studio-wash-cure/",
+        "accessedAt": "2026-11-22"
       }
     },
     {
@@ -377,10 +377,10 @@
       "id": "printer-formlabs-form-studio-1",
       "brand": "Formlabs",
       "model": "Form Studio 1",
-      "powerProfiles": [{ "phase": "printing", "watts": 300, "basis": "rated power" }],
+      "powerProfiles": [{ "phase": "printing", "watts": 300, "basis": "rated power (100–240 VAC, 3 A)" }],
       "source": {
         "url": "https://formlabs.com/global/3d-printers/resin/tech-specs/",
-        "accessedAt": "2026-11-19"
+        "accessedAt": "2026-11-22"
       }
     },
     {
@@ -537,6 +537,28 @@
       "source": {
         "url": "https://wiki.bambulab.com/en/general/power-consumption",
         "accessedAt": "2026-11-20"
+      }
+    },
+    {
+      "id": "printer-bambu-lab-x2d",
+      "brand": "Bambu Lab",
+      "model": "X2D",
+      "printType": "filament",
+      "powerProfiles": [{ "phase": "printing", "watts": 250, "basis": "steady-state printing power with PLA at 25 °C ambient" }],
+      "source": {
+        "url": "https://wiki.bambulab.com/en/general/power-consumption",
+        "accessedAt": "2026-11-22"
+      }
+    },
+    {
+      "id": "printer-bambu-lab-p2s",
+      "brand": "Bambu Lab",
+      "model": "P2S",
+      "printType": "filament",
+      "powerProfiles": [{ "phase": "printing", "watts": 200, "basis": "steady-state printing power with PLA" }],
+      "source": {
+        "url": "https://wiki.bambulab.com/en/general/power-consumption",
+        "accessedAt": "2026-11-22"
       }
     },
     {

@@ -1,6 +1,6 @@
 import type { PrintType } from './types'
 
-export type PartCategory = 'resin-tank' | 'release-film' | 'lcd-screen' | 'nozzle' | 'build-sheet' | 'wash-solvent'
+export type PartCategory = 'resin-tank' | 'release-film' | 'lcd-screen' | 'nozzle' | 'build-sheet' | 'air-filter' | 'wash-solvent'
 
 /** `stated` is the manufacturer's own figure, `derived` converts its layer count to plates, and `typical` is STL Quest's labelled estimate. */
 export type PartLifespanBasis = 'stated' | 'derived' | 'typical'

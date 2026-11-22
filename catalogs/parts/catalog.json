@@ -47,6 +47,12 @@
       "license": "manufacturer product data"
     },
     {
+      "id": "heygears",
+      "repository": "https://www.heygears.com/",
+      "revision": "2026-11-22",
+      "license": "manufacturer product data"
+    },
+    {
       "id": "formlabs-support",
       "repository": "https://formlabs.com/support/",
       "revision": "2026-11-20",
@@ -156,6 +162,58 @@
       "source": {
         "id": "formlabs-store",
         "url": "https://formlabs.com/store/accessories/form-3l-resin-tank/"
+      }
+    },
+    {
+      "id": "part-formlabs-form-studio-1-resin-tank",
+      "brand": "Formlabs",
+      "name": "Form Studio 1 Resin Tank",
+      "category": "resin-tank",
+      "printType": "resin",
+      "fits": ["resin-formlabs-form-studio-1"],
+      "lifespan": 190,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "stated",
+        "url": "https://formlabs.com/eu/products/form-studio-resin-tank/",
+        "note": "Formlabs rates Form Studio 1 tanks for at least 75,000 layers with any resin and gives approximately 190 prints of a 39 mm model at 100 µm."
+      },
+      "listPrice": {
+        "amount": 60.69,
+        "currency": "EUR",
+        "url": "https://formlabs.com/de/products/form-studio-resin-tank/",
+        "checked": "2026-11-22",
+        "note": "Including 19% German VAT."
+      },
+      "source": {
+        "id": "formlabs-store",
+        "url": "https://formlabs.com/de/products/form-studio-resin-tank/"
+      }
+    },
+    {
+      "id": "part-formlabs-form-studio-1-resin-tank-pro",
+      "brand": "Formlabs",
+      "name": "Form Studio 1 Resin Tank Pro",
+      "category": "resin-tank",
+      "printType": "resin",
+      "fits": ["resin-formlabs-form-studio-1"],
+      "lifespan": 190,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "stated",
+        "url": "https://formlabs.com/eu/products/form-studio-resin-tank-pro/",
+        "note": "Formlabs rates Form Studio 1 tanks for at least 75,000 layers with any resin and gives approximately 190 prints of a 39 mm model at 100 µm."
+      },
+      "listPrice": {
+        "amount": 94.01,
+        "currency": "EUR",
+        "url": "https://formlabs.com/de/products/form-studio-resin-tank-pro/",
+        "checked": "2026-11-22",
+        "note": "Including 19% German VAT. Needed for Tough 1500 and Open Material Mode resins."
+      },
+      "source": {
+        "id": "formlabs-store",
+        "url": "https://formlabs.com/de/products/form-studio-resin-tank-pro/"
       }
     },
     {
@@ -644,6 +702,26 @@
       }
     },
     {
+      "id": "part-heygears-lcd-reflex-rs-turbo",
+      "brand": "HeyGears",
+      "name": "UltraCraft Reflex RS Turbo LCD Screen",
+      "category": "lcd-screen",
+      "printType": "resin",
+      "fits": ["resin-heygears-reflex-rs-turbo"],
+      "lifespan": 1000,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "derived",
+        "url": "https://www.heygears.com/hardware/reflex-rs-turbo",
+        "note": "HeyGears states over 1 million layers for the Reflex RS Turbo's amber screen, whose dyed polarizer film resists UV degradation.",
+        "statedLayers": 1000000
+      },
+      "source": {
+        "id": "heygears",
+        "url": "https://www.heygears.com/hardware/reflex-rs-turbo"
+      }
+    },
+    {
       "id": "part-prusa-fep-film-sl1s",
       "brand": "Prusa",
       "name": "FEP film - SL1S",
@@ -965,6 +1043,141 @@
       "source": {
         "id": "bambu-lab-store",
         "url": "https://eu.store.bambulab.com/products/bambu-textured-pei-plate"
+      }
+    },
+    {
+      "id": "part-bambu-lab-hotend-h2-p2s-x2d-0-4-hardened",
+      "brand": "Bambu Lab",
+      "name": "Bambu Hotend - H2/P2S/X2D, 0.4 mm Hardened Steel",
+      "category": "nozzle",
+      "printType": "filament",
+      "fits": [
+        "filament-bambu-lab-x2d",
+        "filament-bambu-lab-p2s",
+        "filament-bambu-lab-h2d",
+        "filament-bambu-lab-h2s",
+        "filament-bambu-lab-h2c"
+      ],
+      "lifespan": 500,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab treats the hotend as condition-based maintenance and states no lifespan. 500 print hours is the common brass-nozzle rule of thumb, conservative for hardened steel."
+      },
+      "listPrice": {
+        "amount": 19.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/bambu-hotend-h2-p2s",
+        "checked": "2026-11-22",
+        "note": "Including VAT. Standard-flow hotend with nozzle, sold out on the checked date; the H2C takes it on the left. The High Flow hotend is €50.99."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/bambu-hotend-h2-p2s"
+      }
+    },
+    {
+      "id": "part-bambu-lab-air-filter-x2d",
+      "brand": "Bambu Lab",
+      "name": "Air Filter - X2D",
+      "category": "air-filter",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-x2d"],
+      "lifespan": 1440,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "stated",
+        "url": "https://wiki.bambulab.com/en/p2s/maintenance/replace-air-filter",
+        "note": "Bambu Lab says to replace the activated-carbon filter after about 1,440 hours of printing, or sooner when it is heavily contaminated."
+      },
+      "listPrice": {
+        "amount": 14.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/air-filter-x2d",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/air-filter-x2d"
+      }
+    },
+    {
+      "id": "part-bambu-lab-air-filter-p2s",
+      "brand": "Bambu Lab",
+      "name": "Air Filter - P2S",
+      "category": "air-filter",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-p2s"],
+      "lifespan": 1440,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "stated",
+        "url": "https://wiki.bambulab.com/en/p2s/maintenance/replace-air-filter",
+        "note": "Bambu Lab says to replace the activated-carbon filter after about 1,440 hours of printing, or sooner when it is heavily contaminated."
+      },
+      "listPrice": {
+        "amount": 14.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/air-filter-p2s",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/air-filter-p2s"
+      }
+    },
+    {
+      "id": "part-bambu-lab-air-filter-h2-series",
+      "brand": "Bambu Lab",
+      "name": "Air Filter - H2 Series",
+      "category": "air-filter",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-h2d", "filament-bambu-lab-h2d-pro", "filament-bambu-lab-h2s", "filament-bambu-lab-h2c"],
+      "lifespan": 1440,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "stated",
+        "url": "https://eu.store.bambulab.com/products/air-filter-h2-series",
+        "note": "Bambu Lab advises replacing the filter after a total printing time of 1,440 hours, or 60 days."
+      },
+      "listPrice": {
+        "amount": 19.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/air-filter-h2-series",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/air-filter-h2-series"
+      }
+    },
+    {
+      "id": "part-bambu-lab-dual-texture-pei-plate",
+      "brand": "Bambu Lab",
+      "name": "Bambu Dual-Texture PEI Plate",
+      "category": "build-sheet",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-x2d", "filament-bambu-lab-p2s"],
+      "lifespan": 500,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://eu.store.bambulab.com/products/bambu-dual-texture-pei-plate",
+        "note": "Bambu Lab states no lifespan. 500 plates is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 37.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/bambu-dual-texture-pei-plate",
+        "checked": "2026-11-22",
+        "note": "Including VAT. Regular price of the X2D and P2S size; €26.59 in a sale and sold out on the checked date."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/bambu-dual-texture-pei-plate"
       }
     },
     {

@@ -98,6 +98,7 @@ const CATEGORY_WORDS: [PartCategory, RegExp][] = [
   ['resin-tank', /\b(tank|vat|cuve|bac)|wanne/i],
   ['nozzle', /\b(nozzle|hotend|buse)|düse/i],
   ['build-sheet', /\b(sheet|pei|plaque|plateau)|platte/i],
+  ['air-filter', /filt(er|re)/i],
 ]
 
 /** The kind of wear part a library part is: its catalogue part's, or else the one its name suggests. */

@@ -11,6 +11,7 @@ const parts = catalog.presets as PartPreset[]
 
 const form4: PrinterProfile = { id: 'form-4-a', name: 'Form 4 · A', printType: 'resin', presetId: 'resin-formlabs-form-4' }
 const mk4: PrinterProfile = { id: 'mk4', name: 'MK4', printType: 'filament', presetId: 'filament-prusa-mk4' }
+const x2d: PrinterProfile = { id: 'x2d', name: 'X2D', printType: 'filament', presetId: 'filament-bambu-lab-x2d' }
 const resin: Consumable = { id: 'resin', kind: 'resin', name: 'Grey', pricePerLitre: 150, densityGramsPerMl: 1.1 }
 const part = (overrides: Partial<PartConsumable>): PartConsumable => ({
   id: 'part',
@@ -86,6 +87,11 @@ describe('missing wear parts', () => {
     expect(suggested([sheet], [mk4])).not.toContain('part-prusa-smooth-pei-sheet')
   })
 
+  it('still suggests a model’s air filter once it has a hotend', () => {
+    const hotend = part({ printType: 'filament', name: 'Spare hotend', printerPresetId: 'filament-bambu-lab-x2d' })
+    expect(suggested([hotend], [x2d])).toContain('part-bambu-lab-air-filter-x2d')
+  })
+
   it('counts the printers a part would serve', () => {
     const tank = missingWearParts([], [form4, { ...form4, id: 'form-4-b' }], parts).find(
       ({ preset }) => preset.id === 'part-formlabs-form-4-resin-tank',
@@ -131,6 +137,10 @@ describe('part from the catalogue', () => {
 describe('part category', () => {
   it('reads a German name', () => {
     expect(partCategory(part({ name: 'Ersatzdüse 0,4' }), parts)).toBe('nozzle')
+  })
+
+  it('reads an air filter in a compound word', () => {
+    expect(partCategory(part({ name: 'Aktivkohlefilter X2D' }), parts)).toBe('air-filter')
   })
 })
 

@@ -1,6 +1,6 @@
 # Wear part catalog
 
-STL Quest includes a hand-curated catalog of printer wear parts: resin tanks, release films, LCD screens, nozzles and hotends, and build sheets. Wash fluids such as IPA are supplies used by equipment, not wear parts, so they are not listed here. The app costs each part across the plates or print hours it lasts. Self-hosted installations read it locally and do not contact third-party services while the app is running.
+STL Quest includes a hand-curated catalog of printer wear parts: resin tanks, release films, LCD screens, nozzles and hotends, build sheets, and air filters. Wash fluids such as IPA are supplies used by equipment, not wear parts, so they are not listed here. The app costs each part across the plates or print hours it lasts. Self-hosted installations read it locally and do not contact third-party services while the app is running.
 
 `catalog.json` records each part, the printer presets it fits from the [printer catalog](../printers/README.md), and where every figure came from. A part with no fitted printers is generic and suits every printer of its print type. `sources` lists the manufacturer stores and support sites used and the date they were checked.
 
@@ -22,9 +22,11 @@ Manufacturers mostly replace wear parts on condition rather than on a schedule, 
 
 These were not catalogued because no reliable manufacturer price or lifespan basis was found on the checked date:
 
-- Build platforms (Formlabs, Elegoo, Phrozen), which have no meaningful wear life.
+- Build platforms (Formlabs, including the Form Studio 1's Flex Build Platform, Elegoo, Phrozen), which have no meaningful wear life.
 - ACF release films, for which no manufacturer states a lifespan comparable to FEP.
 - Anycubic LCD screens, which state no lifespan.
+- The original HeyGears Reflex RS's LCD screen: HeyGears states its over 1 million layers only for the Reflex RS Turbo's upgraded screen. No HeyGears screen has a list price, since its store listed none on the checked date.
 - Creality K1 and Ender nozzles, whose official listings were out of stock or listed inconsistent compatibility.
+- Bambu Lab X2D belts, nozzle wiping pads, and filament cutters. Bambu Lab replaces belts and wiping pads on condition and states no interval, and it gives the cutter's in spools of filament, which this catalog cannot count. The purge wiper and screen are not wear parts.
 
 `pnpm catalog:check` validates the catalog without using the network: unique `part-<slug>` IDs, fitted printers that exist with a matching print type, positive lifespans consistent with any stated layer count, prices in cents with ISO 4217 currency codes, and https sources.
