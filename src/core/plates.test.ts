@@ -32,6 +32,10 @@ describe('plateFileName', () => {
   it('names a plate of one model after that model', () => {
     expect(plateFileName(3, ['SQ-7 hull.stl'])).toBe('SQ-7 hull.3mf')
   })
+
+  it('keeps a version in a model name without a model extension', () => {
+    expect(plateFileName(1, ['SQ-1 Plasma v1.5'])).toBe('SQ-1 Plasma v1.5.3mf')
+  })
 })
 
 describe('slicedObjectStem', () => {

@@ -1,3 +1,4 @@
+import { stripModelExtension } from './assetKeys'
 import { wearPartsFor, type Consumable } from './consumables'
 import { printerCostPerMinute, type CostedPrinter, type PriceCalculatorSettings } from './priceCalculator'
 import { taggedRequestNumber } from './request'
@@ -30,7 +31,7 @@ export const MAX_PLATE_FILE_BYTES = 256 * 1024 * 1024
  * the model to keep its tag.
  */
 export function plateFileName(number: number, objectNames: string[]) {
-  if (objectNames.length === 1) return `${objectNames[0].replace(/\.[^.\s]+$/, '')}.3mf`
+  if (objectNames.length === 1) return `${stripModelExtension(objectNames[0])}.3mf`
   return `stlquest-plate-${number}.3mf`
 }
 
