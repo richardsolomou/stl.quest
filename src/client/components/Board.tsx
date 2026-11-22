@@ -18,6 +18,7 @@ import { MAX_BULK_CARDS } from '../../core/request'
 import type { StatusId, WorkflowDefinition } from '../../core/workflow'
 import {
   archiveRequests,
+  assignRequests,
   deleteRequest,
   deleteRequests,
   moveCopies,
@@ -63,7 +64,7 @@ import { Column, type ZoneLayout } from './Column'
 import { boardStations } from '../boardStations'
 import { StationStrip } from './StationStrip'
 import { AddPrintersLink, EmptyQueue, EmptyRail, EmptyShelf, EmptyStations } from './EmptyZone'
-import { SelectionBar } from './SelectionBar'
+import { SelectionBar, type AssignAction } from './SelectionBar'
 import { StageJumpBar } from './StageJumpBar'
 import { MoveDialog } from './MoveDialog'
 import { BulkMoveDialog } from './BulkMoveDialog'
@@ -94,6 +95,13 @@ type PendingMove = {
 }
 type PendingBatchMove = { to?: StatusId; destinations?: { id: StatusId; label: string }[] }
 type PendingTags = { entries: BoardSelectionEntry[] }
+
+/** Active printers every one of these prints can go on, so assigning them never changes a print's type. */
+function assignablePrinters(printers: PrinterProfile[], prints: PublicPrintRequest[]) {
+  const types = new Set(prints.flatMap(({ printType }) => (printType ? [printType] : [])))
+  if (types.size > 1) return []
+  return printers.filter((printer) => !printer.archived && (types.size === 0 || types.has(printer.printType)))
+}
 
 export function Board({
   requests,
@@ -137,6 +145,7 @@ export function Board({
   const callDeleteRequest = useServerFn(deleteRequest)
   const callDeleteRequests = useServerFn(deleteRequests)
   const callArchiveRequests = useServerFn(archiveRequests)
+  const callAssignRequests = useServerFn(assignRequests)
   const callUpdatePrintCopyTags = useServerFn(updatePrintCopyTags)
   const callMovePrintGroup = useServerFn(movePrintGroup)
   const callReorder = useServerFn(reorderRequest)
@@ -154,6 +163,17 @@ export function Board({
     onMutate: ({ data }) => removeRequestFromQueries(queryClient, workspaceSlug, data.id),
     onError: (_error, _variables, snapshots) => {
       if (snapshots) restoreRequestQueries(queryClient, snapshots)
+    },
+  })
+  const bulkAssignMutation = useMutation({
+    mutationFn: callAssignRequests,
+    onSuccess: async () => {
+      clearSelection()
+      await refreshRequests()
+    },
+    onError: (error) => {
+      if (isReportableMutationError(error)) posthog.captureException(error, { action: 'assign_request_batch' })
+      toast.error(errorMessage(error, pass.assignFailed))
     },
   })
   const archiveMutation = useMutation({
@@ -360,6 +380,21 @@ export function Board({
   const selectedRequests = useMemo(() => boardSelectedRequests(selectedEntries), [selectedEntries])
   const pendingTagState = useMemo(() => boardSelectionTagState(pendingTags?.entries ?? []), [pendingTags])
   const canDeleteSelectedRequests = selectedRequests.length > 0 && selectedRequests.every((request) => request.canDelete)
+  const assignAction = useCallback(
+    (prints: PublicPrintRequest[]): AssignAction | undefined => {
+      const options = assignablePrinters(printers, prints)
+      if (!isAdmin || options.length === 0) return undefined
+      return {
+        printers: options,
+        onAssign: (printerId) => bulkAssignMutation.mutate({ data: { workspaceSlug, ids: prints.map(({ id }) => id), printerId } }),
+      }
+    },
+    [bulkAssignMutation, isAdmin, printers, workspaceSlug],
+  )
+  const estimatePrices = useCallback(
+    (prints: PublicPrintRequest[]) => void navigate({ to: '/calculator', search: { requests: prints.map(({ id }) => id).join(',') } }),
+    [navigate],
+  )
   const canArchiveSelectedRequests = selectedRequests.length > 0 && selectedRequests.every((request) => request.canArchive)
   const canRepeatSelectedRequests = selectedRequests.length > 0 && (isAdmin || selectedRequests.every((request) => request.mine))
   const canDownloadSelectedRequests = selectedRequests.length > 0 && selectedRequests.every((request) => request.hasFile)
@@ -745,6 +780,24 @@ export function Board({
             wholeRequest: !isAdmin,
           })
         }}
+        onAssignRequest={(requestId, cardStatus, groupId, cohortId) =>
+          assignAction(
+            boardRequestSelected(selection, cardStatus, requestId, groupId, cohortId)
+              ? selectedRequests
+              : requests.filter((candidate) => candidate.id === requestId),
+          )
+        }
+        onEstimateRequest={
+          isAdmin
+            ? (requestId, cardStatus, groupId, cohortId) =>
+                estimatePrices(
+                  boardRequestSelected(selection, cardStatus, requestId, groupId, cohortId)
+                    ? selectedRequests
+                    : requests.filter((candidate) => candidate.id === requestId),
+                )
+            : undefined
+        }
+        onPlateRequest={plateTracking ? () => setPlanningPlate(true) : undefined}
         onArchiveRequest={(requestId, cardStatus, groupId, cohortId) => {
           if (!boardRequestSelected(selection, cardStatus, requestId, groupId, cohortId)) {
             archiveMutation.mutate({ data: { workspaceSlug, ids: [requestId] } })
@@ -818,13 +871,8 @@ export function Board({
           tags={isAdmin ? { onClick: () => setPendingTags({ entries: selectedEntries }) } : undefined}
           download={canDownloadSelectedRequests ? { onClick: () => downloadRequests(selectedCopies.map(({ id }) => id)) } : undefined}
           repeat={canRepeatSelectedRequests ? { onClick: () => setRepeatingRequests(selectedRequests) } : undefined}
-          estimate={
-            isAdmin
-              ? {
-                  onClick: () => void navigate({ to: '/calculator', search: { requests: selectedRequests.map(({ id }) => id).join(',') } }),
-                }
-              : undefined
-          }
+          estimate={isAdmin ? { onClick: () => estimatePrices(selectedRequests) } : undefined}
+          assign={assignAction(selectedRequests)}
           plate={plateTracking ? { onClick: () => setPlanningPlate(true) } : undefined}
           archive={canArchiveSelectedRequests ? { onClick: archiveSelection } : undefined}
           remove={canDeleteSelectedRequests ? { onClick: () => setConfirmDelete(true) } : undefined}

@@ -301,6 +301,8 @@ export type BoardConfig = {
   memberVisibility: Record<string, MemberRequestVisibility>
   /** Archive requests this many days after every copy is Ready. Absent means off. */
   autoArchiveDays?: number
+  /** Prints wait on their print type until someone picks a printer. Absent means printers are assigned automatically. */
+  manualPrinterAssignment?: true
 }
 
 export type NewPrintRequest = Pick<

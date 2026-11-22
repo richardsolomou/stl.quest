@@ -51,6 +51,12 @@ export const settings: typeof en = {
         failed: 'Erfassung konnte nicht eingeschaltet werden. Bitte erneut versuchen.',
       },
     },
+    assignment: {
+      title: 'Druckerzuweisung',
+      label: 'Drucker automatisch zuweisen',
+      description:
+        'Jeder neue Druck erhält den am wenigsten ausgelasteten Drucker seiner Art, und Drucke in der Warteschlange werden auf einen neuen Drucker verteilt. Ausgeschaltet warten Drucke bei ihrer Druckart, bis Sie einen Drucker wählen. Drucke, die schon einen Drucker haben, bleiben dort.',
+    },
     archive: {
       title: 'Archiv',
       label: 'Fertige Drucke automatisch archivieren',

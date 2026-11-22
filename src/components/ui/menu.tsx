@@ -84,4 +84,8 @@ function MenuRadioItem({ className, ...props }: MenuPrimitive.RadioItem.Props) {
   )
 }
 
-export { Menu, MenuTrigger, MenuContent, MenuGroup, MenuGroupLabel, MenuItem, MenuRadioGroup, MenuRadioItem }
+function MenuSeparator({ className, ...props }: MenuPrimitive.Separator.Props) {
+  return <MenuPrimitive.Separator data-slot="menu-separator" className={cn('-mx-1 my-1 h-px bg-border', className)} {...props} />
+}
+
+export { Menu, MenuTrigger, MenuContent, MenuGroup, MenuGroupLabel, MenuItem, MenuRadioGroup, MenuRadioItem, MenuSeparator }

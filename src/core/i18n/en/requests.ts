@@ -11,6 +11,7 @@ export const requests = {
     downloadCopies: (count: number) => `Download ${count} copies`,
     printAgain: 'Print again…',
     estimate: 'Estimate price',
+    assignPrinter: 'Assign printer',
     move: 'Move',
     archive: 'Archive',
   },
