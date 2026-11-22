@@ -1,4 +1,5 @@
 import { strToU8, zipSync } from 'fflate'
+import { constants, deflateRawSync } from 'node:zlib'
 
 export type SlicedFixtureFilament = { type: string; color: string; density: number; diameter?: number }
 export type SlicedFixtureObject = {
@@ -142,4 +143,50 @@ export function layeredPlateFile(objects: LayeredFixtureObject[], options?: { ma
       objects: objects.map(({ id, name, layers, mmPerLayer }) => ({ id, name, extrusionMm: layers * mmPerLayer })),
     }),
   })
+}
+
+export type BombEntry = { name: string; text: string; repeats?: number; declaredBytes?: number }
+
+/**
+ * A zip bomb shaped like a sliced file: each entry inflates to `repeats` copies of its `text`, built from one compressed
+ * copy so it costs nothing to make. Its CRCs are zero, since a reader that refuses it never gets as far as checking
+ * them; with `declaredBytes`, an entry's headers claim that size instead of the real one.
+ */
+export function slicedFileBomb(entries: BombEntry[]) {
+  const locals: Buffer[] = []
+  const centrals: Buffer[] = []
+  let offset = 0
+  for (const { name, text, repeats = 1, declaredBytes } of entries) {
+    const unit = deflateRawSync(text, { finishFlush: constants.Z_FULL_FLUSH })
+    const data = Buffer.concat([...Array.from({ length: repeats }, () => unit), Buffer.from([3, 0])])
+    const fileName = Buffer.from(name)
+    const inflated = declaredBytes ?? Buffer.byteLength(text) * repeats
+    const local = Buffer.alloc(30)
+    local.writeUInt32LE(0x04034b50, 0)
+    local.writeUInt16LE(20, 4)
+    local.writeUInt16LE(8, 8)
+    local.writeUInt32LE(data.length, 18)
+    local.writeUInt32LE(inflated, 22)
+    local.writeUInt16LE(fileName.length, 26)
+    const central = Buffer.alloc(46)
+    central.writeUInt32LE(0x02014b50, 0)
+    central.writeUInt16LE(20, 4)
+    central.writeUInt16LE(20, 6)
+    central.writeUInt16LE(8, 10)
+    central.writeUInt32LE(data.length, 20)
+    central.writeUInt32LE(inflated, 24)
+    central.writeUInt16LE(fileName.length, 28)
+    central.writeUInt32LE(offset, 42)
+    locals.push(local, fileName, data)
+    centrals.push(central, fileName)
+    offset += local.length + fileName.length + data.length
+  }
+  const directory = Buffer.concat(centrals)
+  const end = Buffer.alloc(22)
+  end.writeUInt32LE(0x06054b50, 0)
+  end.writeUInt16LE(entries.length, 8)
+  end.writeUInt16LE(entries.length, 10)
+  end.writeUInt32LE(directory.length, 12)
+  end.writeUInt32LE(offset, 16)
+  return new Uint8Array(Buffer.concat([...locals, directory, end]))
 }

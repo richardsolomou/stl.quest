@@ -342,8 +342,8 @@ export function printSlicedPlate(plate: SlicedPlate, assignments: (string | unde
 /**
  * A sliced plate's figures as a plate recording, with what was measured winning: slots of one material become one,
  * and each material's objects and overhead are scaled to what was measured of it. When the measured materials and
- * the file's do not line up, every figure is scaled by the measured total instead; with nothing measured, the file's
- * figures stand.
+ * the file's do not line up, every figure is scaled by the measured total instead. With nothing measured, a finished
+ * print's figures stand, and a stopped print's are zero, as the printer measured none of its waste.
  */
 export function slicedPrintInput<Material>(
   sliced: PrintSlicedPlate,
@@ -366,7 +366,7 @@ export function slicedPrintInput<Material>(
     measured.every(({ material }) => materials.includes(material)) &&
     fileAmounts.every((amount, index) => amount === 0 || measuredAmounts[index] > 0)
   const scale = materials.map((_, index) => {
-    if (measuredTotal <= 0) return 1
+    if (measuredTotal <= 0) return sliced.cut === undefined ? 1 : 0
     if (byMaterial) return fileAmounts[index] > 0 ? measuredAmounts[index] / fileAmounts[index] : 0
     return fileTotal > 0 ? measuredTotal / fileTotal : 0
   })

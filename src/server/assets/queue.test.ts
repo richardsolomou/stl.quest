@@ -13,6 +13,9 @@ import { MAX_UPLOAD_BYTES } from '../../core/uploadLimits'
 import { AssetGenerationQueue } from './queue'
 import { STLQuestService } from '../../core/services'
 import { UploadStaging } from '../../adapters/staging'
+import { SlicedFileError } from '../../core/slicedPlate'
+import { logger } from '../logger'
+import { slicedFileBomb, slicedPlateFile } from '../../../e2e/fixtures/slicedPlate'
 
 const telemetry: Telemetry = { capture: async () => undefined, exception: async () => undefined }
 
@@ -134,6 +137,25 @@ describe('asset generation queue', () => {
     await expect(
       queue.writePlateObject('todo/plate.stl', { id: 1, name: 'SQ-1 plate.stl' }, path.join(root, 'plate.model')),
     ).rejects.toThrow('model processing exceeded the time limit')
+  })
+
+  it('reads a sliced file', async () => {
+    const plates = await queue.readSlicedFile(slicedPlateFile({ objects: [{ id: '1', name: 'Hull.stl', extrusionMm: 100 }] }))
+    expect(plates.map(({ objects }) => objects.map(({ name }) => name))).toEqual([['Hull.stl']])
+  })
+
+  it('logs a sliced file it cannot read', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined)
+    const bomb = slicedFileBomb([{ name: 'Metadata/plate_1.gcode', text: 'G1 E1\n'.repeat(1 << 18), repeats: 1024 }])
+    await queue.readSlicedFile(bomb).catch(() => undefined)
+    expect(warn).toHaveBeenCalledWith(expect.objectContaining({ event: 'sliced_file_unreadable' }), 'sliced file unreadable')
+  })
+
+  it('fails a sliced file whose worker exceeds its deadline as unreadable', async () => {
+    const worker = path.join(root, 'waiting-worker.mjs')
+    await fs.promises.writeFile(worker, 'setInterval(() => {}, 1000)')
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { workerConfig: { path: worker, timeoutMs: 50 } })
+    await expect(queue.readSlicedFile(new Uint8Array(8))).rejects.toBeInstanceOf(SlicedFileError)
   })
 
   it('regenerates every asset after the model is replaced', async () => {

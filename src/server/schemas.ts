@@ -736,7 +736,6 @@ export const spoolmanRestockResultSchema = z.union([
   z.object({ id, error: z.string().trim().min(1).max(512) }),
 ]) satisfies z.ZodType<SpoolmanRestockResult>
 export const spoolmanRestockIdSchema = z.object({ id })
-/** What the bridge read from Bambuddy that a print used per Spoolman spool. */
 /** The query of a sliced file the bridge sends: the Bambuddy run it printed, and which plate of the file did. */
 export const bambuddySlicedFileSchema = z
   .object({
@@ -744,7 +743,7 @@ export const bambuddySlicedFileSchema = z
     plate: z.coerce.number().int().min(1).max(1_000).optional(),
   })
   .transform(({ run_id, plate }) => ({ runId: run_id, ...(plate !== undefined && { plate }) }))
-
+/** What the bridge read from Bambuddy that a print used per Spoolman spool. */
 export const bambuddyUsageSchema = z
   .object({
     run_id: z.string().trim().min(1).max(64),

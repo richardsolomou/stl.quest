@@ -24,8 +24,11 @@ import { PRINT_TYPE_SETTING } from './printTypes'
 import { USAGE_TRACKING_SETTING } from './usageTracking'
 import { layeredPlateFile, slicedPlateFile } from '../../e2e/fixtures/slicedPlate'
 import { MAX_COVER_BYTES } from './coverImage'
+import { readSlicedFile } from './slicedPlate'
 
 const capture = vi.fn(async () => undefined)
+const receiveSliced = (service: STLQuestService, report: { runId: string; plate?: number }, file: Uint8Array) =>
+  service.receivePrintSlicedFile(report, async (stoppedAt) => readSlicedFile(file, 'print.gcode.3mf', stoppedAt))
 const telemetry: Telemetry = { capture, exception: async () => undefined }
 const eventBus = (): EventBus => ({ publish: vi.fn() })
 const admin: Identity = { id: 'admin', email: 'op@example.com', name: 'Admin', role: 'admin' }
@@ -4650,7 +4653,7 @@ describe('STLQuestService crash recovery', () => {
           const { hull, turret } = await twoPrints()
           await service.receivePrint({ ...finished, runId: '7' })
 
-          await service.receivePrintSlicedFile({ runId: '7' }, await hullAndTurretFile(hull, turret))
+          await receiveSliced(service, { runId: '7' }, await hullAndTurretFile(hull, turret))
 
           expect([await grams(hull), await grams(turret)]).toEqual([expect.closeTo(30, 6), expect.closeTo(10, 6)])
         })
@@ -4660,7 +4663,7 @@ describe('STLQuestService crash recovery', () => {
           const { id } = (await repository.listPlates())[0]
           await service.receivePrint({ ...finished, runId: '7' })
 
-          await service.receivePrintSlicedFile({ runId: '7' }, await hullAndTurretFile(hull, turret))
+          await receiveSliced(service, { runId: '7' }, await hullAndTurretFile(hull, turret))
 
           expect((await plateOf(id)).recording).toMatchObject({ source: 'printer', method: 'measured', minutes: 120 })
         })
@@ -4669,7 +4672,7 @@ describe('STLQuestService crash recovery', () => {
           const { hull, turret } = await twoPrints()
           await service.receivePrint({ ...finished, runId: '7' })
 
-          await service.receivePrintSlicedFile({ runId: '7' }, await hullAndTurretFile(hull, turret))
+          await receiveSliced(service, { runId: '7' }, await hullAndTurretFile(hull, turret))
 
           const minutes = (await service.listUsage({}, admin)).filter((event) => event.unit === 'minute' && !event.undoneAt)
           expect(minutes.reduce((total, { amount }) => total + amount, 0)).toBeCloseTo(120, 6)
@@ -4693,7 +4696,7 @@ describe('STLQuestService crash recovery', () => {
           )
           await service.receivePrint({ ...finished, runId: '7' })
 
-          await service.receivePrintSlicedFile({ runId: '7' }, await hullAndTurretFile(hull, turret))
+          await receiveSliced(service, { runId: '7' }, await hullAndTurretFile(hull, turret))
 
           expect([await grams(hull), await grams(turret)]).toEqual([5, 5])
         })
@@ -4706,7 +4709,7 @@ describe('STLQuestService crash recovery', () => {
             { id: '2', name: await tag(hull, 'Hull.stl'), layers: 100, mmPerLayer: 10 },
           ])
 
-          await service.receivePrintSlicedFile({ runId: '7' }, file)
+          await receiveSliced(service, { runId: '7' }, file)
 
           expect([await grams(turret), await grams(hull)]).toEqual([expect.closeTo(20, 6), expect.closeTo(51, 6)])
         })
@@ -4722,16 +4725,56 @@ describe('STLQuestService crash recovery', () => {
             { markers: false },
           )
 
-          await service.receivePrintSlicedFile({ runId: '7' }, file)
+          await receiveSliced(service, { runId: '7' }, file)
 
           expect([await grams(turret), await grams(hull)]).toEqual([expect.closeTo(10, 6), expect.closeTo(50, 6)])
+        })
+
+        it('charges nothing from the file for a failed print that measured nothing', async () => {
+          const { hull, turret } = await twoPrints()
+          await service.receivePrint({ ...finished, outcome: 'failed', grams: undefined, runId: '7' })
+
+          await receiveSliced(service, { runId: '7' }, await hullAndTurretFile(hull, turret))
+
+          expect([await grams(hull), await grams(turret)]).toEqual([0, 0])
+        })
+
+        it('charges nothing from the file for a failed print that measured nothing at a progress', async () => {
+          const { hull, turret } = await twoPrints()
+          await service.receivePrint({ ...finished, outcome: 'failed', progress: 50, grams: undefined, runId: '7' })
+
+          await receiveSliced(service, { runId: '7' }, await hullAndTurretFile(hull, turret))
+
+          expect([await grams(hull), await grams(turret)]).toEqual([0, 0])
+        })
+
+        it('charges nothing from the file for a failed print that measured no grams before it got anywhere', async () => {
+          const { hull, turret } = await twoPrints()
+          await service.receivePrint({ ...finished, outcome: 'failed', progress: 0, grams: 0, runId: '7' })
+
+          await receiveSliced(service, { runId: '7' }, await hullAndTurretFile(hull, turret))
+
+          expect([await grams(hull), await grams(turret)]).toEqual([0, 0])
+        })
+
+        it('splits a failed print’s grams by its whole plate when it reported no progress', async () => {
+          const { hull, turret } = await twoPrints()
+          await service.receivePrint({ ...finished, outcome: 'failed', grams: 8, runId: '7' })
+          const file = layeredPlateFile([
+            { id: '1', name: await tag(turret, 'Turret.stl'), layers: 20, mmPerLayer: 10 },
+            { id: '2', name: await tag(hull, 'Hull.stl'), layers: 100, mmPerLayer: 10 },
+          ])
+
+          await receiveSliced(service, { runId: '7' }, file)
+
+          expect([await grams(turret), await grams(hull)]).toEqual([expect.closeTo(8 / 6, 6), expect.closeTo(40 / 6, 6)])
         })
 
         it('does not move a failed plate’s copies twice', async () => {
           const { hull, turret } = await twoPrints()
           await service.receivePrint({ ...finished, outcome: 'failed', progress: 50, runId: '7' })
 
-          await service.receivePrintSlicedFile({ runId: '7' }, await hullAndTurretFile(hull, turret))
+          await receiveSliced(service, { runId: '7' }, await hullAndTurretFile(hull, turret))
 
           expect((await counts(hull)).up_next).toBe(1)
         })
@@ -4747,7 +4790,7 @@ describe('STLQuestService crash recovery', () => {
           const { hull, turret } = await twoPrints()
           await service.receivePrint({ ...finished, runId: '7' })
 
-          await service.receivePrintSlicedFile({ runId: '7' }, await hullAndTurretFile(hull, turret))
+          await receiveSliced(service, { runId: '7' }, await hullAndTurretFile(hull, turret))
 
           expect(await service.slicedFilesWanted()).toEqual([])
         })
@@ -4756,7 +4799,7 @@ describe('STLQuestService crash recovery', () => {
           await twoPrints()
           await service.receivePrint({ ...finished, runId: '7' })
 
-          await expect(service.receivePrintSlicedFile({ runId: '7' }, new TextEncoder().encode('nope'))).rejects.toMatchObject({
+          await expect(receiveSliced(service, { runId: '7' }, new TextEncoder().encode('nope'))).rejects.toMatchObject({
             status: 422,
           })
         })
@@ -4765,7 +4808,7 @@ describe('STLQuestService crash recovery', () => {
           await twoPrints()
           await service.receivePrint({ ...finished, runId: '7' })
 
-          await service.receivePrintSlicedFile({ runId: '7' }, new TextEncoder().encode('nope')).catch(() => undefined)
+          await receiveSliced(service, { runId: '7' }, new TextEncoder().encode('nope')).catch(() => undefined)
 
           expect(await service.slicedFilesWanted()).toEqual([])
         })
@@ -4777,7 +4820,7 @@ describe('STLQuestService crash recovery', () => {
           const single = unzipSync(await hullAndTurretFile(hull, turret))
           const file = zipSync({ ...single, 'Metadata/plate_2.gcode': single['Metadata/plate_1.gcode'] })
 
-          await expect(service.receivePrintSlicedFile({ runId: '7' }, file)).rejects.toMatchObject({ status: 422 })
+          await expect(receiveSliced(service, { runId: '7' }, file)).rejects.toMatchObject({ status: 422 })
         })
 
         it('reads the plate that printed from a file of several', async () => {
@@ -4794,19 +4837,19 @@ describe('STLQuestService crash recovery', () => {
             'Metadata/slice_info.config': new TextEncoder().encode(plates),
           })
 
-          await service.receivePrintSlicedFile({ runId: '7', plate: 2 }, file)
+          await receiveSliced(service, { runId: '7', plate: 2 }, file)
 
           expect(await grams(hull)).toBeCloseTo(30, 6)
         })
 
         it('asks to send a file again for a print it has not heard of yet', async () => {
-          await expect(service.receivePrintSlicedFile({ runId: '8' }, new Uint8Array())).rejects.toMatchObject({ status: 404 })
+          await expect(receiveSliced(service, { runId: '8' }, new Uint8Array())).rejects.toMatchObject({ status: 404 })
         })
 
         it('ignores a file for a print it does not want one for', async () => {
           await service.receivePrint({ ...finished, runId: '7' })
 
-          await service.receivePrintSlicedFile({ runId: '7' }, new TextEncoder().encode('nope'))
+          await receiveSliced(service, { runId: '7' }, new TextEncoder().encode('nope'))
 
           expect((await repository.listPrintJobs())[0].slicedPlate).toBeUndefined()
         })
@@ -4816,7 +4859,7 @@ describe('STLQuestService crash recovery', () => {
           await service.receivePrint({ ...finished, runId: '7' })
           capture.mockClear()
 
-          await service.receivePrintSlicedFile({ runId: '7' }, await hullAndTurretFile(hull, turret))
+          await receiveSliced(service, { runId: '7' }, await hullAndTurretFile(hull, turret))
 
           expect(capture).toHaveBeenCalledWith('server', 'print_sliced_file_received', {
             outcome: 'finished',
@@ -5077,7 +5120,7 @@ describe('STLQuestService crash recovery', () => {
               { id: '2', name: await tag(turret, 'Turret.stl'), extrusionMm: 1000 },
             ],
           })
-          await service.receivePrintSlicedFile({ runId: '7' }, file)
+          await receiveSliced(service, { runId: '7' }, file)
 
           await service.receivePrintUsage({ runId: '7', spools: [{ spoolId: 1, grams: 80 }] })
 

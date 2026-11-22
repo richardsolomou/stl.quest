@@ -64,6 +64,7 @@ export async function receiveSlicedFileRequest(request: Request) {
   })
   if (read instanceof Response) return read
   if (!query.success) return ingestProblem(400, invalid)
-  await read.context.service.receivePrintSlicedFile(query.data, read.body)
+  const { assetQueue, service } = read.context
+  await service.receivePrintSlicedFile(query.data, (stoppedAt) => assetQueue.readSlicedFile(read.body, stoppedAt))
   return new Response(null, { status: 204 })
 }

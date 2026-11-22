@@ -6,6 +6,7 @@ import PQueue from 'p-queue'
 import { errorMessage } from '../../core/error'
 import type { AssetGenerationFailureKind, AssetGenerationStage, AssetStore, EventBus, Repository, Telemetry } from '../../core/types'
 import { InvalidMeshError } from '../../core/mesh/stl'
+import { readSlicedFile, SlicedFileError, type SlicedPlate } from '../../core/slicedPlate'
 import { thumbnailKey } from '../../core/assetKeys'
 import { ASSET_GENERATION_MEMORY_BUDGET, ASSET_GENERATION_MEMORY_MULTIPLIER } from '../../core/uploadLimits'
 import { generateVisualAssets, type GeneratedAssets } from './pipeline'
@@ -425,6 +426,34 @@ export class AssetGenerationQueue {
     }
   }
 
+  /**
+   * Reads a sliced file off the request thread and within the same deadline and memory budget as visual assets, so a
+   * file that inflates without end can't stall or exhaust the server. One it cannot read, or not in time, is logged and
+   * thrown as a `SlicedFileError`.
+   */
+  async readSlicedFile(file: Uint8Array, stoppedAt?: number): Promise<SlicedPlate[]> {
+    // The worker takes the file's buffer, so its size is read first.
+    const bytes = file.byteLength
+    const release = await this.sourceBytes.acquire(bytes * ASSET_GENERATION_MEMORY_MULTIPLIER)
+    try {
+      await setImmediate()
+      if (!this.workerConfig) return readSlicedFile(file, 'print.gcode.3mf', stoppedAt)
+      let plates: SlicedPlate[] | undefined
+      await this.inWorker({ mode: 'sliced', file, stoppedAt }, file, (reply: { stage: 'complete'; plates: SlicedPlate[] }) => {
+        plates = reply.plates
+      })
+      if (!plates) throw new Error('asset worker exited without plates')
+      return plates
+    } catch (error) {
+      const unreadable = error instanceof InvalidMeshError ? new SlicedFileError(error.message, { cause: error }) : error
+      if (unreadable instanceof SlicedFileError)
+        logger.warn({ event: 'sliced_file_unreadable', reason: unreadable.message, bytes }, 'sliced file unreadable')
+      throw unreadable
+    } finally {
+      release()
+    }
+  }
+
   private async runPipeline(
     file: Uint8Array,
     wants: { thumbnail: boolean; preview: boolean },
@@ -462,17 +491,24 @@ export class AssetGenerationQueue {
         failure ??= new InvalidMeshError('model processing exceeded the time limit')
         void worker.terminate()
       }, this.workerConfig!.timeoutMs ?? 120_000)
-      worker.on('message', (reply: ({ ok: true } & Reply) | { ok: false; message: string; invalidMesh?: boolean }) => {
-        if (!reply.ok) {
-          failure ??= reply.invalidMesh ? new InvalidMeshError(reply.message) : new Error(reply.message)
-          return
-        }
-        handled = handled
-          .then(() => onReply(reply))
-          .catch((error: unknown) => {
-            failure ??= error
-          })
-      })
+      worker.on(
+        'message',
+        (reply: ({ ok: true } & Reply) | { ok: false; message: string; invalidMesh?: boolean; slicedFile?: boolean }) => {
+          if (!reply.ok) {
+            failure ??= reply.invalidMesh
+              ? new InvalidMeshError(reply.message)
+              : reply.slicedFile
+                ? new SlicedFileError(reply.message)
+                : new Error(reply.message)
+            return
+          }
+          handled = handled
+            .then(() => onReply(reply))
+            .catch((error: unknown) => {
+              failure ??= error
+            })
+        },
+      )
       worker.once('error', (error) => {
         failure ??= error
       })

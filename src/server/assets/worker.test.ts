@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { expect, it } from 'vitest'
+import { slicedFileBomb, slicedPlateFile } from '../../../e2e/fixtures/slicedPlate'
 
 function gridObj(size: number) {
   const lines: string[] = []
@@ -65,3 +66,16 @@ it('converts a large OBJ into a plate object within a heap smaller than the file
     await fs.promises.rm(path.dirname(xmlPath), { recursive: true, force: true })
   }
 }, 60_000)
+
+it('reads a sliced file', async () => {
+  const file = slicedPlateFile({ objects: [{ id: '1', name: 'Hull.stl', extrusionMm: 100 }] })
+  await expect(runWorker(file, { mode: 'sliced' })).resolves.toMatchObject({
+    ok: true,
+    plates: [{ index: 1, objects: [{ id: '1', name: 'Hull.stl' }] }],
+  })
+})
+
+it('refuses a sliced file that inflates past its limits within a heap far smaller than it', async () => {
+  const bomb = slicedFileBomb([{ name: 'Metadata/plate_1.gcode', text: 'G1 E1\n'.repeat(1 << 18), repeats: 4096, declaredBytes: 1 << 20 }])
+  await expect(runWorker(bomb, { mode: 'sliced' })).resolves.toMatchObject({ ok: false, slicedFile: true })
+})

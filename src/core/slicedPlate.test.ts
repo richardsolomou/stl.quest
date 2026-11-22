@@ -3,6 +3,7 @@ import { strToU8, zipSync } from 'fflate'
 import {
   filamentGrams,
   layeredPlateFile,
+  slicedFileBomb,
   slicedPlateArchive,
   slicedPlateFile,
   slicedPlateGcode,
@@ -170,6 +171,42 @@ describe('readSlicedFile', () => {
 
   it('rejects a project that was never sliced', () => {
     expect(() => readSlicedFile(zipSync({ '3D/3dmodel.model': strToU8('<model/>') }), 'project.3mf')).toThrow(SlicedFileError)
+  })
+
+  it('rejects a small file whose G-code inflates past what it reads, quickly and within bounded memory', () => {
+    const bomb = slicedFileBomb([{ name: 'Metadata/plate_1.gcode', text: 'G1 X1 E0.01\n'.repeat(87_382), repeats: 1024 }])
+    const before = process.memoryUsage()
+    const startedAt = performance.now()
+
+    expect(() => readSlicedFile(bomb, 'plate.gcode.3mf')).toThrow(SlicedFileError)
+
+    const after = process.memoryUsage()
+    expect([
+      performance.now() - startedAt < 1_000,
+      after.heapUsed + after.arrayBuffers - before.heapUsed - before.arrayBuffers < 64 * 1024 * 1024,
+    ]).toEqual([true, true])
+  })
+
+  it('reads a file built like the bombs below that stays within its limits', () => {
+    const file = slicedFileBomb([{ name: 'Metadata/plate_1.gcode', text: `${header}M83\nG1 E1000\n` }])
+    expect(readSlicedFile(file, 'plate.gcode.3mf')[0].overhead[0]).toBeCloseTo(filamentGrams(1000, PLA), 6)
+  })
+
+  it('stops inflating an entry once it passes what its header claimed', () => {
+    const bomb = slicedFileBomb([{ name: 'Metadata/plate_1.gcode', text: 'G1 E1\n'.repeat(1 << 18), repeats: 64, declaredBytes: 1024 }])
+    expect(() => readSlicedFile(bomb, 'plate.gcode.3mf')).toThrow(SlicedFileError)
+  })
+
+  it('rejects slice info too large to hold in memory', () => {
+    const bomb = slicedFileBomb([
+      { name: 'Metadata/plate_1.gcode', text: 'M83\nG1 E1\n' },
+      { name: 'Metadata/slice_info.config', text: ' '.repeat(1 << 20), repeats: 64 },
+    ])
+    expect(() => readSlicedFile(bomb, 'plate.gcode.3mf')).toThrow(SlicedFileError)
+  })
+
+  it('rejects a G-code line too long to hold in memory', () => {
+    expect(() => readSlicedFile(new TextEncoder().encode(';'.repeat(4 << 20)), 'plate.gcode')).toThrow(SlicedFileError)
   })
 })
 

@@ -79,7 +79,7 @@ import {
   type PrintReport,
   type PrintUsageReport,
 } from './printJobs'
-import { readSlicedFile, SlicedFileError, type SlicedPlate } from './slicedPlate'
+import { SlicedFileError, type SlicedPlate } from './slicedPlate'
 import {
   MAX_REQUEST_NAME_LENGTH,
   MAX_BULK_CARDS,
@@ -2173,28 +2173,29 @@ export class STLQuestService {
    * Takes in a print's sliced file, which the bridge fetched from Bambuddy's archive, and records the print again from
    * it: each object's figures go to the print its name matches, scaled to what the printer measured. A print that did
    * not finish is charged what the file printed up to its progress. A file for a print STL Quest does not want one for
-   * is ignored; one it cannot read is refused and not asked for again.
+   * is ignored; one it cannot read is refused and not asked for again. `read` reads the file's plates, with a stopped
+   * print's progress what each had printed by then.
    */
-  async receivePrintSlicedFile(report: { runId: string; plate?: number }, bytes: Uint8Array) {
+  async receivePrintSlicedFile(report: { runId: string; plate?: number }, read: (stoppedAt?: number) => Promise<SlicedPlate[]>) {
     const job = (await this.repository.listPrintJobs()).find(({ runId }) => runId === report.runId)
     if (!job) throw new Response(this.text.prints.notFound, { status: 404 })
     const plate = (await this.repository.listPlates()).find(({ id }) => id === job.plateId)
     if (!plate || !wantsSlicedFile(job, [plate], Date.now())) return
     const stopped = job.outcome !== 'finished'
-    const read = this.slicedPlateOf(bytes, report.plate, stopped ? (job.progress ?? 100) : undefined)
-    if (typeof read === 'string') {
+    const sliced = await this.slicedPlateOf(read, report.plate, stopped ? job.progress : undefined)
+    if (typeof sliced === 'string') {
       await this.repository.updatePrintJob(job.id, { slicedPlate: 'unreadable' })
-      throw new Response(read, { status: 422 })
+      throw new Response(sliced, { status: 422 })
     }
     const requests = new Map((await this.repository.listRequests()).map((request) => [request.id, request]))
     const assignments = matchSlicedObjects(
-      read.objects,
+      sliced.objects,
       plate.items.map(({ requestId }) => {
         const request = requests.get(requestId)
         return { requestId, number: request?.number, name: request?.name ?? '', fileName: request?.fileName }
       }),
     )
-    const slicedPlate = printSlicedPlate(read, assignments, stopped)
+    const slicedPlate = printSlicedPlate(sliced, assignments, stopped)
     await this.repository.updatePrintJob(job.id, { slicedPlate })
     const recorded = await this.recordPrintAgain({ ...job, slicedPlate })
     this.changed('print.received')
@@ -2208,10 +2209,14 @@ export class STLQuestService {
   }
 
   /** The plate of a sliced file that printed, or why there is none to read. */
-  private slicedPlateOf(bytes: Uint8Array, index: number | undefined, stoppedAt: number | undefined): SlicedPlate | string {
+  private async slicedPlateOf(
+    read: (stoppedAt?: number) => Promise<SlicedPlate[]>,
+    index: number | undefined,
+    stoppedAt: number | undefined,
+  ): Promise<SlicedPlate | string> {
     let plates: SlicedPlate[]
     try {
-      plates = readSlicedFile(bytes, 'print.gcode.3mf', stoppedAt)
+      plates = await read(stoppedAt)
     } catch (error) {
       if (error instanceof SlicedFileError) return this.text.prints.slicedUnreadable
       throw error

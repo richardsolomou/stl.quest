@@ -55,6 +55,13 @@ const MAX_ENTRIES = 4096
 const PLATE_GCODE = /^Metadata\/plate_(\d+)\.gcode$/
 const SLICE_INFO = 'Metadata/slice_info.config'
 const CHUNK = 1 << 20
+/** Compressed bytes inflated at a time; deflate expands at most ~1032×, so this bounds each inflated chunk too. */
+const INFLATE_CHUNK = 16 << 10
+const MAX_INFLATED_CHUNK = 32 << 20
+/** All the G-code and slice info read, a few times the G-code a full plate at `MAX_SLICED_FILE_BYTES` compresses from. */
+const MAX_SLICED_INFLATED_BYTES = 512 << 20
+const MAX_SLICE_INFO_BYTES = 8 << 20
+const MAX_LINE_LENGTH = 1 << 20
 /** Nominal PLA, for G-code that never states its filament. */
 const DEFAULT_DENSITY = 1.24
 const DEFAULT_DIAMETER = 1.75
@@ -82,14 +89,22 @@ function isZip(bytes: Uint8Array) {
 
 function readArchive(bytes: Uint8Array, stoppedAt?: number) {
   let directoryEntries = 0
+  /** What the central directory says is left to inflate of each entry read. */
+  const unclaimed = new Map<string, number>()
   let entries = 0
   const readers = new Map<number, GcodeReader>()
   let sliceInfo: string | undefined
   try {
-    // Streaming inflation reads local members only, so the central directory is checked separately for a whole archive.
+    // Streaming inflation reads local members only, so the central directory is checked separately for a whole
+    // archive, and its sizes refuse an honest bomb before anything inflates.
     unzipSync(bytes, {
-      filter: () => {
+      filter: ({ name, originalSize }) => {
         if (++directoryEntries > MAX_ENTRIES) throw new SlicedFileError('too many archive entries')
+        if (!PLATE_GCODE.test(name) && name !== SLICE_INFO) return false
+        unclaimed.set(name, (unclaimed.get(name) ?? 0) + originalSize)
+        if ((unclaimed.get(SLICE_INFO) ?? 0) > MAX_SLICE_INFO_BYTES) throw new SlicedFileError('slice info too large')
+        if ([...unclaimed.values()].reduce((total, size) => total + size) > MAX_SLICED_INFLATED_BYTES)
+          throw new SlicedFileError('sliced file inflates too large')
         return false
       },
     })
@@ -103,6 +118,10 @@ function readArchive(bytes: Uint8Array, stoppedAt?: number) {
       let text = ''
       entry.ondata = (error, chunk, final) => {
         if (error) throw error
+        // Headers can lie about sizes, so what actually inflates is held to what the directory claimed.
+        const left = (unclaimed.get(entry.name) ?? 0) - chunk.length
+        if (chunk.length > MAX_INFLATED_CHUNK || left < 0) throw new SlicedFileError('sliced file inflates past its headers')
+        unclaimed.set(entry.name, left)
         const decoded = decoder.decode(chunk, { stream: !final })
         if (reader) reader.push(decoded)
         else text += decoded
@@ -111,8 +130,8 @@ function readArchive(bytes: Uint8Array, stoppedAt?: number) {
       entry.start()
     })
     archive.register(UnzipInflate)
-    for (let offset = 0; offset < bytes.length; offset += CHUNK)
-      archive.push(bytes.subarray(offset, offset + CHUNK), offset + CHUNK >= bytes.length)
+    for (let offset = 0; offset < bytes.length; offset += INFLATE_CHUNK)
+      archive.push(bytes.subarray(offset, offset + INFLATE_CHUNK), offset + INFLATE_CHUNK >= bytes.length)
   } catch (error) {
     if (error instanceof SlicedFileError) throw error
     throw new SlicedFileError('unreadable archive', { cause: error })
@@ -202,6 +221,7 @@ class GcodeReader {
   push(text: string) {
     const lines = (this.rest + text).split('\n')
     this.rest = lines.pop() ?? ''
+    if (this.rest.length > MAX_LINE_LENGTH) throw new SlicedFileError('G-code line too long')
     for (const line of lines) this.line(line)
   }
 

@@ -1,6 +1,7 @@
 import { parentPort, workerData } from 'node:worker_threads'
 import { errorMessage } from '../../core/error'
 import { InvalidMeshError } from '../../core/mesh/stl'
+import { readSlicedFile, SlicedFileError } from '../../core/slicedPlate'
 import { generateVisualAssets } from './pipeline'
 import { type PlateObject, writePlateObject } from './plateObject'
 
@@ -11,16 +12,28 @@ import { type PlateObject, writePlateObject } from './plateObject'
 const job = workerData as
   | { mode: 'visual'; file: Uint8Array; wants: { thumbnail: boolean; preview: boolean } }
   | { mode: 'plate'; file: Uint8Array; object: PlateObject; xmlPath: string }
+  | { mode: 'sliced'; file: Uint8Array; stoppedAt?: number }
 
 const fail = (error: unknown) => {
   parentPort!.postMessage({
     ok: false as const,
     message: errorMessage(error, String(error)),
     invalidMesh: error instanceof InvalidMeshError,
+    slicedFile: error instanceof SlicedFileError,
   })
 }
 
-if (job.mode === 'plate') {
+if (job.mode === 'sliced') {
+  try {
+    parentPort!.postMessage({
+      ok: true as const,
+      stage: 'complete' as const,
+      plates: readSlicedFile(job.file, 'print.gcode.3mf', job.stoppedAt),
+    })
+  } catch (error) {
+    fail(error)
+  }
+} else if (job.mode === 'plate') {
   try {
     parentPort!.postMessage({ ok: true as const, stage: 'complete' as const, ...writePlateObject(job.file, job.object, job.xmlPath) })
   } catch (error) {

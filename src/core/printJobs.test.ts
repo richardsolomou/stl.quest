@@ -477,6 +477,10 @@ describe('slicedPrintInput', () => {
     expect(input.overhead).toEqual([2, 4])
   })
 
+  it('charges nothing from a stopped print’s file when nothing was measured', () => {
+    expect(total(slicedPrintInput({ ...sliced, cut: true }, ['pla', 'petg'], []))).toBe(0)
+  })
+
   it('keeps the file’s figures when nothing was measured', () => {
     expect(slicedPrintInput(sliced, ['pla', 'petg'], []).input.objects.map(({ amounts }) => amounts)).toEqual([
       [10, 0],
