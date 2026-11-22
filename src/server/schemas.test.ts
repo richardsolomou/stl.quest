@@ -26,6 +26,7 @@ import {
   storageSettingsSchema,
   socialProviderSettingsSchema,
   updateRequestSchema,
+  restockFromOrderSchema,
 } from './schemas'
 
 describe('board settings schema', () => {
@@ -60,6 +61,35 @@ describe('create consumables schema', () => {
 
   it('rejects an empty list', () => {
     expect(createConsumablesSchema.safeParse({ items: [] }).success).toBe(false)
+  })
+})
+
+describe('restock from order schema', () => {
+  const order = { vendor: 'bambu-lab', added: [], prices: [], restocks: [{ consumableId: 'grey', amount: 2_000 }] }
+
+  it('accepts confirmed restock lines', () => {
+    expect(restockFromOrderSchema.safeParse(order).success).toBe(true)
+  })
+
+  it('drops anything else sent with them, such as the email', () => {
+    expect(restockFromOrderSchema.parse({ ...order, email: 'Order summary' })).not.toHaveProperty('email')
+  })
+
+  it('rejects a shop it has no parser for', () => {
+    expect(restockFromOrderSchema.safeParse({ ...order, vendor: 'unknown' }).success).toBe(false)
+  })
+
+  it('rejects two restocks of one consumable', () => {
+    expect(restockFromOrderSchema.safeParse({ ...order, restocks: [...order.restocks, ...order.restocks] }).success).toBe(false)
+  })
+
+  it('rejects an addition that is not a filament', () => {
+    const ipa = { id: 'ipa', kind: 'supply', name: 'IPA', unit: 'ml', price: 10 }
+    expect(restockFromOrderSchema.safeParse({ ...order, added: [ipa] }).success).toBe(false)
+  })
+
+  it('rejects an order with nothing to restock', () => {
+    expect(restockFromOrderSchema.safeParse({ ...order, restocks: [] }).success).toBe(false)
   })
 })
 

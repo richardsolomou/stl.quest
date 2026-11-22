@@ -2093,6 +2093,32 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(spoolmanStock.getByRole('button', { name: 'Add stock' })).toHaveCount(0)
   await screenshot(page, 'spoolman-managed-stock')
   await spoolmanStock.getByRole('button', { name: 'Done' }).click()
+  // A pasted order confirmation restocks what it lists; a filament Spoolman manages is added there instead.
+  await restockFromOrder(page)
+  const jadeRow = page.locator('[data-order-lines] li').filter({ hasText: 'PLA Basic · Jade White' })
+  await expect(jadeRow.getByRole('combobox')).toContainText('Add to your list')
+  await screenshot(page, 'order-restock-review')
+  await page.getByRole('dialog', { name: 'Restock from an order' }).getByRole('button', { name: 'Restock 1' }).click()
+  await expect(page.getByText('Restocked 1 filament')).toBeVisible()
+  await restockFromOrder(page)
+  await expect(jadeRow.getByRole('combobox')).toContainText('Bambu Lab PLA Basic · Jade White')
+  await page.keyboard.press('Escape')
+  const jadeSpool = await page.request.post('/api/spoolman/spools', {
+    headers: { authorization: `Bearer ${spoolmanToken}` },
+    data: {
+      type: 'added',
+      resource: 'spool',
+      payload: spool(3, { id: 9, name: 'Jade White', material: 'PLA', external_id: 'bambulab_pla_jadewhite_1000_175_n' }, 1_000),
+    },
+  })
+  expect(jadeSpool.status()).toBe(204)
+  await restockFromOrder(page)
+  await expect(jadeRow).toContainText('Managed by Spoolman, so add this spool there.')
+  await expect(
+    page.getByRole('dialog', { name: 'Restock from an order' }).getByRole('button', { name: 'Restock', exact: true }),
+  ).toBeDisabled()
+  await screenshot(page, 'order-restock-spoolman')
+  await page.keyboard.press('Escape')
   await page.goto('/settings/spoolman')
   await page.getByRole('button', { name: 'Disconnect' }).click()
   await page.getByRole('alertdialog', { name: 'Disconnect Spoolman?' }).getByRole('button', { name: 'Disconnect' }).click()
@@ -2331,6 +2357,28 @@ async function selectRequestCards(page: Page, names: string[], modifier: 'Meta' 
 /** Tags render as hover-only colour dots rather than visible text, so presence is checked via the dot's data attribute. */
 function requestCardTag(card: Locator, tagPath: string) {
   return card.locator(`[data-tag-dot^="${tagPath}"]`)
+}
+
+/** Opens the order restock dialog and reads a made-up Bambu Lab order for one spool of PLA Basic in Jade White. */
+async function restockFromOrder(page: Page) {
+  await page.goto('/settings/consumables')
+  await page.getByRole('button', { name: 'Restock from an order' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Restock from an order' })
+  await dialog
+    .getByLabel('Order confirmation email')
+    .fill(
+      [
+        'Bambu Lab EU Store',
+        'Order summary',
+        'PLA Basic × 1',
+        'Jade White (10100) / Filament with spool / 1 kg',
+        '€19.99',
+        'Total',
+        '€19.99 EUR',
+      ].join('\n'),
+    )
+  await dialog.getByRole('button', { name: 'Read order' }).click()
+  await expect(dialog.locator('[data-order-lines]')).toBeVisible()
 }
 
 async function choose(select: Locator, option: string) {

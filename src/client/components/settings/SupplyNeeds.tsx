@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Check, Info, Plus } from 'lucide-react'
+import { Check, ClipboardPaste, Info, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { consumablesOfKind, type Consumable } from '../../../core/consumables'
@@ -13,6 +13,7 @@ import { useI18n } from '../../i18n'
 import { catalogueQuery, printerLifetimesQuery } from '../../queries'
 import { formatNumber } from '../priceCalculator/format'
 import { formatStock, LowMarker, StockMovementForm } from './ConsumableStock'
+import { OrderRestockDialog } from './OrderRestockDialog'
 import { ReplacedButton, WearText } from './PrinterMaintenance'
 
 // A farm with many models could otherwise push the consumables themselves off the first screen.
@@ -63,6 +64,7 @@ export function SupplyNeeds({
   const [replaced, setReplaced] = useState<Record<string, (typeof wearing)[number] & { transactionId: string }>>({})
   const rowKey = ({ printer, part }: { printer: { id: string }; part: { id: string } }) => `${printer.id}-${part.id}`
   const wearingRows = [...wearing, ...Object.values(replaced).filter((row) => !wearing.some((other) => rowKey(other) === rowKey(row)))]
+  const [ordering, setOrdering] = useState(false)
   const nothing = runningOut.length === 0 && wearingRows.length === 0 && materials.length === 0 && parts.length === 0
   const untracked = untrackedConsumables(library, levels)
 
@@ -73,21 +75,27 @@ export function SupplyNeeds({
 
   return (
     <section aria-labelledby="supply-needs" className="grid gap-3 rounded-lg border bg-card p-4 sm:p-5">
-      <div className="flex min-w-0 items-baseline gap-3">
-        <h2 id="supply-needs" className="font-heading text-base leading-tight font-bold tracking-[0.01em] uppercase">
-          {copy.title}
-        </h2>
-        {nothing && loadedLevels && (
-          <p className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
-            {untracked ? (
-              <Info aria-hidden="true" className="size-4 shrink-0" />
-            ) : (
-              <Check aria-hidden="true" className="size-4 shrink-0 text-success" />
-            )}
-            {untracked ? copy.untracked(untracked) : copy.allSet}
-          </p>
-        )}
+      <div className="flex min-w-0 flex-wrap items-start gap-x-3 gap-y-2">
+        <div className="flex min-w-0 flex-1 basis-56 flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h2 id="supply-needs" className="font-heading text-base leading-tight font-bold tracking-[0.01em] uppercase">
+            {copy.title}
+          </h2>
+          {nothing && loadedLevels && (
+            <p className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+              {untracked ? (
+                <Info aria-hidden="true" className="size-4 shrink-0" />
+              ) : (
+                <Check aria-hidden="true" className="size-4 shrink-0 text-success" />
+              )}
+              {untracked ? copy.untracked(untracked) : copy.allSet}
+            </p>
+          )}
+        </div>
+        <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setOrdering(true)}>
+          <ClipboardPaste /> {consumables.order.open}
+        </Button>
       </div>
+      {ordering && <OrderRestockDialog workspaceSlug={workspaceSlug} consumables={library} onClose={() => setOrdering(false)} />}
       {!nothing && <p className="-mt-1.5 text-sm text-muted-foreground">{copy.description}</p>}
       {runningOut.length > 0 && (
         <NeedList title={copy.runningOut} count={runningOut.length}>

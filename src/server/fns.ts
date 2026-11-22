@@ -103,6 +103,7 @@ import {
   moveCopiesBatchSchema,
   recordStepUsageSchema,
   recordStockMovementSchema,
+  restockFromOrderSchema,
   linkSpoolmanFilamentSchema,
   createPlateSchema,
   plateIdSchema,
@@ -1855,6 +1856,13 @@ export const recordStockMovement = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const { workspaceSlug, ...input } = data
     return workspaceMutation(workspaceSlug, (context) => context.service.recordStockMovement(input, context.identity))
+  })
+
+export const restockFromOrder = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(restockFromOrderSchema))
+  .handler(async ({ data }) => {
+    const { workspaceSlug, ...input } = data
+    return workspaceMutation(workspaceSlug, (context) => context.service.restockFromOrder(input, context.identity))
   })
 
 export const undoUsage = createServerFn({ method: 'POST' })
