@@ -542,6 +542,16 @@ export const settings = {
       return parts.length ? `Bought ${parts.join(', ')} ago.` : 'Bought less than a month ago.'
     },
   },
+  slicer: {
+    label: 'Slicer',
+    none: 'None',
+    printers: 'Its printer’s slicer',
+    opens: (slicer: string) => `Prints open straight in ${slicer}. Set a download folder in its preferences first.`,
+    downloads: (slicer: string) => `${slicer} cannot open a file from a link, so prints download for you to open in it.`,
+    unset: 'Choose one to open or download this printer’s prints for it.',
+    material:
+      'Only when this material needs a different slicer from its printer. It applies on the printer this material was last recorded on.',
+  },
   printers: {
     sections: { resin: 'Resin printers', filament: 'Filament printers' },
     addOfType: { resin: 'Add resin printer', filament: 'Add filament printer' },

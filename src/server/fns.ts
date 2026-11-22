@@ -142,7 +142,9 @@ import {
   notificationPreferenceSchema,
   unlinkOwnAccountSchema,
   updateRequestSchema,
+  slicerLinkSchema,
 } from './schemas'
+import { authorizedRequestAsset, requestPrintType } from './requestAssetAccess'
 import { beginCloudStorageAuthorization } from './cloudConnections'
 import { disconnectCloudStorage, publicCloudConnection } from './cloudConnectionState'
 import {
@@ -2069,4 +2071,20 @@ export const unarchiveRequests = createServerFn({ method: 'POST' })
   .validator(inWorkspace(archiveRequestsSchema))
   .handler(async ({ data }) =>
     workspaceMutation(data.workspaceSlug, (context) => context.service.unarchiveRequests(data.ids, context.identity)),
+  )
+
+/** A short-lived link to one request's model that a slicer can fetch without the browser session (see `signSlicerLink`). */
+export const createSlicerLink = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(slicerLinkSchema))
+  .handler(async ({ data }) =>
+    workspaceMutation(data.workspaceSlug, async (context) => {
+      const request = await authorizedRequestAsset(context, data.requestId)
+      if (!request?.filePath) throw new Response(serverMessages().server.access.notFound, { status: 404 })
+      const instance = await app()
+      instance.telemetry.capture(context.identity.id, 'slicer_link_created', {
+        slicer: data.slicer,
+        print_type: await requestPrintType(context.repository, request),
+      })
+      return { path: instance.signSlicerLink({ workspaceId: context.workspace.id, requestId: request.id, userId: context.identity.id }) }
+    }),
   )

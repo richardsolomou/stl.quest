@@ -1,9 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { app } from '../../server/app'
 import { withRequestContext } from '../../server/requestContext'
-import { authorizedRequestAsset } from '../../server/requestAssetAccess'
+import { authorizedRequestAsset, requestPrintType } from '../../server/requestAssetAccess'
 import { assetContentType } from '../../core/assetKeys'
-import { attachmentDisposition, gzipAssetStream } from '../../server/assetDownloads'
+import { taggedFileName } from '../../core/request'
+import { assetResponse, attachmentDisposition } from '../../server/assetDownloads'
 
 export const Route = createFileRoute('/api/files/$requestId')({
   server: {
@@ -29,25 +30,15 @@ export const Route = createFileRoute('/api/files/$requestId')({
           const headers = new Headers({
             'Content-Type': currentPreview ? 'application/octet-stream' : assetContentType(relativePath),
             'Cache-Control': wantPreview ? 'private, no-cache' : 'private, max-age=31536000, immutable',
-            // Uncompressed size, so the client can show progress across gzip.
-            'X-File-Size': String(asset.size),
           })
           if (url.searchParams.get('inline') !== '1') {
-            headers.set('Content-Disposition', attachmentDisposition(printRequest.fileName))
-            const assignedPrinter = printRequest.printerId
-              ? (await context.repository.listInventory('printers')).find(({ id }) => id === printRequest.printerId)
-              : undefined
+            headers.set('Content-Disposition', attachmentDisposition(taggedFileName(printRequest.number, printRequest.fileName)))
             instance.telemetry.capture(context.identity.id, 'stl_download_served', {
-              print_type: assignedPrinter?.printType ?? printRequest.requestedPrintType,
+              print_type: await requestPrintType(context.repository, printRequest),
             })
           }
 
-          if ((request.headers.get('accept-encoding') ?? '').includes('gzip')) {
-            headers.set('Content-Encoding', 'gzip')
-            return new Response(gzipAssetStream(asset.stream), { headers })
-          }
-          headers.set('Content-Length', String(asset.size))
-          return new Response(asset.stream, { headers })
+          return assetResponse(request, asset, headers)
         }),
     },
   },

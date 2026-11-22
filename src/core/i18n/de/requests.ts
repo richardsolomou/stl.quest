@@ -110,6 +110,14 @@ export const requests: typeof en = {
     loadingThumbnail: 'Vorschaubild wird geladen',
   },
   downloadModel: 'Modell herunterladen',
+  slicer: {
+    open: (slicer) => `In ${slicer} öffnen`,
+    download: (slicer) => `Für ${slicer} herunterladen`,
+    opening: (slicer) => `Wird in ${slicer} geöffnet…`,
+    opensModel: 'Es wird der bereits geöffneten Druckplatte hinzugefügt.',
+    opensProject: 'Ein 3MF öffnet sich als eigenes Projekt; ist schon eine Druckplatte geladen, fragt der Slicer zuerst nach.',
+    failed: 'Der Link für den Slicer konnte nicht erstellt werden.',
+  },
   charge: {
     label: 'Berechnet',
     placeholder: 'Nicht erfasst',

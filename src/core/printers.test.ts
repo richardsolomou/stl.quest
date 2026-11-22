@@ -106,6 +106,14 @@ describe('printer profiles', () => {
     )
   })
 
+  it("keeps a slicer for the printer's print type", () => {
+    expect(normalizePrinterProfile({ id: 'x1', name: 'X1', printType: 'filament', slicer: 'orcaslicer' }).slicer).toBe('orcaslicer')
+  })
+
+  it('drops a slicer for another print type', () => {
+    expect(normalizePrinterProfile({ id: 'mars', name: 'Mars', printType: 'resin', slicer: 'orcaslicer' }).slicer).toBeUndefined()
+  })
+
   it('recovers missing dimensions from a saved preset', () => {
     expect(normalizePrinterProfile({ id: 'mars-2', presetId: 'resin-elegoo-mars-2', name: 'Elegoo Mars 2' }).widthMm).toBe(82.62)
   })

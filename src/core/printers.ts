@@ -3,6 +3,7 @@ import type { ModelDimensions, PrinterProfile, PrintRequest, PrintType } from '.
 import { workflow } from './workflow'
 import { getPrinterPreset, PRINTER_PRESETS } from './printerPresets'
 import type { PrinterPreset } from './printerPresets'
+import { isSlicerFor } from './slicers'
 
 export const MAX_PRINTERS = 500
 /** Set when an admin finishes printer setup without adding one, so setup is not offered again. */
@@ -11,6 +12,7 @@ export const PRINTERS_SKIPPED_SETTING = 'printers-skipped'
 /** A catalogue printer takes its print type and build volume from its model; only a custom printer keeps its own. */
 export function normalizePrinterProfile(profile: Partial<PrinterProfile> & Pick<PrinterProfile, 'id' | 'name'>): PrinterProfile {
   const preset = getPrinterPreset(profile.presetId) ?? inferredPrinterPreset(profile)
+  const printType = preset?.printType ?? profile.printType ?? 'resin'
   return {
     id: profile.id,
     presetId: profile.presetId ?? preset?.id,
@@ -18,12 +20,13 @@ export function normalizePrinterProfile(profile: Partial<PrinterProfile> & Pick<
     depthMm: preset ? preset.depthMm : positiveNumber(profile.depthMm),
     heightMm: preset ? preset.heightMm : positiveNumber(profile.heightMm),
     name: profile.name,
-    printType: preset?.printType ?? profile.printType ?? 'resin',
+    printType,
     ...(positiveNumber(profile.purchasePrice) ? { purchasePrice: profile.purchasePrice } : {}),
     ...(positiveNumber(profile.lifespanHours) ? { lifespanHours: profile.lifespanHours } : {}),
     ...(profile.purchasedOn ? { purchasedOn: profile.purchasedOn } : {}),
     ...(!preset && positiveNumber(profile.powerWatts) ? { powerWatts: profile.powerWatts } : {}),
     ...(profile.addOnPresetIds?.length ? { addOnPresetIds: profile.addOnPresetIds } : {}),
+    ...(profile.slicer && isSlicerFor(profile.slicer, printType) ? { slicer: profile.slicer } : {}),
     ...(profile.archived ? { archived: true } : {}),
   }
 }

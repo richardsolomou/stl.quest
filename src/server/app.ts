@@ -72,6 +72,7 @@ import { WorkspaceRuntimeRegistry } from './workspaceRuntimeRegistry'
 import { buildManagedAssetStore, clearManagedStoragePrefix, QuotaAssetStore, QuotaUploadStaging } from './managedStorage'
 import { deploymentType, HOSTED_OWNED_WORKSPACE_LIMIT, hostedDeployment } from './hosted'
 import { basePath } from '../basePath'
+import { signSlicerLink, verifySlicerLink, type SlicerLinkClaims } from './slicerLinks'
 import { normalizeBasePath } from '../core/basePath'
 
 const workflowVersion = workflow.statuses.map((status) => status.id).join(':')
@@ -201,6 +202,10 @@ export function deploymentSettings(repository: DrizzleRepository) {
     getSetting: async <T>(key: string) => await repository.getDeploymentSetting<T>(key),
     setSetting: async (key: string, value: unknown) => await repository.setDeploymentSetting(key, value),
   }
+}
+
+function identityRole(role: WorkspaceSummary['role']): Identity['role'] {
+  return role === 'member' ? 'requester' : 'admin'
 }
 
 async function resolveAuthSecret(repository: DrizzleRepository) {
@@ -343,7 +348,8 @@ async function createApp() {
       return found
     }
 
-    const auth = createAuth(repository.database, await resolveAuthSecret(repository), {
+    const authSecret = await resolveAuthSecret(repository)
+    const auth = createAuth(repository.database, authSecret, {
       onUserDeleting: async (userId) => {
         try {
           const removed = await accountDeletionPlan(userId)
@@ -476,13 +482,29 @@ async function createApp() {
       await recordMemberActivity(workspaceRuntime, membership.id, baseIdentity)
       const workspaceIdentity: Identity = {
         ...baseIdentity,
-        role: membership.role === 'member' ? 'requester' : 'admin',
+        role: identityRole(membership.role),
         workspaceRole: membership.role,
         workspaceId: membership.id,
         workspaceSlug: membership.slug,
       }
       setRequestIdentity(workspaceIdentity)
       return { ...workspaceRuntime, workspace: membership, identity: workspaceIdentity }
+    }
+
+    /**
+     * The workspace a signed slicer link opens, as the member who asked for it, or undefined once the link no longer
+     * verifies or that member has left the workspace; the caller still checks the member may see the request.
+     */
+    const slicerLinkWorkspace = async (payload: string, signature: string) => {
+      const claims = verifySlicerLink(authSecret, payload, signature)
+      if (!claims) return undefined
+      const membership = (await repository!.listWorkspacesForUser(claims.userId)).find(({ id }) => id === claims.workspaceId)
+      if (!membership) return undefined
+      return {
+        ...(await runtime(membership)),
+        requestId: claims.requestId,
+        identity: { id: claims.userId, role: identityRole(membership.role) },
+      }
     }
 
     realtimeViewer = async (request) => {
@@ -691,6 +713,8 @@ async function createApp() {
       deleteAccount,
       setActiveWorkspace,
       workspace,
+      signSlicerLink: (claims: SlicerLinkClaims) => signSlicerLink(authSecret, claims),
+      slicerLinkWorkspace,
       publicWorkspace,
       defaultWorkspaceRuntime,
       listWorkspaces: async (userId: string) => await repository!.listWorkspacesForUser(userId),

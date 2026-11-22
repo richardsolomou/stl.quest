@@ -14,6 +14,17 @@ export function gzipAssetStream(stream: ReadableStream): ReadableStream {
   return Readable.toWeb(gzip) as ReadableStream
 }
 
+/** A model's body, gzipped when the client accepts it; `X-File-Size` keeps the uncompressed size for progress either way. */
+export function assetResponse(request: Request, asset: { stream: ReadableStream; size: number }, headers: Headers) {
+  headers.set('X-File-Size', String(asset.size))
+  if ((request.headers.get('accept-encoding') ?? '').includes('gzip')) {
+    headers.set('Content-Encoding', 'gzip')
+    return new Response(gzipAssetStream(asset.stream), { headers })
+  }
+  headers.set('Content-Length', String(asset.size))
+  return new Response(asset.stream, { headers })
+}
+
 /** Header values must be Latin-1, so non-ASCII names go in the RFC 6266 `filename*` parameter with an ASCII fallback. */
 export function attachmentDisposition(fileName: string) {
   const name = fileName.replace(/["\\\p{Cc}]/gu, '')

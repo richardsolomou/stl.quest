@@ -556,6 +556,18 @@ export const settings: typeof en = {
       return parts.length ? `Acheté il y a ${parts.join(' et ')}.` : 'Acheté il y a moins d’un mois.'
     },
   },
+  slicer: {
+    label: 'Slicer',
+    none: 'Aucun',
+    printers: 'Celui de son imprimante',
+    opens: (slicer) =>
+      `Les impressions s’ouvrent directement dans ${slicer}. Définissez d’abord un dossier de téléchargement dans ses préférences.`,
+    downloads: (slicer) =>
+      `${slicer} ne peut pas ouvrir un fichier depuis un lien : les impressions sont donc téléchargées pour que vous les y ouvriez.`,
+    unset: 'Choisissez-en un pour y ouvrir ou télécharger les impressions de cette imprimante.',
+    material:
+      'Seulement si ce matériau demande un autre slicer que son imprimante. S’applique à l’imprimante sur laquelle ce matériau a été enregistré en dernier.',
+  },
   printers: {
     sections: { resin: 'Imprimantes résine', filament: 'Imprimantes filament' },
     addOfType: { resin: 'Ajouter une imprimante résine', filament: 'Ajouter une imprimante filament' },

@@ -553,6 +553,17 @@ export const settings: typeof en = {
       return parts.length ? `Vor ${parts.join(' und ')} gekauft.` : 'Vor weniger als einem Monat gekauft.'
     },
   },
+  slicer: {
+    label: 'Slicer',
+    none: 'Keiner',
+    printers: 'Slicer des Druckers',
+    opens: (slicer) => `Drucke öffnen sich direkt in ${slicer}. Legen Sie dort zuerst in den Einstellungen einen Download-Ordner fest.`,
+    downloads: (slicer) =>
+      `${slicer} kann keine Datei über einen Link öffnen, daher werden Drucke heruntergeladen, damit Sie sie darin öffnen.`,
+    unset: 'Wählen Sie einen, um die Drucke dieses Druckers darin zu öffnen oder dafür herunterzuladen.',
+    material:
+      'Nur, wenn dieses Material einen anderen Slicer als sein Drucker braucht. Gilt für den Drucker, auf dem dieses Material zuletzt erfasst wurde.',
+  },
   printers: {
     sections: { resin: 'Harzdrucker', filament: 'Filamentdrucker' },
     addOfType: { resin: 'Harzdrucker hinzufügen', filament: 'Filamentdrucker hinzufügen' },

@@ -374,6 +374,18 @@ export class DrizzleRepository implements Repository {
     })
   }
 
+  /** Reserves the workspace's next `amount` request numbers and returns the highest; the update also takes the workspace lock. */
+  private async takeRequestNumbers(tx: DatabaseExecutor, workspaceId: string, amount: number) {
+    const row = await tx
+      .update(organization)
+      .set({ lastRequestNumber: sql`${organization.lastRequestNumber} + ${amount}` })
+      .where(eq(organization.id, workspaceId))
+      .returning({ last: organization.lastRequestNumber })
+      .get()
+    if (!row) throw new Response('workspace not found', { status: 404 })
+    return row.last
+  }
+
   /** A no-op write on the workspace row serializes concurrent changes to its tags or inventory, so two cannot both pass the checks that follow. */
   private async lockWorkspace(tx: DatabaseExecutor, workspaceId: string) {
     await tx
@@ -3994,11 +4006,28 @@ export class DrizzleRepository implements Repository {
     if (hasFile !== Boolean(request.fileName) || hasFile !== Boolean(request.filePath) || (!hasFile && !request.sourceUrl?.trim())) {
       throw new Response('invalid request source', { status: 400 })
     }
+    const number = await this.takeRequestNumbers(db, workspaceId, 1)
+    // Requests stored by a release before numbering have none; they take numbers ahead of this one, oldest first.
+    const unnumbered = await db
+      .select({ id: requests.id })
+      .from(requests)
+      .where(and(eq(requests.workspaceId, workspaceId), isNull(requests.number)))
+      .orderBy(asc(requests.createdAt), asc(requests.id))
+      .all()
+    const last = unnumbered.length ? await this.takeRequestNumbers(db, workspaceId, unnumbered.length) : number
+    for (const [index, row] of unnumbered.entries()) {
+      await db
+        .update(requests)
+        .set({ number: number + index })
+        .where(and(eq(requests.workspaceId, workspaceId), eq(requests.id, row.id)))
+        .run()
+    }
     await db
       .insert(requests)
       .values({
         id,
         workspaceId,
+        number: last,
         name: request.name,
         fileName: request.fileName,
         filePath: request.filePath,

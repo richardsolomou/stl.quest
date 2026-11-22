@@ -37,7 +37,8 @@ export function setRequestIdentity(identity: Identity) {
   if (identity.workspaceId) store.log.workspace_id = identity.workspaceId
 }
 
-export async function withRequestContext(request: Request, handler: () => Promise<Response>) {
+/** `loggedPath` replaces the request's path in logs when the path itself carries a credential, such as a signed link. */
+export async function withRequestContext(request: Request, handler: () => Promise<Response>, loggedPath?: string) {
   const requestId = request.headers.get('x-request-id')?.slice(0, 128) || crypto.randomUUID()
   const { sessionId } = postHogRequestContext(request)
   const startedAt = performance.now()
@@ -62,7 +63,7 @@ export async function withRequestContext(request: Request, handler: () => Promis
           event: 'http_request',
           outcome: response.status >= 500 ? 'error' : response.status >= 400 ? 'rejected' : 'success',
           method: request.method,
-          path,
+          path: loggedPath ?? path,
           status: response.status,
           duration_ms: Math.round(performance.now() - startedAt),
         }

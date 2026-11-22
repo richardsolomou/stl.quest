@@ -5,6 +5,10 @@ import { llmsText } from './llms'
 import { OUTSIDE_THE_PRODUCT } from './site'
 
 describe('llmsText', () => {
+  it('names the slicers a print opens in from the slicer list', () => {
+    expect(llmsText()).toContain('A print opens straight in OrcaSlicer through a short-lived link')
+  })
+
   it('names every workflow stage in order', () => {
     expect(llmsText()).toContain(`Queue, Up next, Printing, Finishing, and Ready`)
   })

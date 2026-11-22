@@ -27,6 +27,7 @@ export const printers = pgTable(
     purchasedOn: text('purchased_on'),
     powerWatts: doublePrecision('power_watts'),
     addOnPresetIdsJson: text('add_on_preset_ids_json').notNull().default('[]'),
+    slicer: text('slicer'),
     archivedAt: bigint('archived_at', { mode: 'number' }),
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),
     updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
@@ -96,6 +97,8 @@ export const consumables = pgTable(
     printerPresetId: text('printer_preset_id'),
     printerId: text('printer_id'),
     unit: text({ enum: ['ml', 'g', 'item'] }),
+    /** A resin or filament's own slicer, used instead of its printer's. */
+    slicer: text('slicer'),
     minimumStock: doublePrecision('minimum_stock'),
     packSize: doublePrecision('pack_size'),
     archivedAt: bigint('archived_at', { mode: 'number' }),
