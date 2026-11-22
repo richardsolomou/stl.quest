@@ -281,6 +281,20 @@
       "when": 1795199608592,
       "tag": "0039_plates",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "6",
+      "when": 1795328554318,
+      "tag": "0040_deleted_inventory_items",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "6",
+      "when": 1795328561280,
+      "tag": "0041_deleted_item_kind_check",
+      "breakpoints": true
     }
   ]
 }

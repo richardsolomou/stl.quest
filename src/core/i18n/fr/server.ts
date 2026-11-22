@@ -112,6 +112,7 @@ export const server: typeof en = {
     notFound: 'cet élément n’existe plus ; actualisez la page',
     exists: 'un élément avec cet identifiant existe déjà',
     full: (limit: number) => `un espace de travail peut en utiliser jusqu’à ${limit} à la fois ; archivez-en un d’abord`,
+    notArchived: 'archivez cet élément avant de le supprimer',
   },
   usage: {
     unknownConsumable: 'consommable inconnu',

@@ -7,6 +7,7 @@ export const spend: typeof en = {
     spend: 'Dépenses',
   },
   title: 'Dépenses',
+  deletedItem: (name: string) => `${name} (supprimé)`,
   description:
     'Ce que vos impressions ont consommé, aux prix en vigueur au moment de la consommation. Modifier un prix plus tard ne réécrit jamais ceci.',
   loading: 'Chargement des dépenses…',
@@ -84,6 +85,7 @@ export const spend: typeof en = {
     used: 'Utilisé',
     cost: 'Dépensé',
     removed: 'Retiré de votre bibliothèque',
+    deleted: 'Supprimé',
   },
   prints: {
     title: 'Par impression',

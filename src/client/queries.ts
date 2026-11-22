@@ -4,6 +4,7 @@ import {
   getPriceCalculatorSettings,
   getConsumables,
   getEquipment,
+  getInventoryReferences,
   getAuthCapabilities,
   getAccountMethods,
   getAdminAccount,
@@ -36,6 +37,7 @@ import {
   getPlates,
 } from '../server/fns'
 import type { ElectricityPricePreset } from '../core/electricityPresets'
+import type { InventoryKind } from '../core/inventory'
 import type { FilamentPreset } from '../core/filamentPresets'
 import type { PartPreset } from '../core/partPresets'
 import { estimatePending } from '../core/printEstimates'
@@ -133,6 +135,11 @@ export const consumablesQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['consumables', workspaceSlug], queryFn: () => getConsumables({ data: { workspaceSlug } }) })
 export const equipmentQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['equipment', workspaceSlug], queryFn: () => getEquipment({ data: { workspaceSlug } }) })
+export const inventoryReferencesQuery = (workspaceSlug: string, inventory: InventoryKind, id: string) =>
+  queryOptions({
+    queryKey: ['inventoryReferences', workspaceSlug, inventory, id],
+    queryFn: () => getInventoryReferences({ data: { workspaceSlug, inventory, id } }),
+  })
 export const usageQuery = (workspaceSlug: string, filters: UsageFilters = {}) =>
   queryOptions({ queryKey: ['usage', workspaceSlug, filters], queryFn: () => listUsage({ data: { ...filters, workspaceSlug } }) })
 /** Every live event in a period, read a page at a time because one list is capped; a page overlaps the last by its oldest moment. */

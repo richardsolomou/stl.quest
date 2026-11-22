@@ -219,9 +219,9 @@ export const managedStorageEntitlements = sqliteTable(
 )
 
 /**
- * The append-only usage log (see core/usage). Printers, equipment, and consumables are archived rather than deleted, so
- * their foreign keys always resolve; request and user IDs are plain text, as deleting a print or an account must not
- * erase the stock and spend it recorded.
+ * The append-only usage log (see core/usage). Deleting a printer, equipment, or consumable clears its foreign key here
+ * and keeps its name and kind in `deleted_item_name` and `deleted_item_kind` where it was what the event used; request
+ * and user IDs are plain text, as deleting a print or an account must not erase the stock and spend it recorded.
  */
 export const usageEvents = sqliteTable(
   'usage_events',
@@ -249,6 +249,8 @@ export const usageEvents = sqliteTable(
     undoneAt: integer('undone_at'),
     plateId: text('plate_id'),
     supersededBy: text('superseded_by'),
+    deletedItemName: text('deleted_item_name'),
+    deletedItemKind: text('deleted_item_kind', { enum: ['printer', 'equipment', 'resin', 'filament', 'part', 'supply'] }),
   },
   (table) => [
     check('usage_events_stage_check', sql`${table.stage} IN ('printing', 'finishing', 'stock')`),
@@ -256,6 +258,10 @@ export const usageEvents = sqliteTable(
     check('usage_events_unit_check', sql`${table.unit} IN ('ml', 'g', 'item', 'minute', 'plate')`),
     check('usage_events_outcome_check', sql`${table.outcome} IN ('completed', 'failed') OR ${table.outcome} IS NULL`),
     check('usage_events_copies_check', sql`${table.copies} > 0 OR ${table.copies} IS NULL`),
+    check(
+      'usage_events_deleted_item_kind_check',
+      sql`${table.deletedItemKind} IN ('printer', 'equipment', 'resin', 'filament', 'part', 'supply') OR ${table.deletedItemKind} IS NULL`,
+    ),
     index('usage_events_request').on(table.workspaceId, table.requestId),
     index('usage_events_consumable').on(table.workspaceId, table.consumableId),
     index('usage_events_transaction').on(table.workspaceId, table.transactionId),

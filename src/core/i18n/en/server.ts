@@ -108,6 +108,7 @@ export const server = {
     notFound: 'this item no longer exists; refresh the page',
     exists: 'an item with this ID already exists',
     full: (limit: number) => `a workspace can keep up to ${limit} of these in use; archive one first`,
+    notArchived: 'archive this item before deleting it',
   },
   usage: {
     unknownConsumable: 'unknown consumable',

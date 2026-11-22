@@ -4,8 +4,9 @@ import { organization } from './auth'
 
 /**
  * What a workspace owns. IDs are chosen by the browser, so they are unique only within a workspace; `position` keeps
- * the order items were added in, which picks a quote's default material, and `archived_at` replaces deleting, so the
- * prints and usage that reference an item keep resolving it.
+ * the order items were added in, which picks a quote's default material, and `archived_at` takes an item out of use
+ * while the prints and usage that reference it keep resolving it. Only an archived item is deleted, and deleting it
+ * unlinks those references first (see `Repository.deleteInventoryItem`).
  */
 export const printers = sqliteTable(
   'printers',

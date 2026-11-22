@@ -1,7 +1,7 @@
 import type { Consumable } from './consumables'
 import type { PriceCalculatorCurrency } from './priceCalculator'
 import type { PrintCharge } from './types'
-import { usageCost, type UsageEvent, type UsageStage, type UsageUnit } from './usage'
+import { usageCost, type DeletedItemKind, type UsageEvent, type UsageStage, type UsageUnit } from './usage'
 
 /**
  * What a workspace spent, read from its usage log at the prices each event recorded. Uses, waste, and replaced parts
@@ -19,11 +19,22 @@ export function isSpend(event: UsageEvent) {
   return !event.undoneAt && (event.kind === 'use' || event.kind === 'waste' || event.kind === 'replace')
 }
 
+const DELETED_ITEM_CATEGORIES: Record<DeletedItemKind, SpendCategory> = {
+  printer: 'printer',
+  equipment: 'equipment',
+  resin: 'material',
+  filament: 'material',
+  part: 'part',
+  supply: 'supply',
+}
+
 /**
- * A consumable that left the library keeps its place by how it was used: wear by the plate or minute, or a replacement,
- * is a part; otherwise material while printing and a supply after.
+ * A deleted item keeps the place of the kind it was. A consumable missing from the library otherwise keeps its place by
+ * how it was used: wear by the plate or minute, or a replacement, is a part; otherwise material while printing and a
+ * supply after.
  */
 export function spendCategory(event: UsageEvent, consumables: ReadonlyMap<string, Consumable>): SpendCategory {
+  if (event.deletedItemKind) return DELETED_ITEM_CATEGORIES[event.deletedItemKind]
   if (!event.consumableId) return event.equipmentId ? 'equipment' : 'printer'
   const kind = consumables.get(event.consumableId)?.kind
   if (kind === 'resin' || kind === 'filament') return 'material'
@@ -52,7 +63,8 @@ function inCurrency(event: UsageEvent, currency: PriceCalculatorCurrency) {
 
 export type CurrencyTotal = { currency: PriceCalculatorCurrency; total: number }
 
-export type SpendItem = { category: SpendCategory; id?: string; unit: UsageUnit; amount: number; cost: number }
+/** One thing used: its library `id`, or the name it kept once deleted, or neither when it was never known. */
+export type SpendItem = { category: SpendCategory; id?: string; deletedName?: string; unit: UsageUnit; amount: number; cost: number }
 export type PrintSpend = { requestId: string; cost: number; failed: boolean; estimated: boolean; slicer: boolean }
 
 export type SpendSummary = {
@@ -104,9 +116,17 @@ export function summariseSpend(events: UsageEvent[], consumables: Consumable[], 
     if (basis === 'slicer') slicer += cost
     categories[category] += cost
     outcomes[spendOutcome(event)] += cost
-    const id = event.consumableId ?? event.equipmentId ?? event.printerId
-    const key = `${category}:${id ?? ''}:${event.unit}`
-    const item = items.get(key) ?? { category, ...(id && { id }), unit: event.unit, amount: 0, cost: 0 }
+    const deletedName = event.deletedItemName
+    const id = deletedName === undefined ? (event.consumableId ?? event.equipmentId ?? event.printerId) : undefined
+    const key = `${category}:${deletedName === undefined ? (id ?? '') : `deleted:${deletedName}`}:${event.unit}`
+    const item = items.get(key) ?? {
+      category,
+      ...(id && { id }),
+      ...(deletedName !== undefined && { deletedName }),
+      unit: event.unit,
+      amount: 0,
+      cost: 0,
+    }
     item.amount += event.amount
     item.cost += cost
     items.set(key, item)

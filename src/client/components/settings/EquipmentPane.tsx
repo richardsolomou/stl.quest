@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronRight, RotateCcw, Search } from 'lucide-react'
+import { ChevronRight, Search } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
-import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
 import type { Consumable } from '../../../core/consumables'
 import {
   DEFAULT_MINUTES_PER_USE,
@@ -28,6 +27,7 @@ import { formatNumber } from '../priceCalculator/format'
 import { QueryState } from '../QueryState'
 import { SettingNotice } from '../SettingNotice'
 import { EquipmentDialog } from './EquipmentDialog'
+import { ArchivedInventory } from './ArchivedInventory'
 import { EquipmentIcon } from './EquipmentIcon'
 import { EquipmentPresetPicker } from './EquipmentPresetPicker'
 import { PageHeader, SettingsPage, SettingsSection } from './SettingsLayout'
@@ -64,7 +64,7 @@ export function EquipmentPane() {
   const workspaceSlug = useWorkspaceSlug()
   const query = useQuery(equipmentQuery(workspaceSlug))
   const consumables = useQuery(consumablesQuery(workspaceSlug)).data?.consumables
-  const { mutation, save, setArchived: storeArchived } = useInventory('equipment')
+  const { mutation, save, setArchived: storeArchived, remove } = useInventory('equipment')
   const { t } = useI18n()
   const copy = t.settings.equipment
   const printTypes = useWorkspacePrintTypes()
@@ -190,38 +190,16 @@ export function EquipmentPane() {
         </>
       )}
 
-      {archived.length > 0 && (
-        <SettingsSection layout="stacked" title={copy.archived.title} description={copy.archived.description}>
-          <div className="@container overflow-hidden rounded-lg border">
-            <Table>
-              <TableBody>
-                {archived.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="w-full max-w-0">
-                      <span className="block truncate font-medium" title={item.name}>
-                        {item.name}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">{copy.kinds[item.kind]}</span>
-                    </TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        disabled={mutation.isPending}
-                        onClick={() => setArchived(item.id, false)}
-                      >
-                        <RotateCcw />
-                        <span className="@max-sm:sr-only">{copy.archived.restore}</span>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </SettingsSection>
-      )}
+      <ArchivedInventory
+        kind="equipment"
+        title={copy.archived.title}
+        description={copy.archived.description}
+        restoreLabel={copy.archived.restore}
+        items={archived.map((item) => ({ id: item.id, name: item.name, detail: copy.kinds[item.kind] }))}
+        pending={mutation.isPending}
+        onRestore={(id) => setArchived(id, false)}
+        onDelete={remove}
+      />
 
       <SettingNotice notice={failure ? { tone: 'error', title: copy.notSaved, hint: copy.notSavedHint, detail: failure } : undefined} />
 

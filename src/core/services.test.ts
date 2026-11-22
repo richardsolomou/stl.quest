@@ -2838,6 +2838,214 @@ describe('STLQuestService crash recovery', () => {
       await repository.setSetting(USAGE_TRACKING_SETTING, true)
     })
 
+    describe('deleting an item', () => {
+      const tank: Consumable = {
+        id: 'tank',
+        kind: 'part',
+        name: 'Tank',
+        printType: 'resin',
+        price: 100,
+        lifespan: 100,
+        lifespanUnit: 'plates',
+        printerId: slaPrinter.id,
+      }
+
+      async function archive(kind: InventoryKind, id: string) {
+        await service.setInventoryItemArchived(kind, id, true, admin)
+      }
+
+      it('refuses an item still in use', async () => {
+        await expect(service.deleteInventoryItem('printers', slaPrinter.id, admin)).rejects.toMatchObject({ status: 409 })
+      })
+
+      it('keeps an item it refuses to delete', async () => {
+        await service.deleteInventoryItem('printers', slaPrinter.id, admin).catch(() => undefined)
+
+        expect((await repository.listInventory('printers')).map(({ id }) => id)).toEqual([slaPrinter.id])
+      })
+
+      it('lets only admins delete', async () => {
+        await archive('consumables', ipa.id)
+
+        await expect(service.deleteInventoryItem('consumables', ipa.id, requester)).rejects.toMatchObject({ status: 403 })
+      })
+
+      it('lets only admins count what names an item', async () => {
+        await expect(service.inventoryReferences('consumables', ipa.id, requester)).rejects.toMatchObject({ status: 403 })
+      })
+
+      it('refuses an item the workspace does not have', async () => {
+        await expect(service.deleteInventoryItem('equipment', 'missing', admin)).rejects.toMatchObject({ status: 404 })
+      })
+
+      it('counts what names a printer', async () => {
+        await stock('consumables', [tank])
+        const requestId = await estimatedPrint()
+        await service.recordStepUsage({ requestId, stage: 'printing', copies: 1, printerId: slaPrinter.id, consumableId: resin.id }, admin)
+
+        expect(await service.inventoryReferences('printers', slaPrinter.id, admin)).toEqual({
+          requests: 1,
+          plates: 0,
+          usage: 3,
+          stock: 0,
+          supplies: 0,
+          parts: 1,
+        })
+      })
+
+      it('counts what names a consumable', async () => {
+        await service.recordStockMovement({ consumableId: ipa.id, kind: 'restock', amount: 500 }, admin)
+        await service.recordStepUsage({ requestId: await estimatedPrint(), stage: 'finishing', copies: 1, equipmentIds: [wash.id] }, admin)
+
+        expect(await service.inventoryReferences('consumables', ipa.id, admin)).toEqual({
+          requests: 0,
+          plates: 0,
+          usage: 1,
+          stock: 1,
+          supplies: 1,
+          parts: 0,
+        })
+      })
+
+      it('removes the item', async () => {
+        await archive('equipment', wash.id)
+
+        await service.deleteInventoryItem('equipment', wash.id, admin)
+
+        expect(await repository.listInventory('equipment')).toEqual([])
+      })
+
+      it('takes a deleted printer off its prints but keeps their print type', async () => {
+        const requestId = await estimatedPrint()
+        await archive('printers', slaPrinter.id)
+
+        await service.deleteInventoryItem('printers', slaPrinter.id, admin)
+
+        expect(await repository.getRequest(requestId)).toMatchObject({ printerId: undefined, requestedPrintType: 'resin' })
+      })
+
+      it('keeps a deleted printer’s name on its printing time', async () => {
+        const requestId = await estimatedPrint()
+        await service.recordStepUsage({ requestId, stage: 'printing', copies: 1, printerId: slaPrinter.id, consumableId: resin.id }, admin)
+        await archive('printers', slaPrinter.id)
+
+        await service.deleteInventoryItem('printers', slaPrinter.id, admin)
+
+        const usage = (await service.listUsage({}, admin)).sort(
+          (a, b) => Number(a.consumableId === undefined) - Number(b.consumableId === undefined),
+        )
+        expect(
+          usage.map(({ printerId, consumableId, deletedItemName, deletedItemKind }) => ({
+            printerId,
+            consumableId,
+            deletedItemName,
+            deletedItemKind,
+          })),
+        ).toEqual([
+          { printerId: undefined, consumableId: resin.id, deletedItemName: undefined, deletedItemKind: undefined },
+          { printerId: undefined, consumableId: undefined, deletedItemName: slaPrinter.name, deletedItemKind: 'printer' },
+        ])
+      })
+
+      it('keeps the spend of a deleted material under its name', async () => {
+        const requestId = await estimatedPrint()
+        await service.recordStepUsage({ requestId, stage: 'printing', copies: 1, printerId: slaPrinter.id, consumableId: resin.id }, admin)
+        await archive('consumables', resin.id)
+        const before = summariseSpend(await service.listUsage({}, admin), await repository.listInventory('consumables'), 'EUR').total
+
+        await service.deleteInventoryItem('consumables', resin.id, admin)
+
+        const spend = summariseSpend(await service.listUsage({}, admin), await repository.listInventory('consumables'), 'EUR')
+        expect({ total: spend.total, material: spend.items.find(({ category }) => category === 'material') }).toEqual({
+          total: before,
+          material: expect.objectContaining({ deletedName: resin.name, amount: 12 }),
+        })
+      })
+
+      it('stops equipment using a deleted supply', async () => {
+        await archive('consumables', ipa.id)
+
+        await service.deleteInventoryItem('consumables', ipa.id, admin)
+
+        expect((await repository.listInventory('equipment'))[0].supplies).toEqual([])
+      })
+
+      it('leaves a deleted printer’s wear parts in the library', async () => {
+        await stock('consumables', [tank])
+        await archive('printers', slaPrinter.id)
+
+        await service.deleteInventoryItem('printers', slaPrinter.id, admin)
+
+        expect((await repository.listInventory('consumables')).find(({ id }) => id === tank.id)).toEqual(tank)
+      })
+
+      it('announces the deletion', async () => {
+        const publish = vi.fn()
+        const announcing = new STLQuestService(repository, assets, staging, { publish }, telemetry, { remove: removeTusUpload })
+        await archive('equipment', wash.id)
+
+        await announcing.deleteInventoryItem('equipment', wash.id, admin)
+
+        expect(publish.mock.calls).toEqual([['inventory.deleted']])
+      })
+
+      it('reports the deletion with what named the item', async () => {
+        await service.recordStockMovement({ consumableId: ipa.id, kind: 'restock', amount: 500 }, admin)
+        await archive('consumables', ipa.id)
+        capture.mockClear()
+
+        await service.deleteInventoryItem('consumables', ipa.id, admin)
+
+        expect(capture.mock.calls).toEqual([
+          [
+            admin.id,
+            'inventory_item_deleted',
+            {
+              inventory_kind: 'consumables',
+              item_kind: 'supply',
+              request_count: 0,
+              plate_count: 0,
+              usage_count: 0,
+              stock_count: 1,
+              equipment_count: 1,
+              part_count: 0,
+            },
+          ],
+        ])
+      })
+
+      it('never deletes another workspace’s item', async () => {
+        await archive('equipment', wash.id)
+        const other = await repository.scoped((await repository.createWorkspace({ id: admin.id }, 'Second farm')).id)
+        const otherService = new STLQuestService(other, assets, staging, eventBus(), telemetry, { remove: removeTusUpload })
+
+        await expect(otherService.deleteInventoryItem('equipment', wash.id, admin)).rejects.toMatchObject({ status: 404 })
+      })
+
+      it('lands a replayed upload unassigned once its printer was deleted', async () => {
+        const uploadId = 'upload-to-deleted-printer'
+        const part = staging.uploadPart(uploadId)
+        await fs.promises.writeFile(part, 'stl')
+        await repository.createUploadSession(uploadId, admin.id, Date.now() + 60_000, 3)
+        const requestId = crypto.randomUUID()
+        await repository.beginUploadOperation(crypto.randomUUID(), {
+          kind: 'upload',
+          uploadId,
+          ownerId: admin.id,
+          requestId,
+          partPath: part,
+          destinationPath: 'todo/replayed.stl',
+          request: { name: 'Replayed', fileName: 'replayed.stl', quantity: 1, ownerUserId: admin.id, printerId: slaPrinter.id },
+        })
+        await archive('printers', slaPrinter.id)
+        await service.deleteInventoryItem('printers', slaPrinter.id, admin)
+
+        await service.recoverOperations()
+
+        expect(await repository.getRequest(requestId)).toMatchObject({ name: 'Replayed', printerId: undefined })
+      })
+    })
+
     describe('while tracking is off', () => {
       beforeEach(async () => {
         await repository.setSetting(USAGE_TRACKING_SETTING, false)

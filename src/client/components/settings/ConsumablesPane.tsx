@@ -1,11 +1,10 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronRight, Plus, RotateCcw, Search } from 'lucide-react'
+import { ChevronRight, Plus, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu'
-import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
 import {
   consumablePrice,
   consumablesOfKind,
@@ -38,6 +37,7 @@ import { UsageTrackingInvite } from '../UsageTracking'
 import { currencySymbol, formatMoney, formatNumber } from '../priceCalculator/format'
 import { QueryState } from '../QueryState'
 import { AlsoPrints } from './AlsoPrints'
+import { ArchivedInventory } from './ArchivedInventory'
 import { ConsumableDialog } from './ConsumableDialog'
 import { ConsumableIcon } from './ConsumableIcon'
 import { materialFacts, MaterialPicker, PartPicker } from './ConsumablePicker'
@@ -93,7 +93,7 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
   const tracking = useUsageTracking()
   const stock = useQuery({ ...stockQuery(workspaceSlug), enabled: tracking }).data?.stock
   const levels = useMemo(() => stock ?? [], [stock])
-  const { mutation, save, setArchived } = useInventory('consumables')
+  const { mutation, save, setArchived, remove } = useInventory('consumables')
   // A new item scrolls into view once it is stored, so it is found where it landed when its dialog closes.
   const [added, setAdded] = useState<string>()
   const saveItem = async (item: Consumable) => {
@@ -289,38 +289,16 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
         </div>
       </SettingsSection>
 
-      {archived.length > 0 && (
-        <SettingsSection layout="stacked" title={copy.archived.title} description={copy.archived.description}>
-          <div className="@container overflow-hidden rounded-lg border">
-            <Table>
-              <TableBody>
-                {archived.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="w-full max-w-0">
-                      <span className="block truncate font-medium" title={item.name}>
-                        {item.name}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">{kindTitles[item.kind]}</span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        disabled={mutation.isPending}
-                        onClick={() => void setArchived(item.id, false).catch(failed)}
-                      >
-                        <RotateCcw />
-                        <span className="@max-sm:sr-only">{copy.archived.restore}</span>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </SettingsSection>
-      )}
+      <ArchivedInventory
+        kind="consumables"
+        title={copy.archived.title}
+        description={copy.archived.description}
+        restoreLabel={copy.archived.restore}
+        items={archived.map((item) => ({ id: item.id, name: item.name, detail: kindTitles[item.kind] }))}
+        pending={mutation.isPending}
+        onRestore={(id) => void setArchived(id, false).catch(failed)}
+        onDelete={remove}
+      />
 
       {picking?.kind === 'resin' && (
         <MaterialPicker

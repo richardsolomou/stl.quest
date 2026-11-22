@@ -28,6 +28,10 @@ export type UsageUnit = (typeof USAGE_UNITS)[number]
 export const USAGE_OUTCOMES = ['completed', 'failed'] as const
 export type UsageOutcome = (typeof USAGE_OUTCOMES)[number]
 
+/** What a deleted item was, kept on the usage that used it: a printer, equipment, or the consumable's kind. */
+export const DELETED_ITEM_KINDS = ['printer', 'equipment', 'resin', 'filament', 'part', 'supply'] as const
+export type DeletedItemKind = (typeof DELETED_ITEM_KINDS)[number]
+
 export type UsageEvent = {
   id: string
   /** Shared by every event one action recorded, so the action can be undone as a whole. */
@@ -56,6 +60,9 @@ export type UsageEvent = {
   plateId?: string
   /** The plate transaction that replaced it; such an event is undone, and comes back if that plate's usage is undone. */
   supersededBy?: string
+  /** The name and kind of what it used once that was deleted from the library, since its ID no longer names anything. */
+  deletedItemName?: string
+  deletedItemKind?: DeletedItemKind
 }
 
 /** What a step records: the printer and material when printing starts, the equipment when finishing. */

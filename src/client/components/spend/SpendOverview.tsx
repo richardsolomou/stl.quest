@@ -306,20 +306,25 @@ function ItemTable({ items, library, money }: { items: SpendItem[]; library: Usa
         </thead>
         <tbody>
           {shown.map((item) => {
-            const name = usedItemName(
-              item.category === 'printer'
-                ? { printerId: item.id }
-                : item.category === 'equipment'
-                  ? { equipmentId: item.id }
-                  : { consumableId: item.id },
-              library,
-            )
+            // A deleted item is marked on the line below, which never truncates, so a long name cannot hide it.
+            const name =
+              item.deletedName ??
+              usedItemName(
+                item.category === 'printer'
+                  ? { printerId: item.id }
+                  : item.category === 'equipment'
+                    ? { equipmentId: item.id }
+                    : { consumableId: item.id },
+                library,
+                copy,
+              )
             return (
-              <tr key={`${item.category}:${item.id}:${item.unit}`} className="border-b border-border/60 last:border-0">
+              <tr key={`${item.category}:${item.id ?? item.deletedName}:${item.unit}`} className="border-b border-border/60 last:border-0">
                 <td className="max-w-0 py-1.5">
                   <span className={cn('block truncate', !name && 'text-muted-foreground italic')}>{name ?? copy.items.removed}</span>
                   <span className="block text-xs text-muted-foreground">
                     {copy.categories[item.category]}
+                    {item.deletedName !== undefined && ` · ${copy.items.deleted}`}
                     {/* On phones the amount joins this line, so the name keeps the width. */}
                     <span className="tabular-nums sm:hidden"> · {formatUsageAmount(item.amount, item.unit, copy, locale)}</span>
                   </span>

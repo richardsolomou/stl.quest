@@ -58,6 +58,8 @@ export function mapUsageEvent(row: typeof usageEvents.$inferSelect): UsageEvent 
     ...(row.estimated && { estimated: true }),
     ...(row.plateId && { plateId: row.plateId }),
     ...(row.supersededBy && { supersededBy: row.supersededBy }),
+    ...(row.deletedItemName !== null && { deletedItemName: row.deletedItemName }),
+    ...(row.deletedItemKind && { deletedItemKind: row.deletedItemKind }),
   }
 }
 

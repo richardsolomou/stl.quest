@@ -5,6 +5,7 @@ export const spend = {
     spend: 'Spend',
   },
   title: 'Spend',
+  deletedItem: (name: string) => `${name} (deleted)`,
   description: 'What your prints used, at the prices you had when they used it. Changing a price later never rewrites this.',
   loading: 'Loading spend…',
   loadError: 'Could not load spend',
@@ -81,6 +82,7 @@ export const spend = {
     used: 'Used',
     cost: 'Spent',
     removed: 'Removed from your library',
+    deleted: 'Deleted',
   },
   prints: {
     title: 'By print',

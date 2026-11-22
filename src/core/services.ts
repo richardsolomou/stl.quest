@@ -69,6 +69,7 @@ import { automaticEstimateFields, requestPrintEstimate, type MaterialEstimateSet
 import { consumablesOfKind, type Consumable } from './consumables'
 import type { EquipmentItem } from './equipment'
 import { activeItems, INVENTORY_LIMITS, type InventoryItems, type InventoryKind } from './inventory'
+import { canDeleteInventoryItem, deletedItemKind } from './inventoryDeletion'
 import {
   DEFAULT_PRICE_CALCULATOR_SETTINGS,
   PRICE_CALCULATOR_SETTING,
@@ -1599,6 +1600,33 @@ export class STLQuestService {
     return await this.changeInventory(kind, identity, (items) =>
       this.replacingItem(items, id, (stored) => ({ ...stored, archived: archived || undefined })),
     )
+  }
+
+  /** What names an item, so the confirmation before deleting it can say what loses the link. */
+  async inventoryReferences(kind: InventoryKind, id: string, identity: Identity) {
+    this.requireAdmin(identity)
+    return await this.repository.inventoryReferences(kind, id)
+  }
+
+  /** Deletes an archived item for good; usage keeps its name and cost, and the rest that named it loses the link. */
+  async deleteInventoryItem(kind: InventoryKind, id: string, identity: Identity) {
+    this.requireAdmin(identity)
+    const { item, references, items } = await this.repository.deleteInventoryItem(kind, id, (stored) => {
+      if (!stored) throw new Response(this.text.inventory.notFound, { status: 404 })
+      if (!canDeleteInventoryItem(stored)) throw new Response(this.text.inventory.notArchived, { status: 409 })
+    })
+    this.changed('inventory.deleted')
+    this.capture(identity.id, 'inventory_item_deleted', {
+      inventory_kind: kind,
+      item_kind: deletedItemKind(kind, item),
+      request_count: references.requests,
+      plate_count: references.plates,
+      usage_count: references.usage,
+      stock_count: references.stock,
+      equipment_count: references.supplies,
+      part_count: references.parts,
+    })
+    return items
   }
 
   async skipPrinterSetup(identity: Identity) {

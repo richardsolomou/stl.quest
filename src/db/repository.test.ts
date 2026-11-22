@@ -13,6 +13,7 @@ import type { AccountRole, PrinterProfile, WorkspaceRole } from '../core/types'
 import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
 import type { UsageEvent } from '../core/usage'
 import type { Consumable } from '../core/consumables'
+import type { EquipmentItem } from '../core/equipment'
 import type { InventoryItems, InventoryKind } from '../core/inventory'
 import {
   account,
@@ -664,6 +665,141 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     ])
 
     expect((await repository.listUsage({ from: 1_000, to: 2_000 })).map((event) => event.id)).toEqual(['inside'])
+  })
+
+  describe('deleting an inventory item', () => {
+    const saturn: PrinterProfile = { id: 'saturn', name: 'Saturn', printType: 'resin', archived: true }
+    const wash: EquipmentItem = {
+      id: 'wash',
+      name: 'Wash',
+      kind: 'wash',
+      stage: 'finishing',
+      powerWatts: 50,
+      minutesPerUse: 10,
+      supplies: [{ consumableId: ipa.id, amountPerUse: 100 }],
+    }
+    const accept = () => undefined
+
+    async function assignedPrint() {
+      return await repository.createRequest({
+        name: 'Assigned',
+        fileName: 'assigned.stl',
+        filePath: 'todo/assigned.stl',
+        quantity: 1,
+        ownerUserId: 'maker',
+        printerId: saturn.id,
+      })
+    }
+
+    beforeEach(async () => {
+      await stock(repository, 'printers', [saturn])
+      await stock(repository, 'consumables', [ipa])
+      await stock(repository, 'equipment', [wash])
+    })
+
+    it('counts what names a printer', async () => {
+      const requestId = await assignedPrint()
+      await repository.createPlate({
+        id: 'plate',
+        printerId: saturn.id,
+        otherStuff: false,
+        items: [{ requestId, copies: 1 }],
+        createdAt: 1,
+      })
+      await repository.appendUsageEvents([
+        usageEvent({ stage: 'printing', kind: 'use', printerId: saturn.id, consumableId: undefined, unit: 'minute' }),
+        usageEvent({ kind: 'replace', printerId: saturn.id }),
+      ])
+
+      expect(await repository.inventoryReferences('printers', saturn.id)).toEqual({
+        requests: 1,
+        plates: 1,
+        usage: 1,
+        stock: 1,
+        supplies: 0,
+        parts: 0,
+      })
+    })
+
+    it('unlinks a deleted printer from its prints and plates', async () => {
+      const requestId = await assignedPrint()
+      await repository.createPlate({
+        id: 'plate',
+        printerId: saturn.id,
+        otherStuff: false,
+        items: [{ requestId, copies: 1 }],
+        createdAt: 1,
+      })
+
+      await repository.deleteInventoryItem('printers', saturn.id, accept)
+
+      expect({
+        request: await repository.getRequest(requestId),
+        plate: (await repository.listPlates())[0]?.printerId,
+        printers: await repository.listInventory('printers'),
+      }).toMatchObject({ request: { printerId: undefined, requestedPrintType: 'resin' }, plate: undefined, printers: [] })
+    })
+
+    it('keeps the name of a deleted item on what it was used for', async () => {
+      await repository.appendUsageEvents([
+        usageEvent({ id: 'restock' }),
+        usageEvent({ id: 'wash-run', stage: 'finishing', kind: 'use', equipmentId: wash.id, consumableId: undefined, unit: 'minute' }),
+        usageEvent({ id: 'wash-ipa', stage: 'finishing', kind: 'use', equipmentId: wash.id }),
+      ])
+
+      await repository.deleteInventoryItem('consumables', ipa.id, accept)
+      await repository.deleteInventoryItem('equipment', wash.id, accept)
+
+      expect(
+        (await repository.listUsage({}))
+          .map(({ id, consumableId, equipmentId, deletedItemName, deletedItemKind }) => ({
+            id,
+            consumableId,
+            equipmentId,
+            deletedItemName,
+            deletedItemKind,
+          }))
+          .sort((a, b) => a.id.localeCompare(b.id)),
+      ).toEqual([
+        { id: 'restock', consumableId: undefined, equipmentId: undefined, deletedItemName: 'IPA', deletedItemKind: 'supply' },
+        { id: 'wash-ipa', consumableId: undefined, equipmentId: undefined, deletedItemName: 'IPA', deletedItemKind: 'supply' },
+        { id: 'wash-run', consumableId: undefined, equipmentId: undefined, deletedItemName: 'Wash', deletedItemKind: 'equipment' },
+      ])
+    })
+
+    it('stops equipment using a deleted consumable', async () => {
+      await repository.deleteInventoryItem('consumables', ipa.id, accept)
+
+      expect((await repository.listInventory('equipment'))[0].supplies).toEqual([])
+    })
+
+    it('changes nothing when the check refuses', async () => {
+      await repository.appendUsageEvents([usageEvent({ id: 'restock' })])
+
+      await repository
+        .deleteInventoryItem('consumables', ipa.id, () => {
+          throw new Response('no', { status: 409 })
+        })
+        .catch(() => undefined)
+
+      expect({
+        library: (await repository.listInventory('consumables')).map(({ id }) => id),
+        usage: (await repository.listUsage({})).map(({ consumableId }) => consumableId),
+      }).toEqual({ library: [ipa.id], usage: [ipa.id] })
+    })
+
+    it('leaves another workspace’s item of the same ID alone', async () => {
+      const other = await repository.scoped((await repository.createWorkspace({ id: 'maker' }, 'Second farm')).id)
+      await stock(other, 'consumables', [ipa])
+      await other.appendUsageEvents([usageEvent({ id: 'theirs' })])
+
+      await repository.deleteInventoryItem('consumables', ipa.id, accept)
+
+      expect({
+        library: (await other.listInventory('consumables')).map(({ id }) => id),
+        usage: (await other.listUsage({})).map(({ consumableId }) => consumableId),
+      }).toEqual({ library: [ipa.id], usage: [ipa.id] })
+    })
   })
 
   it('sums live stock per consumable, kind, and unit', async () => {
@@ -1810,7 +1946,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 40 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 42 })
     await migrated.close()
   })
 

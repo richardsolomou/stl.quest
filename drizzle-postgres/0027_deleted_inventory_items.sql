@@ -1,0 +1,3 @@
+ALTER TABLE "usage_events" ADD COLUMN "deleted_item_name" text;--> statement-breakpoint
+ALTER TABLE "usage_events" ADD COLUMN "deleted_item_kind" text;--> statement-breakpoint
+ALTER TABLE "usage_events" ADD CONSTRAINT "usage_events_deleted_item_kind_check" CHECK ("usage_events"."deleted_item_kind" IN ('printer', 'equipment', 'resin', 'filament', 'part', 'supply') OR "usage_events"."deleted_item_kind" IS NULL);
