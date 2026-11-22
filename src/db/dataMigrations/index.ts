@@ -5,6 +5,7 @@ import { legacyCostingMigration } from './0001LegacyCosting'
 import { inventoryTablesMigration } from './0002InventoryTables'
 import { markupPercentMigration } from './0003MarkupPercent'
 import { requestNumbersMigration } from './0004RequestNumbers'
+import { detachRebalancedPrintsMigration } from './0005DetachRebalancedPrints'
 import type { DataMigration, MigrationLog, SchemaMigrator } from './types'
 
 export const dataMigrations: readonly DataMigration[] = [
@@ -12,6 +13,7 @@ export const dataMigrations: readonly DataMigration[] = [
   inventoryTablesMigration,
   markupPercentMigration,
   requestNumbersMigration,
+  detachRebalancedPrintsMigration,
 ]
 
 /**
