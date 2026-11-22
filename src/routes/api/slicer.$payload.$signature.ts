@@ -6,7 +6,8 @@ import { app } from '../../server/app'
 import { assetResponse, attachmentDisposition } from '../../server/assetDownloads'
 import { authorizedRequestAsset, requestPrintType } from '../../server/requestAssetAccess'
 import { withRequestContext } from '../../server/requestContext'
-import { checkedPlateModels, plateThreeMf } from '../../server/plateFile'
+import { checkedPlateModels, PlateModelError, type PlateFiles } from '../../server/plateFile'
+import { serverMessages } from '../../server/locale'
 
 type App = Awaited<ReturnType<typeof app>>
 
@@ -19,14 +20,28 @@ async function plateFile(instance: App, context: NonNullable<Awaited<ReturnType<
     if (error instanceof Response) return new Response('not found', { status: 404 })
     throw error
   }
+  let file: Awaited<ReturnType<PlateFiles['open']>>
+  try {
+    file = await context.plateFiles.open(plateId, checked.models)
+  } catch (error) {
+    if (error instanceof PlateModelError)
+      return new Response(serverMessages().server.plates.unconvertible(error.model.name), { status: 422 })
+    throw error
+  }
   instance.telemetry.capture(context.identity.id, 'slicer_plate_served', {
     request_count: checked.models.length,
     copy_count: checked.copies,
   })
-  return new Response(plateThreeMf(context.assets, checked.models), {
+  return new Response(file.stream, {
     headers: {
       'Content-Type': assetContentType('plate.3mf'),
-      'Content-Disposition': attachmentDisposition(plateFileName(checked.plate.number)),
+      'Content-Disposition': attachmentDisposition(
+        plateFileName(
+          checked.plate.number,
+          checked.models.map(({ name }) => name),
+        ),
+      ),
+      'Content-Length': String(file.size),
       'Cache-Control': 'private, no-store',
     },
   })

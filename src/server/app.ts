@@ -23,6 +23,7 @@ import { normalizeBoardConfig, seesOnlyOwnRequests } from '../core/visibility'
 import { workflow } from '../core/workflow'
 import { accountDeletionWorkspaces, MEMBER_ACTIVITY_INTERVAL_MS } from '../core/workspaces'
 import { AssetGenerationQueue, resolveAssetQueueLimits } from './assets/queue'
+import { PlateFiles } from './plateFile'
 import { APIError } from 'better-auth/api'
 import { createAuth } from './auth'
 import { deliveryTracker, emailNotifier, readEmailBranding, workspaceMailer, type DeliveryTracker } from './notifications'
@@ -942,6 +943,7 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
         'storage-failed asset generation stays failed until storage is healthy',
       ),
   })
+  const plateFiles = new PlateFiles(assetQueue)
   let closed = false
   return {
     repository,
@@ -949,6 +951,7 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
     events,
     service,
     assetQueue,
+    plateFiles,
     storageMigration,
     assertAssetsMutable: () => assertAssetsMutable(),
     storage,
@@ -966,6 +969,7 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
       if (closed) return
       closed = true
       await Promise.all([autoArchive.stop(), storageFailureRecovery.stop()])
+      await plateFiles.close()
       await assetQueue.shutdown()
     },
   }

@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import fs from 'node:fs'
+import os from 'node:os'
+import { afterEach, describe, expect, it } from 'vitest'
 import { strFromU8, unzipSync } from 'fflate'
 import { MAX_PLATE_FILE_BYTES } from '../core/plates'
 import { parseThreeMf } from '../core/mesh/threeMf'
-import { checkedPlateModels, plateThreeMf } from './plateFile'
+import { type PlateObject, writePlateObject } from './assets/plateObject'
+import { checkedPlateModels, PlateFiles, PlateModelError } from './plateFile'
 
 // One triangle in ASCII STL, so any two files differ only by name.
 const triangle = new TextEncoder().encode(`solid t
@@ -16,9 +19,26 @@ endfacet
 endsolid t
 `)
 
+/** A binary STL of `count` separate triangles, enough to outgrow every buffer between the build and the client. */
+function triangles(count: number) {
+  const file = new DataView(new ArrayBuffer(84 + count * 50))
+  file.setUint32(80, count, true)
+  for (let index = 0; index < count; index++)
+    for (const [corner, [x, y]] of [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+    ].entries()) {
+      file.setFloat32(84 + index * 50 + 12 + corner * 12, x + index, true)
+      file.setFloat32(84 + index * 50 + 16 + corner * 12, y, true)
+    }
+  return new Uint8Array(file.buffer)
+}
+
 const files = new Map([
   ['todo/hull.stl', triangle],
   ['todo/turret.stl', triangle],
+  ['todo/big.stl', triangles(300_000)],
 ])
 
 // Sizes stand in for files too large to keep in a test.
@@ -45,15 +65,39 @@ function context(listed = models) {
   }
 }
 
+/** Converts in process, as the asset queue does under tests, counting the models it converts. */
+function plateFiles(keepMs?: number) {
+  const converted: string[] = []
+  const converter = {
+    writePlateObject: async (path: string, object: PlateObject, xmlPath: string) => {
+      converted.push(path)
+      return writePlateObject(files.get(path)!, object, xmlPath)
+    },
+  }
+  return { files: new PlateFiles(converter, keepMs), converted }
+}
+
+const opened: PlateFiles[] = []
+afterEach(async () => {
+  await Promise.all(opened.splice(0).map((plates) => plates.close()))
+})
+
+async function bytes(listed = models) {
+  const { files: plates } = plateFiles()
+  opened.push(plates)
+  return new Uint8Array(await new Response((await plates.open('plate', listed)).stream).arrayBuffer())
+}
+
 async function written() {
-  const archive = unzipSync(new Uint8Array(await new Response(plateThreeMf(assets, models)).arrayBuffer()))
+  const archive = unzipSync(await bytes())
   return { archive, model: strFromU8(archive['3D/3dmodel.model']) }
 }
 
-describe('plateThreeMf', () => {
+const bigPlate = [{ requestId: 'big', name: 'SQ-5 big.stl', path: 'todo/big.stl', copies: 1 }]
+
+describe('PlateFiles', () => {
   it('holds every copy of every model', async () => {
-    const bytes = new Uint8Array(await new Response(plateThreeMf(assets, models)).arrayBuffer())
-    expect(parseThreeMf(bytes).length / 9).toBe(3)
+    expect(parseThreeMf(await bytes()).length / 9).toBe(3)
   })
 
   it('has the parts the 3MF core specification requires', async () => {
@@ -71,12 +115,67 @@ describe('plateThreeMf', () => {
     expect([...(await written()).model.matchAll(/<item objectid="(\d+)"/g)].map((match) => match[1])).toEqual(['1', '1', '2'])
   })
 
-  it('fails the download when a model cannot be read as a mesh', async () => {
+  it('refuses the plate before sending anything when a model cannot be read as a mesh', async () => {
     files.set('todo/broken.stl', new TextEncoder().encode('not a mesh'))
-    const stream = plateThreeMf(assets, [{ requestId: 'broken', name: 'SQ-9 broken.stl', path: 'todo/broken.stl', copies: 1 }])
-    await expect(new Response(stream).arrayBuffer()).rejects.toThrow()
+    await expect(bytes([{ requestId: 'broken', name: 'SQ-9 broken.stl', path: 'todo/broken.stl', copies: 1 }])).rejects.toMatchObject({
+      model: { requestId: 'broken' },
+    })
+  })
+
+  it('refuses a model with no triangle that has any area', async () => {
+    files.set('todo/flat.stl', new TextEncoder().encode(new TextDecoder().decode(triangle).replace('vertex 10 0 0', 'vertex 0 0 0')))
+    await expect(bytes([{ requestId: 'flat', name: 'SQ-6 flat.stl', path: 'todo/flat.stl', copies: 1 }])).rejects.toBeInstanceOf(
+      PlateModelError,
+    )
+  })
+
+  it('leaves no temporary file behind when a build fails', async () => {
+    const before = await plateDirectories()
+    await bytes([{ requestId: 'broken', name: 'SQ-9 broken.stl', path: 'todo/broken.stl', copies: 1 }]).catch(() => undefined)
+    expect(await plateDirectories()).toEqual(before)
+  })
+
+  it('reuses a plate file it already built', async () => {
+    const { files: plates, converted } = plateFiles()
+    opened.push(plates)
+    await new Response((await plates.open('plate', models)).stream).arrayBuffer()
+    await new Response((await plates.open('plate', models)).stream).arrayBuffer()
+    expect(converted).toHaveLength(models.length)
+  })
+
+  it('rebuilds a plate whose prints changed', async () => {
+    const { files: plates, converted } = plateFiles()
+    opened.push(plates)
+    await new Response((await plates.open('plate', models)).stream).arrayBuffer()
+    await new Response((await plates.open('plate', models.slice(1))).stream).arrayBuffer()
+    expect(converted).toHaveLength(models.length + 1)
+  })
+
+  it('removes a plate file once its link has expired', async () => {
+    const before = await plateDirectories()
+    const { files: plates } = plateFiles(20)
+    opened.push(plates)
+    await new Response((await plates.open('plate', models)).stream).arrayBuffer()
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    expect(await plateDirectories()).toEqual(before)
+  })
+
+  it('does not hold up the next plate while a download is paused', async () => {
+    const { files: plates } = plateFiles()
+    opened.push(plates)
+    const paused = (await plates.open('big', bigPlate)).stream.getReader()
+    await paused.read()
+    const next = plates.open('plate', models).then(({ stream }) => new Response(stream).arrayBuffer())
+    await expect(Promise.race([next.then(() => 'built'), new Promise((resolve) => setTimeout(resolve, 2000, 'stuck'))])).resolves.toBe(
+      'built',
+    )
+    await paused.cancel()
   })
 })
+
+async function plateDirectories() {
+  return (await fs.promises.readdir(os.tmpdir())).filter((name) => name.startsWith('stlquest-plate-')).sort()
+}
 
 describe('checkedPlateModels', () => {
   it('sums the copies on the plate', async () => {

@@ -9,6 +9,7 @@ import { InvalidMeshError } from '../../core/mesh/stl'
 import { thumbnailKey } from '../../core/assetKeys'
 import { ASSET_GENERATION_MEMORY_BUDGET, ASSET_GENERATION_MEMORY_MULTIPLIER } from '../../core/uploadLimits'
 import { generateVisualAssets, type GeneratedAssets } from './pipeline'
+import { type PlateFootprint, type PlateObject, writePlateObject } from './plateObject'
 import { logger } from '../logger'
 import { acquireWorkLease, type WorkLocker, WorkLeaseLost } from '../workLock'
 import { isRetryableStorageError } from '../../adapters/retryableError'
@@ -401,51 +402,85 @@ export class AssetGenerationQueue {
     }
   }
 
-  private runPipeline(
+  /**
+   * Converts the model at `path` and appends it to a plate's model XML, off the request thread and within the same
+   * deadline and memory budget as visual assets, so a plate build can't stall or exhaust the server.
+   */
+  async writePlateObject(path: string, object: PlateObject, xmlPath: string): Promise<PlateFootprint> {
+    const size = (await this.assets.stat(path))?.size ?? this.maxSourceBytes
+    if (size > this.maxSourceBytes) throw new SourceTooLargeError(this.maxSourceBytes, size)
+    const release = await this.sourceBytes.acquire(size * ASSET_GENERATION_MEMORY_MULTIPLIER)
+    try {
+      const file = await readAll(await this.assets.read(path), this.maxSourceBytes)
+      await setImmediate()
+      if (!this.workerConfig) return writePlateObject(file, object, xmlPath)
+      let footprint: PlateFootprint | undefined
+      await this.inWorker({ mode: 'plate', file, object, xmlPath }, file, (reply: { stage: 'complete' } & PlateFootprint) => {
+        footprint = { width: reply.width, depth: reply.depth }
+      })
+      if (!footprint) throw new Error('asset worker exited without a footprint')
+      return footprint
+    } finally {
+      release()
+    }
+  }
+
+  private async runPipeline(
     file: Uint8Array,
     wants: { thumbnail: boolean; preview: boolean },
     thumbnailReady: (thumbnail: Uint8Array) => void | Promise<void>,
   ): Promise<GeneratedAssets> {
     if (!this.workerConfig) return generateVisualAssets(file, wants, thumbnailReady)
+    let result: GeneratedAssets | undefined
+    await this.inWorker(
+      { mode: 'visual', file, wants },
+      file,
+      async (reply: { stage: 'thumbnail'; thumbnailPng: Uint8Array } | ({ stage: 'complete' } & GeneratedAssets)) => {
+        if (reply.stage === 'thumbnail') await thumbnailReady(reply.thumbnailPng)
+        else result = reply
+      },
+    )
+    if (!result) throw new Error('asset worker exited without a result')
+    return result
+  }
+
+  /** Runs one job in a fresh worker, settling once it exits and every reply has been handled, or failing at the deadline. */
+  private inWorker<Reply extends { stage: string }>(
+    workerData: Record<string, unknown>,
+    file: Uint8Array,
+    onReply: (reply: Reply) => void | Promise<void>,
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
       const worker = new Worker(this.workerConfig!.path, {
-        workerData: { file, wants, mode: 'visual' },
+        workerData,
         transferList: [file.buffer as ArrayBuffer],
         execArgv: this.workerConfig!.execArgv,
       })
       let failure: unknown
-      let result: GeneratedAssets | undefined
-      let thumbnailWrite = Promise.resolve()
+      let handled = Promise.resolve()
       const deadline = setTimeout(() => {
         failure ??= new InvalidMeshError('model processing exceeded the time limit')
         void worker.terminate()
       }, this.workerConfig!.timeoutMs ?? 120_000)
-      worker.on(
-        'message',
-        (
-          reply:
-            | { ok: true; stage: 'thumbnail'; thumbnailPng: Uint8Array }
-            | ({ ok: true; stage: 'complete' } & GeneratedAssets)
-            | { ok: false; message: string; invalidMesh?: boolean },
-        ) => {
-          if (!reply.ok) failure ??= reply.invalidMesh ? new InvalidMeshError(reply.message) : new Error(reply.message)
-          else if (reply.stage === 'thumbnail') {
-            thumbnailWrite = thumbnailWrite
-              .then(() => thumbnailReady(reply.thumbnailPng))
-              .catch((error: unknown) => {
-                failure ??= error
-              })
-          } else result = reply
-        },
-      )
+      worker.on('message', (reply: ({ ok: true } & Reply) | { ok: false; message: string; invalidMesh?: boolean }) => {
+        if (!reply.ok) {
+          failure ??= reply.invalidMesh ? new InvalidMeshError(reply.message) : new Error(reply.message)
+          return
+        }
+        handled = handled
+          .then(() => onReply(reply))
+          .catch((error: unknown) => {
+            failure ??= error
+          })
+      })
       worker.once('error', (error) => {
         failure ??= error
       })
       worker.once('exit', (code) => {
         clearTimeout(deadline)
-        void thumbnailWrite.then(() => {
-          if (failure || code !== 0 || !result) reject(failure ?? new Error(`asset worker exited without a result (code ${code})`))
-          else resolve(result)
+        void handled.then(() => {
+          if (failure || code !== 0) reject(failure ?? new Error(`asset worker exited with code ${code}`))
+          else resolve()
         })
       })
     })

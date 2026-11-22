@@ -70,6 +70,8 @@ test('runs a plate as one and sends it back to print again when Bambuddy reports
   const served = await slicer.get(slicerUrl.searchParams.get('file')!)
   expect(served.status()).toBe(200)
   expect(served.headers()['content-disposition']).toBe(`attachment; filename="stlquest-plate-${plateNumber}.3mf"`)
+  // The file is built whole before it is sent, so its length is known up front.
+  expect(Number(served.headers()['content-length'])).toBe((await served.body()).byteLength)
   const model = strFromU8(unzipSync(new Uint8Array(await served.body()))['3D/3dmodel.model'])
   expect([...model.matchAll(/<object id="\d+" name="([^"]+)"/g)].map((match) => match[1].replace(/^SQ-\d+ /, 'SQ-n ')).sort()).toEqual(
     prints.map((name) => `SQ-n ${name}.stl`).sort(),

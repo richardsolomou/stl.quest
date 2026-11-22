@@ -139,6 +139,7 @@ export const server: typeof en = {
     printerNeeded: 'choisissez l’imprimante sur laquelle ce plateau tourne',
     onRunningPlate: (number: number) => `ces exemplaires sont sur le plateau n° ${number} ; déplacez plutôt le plateau`,
     noModels: 'aucune impression de ce plateau n’a de fichier de modèle',
+    unconvertible: (name: string) => `${name} ne peut pas être converti pour le fichier du plateau ; ouvrez-le plutôt seul`,
     tooLarge: (limit: string) =>
       `les modèles de ce plateau dépassent ${limit} au total, le maximum d’un fichier de plateau ; téléchargez-les plutôt un par un`,
   },
