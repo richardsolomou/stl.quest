@@ -41,7 +41,7 @@ The bridge listens to Spoolman's `/api/v1/` websocket, which reports spool, fila
 
 ## How stock is counted
 
-Each Spoolman filament counts towards one filament in **Consumables**. That filament's stock becomes the sum of `remaining_weight` across its spools that are not archived, and it is read-only in STL Quest: restock, count, and waste are done in Spoolman. Its minimum stock still warns in **What you need**, and usage recorded at each step still counts towards cost and spend; it is never written back to Spoolman. Stock shows where usage and stock tracking is on (**Settings → General**).
+Each Spoolman filament counts towards one filament in **Consumables**. That filament's stock becomes the sum of `remaining_weight` across its spools that are not archived, and it is read-only in STL Quest: restock, count, and waste are done in Spoolman. Restocking from a pasted order email lists such a filament as one to add in Spoolman and leaves its stock alone. Its minimum stock still warns in **What you need**, and usage recorded at each step still counts towards cost and spend; it is never written back to Spoolman. Stock shows where usage and stock tracking is on (**Settings → General**).
 
 A Spoolman filament finds its library filament in this order:
 

@@ -66,7 +66,8 @@ import {
 import { modelFormat, sourceImageKey } from './assetKeys'
 import { imageContentType, MAX_COVER_BYTES } from './coverImage'
 import { automaticEstimateFields, requestPrintEstimate, type MaterialEstimateSettings } from './printEstimates'
-import { consumablesOfKind, type Consumable } from './consumables'
+import { consumablesOfKind, withConsumablePrice, type Consumable } from './consumables'
+import type { OrderRestockInput } from './orders/orderRestock'
 import { sameFilamentProduct, withSharedFilamentPrice } from './filamentPresets'
 import type { EquipmentItem } from './equipment'
 import { activeItems, INVENTORY_LIMITS, type InventoryItems, type InventoryKind } from './inventory'
@@ -1317,6 +1318,46 @@ export class STLQuestService {
       identity,
     )
     this.capture(identity.id, 'stock_movement_recorded', { kind: input.kind, consumable_kind: consumable.kind })
+    return recorded
+  }
+
+  /**
+   * Records what an order confirmation brought as one undoable restock: catalogue colours join the library first, and
+   * prices change only where the order gave them. A filament Spoolman manages, or that would be managed once added, is
+   * refused, since its spool is added in Spoolman instead.
+   */
+  async restockFromOrder(input: OrderRestockInput, identity: Identity) {
+    await this.requireUsageTracking(identity)
+    const current = await this.consumables()
+    const added = input.added.filter((item) => !current.some(({ id }) => id === item.id))
+    const prospective = [...current, ...added]
+    const managed = await this.spoolmanStock(prospective)
+    const known = (id: string) => prospective.some((item) => item.id === id && !item.archived)
+    if (!input.restocks.every(({ consumableId }) => known(consumableId)) || !input.prices.every(({ consumableId }) => known(consumableId)))
+      throw new Response(this.text.usage.unknownConsumable, { status: 400 })
+    if (input.restocks.some(({ consumableId }) => managed.has(consumableId)))
+      throw new Response(this.text.usage.managedBySpoolman, { status: 409 })
+    const prices = new Map(input.prices.map(({ consumableId, price }) => [consumableId, price]))
+    const library =
+      added.length || prices.size
+        ? await this.changeInventory('consumables', identity, (items) => [
+            ...items.map((item) => (prices.has(item.id) ? withConsumablePrice(item, prices.get(item.id)!) : item)),
+            ...added.filter((item) => !items.some(({ id }) => id === item.id)).map((item) => ({ ...item, archived: undefined })),
+          ])
+        : current
+    const recorded = await this.appendUsage(
+      input.restocks.flatMap(({ consumableId, amount }) => {
+        const consumable = library.find(({ id }) => id === consumableId)
+        return consumable ? [{ stage: 'stock' as const, kind: 'restock' as const, ...consumed(consumable), amount }] : []
+      }),
+      identity,
+    )
+    this.capture(identity.id, 'order_restock_recorded', {
+      vendor: input.vendor,
+      restock_count: input.restocks.length,
+      added_count: added.length,
+      price_count: prices.size,
+    })
     return recorded
   }
 
