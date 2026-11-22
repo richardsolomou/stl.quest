@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { BAMBU_LAB_EU_GERMAN_TEXT, BAMBU_LAB_EU_HTML, BAMBU_LAB_EU_QUOTED_PRINTABLE, BAMBU_LAB_EU_TEXT } from './fixtures'
+import {
+  BAMBU_LAB_EU_FRENCH_TEXT,
+  BAMBU_LAB_EU_GERMAN_TEXT,
+  BAMBU_LAB_EU_HTML,
+  BAMBU_LAB_EU_QUOTED_PRINTABLE,
+  BAMBU_LAB_EU_TEXT,
+} from './fixtures'
 import { parseOrderEmail, type OrderParser } from './orderEmail'
 import { moneyIn, orderEmailLines } from './orderText'
 
@@ -22,8 +28,23 @@ describe('parseOrderEmail', () => {
 
   it('reads a German order with each line on one row and decimal commas', () => {
     expect(parseOrderEmail(BAMBU_LAB_EU_GERMAN_TEXT)?.lines).toEqual([
-      { product: 'PLA Basic', colour: { name: 'Jade White', code: '10100' }, form: 'refill', grams: 1_000, quantity: 1, linePrice: 16.99 },
-      { product: 'PLA Basic', colour: { name: 'Gray', code: '10103' }, form: 'spool', grams: 1_000, quantity: 2, linePrice: 39.98 },
+      { product: 'PLA Basic', colour: { name: 'Jade-Weiß', code: '10100' }, form: 'refill', grams: 1_000, quantity: 1, linePrice: 16.99 },
+      { product: 'PLA Basic', colour: { name: 'Grau', code: '10103' }, form: 'spool', grams: 1_000, quantity: 2, linePrice: 39.98 },
+    ])
+  })
+
+  it('reads a French order', () => {
+    expect(parseOrderEmail(BAMBU_LAB_EU_FRENCH_TEXT)?.lines).toEqual([
+      {
+        product: 'PLA Basic',
+        colour: { name: 'Blanc de jade', code: '10100' },
+        form: 'refill',
+        grams: 1_000,
+        quantity: 2,
+        linePrice: 33.98,
+      },
+      { product: 'PLA Matte', colour: { name: 'Anthracite', code: '11101' }, form: 'spool', grams: 1_000, quantity: 1, linePrice: 21.99 },
+      { product: 'PETG HF', colour: { name: 'Noir', code: '33102' }, form: 'refill', grams: 1_000, quantity: 1, linePrice: 19.99 },
     ])
   })
 

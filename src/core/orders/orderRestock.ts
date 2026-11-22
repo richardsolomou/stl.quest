@@ -32,8 +32,9 @@ const sameWords = (left: string | undefined, right: string | undefined) =>
   left !== undefined && right !== undefined && normalizedWords(left).join(' ') === normalizedWords(right).join(' ')
 
 /**
- * The library filament, or else the catalogue colour, an order line names. A catalogue product matches when its words
- * are the title's in any order ("PETG HF" is HF PETG), and a colour by any of its names. Without a catalogue product,
+ * The library filament, or else the catalogue colour, an order line names. The colour's code names both, whatever
+ * language the shop printed its name in. Without a known code, a catalogue product matches when its words are the
+ * title's in any order ("PETG HF" is HF PETG), and a colour by any of its names. Without a catalogue product,
  * the only library filament whose name holds every word of the title and colour matches.
  */
 export function matchOrderLine(
@@ -47,9 +48,17 @@ export function matchOrderLine(
   const found = (consumableId: string): OrderLineMatch =>
     managedBySpoolman.has(consumableId) ? { kind: 'spoolman', consumableId } : { kind: 'library', consumableId }
   const brand = ORDER_VENDOR_BRANDS[vendor]
+  const code = line.colour?.code
+  const coded = code
+    ? catalogue.flatMap((candidate) => {
+        const colour = candidate.brand === brand ? candidate.colors?.find((option) => option.code === code) : undefined
+        return colour ? [{ preset: candidate, colour }] : []
+      })[0]
+    : undefined
   const words = productWords(line.product)
-  const preset = catalogue.find((candidate) => candidate.brand === brand && productWords(candidate.name) === words)
-  const catalogued = preset?.colors?.find(({ names }) => Object.values(names).some((name) => sameWords(name, line.colour?.name)))
+  const preset = coded?.preset ?? catalogue.find((candidate) => candidate.brand === brand && productWords(candidate.name) === words)
+  const catalogued =
+    coded?.colour ?? preset?.colors?.find(({ names }) => Object.values(names).some((name) => sameWords(name, line.colour?.name)))
   const colourName = catalogued?.names.en ?? line.colour?.name
   const stocked =
     preset && library.find((filament) => filament.filamentPresetId === preset.id && sameWords(filament.colour?.name, colourName))
