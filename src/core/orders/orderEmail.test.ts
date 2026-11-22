@@ -67,6 +67,10 @@ describe('parseOrderEmail', () => {
 })
 
 describe('orderEmailLines', () => {
+  it('keeps text after characters whose lower case is longer', () => {
+    expect(orderEmailLines('<div>İstanbul</div><div>Gray 10103</div>')).toEqual(['İstanbul', 'Gray 10103'])
+  })
+
   it('leaves no markup when tags are nested to survive one pass of stripping', () => {
     const lines = orderEmailLines(
       '<html><body><scr<script>x</script>ipt>alert(1)</script><!<!--x-->-- y -->Gray 10103</body></html><script',

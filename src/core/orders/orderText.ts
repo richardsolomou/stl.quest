@@ -3,8 +3,34 @@ import { PRICE_CALCULATOR_CURRENCIES, type PriceCalculatorCurrency } from '../pr
 /** A pasted email this long is refused before it is read; order confirmations are far smaller. */
 export const MAX_ORDER_EMAIL_LENGTH = 500_000
 
-const BLOCK_TAGS =
-  /<\s*(?:br|\/?(?:p|div|tr|td|th|li|ul|ol|table|tbody|thead|h[1-6]|section|article|header|footer|center|blockquote))\b[^>]*>/gi
+// Tags that start a new line in the text an email shows, and elements whose content it never shows.
+const BLOCK_TAGS = new Set([
+  'br',
+  'p',
+  'div',
+  'tr',
+  'td',
+  'th',
+  'li',
+  'ul',
+  'ol',
+  'table',
+  'tbody',
+  'thead',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'section',
+  'article',
+  'header',
+  'footer',
+  'center',
+  'blockquote',
+])
+const HIDDEN_TAG_ENDS: Record<string, RegExp> = { head: /<\/head/i, style: /<\/style/i, script: /<\/script/i, title: /<\/title/i }
 const ENTITIES: Record<string, string> = {
   amp: '&',
   lt: '<',
@@ -40,18 +66,45 @@ export function orderEmailLines(pasted: string) {
     .filter(Boolean)
 }
 
-/** The text an HTML email shows. Its output is only ever plain text, and each strip repeats so nested markup cannot survive. */
+/**
+ * The text an HTML email shows, read in one pass: markup, comments, and hidden elements are skipped rather than
+ * removed with patterns, so nothing nested can reassemble into a tag, and the result is only ever plain text.
+ */
 function htmlText(html: string) {
-  const stripped = untilStable(html, (text) =>
-    text.replace(/<!--[\s\S]*?-->/g, '').replace(/<(head|style|script|title)\b[\s\S]*?<\/\1\s*>/gi, ''),
-  )
-  const lines = stripped.replace(/\r?\n/g, ' ').replace(BLOCK_TAGS, '\n')
-  return decodeEntities(untilStable(lines, (text) => text.replace(/<[^>]*>/g, '')).replace(/[<>]/g, ''))
+  let text = ''
+  let at = 0
+  while (at < html.length) {
+    const open = html.indexOf('<', at)
+    if (open < 0) {
+      text += flat(html.slice(at))
+      break
+    }
+    text += flat(html.slice(at, open))
+    if (html.startsWith('<!--', open)) {
+      const close = html.indexOf('-->', open + 4)
+      at = close < 0 ? html.length : close + 3
+      continue
+    }
+    const close = html.indexOf('>', open + 1)
+    if (close < 0) break
+    const name = /^\/?\s*([a-z][a-z0-9]*)/i.exec(html.slice(open + 1, close))?.[1]?.toLowerCase() ?? ''
+    const closing = html[open + 1] === '/'
+    at = close + 1
+    const hiddenEnd = closing ? undefined : HIDDEN_TAG_ENDS[name]
+    if (hiddenEnd) {
+      const found = html.slice(at).search(hiddenEnd)
+      const end = found < 0 ? -1 : at + found
+      const endClose = end < 0 ? -1 : html.indexOf('>', end)
+      at = endClose < 0 ? html.length : endClose + 1
+    } else if (BLOCK_TAGS.has(name)) text += '\n'
+  }
+  // Malformed markup can leave a lone bracket behind as text, which an order line never needs.
+  return decodeEntities(text.replace(/[<>]/g, ''))
 }
 
-function untilStable(text: string, strip: (text: string) => string) {
-  for (let previous = ''; previous !== text;) [previous, text] = [text, strip(text)]
-  return text
+/** An HTML source's own line breaks show as spaces; only block tags break lines. */
+function flat(source: string) {
+  return source.replace(/\r?\n/g, ' ')
 }
 
 function decodeEntities(text: string) {
