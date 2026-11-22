@@ -10,6 +10,7 @@ import {
 import { defaultFinishing, supplyUnitPrice, type EquipmentItem } from './equipment'
 import { printingPower } from './equipmentPresets'
 import { DEFAULT_MATERIAL_ESTIMATE_SETTINGS, validMaterialEstimateSettings, type MaterialEstimateSettings } from './printEstimates'
+import type { PrinterRunCount } from './printJobs'
 import type { PrinterProfile, PrintType } from './types'
 
 export const PRICE_CALCULATOR_SETTING = 'price_calculator'
@@ -144,6 +145,34 @@ export type PrintCostInput = {
   material?: ResinConsumable | FilamentConsumable
   /** Each is used once per plate; none for a resin print means a typical wash and cure. */
   equipment?: EquipmentItem[]
+  /** The plate runs each printer reported, so a printer with enough of them prices failures from its own rate. */
+  printerRuns?: PrinterRunCount[]
+}
+
+/**
+ * Plate runs a printer needs reported before its own failure rate prices quotes instead of the flat allowance. At 20,
+ * one failure moves the rate by 5 points, half the default allowance; with fewer, one bad run swings a quote by more
+ * than the allowance it replaces.
+ */
+export const MIN_MEASURED_FAILURE_RUNS = 20
+
+/** The share of a printer's reported plate runs that failed or were cancelled, as a percentage. */
+export function measuredFailurePercent({ runs, failed, cancelled }: Pick<PrinterRunCount, 'runs' | 'failed' | 'cancelled'>) {
+  return runs > 0 ? ((failed + cancelled) * 100) / runs : 0
+}
+
+/**
+ * The failure allowance a quote uses: the printer's measured failure rate once it has reported enough runs, with how
+ * many, else the workspace's flat allowance.
+ */
+export function failureRateFor(
+  rates: Pick<PriceCalculatorSettings, 'failureAllowancePercent'>,
+  printer?: Pick<CostedPrinter, 'id'>,
+  printerRuns: PrinterRunCount[] = [],
+): { percent: number; runs?: number } {
+  const counted = printer && printerRuns.find(({ printerId }) => printerId === printer.id)
+  if (counted && counted.runs >= MIN_MEASURED_FAILURE_RUNS) return { percent: measuredFailurePercent(counted), runs: counted.runs }
+  return { percent: nonNegative(rates.failureAllowancePercent) }
 }
 
 export type EquipmentCost = {
@@ -158,7 +187,7 @@ export type EquipmentCost = {
  * Itemises a print's cost from what it uses: material, the printer's power and wear, its model's wear parts, and each
  * piece of equipment once per plate. Failure allowance applies to production, never to labour; the markup to both.
  */
-export function costPrint({ rates, printType, job, consumables, printer, material, equipment = [] }: PrintCostInput) {
+export function costPrint({ rates, printType, job, consumables, printer, material, equipment = [], printerRuns }: PrintCostInput) {
   const pricePerKwh = nonNegative(rates.electricityPricePerKwh)
   const printHours = nonNegative(job.printHours)
   const plates = nonNegative(job.plates)
@@ -198,7 +227,8 @@ export function costPrint({ rates, printType, job, consumables, printer, materia
     printerWearCost +
     sum(wearParts.map(({ cost }) => cost)) +
     sum(equipmentCosts.map(({ electricity, supplies, wear }) => electricity + supplies + wear))
-  const failureAllowance = production * (nonNegative(rates.failureAllowancePercent) / 100)
+  const failureRate = failureRateFor(rates, printer, printerRuns)
+  const failureAllowance = production * (failureRate.percent / 100)
   const estimatedCost = production + failureAllowance
   const labour = (nonNegative(job.handsOnMinutes) / 60) * nonNegative(rates.labourCostPerHour)
   const markup = (estimatedCost + labour) * (nonNegative(rates.markupPercent) / 100)
@@ -215,6 +245,7 @@ export function costPrint({ rates, printType, job, consumables, printer, materia
     },
     wearParts,
     equipment: equipmentCosts,
+    failureRate,
     failureAllowance,
     estimatedCost,
     labour,
@@ -344,7 +375,13 @@ export type RequestPriceInput = {
  * first, and the workspace's own wash and cure; a partial estimate prices nothing rather than understating it.
  */
 export function priceRequest(
-  { rates, consumables, printer, equipment = [] }: Pick<PrintCostInput, 'rates' | 'consumables' | 'printer' | 'equipment'>,
+  {
+    rates,
+    consumables,
+    printer,
+    equipment = [],
+    printerRuns,
+  }: Pick<PrintCostInput, 'rates' | 'consumables' | 'printer' | 'equipment' | 'printerRuns'>,
   request: RequestPriceInput,
 ) {
   if (request.material === undefined || request.minutes === undefined) return undefined
@@ -366,6 +403,7 @@ export function priceRequest(
       printer,
       material,
       equipment: defaultFinishing(equipment, request.printType),
+      printerRuns,
     }),
   }
 }
@@ -377,10 +415,11 @@ export function priceRequestOnPrinters<Printer extends CostedPrinter & Pick<Prin
   request: RequestPriceInput,
   consumables: Consumable[],
   equipment: EquipmentItem[] = [],
+  printerRuns: PrinterRunCount[] = [],
 ) {
   return printers
     .filter((printer) => !printer.archived && printer.printType === request.printType)
-    .map((printer) => ({ printer, quote: priceRequest({ rates, consumables, printer, equipment }, request) }))
+    .map((printer) => ({ printer, quote: priceRequest({ rates, consumables, printer, equipment, printerRuns }, request) }))
 }
 
 function suppliedPrice(consumables: Consumable[], consumableId: string) {

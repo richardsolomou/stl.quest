@@ -98,6 +98,14 @@ test('runs a plate as one and sends it back to print again when Bambuddy reports
 
   await page.goto('/settings/bambuddy')
   await expect(page.getByRole('list', { name: 'Recent prints' })).toContainText(`Plate #${retried}`)
+  // The printer counts the failed run, and quotes keep the flat allowance until it has reported enough runs.
+  await page.goto('/settings/printers')
+  await page.getByRole('button', { name: `Edit ${printer}` }).click()
+  const printerFailures = page.getByRole('dialog', { name: printer })
+  await expect(printerFailures).toContainText('1 failed or cancelled (100%) · Quotes use it from 20 runs')
+  await screenshot(page, 'plate-run-printer-failures')
+  await printerFailures.getByRole('button', { name: 'Done' }).click()
+  await page.goto('/settings/bambuddy')
   await page.setViewportSize({ width: 320, height: 800 })
   await screenshot(page, 'bambuddy-mobile')
   await page.setViewportSize({ width: 1280, height: 900 })

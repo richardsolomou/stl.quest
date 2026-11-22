@@ -74,6 +74,34 @@ describe('matchSlicedObjects', () => {
     expect(matchSlicedObjects([{}], [hull])).toEqual([undefined])
   })
 
+  it('matches a tagged object to the print with that request number', () => {
+    expect(matchSlicedObjects([{ name: 'SQ-142 Plasma.stl' }], [hull, { ...turret, number: 142 }])).toEqual(['turret'])
+  })
+
+  it('matches an object split off a tagged model', () => {
+    expect(matchSlicedObjects([{ name: 'SQ-142 Plasma.stl_2' }], [{ ...turret, number: 142 }])).toEqual(['turret'])
+  })
+
+  it('matches a tagged object whose slicer dropped the extension', () => {
+    expect(matchSlicedObjects([{ name: 'SQ-142 Plasma' }], [{ ...turret, number: 142 }])).toEqual(['turret'])
+  })
+
+  it('prefers the tag to a model name that fits another print', () => {
+    expect(
+      matchSlicedObjects(
+        [{ name: 'SQ-7 Chrimera_Turret.stl' }],
+        [
+          { ...hull, number: 7 },
+          { ...turret, number: 8 },
+        ],
+      ),
+    ).toEqual(['hull'])
+  })
+
+  it('leaves an object tagged with a request not on the plate unmatched', () => {
+    expect(matchSlicedObjects([{ name: 'SQ-99 Chrimera_Turret.stl' }], [{ ...turret, number: 8 }])).toEqual([undefined])
+  })
+
   it('prefers the longest model name that fits', () => {
     expect(
       matchSlicedObjects(
@@ -105,6 +133,19 @@ describe('splitWeights', () => {
 
   it('splits evenly by copies when an estimate is missing too', () => {
     expect(splitWeights([sized('a', 2), sized('b', 1, 3_000, 1)])).toEqual({ method: 'even', weights: [2, 1] })
+  })
+
+  it('weighs prints by what a slicer file measured for them before their volume', () => {
+    expect(
+      splitWeights([
+        { ...sized('a', 2, 1_000), measuredAmount: 30 },
+        { ...sized('b', 1, 3_000), measuredAmount: 10 },
+      ]),
+    ).toEqual({ method: 'measured', weights: [30, 10] })
+  })
+
+  it('weighs by volume when a print has no measured amount', () => {
+    expect(splitWeights([{ ...sized('a', 2, 1_000), measuredAmount: 30 }, sized('b', 1, 3_000)]).method).toBe('volume')
   })
 })
 
@@ -178,19 +219,30 @@ describe('splitPlate from typed totals', () => {
   ]
 
   it('splits material by the prints’ weights', () => {
-    expect(splitPlate({ total: 40, otherShare: 0 }, 60, prints, 1).prints.map(({ amounts }) => amounts[0])).toEqual([30, 10])
+    expect(splitPlate({ totals: [40], otherShare: 0 }, 60, prints, 1).prints.map(({ amounts }) => amounts[0])).toEqual([30, 10])
   })
 
   it('names the method the weights used', () => {
-    expect(splitPlate({ total: 40, otherShare: 0 }, 60, prints, 1).method).toBe('volume')
+    expect(splitPlate({ totals: [40], otherShare: 0 }, 60, prints, 1).method).toBe('volume')
   })
 
   it('keeps the share of other stuff on the plate unattributed', () => {
-    expect(splitPlate({ total: 40, otherShare: 0.25 }, 60, prints, 1).other.amounts).toEqual([10])
+    expect(splitPlate({ totals: [40], otherShare: 0.25 }, 60, prints, 1).other.amounts).toEqual([10])
+  })
+
+  it('splits each filament’s total by the same weights', () => {
+    expect(splitPlate({ totals: [40, 8], otherShare: 0 }, 60, prints, 2).prints.map(({ amounts }) => amounts)).toEqual([
+      [30, 6],
+      [10, 2],
+    ])
+  })
+
+  it('keeps other stuff’s share of each filament', () => {
+    expect(splitPlate({ totals: [40, 8], otherShare: 0.25 }, 60, prints, 2).other.amounts).toEqual([10, 2])
   })
 
   it('splits time like the material', () => {
-    expect(splitPlate({ total: 40, otherShare: 0.25 }, 60, prints, 1).prints.map(({ minutes }) => minutes)).toEqual([33.75, 11.25])
+    expect(splitPlate({ totals: [40], otherShare: 0.25 }, 60, prints, 1).prints.map(({ minutes }) => minutes)).toEqual([33.75, 11.25])
   })
 })
 

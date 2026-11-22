@@ -1,4 +1,7 @@
+import type { FilamentConsumable } from './consumables'
 import { heldByPlates, printingPlate, type Plate } from './plates'
+import { taggedRequestNumber } from './request'
+import { sameText } from './spoolman'
 
 /**
  * Prints a printer actually ran, as Bambuddy (github.com/maziggy/bambuddy) reports them through its generic webhook.
@@ -87,10 +90,42 @@ export function displayedGrams(text?: string) {
   return match ? Number(match[1]) : undefined
 }
 
-/** The request number of the one `SQ-<n>` tag in a job or file name, which downloads from STL Quest carry. */
-export function taggedRequestNumber(name?: string) {
-  const tags = [...new Set([...(name ?? '').matchAll(/(?<![\p{L}\p{N}])SQ-(\d{1,9})(?!\p{N})/giu)].map((match) => Number(match[1])))]
-  return tags.length === 1 ? tags[0] : undefined
+export type DisplayedTray = { material?: string; grams: number }
+
+/**
+ * Bambuddy's per-tray breakdown read into each tray's material and grams: `AMS-A T1 PLA: 12.3g | Ext PETG: 4.0g` from
+ * the spools it tracked, or `PLA: 12.3g` from the sliced file's filament slots.
+ */
+export function displayedTrays(text?: string): DisplayedTray[] {
+  return (known(text) ?? '').split('|').flatMap((part) => {
+    const match = /^(.*?):\s*(\d+(?:\.\d+)?)\s*g$/i.exec(part.trim())
+    if (!match) return []
+    const material = known(match[1].replace(/^(?:Ext|.+?\sT\d+)\s+/, ''))
+    return [{ ...(material && { material }), grams: Number(match[2]) }]
+  })
+}
+
+/**
+ * What a print used of each library filament: each tray goes to the first filament of its material, else the first
+ * filament, and grams the trays leave out (a tray Bambuddy tracks no spool in) go to the first filament too.
+ */
+export function printFilaments(
+  job: Pick<PrintJob, 'grams' | 'filamentDetails'>,
+  filaments: FilamentConsumable[],
+  materialOf: (filament: FilamentConsumable) => string | undefined,
+): { filament: FilamentConsumable; grams: number }[] {
+  const first = filaments[0]
+  if (!first) return []
+  const used = new Map<FilamentConsumable, number>()
+  const add = (filament: FilamentConsumable, grams: number) => {
+    if (grams > 0) used.set(filament, (used.get(filament) ?? 0) + grams)
+  }
+  const trays = displayedTrays(job.filamentDetails)
+  for (const { material, grams } of trays) add(filaments.find((filament) => sameText(materialOf(filament), material)) ?? first, grams)
+  // Bambuddy rounds every figure to a tenth of a gram, so the trays can only fall short of the total by more than that.
+  const untracked = Math.round(((job.grams ?? 0) - trays.reduce((total, { grams }) => total + grams, 0)) * 10) / 10
+  add(first, untracked)
+  return [...used].map(([filament, grams]) => ({ filament, grams }))
 }
 
 /** The print event a Bambuddy notification is, or none for notifications that are not about a print's start or end. */

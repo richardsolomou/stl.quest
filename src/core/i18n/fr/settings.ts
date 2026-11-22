@@ -739,6 +739,7 @@ export const settings: typeof en = {
         lifespan ? `${run} sur ${lifespan} heures d’impression effectuées` : `${run} heures d’impression effectuées`,
       runs: (runs, failed, rate) =>
         `${runs} ${runs === 1 ? 'passage de plateau signalé' : 'passages de plateau signalés'} · ${failed} échoués ou annulés (${rate})`,
+      runsPricing: (minimum, used) => (used ? 'Les devis utilisent ce taux' : `Les devis l’utilisent dès ${minimum} passages`),
       pastLifespan: 'Durée de vie dépassée',
       addOns: 'Modules ajoutés',
       addOnsHint:

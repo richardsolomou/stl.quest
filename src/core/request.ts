@@ -95,6 +95,12 @@ export function requestTag(number: number) {
   return `SQ-${number}`
 }
 
+/** The request number of the one `SQ-<n>` tag in a job or file name, which downloads from STL Quest carry. */
+export function taggedRequestNumber(name?: string) {
+  const tags = [...new Set([...(name ?? '').matchAll(/(?<![\p{L}\p{N}])SQ-(\d{1,9})(?!\p{N})/giu)].map((match) => Number(match[1])))]
+  return tags.length === 1 ? tags[0] : undefined
+}
+
 /** The name a downloaded model is saved as: its file name behind the request's tag, unless it already starts with it. */
 export function taggedFileName(number: number, fileName: string) {
   const tag = requestTag(number)
