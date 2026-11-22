@@ -16,10 +16,10 @@ Each `lifespanSource` records its `basis`:
 - `derived`: a manufacturer's layer or release count converted to plates with the catalog's `layersPerPlate` assumption (1,000 layers, a 50 mm plate at 50 µm).
 - `typical`: STL Quest's labelled estimate where the manufacturer states none. Its note gives the basis, such as another manufacturer's figure for a comparable part or a rounded order-of-magnitude starting point. The categories no manufacturer gives an interval for use these starting points:
   - nozzles and hotends 500 print hours, and HeyGears LCD screens 2,000 print hours, as Elegoo and Phrozen rate theirs;
-  - Bambu Lab belts 5,000 print hours, purge wipers 1,000, wiping pads 500, and PTFE tubes 2,000;
+  - Bambu Lab belts 5,000 print hours, purge wipers 2,000, wiping pads 500, and PTFE tubes 2,000;
   - filament cutters 500 print hours, from Bambu Lab's 10 to 15 spools at about 50 print hours a 1 kg spool;
-  - ACF films 30 plates, from Anycubic's 30,000-layer FEP figure, and HeyGears films 45 plates, from its 45,000-layer figure for the Reflex's film;
-  - screen protectors 200 plates, and flexible build platforms and print surfaces 500 plates.
+  - ACF films 30 plates, from Anycubic's 30,000-layer FEP figure, and HeyGears films 45 plates, from its 45,000-layer figure for the Reflex's film, except the pulsing-release film at 150 plates, since the pulsing module peels each layer more gently;
+  - screen protectors 200 plates, and flexible build platforms and print surfaces 500 plates, except the Form Studio 1 Build Platform Flex at 1,000 plates from use.
 
 Manufacturers mostly replace wear parts on condition rather than on a schedule, so every lifespan is a planning figure that users can override.
 

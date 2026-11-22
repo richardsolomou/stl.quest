@@ -1524,11 +1524,11 @@
       "category": "purge-wiper",
       "printType": "filament",
       "fits": ["filament-bambu-lab-x2d"],
-      "lifespan": 1000,
+      "lifespan": 2000,
       "lifespanUnit": "hours",
       "lifespanSource": {
         "basis": "typical",
-        "note": "Bambu Lab replaces the purge wiper when it is damaged or deformed and states no interval. 1,000 print hours is an order-of-magnitude starting point, not a measured figure."
+        "note": "Bambu Lab replaces the purge wiper when it is damaged or deformed and states no interval. 2,000 print hours is a starting point from use, not a measured figure."
       },
       "listPrice": {
         "amount": 15.99,
@@ -1948,11 +1948,11 @@
       "category": "flex-platform",
       "printType": "resin",
       "fits": ["resin-formlabs-form-studio-1"],
-      "lifespan": 500,
+      "lifespan": 1000,
       "lifespanUnit": "plates",
       "lifespanSource": {
         "basis": "typical",
-        "note": "Formlabs states no lifespan for its flexible build surfaces, which are replaced once they dent, scratch, or stop releasing parts cleanly. 500 plates is an order-of-magnitude starting point, not a measured figure."
+        "note": "Formlabs states no lifespan for its flexible build surfaces, which are replaced once they dent, scratch, or stop releasing parts cleanly. 1,000 plates is a starting point from use, not a measured figure."
       },
       "listPrice": {
         "amount": 153.51,
@@ -2155,12 +2155,12 @@
       "category": "release-film",
       "printType": "resin",
       "fits": ["resin-heygears-reflex-rs", "resin-heygears-reflex-rs-turbo"],
-      "lifespan": 45,
+      "lifespan": 150,
       "lifespanUnit": "plates",
       "lifespanSource": {
         "basis": "typical",
         "url": "https://www.heygears.com/hardware/reflex",
-        "note": "HeyGears states no lifespan for this film. 45 plates is its stated 45,000-layer life for the Reflex’s release film."
+        "note": "HeyGears states no lifespan for this film. The pulsing module peels each layer more gently than a fixed release, so it outlasts the Reflex's standard film (rated 45,000 layers); 150 plates is a starting point from use, not a measured figure."
       },
       "listPrice": {
         "amount": 99,
