@@ -42,6 +42,7 @@ export const settings: typeof en = {
         consumables: 'Sehen, was noch da ist und was nachgekauft werden muss',
         spend: 'Sehen, was Ihre Drucke tatsächlich kosten',
         maintenance: 'Sehen, wann ein Verschleißteil fällig ist',
+        spoolman: 'Spoolman-Bestand in Verbrauchsmaterial zeigen',
         turnOn: 'Einschalten',
         whatItDoes: 'Was das bewirkt',
         explanation:
@@ -89,6 +90,7 @@ export const settings: typeof en = {
     users: 'Mitglieder',
     email: 'E-Mail',
     storage: 'Speicher',
+    spoolman: 'Spoolman',
   },
   pricing: {
     title: 'Preise',
@@ -350,6 +352,12 @@ export const settings: typeof en = {
     listPriceHint: 'Tragen Sie ein, was Sie zahlen, inklusive Steuer und Versand.',
     listPriceSource: 'Shopseite',
     stock: {
+      spoolman: {
+        managed: 'Von Spoolman verwaltet',
+        spools: (count: number) => `${count} ${count === 1 ? 'Spule' : 'Spulen'}`,
+        hint: 'Der Bestand ist, was seine Spulen in Spoolman noch haben, also ändert er sich dort.',
+        link: 'Spoolman-Verbindung',
+      },
       title: 'Bestand',
       onHand: (amount: string) => `${amount} vorrätig`,
       left: (amount: string) => `noch ${amount}`,
@@ -585,6 +593,17 @@ export const settings: typeof en = {
       return parts.length ? `Vor ${parts.join(' und ')} gekauft.` : 'Vor weniger als einem Monat gekauft.'
     },
   },
+  slicer: {
+    label: 'Slicer',
+    none: 'Keiner',
+    printers: 'Slicer des Druckers',
+    opens: (slicer) => `Drucke öffnen sich direkt in ${slicer}. Legen Sie dort zuerst in den Einstellungen einen Download-Ordner fest.`,
+    downloads: (slicer) =>
+      `${slicer} kann keine Datei über einen Link öffnen, daher werden Drucke heruntergeladen, damit Sie sie darin öffnen.`,
+    unset: 'Wählen Sie einen, um die Drucke dieses Druckers darin zu öffnen oder dafür herunterzuladen.',
+    material:
+      'Nur, wenn dieses Material einen anderen Slicer als sein Drucker braucht. Gilt für den Drucker, auf dem dieses Material zuletzt erfasst wurde.',
+  },
   printers: {
     sections: { resin: 'Harzdrucker', filament: 'Filamentdrucker' },
     addOfType: { resin: 'Harzdrucker hinzufügen', filament: 'Filamentdrucker hinzufügen' },
@@ -725,6 +744,70 @@ export const settings: typeof en = {
     choosePreset: (printer: string) => `${printer} verwenden`,
     current: 'Aktuell',
     chooseHint: 'Dieses Modell für den Drucker verwenden.',
+  },
+  spoolman: {
+    title: 'Spoolman',
+    description:
+      'Filamentbestand aus Spoolman lesen, das jede deiner Spulen verwaltet. Eine kleine Bridge neben Spoolman schickt die Spulen hierher, also wird nichts in deinem Netzwerk für das Internet geöffnet und STL Quest hat nie einen Zugang dorthin.',
+    loading: 'Spoolman wird geladen…',
+    loadError: 'Spoolman konnte nicht geladen werden',
+    connection: {
+      title: 'Verbindung',
+      description:
+        'Mit einem Token kann die Bridge oder jedes Werkzeug, das Webanfragen sendet, Spulen an diesen Arbeitsbereich schicken. Es kann nur senden, nie lesen.',
+      name: 'Spoolman',
+      status: { receiving: 'Empfängt', waiting: 'Wartet', off: 'Nicht verbunden' },
+      off: 'Erstelle ein Token und starte dann die Bridge neben Spoolman.',
+      waiting: 'Starte die Bridge mit dem Token. Die Spulen erscheinen unten, sobald sie sie sendet.',
+      received: (when: string, spools: string) => `Zuletzt aktualisiert ${when} · ${spools}`,
+      create: 'Token erstellen',
+      replace: 'Token ersetzen',
+      disconnect: 'Trennen',
+      token: 'Token',
+      tokenHint: 'Wird nur jetzt angezeigt. Trage es in die Einstellungen der Bridge ein; es ersetzt jedes frühere Token.',
+      replaceConfirm: {
+        title: 'Token ersetzen?',
+        description:
+          'Das aktuelle Token funktioniert sofort nicht mehr, also braucht die Bridge das neue, bevor sie wieder senden kann. Bereits empfangene Spulen bleiben.',
+        confirm: 'Token ersetzen',
+      },
+      disconnectConfirm: {
+        title: 'Spoolman trennen?',
+        description:
+          'Das Token funktioniert nicht mehr und die gesendeten Spulen werden vergessen, also zählt der Filamentbestand wieder, was STL Quest erfasst. Von Hand verknüpfte Filamente bleiben für eine neue Verbindung verknüpft.',
+        confirm: 'Trennen',
+      },
+      error: 'Die Verbindung konnte nicht geändert werden.',
+    },
+    bridge: {
+      title: 'Bridge',
+      description:
+        'Starte sie mit Docker dort, wo sie Spoolman erreicht. Sie hört auf Änderungen in Spoolman, schickt jede Spule hierher und baut nur ausgehende Verbindungen auf.',
+      compose: 'Docker Compose',
+      spoolmanUrl: 'Setze SPOOLMAN_URL auf die Adresse, unter der du Spoolman öffnest.',
+      endpoint: 'Endpunkt',
+      endpointHint:
+        'Home Assistant, Bambuddy oder ein Skript können stattdessen das Spulen-JSON von Spoolman hierher senden, mit dem Token als Bearer-Token.',
+      docs: 'So sendest du Spulen',
+    },
+    filaments: {
+      title: 'Filamente',
+      description:
+        'Jedes Spoolman-Filament zählt zu einem Filament in Verbrauchsmaterial, dessen Bestand dann ist, was seine Spulen noch haben. Filamente aus SpoolmanDB finden ihre Katalogfarbe, andere passen über Marke, Material und Farbe, und wo beides unsicher ist, wählst du.',
+      empty: 'Noch keine Spulen.',
+      unnamed: (id: number) => `Filament #${id}`,
+      spools: (count: number) => `${count} ${count === 1 ? 'Spule' : 'Spulen'}`,
+      countsTowards: (name: string) => `Wozu ${name} zählt`,
+      automatic: (name?: string) => (name ? `Automatisch · ${name}` : 'Automatisch · kein Treffer'),
+      none: 'Nicht gezählt',
+      by: {
+        catalogue: 'Über seinen SpoolmanDB-Eintrag zugeordnet',
+        colour: 'Über Marke, Material und Farbe zugeordnet',
+        manual: 'Von Hand gewählt',
+      },
+      noLibrary: 'Füge die Filamente, die du kaufst, in Verbrauchsmaterial hinzu, um Spoolman-Bestand dazu zu zählen.',
+      error: 'Die Verknüpfung konnte nicht gespeichert werden.',
+    },
   },
   email: {
     title: 'E-Mail',

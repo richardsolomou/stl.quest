@@ -11,6 +11,8 @@ import type { InventoryReferences } from './inventoryDeletion'
 import type { Plate, PlateItem, PlateRecording } from './plates'
 import type { PriceCalculatorCurrency } from './priceCalculator'
 import type { ChargedPrint } from './spend'
+import type { SpoolmanChange, SpoolmanLink, SpoolmanSpool } from './spoolman'
+import type { SlicerId } from './slicers'
 
 export type Role = 'admin' | 'requester'
 export type AccountRole = 'super_admin' | 'requester'
@@ -79,6 +81,8 @@ export type PrinterProfile = PrinterSummary & {
   powerWatts?: number
   /** Catalogue equipment bolted onto this printer, such as a pulsing release module, whose printing power adds to its own. */
   addOnPresetIds?: string[]
+  /** Which slicer this printer's files open in (see `SLICERS`). */
+  slicer?: SlicerId
   archived?: boolean
 }
 
@@ -95,6 +99,8 @@ export type Invite = {
 
 export type PrintRequest = {
   id: string
+  /** Counts up per workspace and makes the request's tag (see `requestTag`). */
+  number: number
   name: string
   fileName?: string
   filePath?: string
@@ -506,6 +512,24 @@ interface RepositoryShape {
   claimInvite(tokenHash: string, now: number): Invite | undefined
   completeInvite(id: string, userId: string): void
   deleteInvite(id: string): void
+  spoolmanConnection(): { createdAt: number; receivedAt?: number } | undefined
+  /** Stores the hash of a new token, which replaces the old one and keeps the spools already received. */
+  connectSpoolman(tokenHash: string, now: number): void
+  /** Forgets the token and every spool received with it; links to library filaments stay. */
+  disconnectSpoolman(): void
+  listSpoolmanSpools(): SpoolmanSpool[]
+  /**
+   * Applies what Spoolman sent and stamps when it arrived, unless the workspace has disconnected meanwhile or a new spool
+   * would take it past `maxSpools`; `first` says whether it is the first since connecting.
+   */
+  receiveSpoolman(
+    change: SpoolmanChange,
+    now: number,
+    maxSpools: number,
+  ): { received: false; full?: boolean } | { received: true; first: boolean }
+  listSpoolmanLinks(): SpoolmanLink[]
+  /** Links the Spoolman filament to a library filament or to none, or with no link hands it back to matching. */
+  setSpoolmanLink(filamentId: number, link: { consumableId: string | null } | undefined, now: number): void
   getSetting<T>(key: string): T | undefined
   listAssetMigrations(): string[]
   recordAssetMigration(id: string): void
@@ -739,6 +763,7 @@ export type AppEvent =
   | 'inventory.changed'
   | 'inventory.deleted'
   | 'plate.changed'
+  | 'spoolman.received'
 
 export interface EventBus {
   publish(event: AppEvent): void

@@ -116,6 +116,14 @@ export const server = {
     materialMismatch: 'this material does not suit the print type',
     nothingToUndo: 'nothing to undo',
     trackingOff: 'usage and stock tracking is off for this workspace',
+    managedBySpoolman: 'Spoolman manages the stock of this filament',
+  },
+  spoolman: {
+    notConnected: 'this Spoolman token is not connected to a workspace',
+    tooManySpools: (max: number) => `send at most ${max} spools`,
+    tooLarge: (megabytes: number) => `send at most ${megabytes} MB at once`,
+    invalid: 'send Spoolman spools as JSON: {"spools": [...]} or one Spoolman spool event',
+    rateLimited: 'too many updates; wait a minute and send again',
   },
   plates: {
     notFound: 'plate not found',

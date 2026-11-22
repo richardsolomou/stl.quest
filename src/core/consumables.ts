@@ -1,4 +1,5 @@
 import { PRINT_TYPES, type PrinterProfile, type PrintType } from './types'
+import type { SlicerId } from './slicers'
 import type { UsageUnit } from './usage'
 
 export const MAX_CONSUMABLES = 200
@@ -22,6 +23,8 @@ export type ResinConsumable = LibraryFields & {
   resinPresetId?: string
   pricePerLitre: number
   densityGramsPerMl: number
+  /** Opens this resin's files in its own slicer rather than the printer's. */
+  slicer?: SlicerId
 }
 
 export type FilamentColour = { name: string; hex: string }
@@ -34,6 +37,8 @@ export type FilamentConsumable = LibraryFields & {
   filamentPresetId?: string
   colour?: FilamentColour
   pricePerKg: number
+  /** Opens this filament's files in its own slicer rather than the printer's. */
+  slicer?: SlicerId
 }
 
 /** A part that wears out, such as a resin tank or build plate, costed across the plates or print hours it lasts. */

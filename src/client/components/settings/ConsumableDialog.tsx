@@ -52,6 +52,7 @@ import { useAutosave } from '../../useAutosave'
 import { useUsageTracking } from '../../workspace'
 import { AutosaveStatus } from '../AutosaveStatus'
 import { ColourSwatch } from '../ColourSwatch'
+import { SlicerField } from './SlicerField'
 import { DialogShell } from '../DialogShell'
 import { formatNumber } from '../priceCalculator/format'
 import { StockPanel, useStockMovements } from './ConsumableStock'
@@ -334,6 +335,15 @@ export function ConsumableDialog({
           <StoreField stores={stores} value={draft.storeId} onChange={(storeId) => setDraft({ ...draft, storeId })} />
         )}
       </div>
+      {tracking && (draft.kind === 'resin' || draft.kind === 'filament') && (
+        <SlicerField
+          id="consumable-slicer"
+          printType={draft.kind}
+          value={draft.slicer}
+          material
+          onChange={(slicer) => setDraft({ ...draft, slicer })}
+        />
+      )}
       {!openedNew && tracking && <StockPanel workspaceSlug={workspaceSlug} consumable={draft} level={level} printers={printers} />}
     </DialogShell>
   )
@@ -509,7 +519,11 @@ function PartProduct({ part, printers }: { part: PartConsumable; printers: Print
         {copy.dialog.part}
       </h3>
       <div className="flex items-center gap-3 rounded-lg border bg-muted/20 p-2.5">
-        <PrinterPresetImage printer={printer ?? { printType: part.printType }} className="size-12 rounded-md border bg-muted/40" />
+        {preset?.image ? (
+          <ConsumableIcon consumable={part} image={preset.image} className="size-12" />
+        ) : (
+          <PrinterPresetImage printer={printer ?? { printType: part.printType }} className="size-12 rounded-md border bg-muted/40" />
+        )}
         <div className="min-w-0 flex-1">
           <p className="font-medium [overflow-wrap:anywhere]">{preset ? part.name : copy.picker.custom.part}</p>
           <p className="text-xs leading-relaxed text-muted-foreground">

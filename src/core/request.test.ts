@@ -11,6 +11,8 @@ import {
   validRequestQuantity,
   validRequestUpdate,
   validSourceUrl,
+  requestTag,
+  taggedFileName,
 } from './request'
 
 it('returns every stored asset path for a request', () => {
@@ -113,5 +115,19 @@ describe('sourceCoverChange', () => {
 
   it('keeps the cover when the link is not part of the save', () => {
     expect(sourceCoverChange({ sourceUrl: link }, undefined)).toBe('keep')
+  })
+})
+
+describe('request tags', () => {
+  it('tags a request by its number', () => {
+    expect(requestTag(142)).toBe('SQ-142')
+  })
+
+  it('puts the tag before the file name', () => {
+    expect(taggedFileName(142, 'Plasma.3mf')).toBe('SQ-142 Plasma.3mf')
+  })
+
+  it('keeps a file name that already carries its tag', () => {
+    expect(taggedFileName(142, 'SQ-142 Plasma.3mf')).toBe('SQ-142 Plasma.3mf')
   })
 })

@@ -39,6 +39,7 @@ export const settings = {
         consumables: 'Track what’s left and what to reorder',
         spend: 'See what your prints actually cost',
         maintenance: 'See when each wear part is due',
+        spoolman: 'Show Spoolman stock in Consumables',
         turnOn: 'Turn on',
         whatItDoes: 'What this does',
         explanation:
@@ -85,6 +86,7 @@ export const settings = {
     users: 'Members',
     email: 'Email',
     storage: 'Storage',
+    spoolman: 'Spoolman',
   },
   pricing: {
     title: 'Pricing',
@@ -342,6 +344,12 @@ export const settings = {
     listPriceHint: 'Enter what you pay, tax and shipping included.',
     listPriceSource: 'Store page',
     stock: {
+      spoolman: {
+        managed: 'Managed by Spoolman',
+        spools: (count: number) => `${count} ${count === 1 ? 'spool' : 'spools'}`,
+        hint: 'Stock is what its spools in Spoolman have left, so it changes there.',
+        link: 'Spoolman connection',
+      },
       title: 'Stock',
       onHand: (amount: string) => `${amount} on hand`,
       left: (amount: string) => `${amount} left`,
@@ -573,6 +581,16 @@ export const settings = {
       return parts.length ? `Bought ${parts.join(', ')} ago.` : 'Bought less than a month ago.'
     },
   },
+  slicer: {
+    label: 'Slicer',
+    none: 'None',
+    printers: 'Its printer’s slicer',
+    opens: (slicer: string) => `Prints open straight in ${slicer}. Set a download folder in its preferences first.`,
+    downloads: (slicer: string) => `${slicer} cannot open a file from a link, so prints download for you to open in it.`,
+    unset: 'Choose one to open or download this printer’s prints for it.',
+    material:
+      'Only when this material needs a different slicer from its printer. It applies on the printer this material was last recorded on.',
+  },
   printers: {
     sections: { resin: 'Resin printers', filament: 'Filament printers' },
     addOfType: { resin: 'Add resin printer', filament: 'Add filament printer' },
@@ -710,6 +728,65 @@ export const settings = {
     choosePreset: (printer: string) => `Use ${printer}`,
     current: 'Current',
     chooseHint: 'Use this model for the printer.',
+  },
+  spoolman: {
+    title: 'Spoolman',
+    description:
+      'Read filament stock from Spoolman, which keeps track of every spool you own. A small bridge next to Spoolman sends its spools here, so nothing in your network is opened to the internet and STL Quest never holds a way into it.',
+    loading: 'Loading Spoolman…',
+    loadError: 'Could not load Spoolman',
+    connection: {
+      title: 'Connection',
+      description:
+        'A token lets the bridge, or any tool that can send a web request, add spools to this workspace. It can only send, never read.',
+      name: 'Spoolman',
+      status: { receiving: 'Receiving', waiting: 'Waiting', off: 'Not connected' },
+      off: 'Create a token, then run the bridge next to Spoolman.',
+      waiting: 'Run the bridge with the token. Spools show up below once it sends them.',
+      received: (when: string, spools: string) => `Last update ${when} · ${spools}`,
+      create: 'Create token',
+      replace: 'Replace token',
+      disconnect: 'Disconnect',
+      token: 'Token',
+      tokenHint: 'Shown only now. Put it in the bridge’s settings; it replaces any token before it.',
+      replaceConfirm: {
+        title: 'Replace the token?',
+        description:
+          'The current token stops working at once, so the bridge needs the new one before it can send again. Spools already received stay.',
+        confirm: 'Replace token',
+      },
+      disconnectConfirm: {
+        title: 'Disconnect Spoolman?',
+        description:
+          'The token stops working and the spools it sent are forgotten, so filament stock goes back to what STL Quest records. Filaments you linked by hand stay linked for when you reconnect.',
+        confirm: 'Disconnect',
+      },
+      error: 'The connection could not be changed.',
+    },
+    bridge: {
+      title: 'Bridge',
+      description:
+        'Run it with Docker wherever it can reach Spoolman. It listens to Spoolman for changes and sends every spool here, and it only ever connects out.',
+      compose: 'Docker Compose',
+      spoolmanUrl: 'Set SPOOLMAN_URL to the address you open Spoolman at.',
+      endpoint: 'Endpoint',
+      endpointHint: 'Home Assistant, Bambuddy, or a script can send Spoolman’s spool JSON here instead, with the token as a Bearer token.',
+      docs: 'How to send spools',
+    },
+    filaments: {
+      title: 'Filaments',
+      description:
+        'Each Spoolman filament counts towards one filament in Consumables, whose stock then becomes what its spools have left. Filaments added from SpoolmanDB find their catalogue colour, others match by brand, material, and colour, and you choose where neither is sure.',
+      empty: 'No spools yet.',
+      unnamed: (id: number) => `Filament #${id}`,
+      spools: (count: number) => `${count} ${count === 1 ? 'spool' : 'spools'}`,
+      countsTowards: (name: string) => `What ${name} counts towards`,
+      automatic: (name?: string) => (name ? `Automatic · ${name}` : 'Automatic · no match'),
+      none: 'Not counted',
+      by: { catalogue: 'Matched by its SpoolmanDB entry', colour: 'Matched by brand, material, and colour', manual: 'Chosen by hand' },
+      noLibrary: 'Add the filaments you buy in Consumables to count Spoolman stock towards them.',
+      error: 'The link could not be saved.',
+    },
   },
   email: {
     title: 'Email',

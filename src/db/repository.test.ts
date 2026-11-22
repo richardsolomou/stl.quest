@@ -89,6 +89,35 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       : await DrizzleRepository.create(repository.database, { ownsDatabase: false })
   }
 
+  it('keeps Spoolman spools until the workspace disconnects', async () => {
+    const spool = { id: 1, filamentId: 10, material: 'PLA', remainingGrams: 600, archived: true }
+    await repository.connectSpoolman('hash', 1)
+    await repository.receiveSpoolman({ replace: [spool] }, 2, 10)
+    await repository.receiveSpoolman({ upsert: { ...spool, id: 2, archived: false } }, 3, 10)
+    // PostgreSQL stores the flag as an integer, so it is read for truthiness, as stock reads it.
+    expect((await repository.listSpoolmanSpools()).map(({ id, archived }) => [id, archived ? 'archived' : 'in use'])).toEqual([
+      [1, 'archived'],
+      [2, 'in use'],
+    ])
+    await repository.disconnectSpoolman()
+    expect(await repository.listSpoolmanSpools()).toEqual([])
+  })
+
+  it('finds the workspace of a Spoolman token only by its hash', async () => {
+    await repository.connectSpoolman('hash', 1)
+    expect([(await repository.workspaceForSpoolmanToken('hash'))?.id, await repository.workspaceForSpoolmanToken('other')]).toEqual([
+      'test-workspace',
+      undefined,
+    ])
+  })
+
+  it('drops a Spoolman link when its filament is deleted', async () => {
+    await stock(repository, 'consumables', [{ id: 'pla', kind: 'filament', name: 'PLA', pricePerKg: 20, archived: true }])
+    await repository.setSpoolmanLink(10, { consumableId: 'pla' }, 1)
+    await repository.deleteInventoryItem('consumables', 'pla', () => undefined)
+    expect(await repository.listSpoolmanLinks()).toEqual([])
+  })
+
   it('checks whether the workspace has requests', async () => {
     expect(await repository.hasRequests()).toBe(false)
     await repository.createRequest({
@@ -99,6 +128,47 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       ownerUserId: 'maker',
     })
     expect(await repository.hasRequests()).toBe(true)
+  })
+
+  it('numbers requests one after another', async () => {
+    const model = { name: 'Model', fileName: 'model.stl', filePath: 'todo/model.stl', quantity: 1, ownerUserId: 'maker' }
+    const first = await repository.createRequest(model)
+    const second = await repository.createRequest(model)
+
+    expect([(await repository.getRequest(first))?.number, (await repository.getRequest(second))?.number]).toEqual([1, 2])
+  })
+
+  it('numbers concurrently created requests apart', async () => {
+    const model = { name: 'Model', fileName: 'model.stl', filePath: 'todo/model.stl', quantity: 1, ownerUserId: 'maker' }
+    await Promise.all([repository.createRequest(model), repository.createRequest(model), repository.createRequest(model)])
+
+    expect((await repository.listRequests()).map(({ number }) => number).sort((left, right) => left - right)).toEqual([1, 2, 3])
+  })
+
+  it('never reuses the number of a deleted request', async () => {
+    const model = { name: 'Model', fileName: 'model.stl', filePath: 'todo/model.stl', quantity: 1, ownerUserId: 'maker' }
+    await repository.createRequest(model)
+    await repository.deleteRequest(await repository.createRequest(model))
+
+    expect((await repository.getRequest(await repository.createRequest(model)))?.number).toBe(3)
+  })
+
+  it('numbers requests that were stored without one before the next request', async () => {
+    const model = { name: 'Model', fileName: 'model.stl', filePath: 'todo/model.stl', quantity: 1, ownerUserId: 'maker' }
+    const first = await repository.createRequest(model)
+    const unnumbered = await repository.createRequest(model)
+    await repository.database.update(requests).set({ number: null }).where(eq(requests.id, unnumbered)).run()
+    const next = await repository.createRequest(model)
+
+    expect(await Promise.all([first, unnumbered, next].map(async (id) => (await repository.getRequest(id))?.number))).toEqual([1, 3, 4])
+  })
+
+  it("numbers each workspace's requests on their own", async () => {
+    const model = { name: 'Model', fileName: 'model.stl', filePath: 'todo/model.stl', quantity: 1, ownerUserId: 'maker' }
+    await repository.createRequest(model)
+    const other = await repository.scoped((await repository.createWorkspace({ id: 'owner' }, 'Second farm')).id)
+
+    expect((await other.getRequest(await other.createRequest(model)))?.number).toBe(1)
   })
 
   it('persists requests and tracks copy quantities transactionally', async () => {
@@ -2075,7 +2145,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 44 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 47 })
     await migrated.close()
   })
 

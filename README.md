@@ -26,7 +26,7 @@ STL Quest replaces scattered spreadsheets and chat threads with one shared queue
 1. **Requesters upload models or save source links** with quantity, notes, and a preferred print type. Links to MakerWorld and Printables get their cover automatically, and any linked print can take a pasted or uploaded cover image.
 2. **You choose the queue order** — balance work between requesters, print the oldest request first, or pick whatever fits.
 3. **STL Quest auto-assigns a compatible printer**, or an operator picks one manually.
-4. **Your slicer handles the build** — orientation, arrangement, and supports.
+4. **Your slicer handles the build** — orientation, arrangement, and supports. A print opens straight in OrcaSlicer, or downloads for any other slicer, named with its request tag such as `SQ-142 Plasma.3mf`.
 5. **Each copy is tracked** through printing, finishing, and collection.
 
 Along the way:
@@ -35,6 +35,7 @@ Along the way:
 - Interactive STL, 3MF, and OBJ previews, thumbnails, filtering, and drag-and-drop board controls. OBJ geometry is supported without companion MTL or texture files.
 - Mixed resin and filament fleets with dimension-aware auto-assignment.
 - Local, S3-compatible, Dropbox, Google Drive, OneDrive, or Box storage, with guided migration.
+- Filament stock read from [Spoolman](docs/spoolman.md) through a small bridge that only connects out, on hosted and self-hosted installs alike.
 - Fair ordering, manual requester priorities, and withdrawal controls.
 - Automatic migrations, backups, health checks, and optional print-ready email notifications that carry your workspace logo and can go out through your own mail server.
 - Built-in realtime updates and board presence with no additional service to install.

@@ -41,6 +41,7 @@ export const settings: typeof en = {
         consumables: 'Suivre ce qui reste et ce qu’il faut recommander',
         spend: 'Voir ce que coûtent vraiment vos impressions',
         maintenance: 'Savoir quand changer chaque pièce d’usure',
+        spoolman: 'Afficher le stock Spoolman dans les consommables',
         turnOn: 'Activer',
         whatItDoes: 'À quoi ça sert',
         explanation:
@@ -88,6 +89,7 @@ export const settings: typeof en = {
     users: 'Membres',
     email: 'E-mail',
     storage: 'Stockage',
+    spoolman: 'Spoolman',
   },
   pricing: {
     title: 'Tarifs',
@@ -356,6 +358,12 @@ export const settings: typeof en = {
     listPriceHint: 'Saisissez ce que vous payez, taxes et livraison comprises.',
     listPriceSource: 'Page boutique',
     stock: {
+      spoolman: {
+        managed: 'Géré par Spoolman',
+        spools: (count: number) => `${count} ${count === 1 ? 'bobine' : 'bobines'}`,
+        hint: 'Le stock correspond à ce qui reste sur ses bobines dans Spoolman, c’est donc là qu’il change.',
+        link: 'Connexion Spoolman',
+      },
       title: 'Stock',
       onHand: (amount: string) => `${amount} en stock`,
       left: (amount: string) => `${amount} restant`,
@@ -588,6 +596,18 @@ export const settings: typeof en = {
       return parts.length ? `Acheté il y a ${parts.join(' et ')}.` : 'Acheté il y a moins d’un mois.'
     },
   },
+  slicer: {
+    label: 'Slicer',
+    none: 'Aucun',
+    printers: 'Celui de son imprimante',
+    opens: (slicer) =>
+      `Les impressions s’ouvrent directement dans ${slicer}. Définissez d’abord un dossier de téléchargement dans ses préférences.`,
+    downloads: (slicer) =>
+      `${slicer} ne peut pas ouvrir un fichier depuis un lien : les impressions sont donc téléchargées pour que vous les y ouvriez.`,
+    unset: 'Choisissez-en un pour y ouvrir ou télécharger les impressions de cette imprimante.',
+    material:
+      'Seulement si ce matériau demande un autre slicer que son imprimante. S’applique à l’imprimante sur laquelle ce matériau a été enregistré en dernier.',
+  },
   printers: {
     sections: { resin: 'Imprimantes résine', filament: 'Imprimantes filament' },
     addOfType: { resin: 'Ajouter une imprimante résine', filament: 'Ajouter une imprimante filament' },
@@ -729,6 +749,70 @@ export const settings: typeof en = {
     choosePreset: (printer: string) => `Utiliser ${printer}`,
     current: 'Actuel',
     chooseHint: 'Utiliser ce modèle pour l’imprimante.',
+  },
+  spoolman: {
+    title: 'Spoolman',
+    description:
+      'Lire le stock de filament depuis Spoolman, qui suit chacune de vos bobines. Un petit pont à côté de Spoolman envoie ses bobines ici : rien dans votre réseau n’est ouvert à Internet et STL Quest n’y a jamais accès.',
+    loading: 'Chargement de Spoolman…',
+    loadError: 'Impossible de charger Spoolman',
+    connection: {
+      title: 'Connexion',
+      description:
+        'Un jeton permet au pont, ou à tout outil capable d’envoyer une requête web, d’ajouter des bobines à cet espace de travail. Il peut seulement envoyer, jamais lire.',
+      name: 'Spoolman',
+      status: { receiving: 'Reçoit', waiting: 'En attente', off: 'Non connecté' },
+      off: 'Créez un jeton, puis lancez le pont à côté de Spoolman.',
+      waiting: 'Lancez le pont avec le jeton. Les bobines apparaîtront ci-dessous dès qu’il les enverra.',
+      received: (when: string, spools: string) => `Dernière mise à jour ${when} · ${spools}`,
+      create: 'Créer un jeton',
+      replace: 'Remplacer le jeton',
+      disconnect: 'Déconnecter',
+      token: 'Jeton',
+      tokenHint: 'Affiché uniquement maintenant. Mettez-le dans les réglages du pont ; il remplace tout jeton précédent.',
+      replaceConfirm: {
+        title: 'Remplacer le jeton ?',
+        description:
+          'Le jeton actuel cesse aussitôt de fonctionner : le pont a besoin du nouveau pour envoyer à nouveau. Les bobines déjà reçues restent.',
+        confirm: 'Remplacer le jeton',
+      },
+      disconnectConfirm: {
+        title: 'Déconnecter Spoolman ?',
+        description:
+          'Le jeton cesse de fonctionner et les bobines envoyées sont oubliées : le stock de filament redevient celui que STL Quest enregistre. Les filaments liés à la main le restent pour une prochaine connexion.',
+        confirm: 'Déconnecter',
+      },
+      error: 'La connexion n’a pas pu être modifiée.',
+    },
+    bridge: {
+      title: 'Pont',
+      description:
+        'Lancez-le avec Docker là où il peut joindre Spoolman. Il écoute les changements de Spoolman, envoie chaque bobine ici et ne fait que des connexions sortantes.',
+      compose: 'Docker Compose',
+      spoolmanUrl: 'Indiquez dans SPOOLMAN_URL l’adresse à laquelle vous ouvrez Spoolman.',
+      endpoint: 'Point d’accès',
+      endpointHint:
+        'Home Assistant, Bambuddy ou un script peuvent envoyer ici le JSON des bobines de Spoolman, avec le jeton en jeton Bearer.',
+      docs: 'Comment envoyer des bobines',
+    },
+    filaments: {
+      title: 'Filaments',
+      description:
+        'Chaque filament Spoolman compte pour un filament des consommables, dont le stock devient ce qui reste sur ses bobines. Les filaments ajoutés depuis SpoolmanDB trouvent leur couleur du catalogue, les autres se rapprochent par marque, matière et couleur, et vous choisissez quand aucun n’est sûr.',
+      empty: 'Aucune bobine pour l’instant.',
+      unnamed: (id: number) => `Filament n° ${id}`,
+      spools: (count: number) => `${count} ${count === 1 ? 'bobine' : 'bobines'}`,
+      countsTowards: (name: string) => `Ce pour quoi ${name} compte`,
+      automatic: (name?: string) => (name ? `Automatique · ${name}` : 'Automatique · aucune correspondance'),
+      none: 'Non compté',
+      by: {
+        catalogue: 'Rapproché par son entrée SpoolmanDB',
+        colour: 'Rapproché par marque, matière et couleur',
+        manual: 'Choisi à la main',
+      },
+      noLibrary: 'Ajoutez les filaments que vous achetez dans les consommables pour y compter le stock Spoolman.',
+      error: 'Le lien n’a pas pu être enregistré.',
+    },
   },
   email: {
     title: 'E-mail',

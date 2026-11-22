@@ -56,3 +56,14 @@ services:
       - ${DATA_HOST_DIR:-./stlquest-data}:/data
       # Your resin and filament files stay private as plain files organized by production stage.
       - ${PRINTS_HOST_DIR:-./prints}:/prints
+
+  # Optional: sends filament stock from a Spoolman on this network. Create the token under
+  # Settings → Spoolman; see docs/spoolman.md.
+  # stlquest-spoolman-bridge:
+  #   image: ghcr.io/richardsolomou/stl.quest-spoolman-bridge:latest
+  #   restart: unless-stopped
+  #   environment:
+  #     SPOOLMAN_URL: http://spoolman:7912
+  #     STLQUEST_URL: http://stlquest:3000
+  #     STLQUEST_ALLOW_HTTP: 'true'
+  #     STLQUEST_TOKEN: ${STLQUEST_SPOOLMAN_TOKEN:-}

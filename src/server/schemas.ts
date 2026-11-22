@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isSlicerFor, SLICER_IDS } from '../core/slicers'
 import { notificationKinds, type NotificationKind } from '../core/notifications'
 import { onboardingTaskIds } from '../core/onboarding'
 import { isPastPurchaseDate } from '../core/maintenance'
@@ -19,6 +20,7 @@ import { MAX_USER_NAME_LENGTH, normalizeEmail } from '../core/identity'
 import { MAX_PRINT_GROUP_NAME_LENGTH } from '../core/printGroups'
 import { PRINT_TYPES, printGroupColors, REQUEST_SORTS } from '../core/types'
 import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
+import { MAX_SPOOLMAN_SPOOLS, type SpoolmanChange } from '../core/spoolman'
 import { MAX_CONSUMABLES, SUPPLY_UNITS } from '../core/consumables'
 import { isPrinterAddOn } from '../core/equipmentPresets'
 import { EQUIPMENT_KINDS, EQUIPMENT_STAGES, MAX_EQUIPMENT } from '../core/equipment'
@@ -129,6 +131,10 @@ const consumableSchema = z.discriminatedUnion('kind', [
     resinPresetId: z.string().trim().min(1).max(200).optional(),
     pricePerLitre: z.number().positive().max(100_000),
     densityGramsPerMl: z.number().positive().max(100),
+    slicer: z
+      .enum(SLICER_IDS)
+      .refine((slicer) => isSlicerFor(slicer, 'resin'), 'not a resin slicer')
+      .optional(),
   }),
   z.object({
     ...consumableBaseSchema,
@@ -141,6 +147,10 @@ const consumableSchema = z.discriminatedUnion('kind', [
       })
       .optional(),
     pricePerKg: z.number().positive().max(100_000),
+    slicer: z
+      .enum(SLICER_IDS)
+      .refine((slicer) => isSlicerFor(slicer, 'filament'), 'not a filament slicer')
+      .optional(),
   }),
   z.object({
     ...consumableBaseSchema,
@@ -253,6 +263,7 @@ const printerProfileSchema = z.object({
   lifespanHours: z.number().positive().max(10_000_000).optional(),
   purchasedOn: purchaseDate.optional(),
   powerWatts: z.number().positive().max(100_000).optional(),
+  slicer: z.enum(SLICER_IDS).optional(),
   addOnPresetIds: z
     .array(id.refine(isPrinterAddOn, 'not a printer add-on'))
     .max(20)
@@ -464,6 +475,8 @@ export const moveCopiesBatchSchema = z.object({
   moves: z.array(moveCopiesSchema).min(1).max(MAX_BULK_CARDS),
 })
 
+export const slicerLinkSchema = z.object({ requestId: id, slicer: z.enum(SLICER_IDS) })
+
 const settingsItemId = z.string().trim().min(1).max(200)
 const usageAmount = z.number().positive().max(1_000_000)
 export const recordStepUsageSchema = z.object({
@@ -583,4 +596,58 @@ export const updateRequestSchema = z.object({
 export const repeatRequestSchema = z.object({
   id,
   quantity: z.number().int().min(MIN_REQUEST_QUANTITY).max(MAX_REQUEST_QUANTITY),
+})
+
+// Spoolman's own JSON, so its websocket events and REST responses can be forwarded as they are; it leaves out what is null.
+const spoolmanKey = z.number().int().min(0).max(2_147_483_647)
+const spoolmanText = (max: number) =>
+  z
+    .string()
+    .max(max)
+    .nullish()
+    .transform((value) => value?.trim() || undefined)
+const spoolmanSpool = z
+  .object({
+    id: spoolmanKey,
+    remaining_weight: z.number().min(-1_000_000).max(1_000_000).nullish(),
+    archived: z.boolean().nullish(),
+    filament: z.object({
+      id: spoolmanKey,
+      name: spoolmanText(256),
+      material: spoolmanText(64),
+      color_hex: z
+        .string()
+        .regex(/^#?[0-9a-f]{6}([0-9a-f]{2})?$/i)
+        .nullish(),
+      external_id: spoolmanText(256),
+      vendor: z.object({ name: spoolmanText(256) }).nullish(),
+    }),
+  })
+  .transform(({ id: spoolId, remaining_weight, archived, filament }) => ({
+    id: spoolId,
+    filamentId: filament.id,
+    ...(filament.name && { filamentName: filament.name }),
+    ...(filament.vendor?.name && { vendor: filament.vendor.name }),
+    ...(filament.material && { material: filament.material }),
+    ...(filament.color_hex && { colourHex: `#${filament.color_hex.replace('#', '').slice(0, 6).toUpperCase()}` }),
+    ...(filament.external_id && { externalId: filament.external_id }),
+    ...(typeof remaining_weight === 'number' && { remainingGrams: remaining_weight }),
+    archived: archived ?? false,
+  }))
+export const spoolmanIngestSchema = z.union([
+  z
+    .object({
+      spools: z
+        .array(spoolmanSpool)
+        .max(MAX_SPOOLMAN_SPOOLS)
+        .refine((spools) => new Set(spools.map((spool) => spool.id)).size === spools.length, 'each spool once'),
+    })
+    .transform(({ spools }) => ({ replace: spools })),
+  z
+    .object({ type: z.enum(['added', 'updated', 'deleted']), resource: z.literal('spool'), payload: spoolmanSpool })
+    .transform(({ type, payload }) => (type === 'deleted' ? { remove: payload.id } : { upsert: payload })),
+]) satisfies z.ZodType<SpoolmanChange>
+export const linkSpoolmanFilamentSchema = z.object({
+  filamentId: spoolmanKey,
+  choice: z.union([z.literal('auto'), z.literal('none'), settingsItemId]),
 })

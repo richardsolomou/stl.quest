@@ -4119,6 +4119,172 @@ describe('STLQuestService crash recovery', () => {
     })
   })
 
+  describe('Spoolman', () => {
+    const black: Consumable = {
+      id: 'basic-black',
+      kind: 'filament',
+      name: 'Bambu Lab PLA · Black',
+      filamentPresetId: 'filament-bambu-lab-pla',
+      colour: { name: 'Black', hex: '#000000' },
+      pricePerKg: 20,
+      minimumStock: 1_000,
+    }
+    const white: Consumable = { id: 'white', kind: 'filament', name: 'Own white', pricePerKg: 18 }
+    const spool = {
+      id: 1,
+      filamentId: 10,
+      vendor: 'Bambu Lab',
+      material: 'PLA',
+      externalId: 'bambulab_pla_black_1000_175_n',
+      archived: false,
+    }
+
+    beforeEach(async () => {
+      await stock('consumables', [black, white])
+      await repository.setSetting(USAGE_TRACKING_SETTING, true)
+      await service.connectSpoolman('hash', admin)
+    })
+
+    const level = async (id: string) => (await service.stockLevels(admin)).find((stocked) => stocked.consumableId === id)
+
+    it('takes a matched filament stock from the spools Spoolman sent', async () => {
+      await service.receiveSpoolman({
+        replace: [
+          { ...spool, remainingGrams: 600 },
+          { ...spool, id: 2, remainingGrams: 300 },
+        ],
+      })
+
+      expect(await level(black.id)).toMatchObject({ onHand: 900, low: true, spoolman: { spools: 2 } })
+    })
+
+    it('replaces every spool when Spoolman sends them all', async () => {
+      await service.receiveSpoolman({
+        replace: [
+          { ...spool, remainingGrams: 600 },
+          { ...spool, id: 2, remainingGrams: 300 },
+        ],
+      })
+
+      await service.receiveSpoolman({ replace: [{ ...spool, remainingGrams: 450 }] })
+
+      expect((await level(black.id))?.onHand).toBe(450)
+    })
+
+    it('updates one spool from a single event', async () => {
+      await service.receiveSpoolman({
+        replace: [
+          { ...spool, remainingGrams: 600 },
+          { ...spool, id: 2, remainingGrams: 300 },
+        ],
+      })
+
+      await service.receiveSpoolman({ upsert: { ...spool, id: 2, remainingGrams: 100 } })
+
+      expect((await level(black.id))?.onHand).toBe(700)
+    })
+
+    it('forgets a deleted spool', async () => {
+      await service.receiveSpoolman({
+        replace: [
+          { ...spool, remainingGrams: 600 },
+          { ...spool, id: 2, remainingGrams: 300 },
+        ],
+      })
+
+      await service.receiveSpoolman({ remove: 2 })
+
+      expect((await level(black.id))?.onHand).toBe(600)
+    })
+
+    it('refuses a new spool past the limit', async () => {
+      await service.receiveSpoolman({ replace: Array.from({ length: 5_000 }, (_, id) => ({ ...spool, id, remainingGrams: 1 })) })
+
+      await expect(service.receiveSpoolman({ upsert: { ...spool, id: 5_000 } })).rejects.toMatchObject({ status: 413 })
+    })
+
+    it('waits for the first send again once the token is replaced', async () => {
+      await service.receiveSpoolman({ replace: [{ ...spool, remainingGrams: 600 }] })
+
+      await service.connectSpoolman('replacement-hash', admin)
+
+      expect((await service.spoolman(admin)).connection?.receivedAt).toBeUndefined()
+    })
+
+    it('refuses spools once disconnected', async () => {
+      await service.disconnectSpoolman(admin)
+
+      await expect(service.receiveSpoolman({ replace: [spool] })).rejects.toMatchObject({ status: 401 })
+    })
+
+    it('hands stock back to the usage log when disconnected', async () => {
+      await service.receiveSpoolman({ replace: [{ ...spool, remainingGrams: 600 }] })
+
+      await service.disconnectSpoolman(admin)
+
+      expect((await level(black.id))?.spoolman).toBeUndefined()
+    })
+
+    it('refuses stock movements on a filament Spoolman manages', async () => {
+      await service.receiveSpoolman({ replace: [{ ...spool, remainingGrams: 600 }] })
+
+      await expect(service.recordStockMovement({ consumableId: black.id, kind: 'restock', amount: 1_000 }, admin)).rejects.toMatchObject({
+        status: 409,
+      })
+    })
+
+    it('counts a filament linked by hand', async () => {
+      await service.receiveSpoolman({ replace: [{ id: 3, filamentId: 20, material: 'PLA', remainingGrams: 250, archived: false }] })
+
+      await service.linkSpoolmanFilament({ filamentId: 20, choice: white.id }, admin)
+
+      expect((await level(white.id))?.onHand).toBe(250)
+    })
+
+    it('stops counting a filament unlinked by hand', async () => {
+      await service.receiveSpoolman({ replace: [{ ...spool, remainingGrams: 600 }] })
+
+      await service.linkSpoolmanFilament({ filamentId: 10, choice: 'none' }, admin)
+
+      expect((await level(black.id))?.spoolman).toBeUndefined()
+    })
+
+    it('refuses to link a filament the library lacks', async () => {
+      await expect(service.linkSpoolmanFilament({ filamentId: 10, choice: 'missing' }, admin)).rejects.toMatchObject({ status: 400 })
+    })
+
+    it('lists the filaments Spoolman sent with what each counts towards', async () => {
+      await service.receiveSpoolman({ replace: [{ ...spool, remainingGrams: 600 }] })
+
+      expect((await service.spoolman(admin)).filaments).toEqual([
+        expect.objectContaining({ id: 10, choice: 'auto', match: { consumableId: black.id, by: 'catalogue' }, remainingGrams: 600 }),
+      ])
+    })
+
+    it('shows the connection only to admins', async () => {
+      await expect(service.spoolman(requester)).rejects.toMatchObject({ status: 403 })
+    })
+
+    it('reports the first spools received since connecting', async () => {
+      capture.mockClear()
+
+      await service.receiveSpoolman({ replace: [{ ...spool, remainingGrams: 600 }] })
+      await service.receiveSpoolman({ replace: [{ ...spool, remainingGrams: 500 }] })
+
+      expect(capture.mock.calls.filter((call) => (call as unknown[])[1] === 'spoolman_first_received')).toEqual([
+        ['server', 'spoolman_first_received', { filament_count: 1, matched_count: 1, spool_count: 1 }],
+      ])
+    })
+
+    it('keeps spools within their workspace', async () => {
+      await service.receiveSpoolman({ replace: [{ ...spool, remainingGrams: 600 }] })
+      const other = await repository.scoped((await repository.createWorkspace({ id: admin.id }, 'Second farm')).id)
+      const otherService = new STLQuestService(other, assets, staging, eventBus(), telemetry, { remove: removeTusUpload })
+
+      expect((await otherService.spoolman(admin)).filaments).toEqual([])
+    })
+  })
+
   describe('print-ready notifications', () => {
     let printsReady: Mock<Notifier['printsReady']>
     let canSend: boolean

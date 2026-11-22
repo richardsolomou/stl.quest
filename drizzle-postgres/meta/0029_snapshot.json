@@ -1,5 +1,5 @@
 {
-  "id": "5c373da5-340d-492d-8a80-33d0efd02b86",
+  "id": "8221bfd9-d6f3-4fa5-b76a-4d15443a624d",
   "prevId": "eec61eaf-8d01-4e59-a1c6-54c350f89e4c",
   "version": "7",
   "dialect": "postgresql",
@@ -629,6 +629,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "last_request_number": {
+          "name": "last_request_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         }
       },
       "indexes": {
@@ -1520,6 +1527,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "slicer": {
+          "name": "slicer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "minimum_stock": {
           "name": "minimum_stock",
           "type": "double precision",
@@ -1529,12 +1542,6 @@
         "pack_size": {
           "name": "pack_size",
           "type": "double precision",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "store_id": {
-          "name": "store_id",
-          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -1592,21 +1599,6 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "consumables_workspace_store_fk": {
-          "name": "consumables_workspace_store_fk",
-          "tableFrom": "consumables",
-          "tableTo": "stores",
-          "columnsFrom": [
-            "workspace_id",
-            "store_id"
-          ],
-          "columnsTo": [
-            "workspace_id",
-            "id"
-          ],
-          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
@@ -1903,6 +1895,12 @@
           "notNull": true,
           "default": "'[]'"
         },
+        "slicer": {
+          "name": "slicer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "archived_at": {
           "name": "archived_at",
           "type": "bigint",
@@ -1977,117 +1975,6 @@
           "value": "\"printers\".\"print_type\" IN ('resin', 'filament')"
         }
       },
-      "isRLSEnabled": false
-    },
-    "public.stores": {
-      "name": "stores",
-      "schema": "",
-      "columns": {
-        "workspace_id": {
-          "name": "workspace_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "position": {
-          "name": "position",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "shipping_cost": {
-          "name": "shipping_cost",
-          "type": "double precision",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "free_shipping_over": {
-          "name": "free_shipping_over",
-          "type": "double precision",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "archived_at": {
-          "name": "archived_at",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "stores_position": {
-          "name": "stores_position",
-          "columns": [
-            {
-              "expression": "workspace_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "position",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "stores_workspace_id_organization_id_fk": {
-          "name": "stores_workspace_id_organization_id_fk",
-          "tableFrom": "stores",
-          "tableTo": "organization",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "stores_workspace_id_id_pk": {
-          "name": "stores_workspace_id_id_pk",
-          "columns": [
-            "workspace_id",
-            "id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.managed_storage_accounts": {
@@ -3008,6 +2895,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "number": {
+          "name": "number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "name": {
           "name": "name",
           "type": "text",
@@ -3312,6 +3205,14 @@
           "columns": [
             "workspace_id",
             "id"
+          ]
+        },
+        "requests_workspace_number_unique": {
+          "name": "requests_workspace_number_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "workspace_id",
+            "number"
           ]
         }
       },

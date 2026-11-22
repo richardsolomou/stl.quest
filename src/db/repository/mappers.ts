@@ -114,6 +114,7 @@ export function mapUserIdentity(row: Pick<typeof user.$inferSelect, 'id' | 'emai
 export function mapRequest(row: RequestRow, states: RequestStatusRow[]): PrintRequest {
   return {
     id: row.id,
+    number: row.number ?? 0,
     name: row.name,
     fileName: row.fileName ?? undefined,
     filePath: row.filePath ?? undefined,

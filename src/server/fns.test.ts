@@ -8,6 +8,7 @@ import {
   nextSmtpConfig,
   nextEmailTemplates,
   parseEmailLogo,
+  spoolmanUrls,
   storedPriceCalculatorSettings,
 } from './fns'
 import { withRequestLocale } from './locale'
@@ -194,5 +195,19 @@ describe('email templates', () => {
       'print-ready': template,
       invite: template,
     })
+  })
+})
+
+describe('spoolman urls', () => {
+  it('uses the public https origin behind a TLS proxy, so the token never travels in cleartext', () => {
+    vi.stubEnv('BETTER_AUTH_URL', '')
+    try {
+      const request = new Request('http://127.0.0.1:3000/_serverFn/x', {
+        headers: { host: 'stl.quest', 'x-forwarded-proto': 'https' },
+      })
+      expect(spoolmanUrls(request).ingestUrl).toBe('https://stl.quest/api/spoolman/spools')
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 })

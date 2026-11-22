@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { checkCatalogImages } from './catalogImages'
 import { SUPPLY_UNITS } from '../src/core/consumables'
 import { SUPPLY_CATEGORIES, type SupplyPreset } from '../src/core/supplyPresets'
 import { isHttps, listPriceProblem } from './catalogChecks'
@@ -41,4 +42,10 @@ for (const preset of catalog.presets) {
     fail(preset, 'unknown source or invalid source URL')
 }
 if (!catalog.presets.length) throw new Error('Supply catalog is empty')
-console.log(`Validated ${catalog.presets.length} supply presets.`)
+const images = checkCatalogImages({
+  imagesPath: path.join(root, 'catalogs/supplies/images.json'),
+  publicRoot: path.join(root, 'public'),
+  directory: 'supply-presets',
+  presetIds: new Set(catalog.presets.map((preset) => preset.id)),
+})
+console.log(`Validated ${catalog.presets.length} supply presets and ${images} images.`)

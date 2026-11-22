@@ -6,6 +6,8 @@ const refresh = process.argv.includes('--refresh')
 const catalogs = [
   { name: 'equipment', imagesPath: 'catalogs/equipment/images.json', directory: 'equipment-presets' },
   { name: 'resin', imagesPath: 'catalogs/resins/images.json', directory: 'resin-presets' },
+  { name: 'wear part', imagesPath: 'catalogs/parts/images.json', directory: 'part-presets' },
+  { name: 'supply', imagesPath: 'catalogs/supplies/images.json', directory: 'supply-presets' },
 ]
 
 for (const { name, imagesPath, directory } of catalogs) {

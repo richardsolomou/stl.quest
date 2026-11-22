@@ -147,7 +147,17 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
   const resins = useQuery({ ...catalogueQuery('resins'), enabled: picking?.kind === 'resin' }).data
   const filaments = useQuery({ ...catalogueQuery('filaments'), enabled: picking?.kind === 'filament' }).data
   const partCatalogue = useQuery(catalogueQuery('parts')).data
-  const supplyCatalogue = useQuery({ ...catalogueQuery('supplies'), enabled: picking?.kind === 'supply' }).data
+  // Catalogue supplies in the library show their product photo, which loads after the list rather than holding it back.
+  const usesSupplies = saved.some((item) => item.kind === 'supply' && item.supplyPresetId)
+  const supplyCatalogue = useQuery({ ...catalogueQuery('supplies'), enabled: usesSupplies || picking?.kind === 'supply' }).data
+  const productImage = (item: Consumable) =>
+    item.kind === 'resin'
+      ? findPreset(resins, item.resinPresetId)?.image
+      : item.kind === 'part'
+        ? findPreset(partCatalogue, item.partPresetId)?.image
+        : item.kind === 'supply'
+          ? findPreset(supplyCatalogue, item.supplyPresetId)?.image
+          : undefined
   const equipment = useQuery({ ...equipmentQuery(workspaceSlug), enabled: picking?.kind === 'supply' }).data?.equipment
   const failed = () => void toast.error(copy.notSaved)
   const archive = (item: Consumable) => {
@@ -259,6 +269,7 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
                       ? findPreset(filaments, entry.consumable.filamentPresetId)
                       : undefined
                 }
+                image={productImage(entry.consumable)}
                 level={level(entry.consumable)}
                 money={money}
                 rate={rate}
@@ -534,6 +545,7 @@ function ConsumableRow({
   consumable,
   nested = false,
   preset,
+  image,
   level,
   money,
   rate,
@@ -544,6 +556,8 @@ function ConsumableRow({
   nested?: boolean
   /** The catalogue product a resin or filament is. */
   preset?: ResinPreset | FilamentPreset
+  /** The catalogue product's photo. */
+  image?: { src: string }
   level?: StockLevel
   money: (value: number) => string
   rate: (value: number) => string
@@ -589,11 +603,7 @@ function ConsumableRow({
       className={cn(rowClassName, nested && 'bg-muted/20 pl-8 @sm:pl-14')}
       onClick={onOpen}
     >
-      <ConsumableIcon
-        consumable={consumable}
-        image={preset && 'image' in preset ? preset.image : undefined}
-        className={cn(nested && 'size-8')}
-      />
+      <ConsumableIcon consumable={consumable} image={image} className={cn(nested && 'size-8')} />
       <span className="min-w-0 flex-1">
         <span className="block font-medium @max-sm:line-clamp-2 @sm:truncate">{name}</span>
         {facts && <span className="block truncate text-xs text-muted-foreground">{facts}</span>}

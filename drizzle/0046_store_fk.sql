@@ -1,18 +1,3 @@
-CREATE TABLE `stores` (
-	`workspace_id` text NOT NULL,
-	`id` text NOT NULL,
-	`position` integer NOT NULL,
-	`name` text NOT NULL,
-	`shipping_cost` real,
-	`free_shipping_over` real,
-	`archived_at` integer,
-	`created_at` integer NOT NULL,
-	`updated_at` integer NOT NULL,
-	PRIMARY KEY(`workspace_id`, `id`),
-	FOREIGN KEY (`workspace_id`) REFERENCES `organization`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `stores_position` ON `stores` (`workspace_id`,`position`);--> statement-breakpoint
 PRAGMA foreign_keys=OFF;--> statement-breakpoint
 CREATE TABLE `__new_consumables` (
 	`workspace_id` text NOT NULL,
@@ -30,6 +15,7 @@ CREATE TABLE `__new_consumables` (
 	`printer_preset_id` text,
 	`printer_id` text,
 	`unit` text,
+	`slicer` text,
 	`minimum_stock` real,
 	`pack_size` real,
 	`store_id` text,
@@ -45,7 +31,7 @@ CREATE TABLE `__new_consumables` (
 	CONSTRAINT "consumables_unit_check" CHECK("__new_consumables"."unit" IN ('ml', 'g', 'item') OR "__new_consumables"."unit" IS NULL)
 );
 --> statement-breakpoint
-INSERT INTO `__new_consumables`("workspace_id", "id", "position", "kind", "name", "preset_id", "price", "density_grams_per_ml", "colour_json", "print_type", "lifespan", "lifespan_unit", "printer_preset_id", "printer_id", "unit", "minimum_stock", "pack_size", "archived_at", "created_at", "updated_at") SELECT "workspace_id", "id", "position", "kind", "name", "preset_id", "price", "density_grams_per_ml", "colour_json", "print_type", "lifespan", "lifespan_unit", "printer_preset_id", "printer_id", "unit", "minimum_stock", "pack_size", "archived_at", "created_at", "updated_at" FROM `consumables`;--> statement-breakpoint
+INSERT INTO `__new_consumables`("workspace_id", "id", "position", "kind", "name", "preset_id", "price", "density_grams_per_ml", "colour_json", "print_type", "lifespan", "lifespan_unit", "printer_preset_id", "printer_id", "unit", "slicer", "minimum_stock", "pack_size", "store_id", "archived_at", "created_at", "updated_at") SELECT "workspace_id", "id", "position", "kind", "name", "preset_id", "price", "density_grams_per_ml", "colour_json", "print_type", "lifespan", "lifespan_unit", "printer_preset_id", "printer_id", "unit", "slicer", "minimum_stock", "pack_size", "store_id", "archived_at", "created_at", "updated_at" FROM `consumables`;--> statement-breakpoint
 DROP TABLE `consumables`;--> statement-breakpoint
 ALTER TABLE `__new_consumables` RENAME TO `consumables`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;--> statement-breakpoint

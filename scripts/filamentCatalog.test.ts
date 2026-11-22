@@ -3,8 +3,12 @@ import { applyFilamentPatches, parseSpoolmanFilaments } from './filamentCatalog'
 
 const source = { id: 'spoolmandb', webRepository: 'https://github.com/Donkie/SpoolmanDB', revision: 'revision', catalogPath: 'filaments' }
 
-function parse(filaments: Record<string, unknown>[]) {
+function read(filaments: Record<string, unknown>[]) {
   return parseSpoolmanFilaments([{ path: 'filaments/brand.json', contents: JSON.stringify({ manufacturer: 'Brand', filaments }) }], source)
+}
+
+function parse(filaments: Record<string, unknown>[]) {
+  return read(filaments).presets
 }
 
 const basic = { name: '{color_name}', material: 'PLA', density: 1.24, colors: [{ name: 'Jade White', hex: 'FFFFFF' }] }
@@ -93,5 +97,29 @@ describe('filament catalog synchronization', () => {
 
   it('rejects a patch for a preset the catalog lacks', () => {
     expect(() => applyFilamentPatches(parse([basic]), { 'filament-brand-petg': { name: 'PETG Basic' } })).toThrow('filament-brand-petg')
+  })
+})
+
+describe('SpoolmanDB IDs for matching Spoolman filaments', () => {
+  it('records each colour under the SpoolmanDB ID its entries share', () => {
+    expect(read([basic, marble]).spoolman.colours['brand_pla_whitemarble']).toEqual(['filament-brand-marble-pla', 'White Marble'])
+  })
+
+  it('finds a product line through the colour name its template fills in', () => {
+    const matte = { name: 'Matte {color_name}', material: 'PLA', colors: [{ name: 'Charcoal', hex: '000000' }] }
+
+    expect(read([matte]).spoolman.colours['brand_pla_mattecharcoal']).toEqual(['filament-brand-matte-pla', 'Charcoal'])
+  })
+
+  it('leaves out an ID two catalogue colours share', () => {
+    // "Silk {color_name}" in Blue and a product named "Silk Blue" both fill in to "Silk Blue".
+    const silk = { name: 'Silk {color_name}', material: 'PLA', colors: [{ name: 'Blue', hex: '0000FF' }] }
+    const silkBlue = { name: 'Silk Blue', material: 'PLA', colors: [{ name: 'Silk Blue', hex: '0000FF' }] }
+
+    expect(read([silk, silkBlue]).spoolman.colours['brand_pla_silkblue']).toBeUndefined()
+  })
+
+  it('keeps each product’s brand and material', () => {
+    expect(read([basic]).spoolman.presets['filament-brand-pla']).toEqual(['Brand', 'PLA'])
   })
 })

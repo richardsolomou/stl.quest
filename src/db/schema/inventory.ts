@@ -27,6 +27,7 @@ export const printers = sqliteTable(
     purchasedOn: text('purchased_on'),
     powerWatts: real('power_watts'),
     addOnPresetIdsJson: text('add_on_preset_ids_json').notNull().default('[]'),
+    slicer: text('slicer'),
     archivedAt: integer('archived_at'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
@@ -115,6 +116,8 @@ export const consumables = sqliteTable(
     printerPresetId: text('printer_preset_id'),
     printerId: text('printer_id'),
     unit: text({ enum: ['ml', 'g', 'item'] }),
+    /** A resin or filament's own slicer, used instead of its printer's. */
+    slicer: text('slicer'),
     minimumStock: real('minimum_stock'),
     packSize: real('pack_size'),
     storeId: text('store_id'),
@@ -134,5 +137,60 @@ export const consumables = sqliteTable(
       foreignColumns: [stores.workspaceId, stores.id],
       name: 'consumables_workspace_store_fk',
     }),
+  ],
+)
+
+/** A workspace's Spoolman connection: the hash of the write-only token its bridge or other tools send spools with. */
+export const spoolmanConnections = sqliteTable('spoolman_connections', {
+  workspaceId: text('workspace_id')
+    .primaryKey()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  tokenHash: text('token_hash').notNull().unique(),
+  createdAt: integer('created_at').notNull(),
+  receivedAt: integer('received_at'),
+})
+
+/** The spools Spoolman last sent, each with its filament as Spoolman describes it; they go when the connection does. */
+export const spoolmanSpools = sqliteTable(
+  'spoolman_spools',
+  {
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => spoolmanConnections.workspaceId, { onDelete: 'cascade' }),
+    id: integer().notNull(),
+    filamentId: integer('filament_id').notNull(),
+    filamentName: text('filament_name'),
+    vendor: text(),
+    material: text(),
+    colourHex: text('colour_hex'),
+    externalId: text('external_id'),
+    remainingGrams: real('remaining_grams'),
+    archived: integer({ mode: 'boolean' }).notNull().default(false),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.workspaceId, table.id] })],
+)
+
+/**
+ * Which library filament a Spoolman filament is, when someone chose it rather than leaving it to matching; no
+ * consumable means it is deliberately linked to none. Links outlive the connection, so reconnecting keeps them.
+ */
+export const spoolmanLinks = sqliteTable(
+  'spoolman_links',
+  {
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    filamentId: integer('filament_id').notNull(),
+    consumableId: text('consumable_id'),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.filamentId] }),
+    foreignKey({
+      columns: [table.workspaceId, table.consumableId],
+      foreignColumns: [consumables.workspaceId, consumables.id],
+      name: 'spoolman_links_workspace_consumable_fk',
+    }).onDelete('cascade'),
   ],
 )

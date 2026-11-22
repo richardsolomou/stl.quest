@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "d914d662-eb17-4c98-8da0-6c870d83bdab",
+  "id": "f3fe49a1-78e5-45c0-8db5-4adae6657c83",
   "prevId": "7d125609-f09f-4bfd-9e41-7e9879275484",
   "tables": {
     "asset_generation_jobs": {
@@ -590,6 +590,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "last_request_number": {
+          "name": "last_request_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {
@@ -1474,6 +1482,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "slicer": {
+          "name": "slicer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "minimum_stock": {
           "name": "minimum_stock",
           "type": "real",
@@ -1484,13 +1499,6 @@
         "pack_size": {
           "name": "pack_size",
           "type": "real",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "store_id": {
-          "name": "store_id",
-          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1539,21 +1547,6 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "consumables_workspace_store_fk": {
-          "name": "consumables_workspace_store_fk",
-          "tableFrom": "consumables",
-          "tableTo": "stores",
-          "columnsFrom": [
-            "workspace_id",
-            "store_id"
-          ],
-          "columnsTo": [
-            "workspace_id",
-            "id"
-          ],
-          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
@@ -1862,6 +1855,13 @@
           "autoincrement": false,
           "default": "'[]'"
         },
+        "slicer": {
+          "name": "slicer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "archived_at": {
           "name": "archived_at",
           "type": "integer",
@@ -1925,110 +1925,6 @@
           "value": "\"printers\".\"print_type\" IN ('resin', 'filament')"
         }
       }
-    },
-    "stores": {
-      "name": "stores",
-      "columns": {
-        "workspace_id": {
-          "name": "workspace_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "position": {
-          "name": "position",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "shipping_cost": {
-          "name": "shipping_cost",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "free_shipping_over": {
-          "name": "free_shipping_over",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "archived_at": {
-          "name": "archived_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "stores_position": {
-          "name": "stores_position",
-          "columns": [
-            "workspace_id",
-            "position"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "stores_workspace_id_organization_id_fk": {
-          "name": "stores_workspace_id_organization_id_fk",
-          "tableFrom": "stores",
-          "tableTo": "organization",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "stores_workspace_id_id_pk": {
-          "columns": [
-            "workspace_id",
-            "id"
-          ],
-          "name": "stores_workspace_id_id_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
     },
     "managed_storage_accounts": {
       "name": "managed_storage_accounts",
@@ -2906,6 +2802,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "number": {
+          "name": "number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "name": {
           "name": "name",
           "type": "text",
@@ -3125,6 +3028,14 @@
           "columns": [
             "workspace_id",
             "id"
+          ],
+          "isUnique": true
+        },
+        "requests_workspace_number_unique": {
+          "name": "requests_workspace_number_unique",
+          "columns": [
+            "workspace_id",
+            "number"
           ],
           "isUnique": true
         },

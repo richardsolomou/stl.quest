@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
@@ -24,7 +25,7 @@ type MovementKind = 'restock' | 'correction' | 'waste'
 const RECENT_MOVEMENTS = 5
 
 /** An amount in the unit a person reads it in: litres or millilitres, kilograms or grams, or a bare count. */
-function formatQuantity(amount: number, unit: SupplyUnit, locale: Locale) {
+export function formatQuantity(amount: number, unit: SupplyUnit, locale: Locale) {
   if (unit === 'item') return formatNumber(amount, locale)
   const [large, small] = unit === 'ml' ? ['L', 'mL'] : ['kg', 'g']
   return Math.abs(amount) >= 1_000 ? `${formatNumber(amount / 1_000, locale)} ${large}` : `${formatNumber(amount, locale, 0)} ${small}`
@@ -94,6 +95,7 @@ export function StockPanel({
   const [form, setForm] = useState<MovementKind>()
   const amount = (value: number) => formatStock(value, consumable, locale, copy)
   const tracked = level?.tracked ?? false
+  if (level?.spoolman) return <SpoolmanStock level={level} spools={level.spoolman.spools} amount={amount} />
   return (
     <section aria-labelledby="consumable-stock" className="grid gap-3 border-t pt-4">
       <h3 id="consumable-stock" className="text-sm font-medium">
@@ -145,6 +147,39 @@ export function StockPanel({
         />
       )}
       <RecentMovements workspaceSlug={workspaceSlug} consumable={consumable} printers={printers} />
+    </section>
+  )
+}
+
+/** Stock Spoolman manages: what its spools have left, with nothing to move here. */
+function SpoolmanStock({ level, spools, amount }: { level: StockLevel; spools: number; amount: (value: number) => string }) {
+  const copy = useI18n().t.settings.consumables.stock
+  return (
+    <section aria-labelledby="consumable-stock" className="grid gap-2 border-t pt-4">
+      <h3 id="consumable-stock" className="text-sm font-medium">
+        {copy.title}
+      </h3>
+      <p className="flex flex-wrap items-center gap-x-1.5 text-sm">
+        {level.missing ? (
+          <span className="font-semibold text-destructive">{copy.none}</span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 font-semibold">
+            {level.low && <LowMarker />}
+            {copy.onHand(amount(level.onHand))}
+          </span>
+        )}
+        <span className="text-muted-foreground">
+          · {copy.spoolman.managed} · {copy.spoolman.spools(spools)}
+        </span>
+        {level.low && <span className="text-muted-foreground">· {copy.low}</span>}
+        {level.minimum !== undefined && <span className="text-muted-foreground">· {copy.warnsBelow(amount(level.minimum))}</span>}
+      </p>
+      <p className="text-xs text-muted-foreground">
+        {copy.spoolman.hint}{' '}
+        <Link to="/settings/$section" params={{ section: 'spoolman' }} className="underline underline-offset-2">
+          {copy.spoolman.link}
+        </Link>
+      </p>
     </section>
   )
 }

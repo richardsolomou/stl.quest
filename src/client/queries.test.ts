@@ -12,6 +12,7 @@ import type { SettingsSection } from './settingsSections'
 
 const request = {
   id: 'request-1',
+  number: 1,
   name: 'Dragon',
   quantity: 1,
   counts: { pending: 1 },
@@ -148,6 +149,13 @@ describe('preloadSettingsSection', () => {
 
   it('leaves stock out of the consumables section when usage is not tracked', async () => {
     expect(await preloadedKeys('consumables', { ...admin, usageTracking: false })).not.toContainEqual(['stock', 'workshop'])
+  })
+
+  it('loads the Spoolman section with the library filaments it links to', async () => {
+    expect(await preloadedKeys('spoolman')).toEqual([
+      ['spoolman', 'workshop'],
+      ['consumables', 'workshop'],
+    ])
   })
 
   it('waits for the section’s data while rendering on the server', async () => {

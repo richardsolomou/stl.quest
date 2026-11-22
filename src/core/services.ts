@@ -96,6 +96,15 @@ import { printGroupCohortKey, printGroupNameTaken, validPrintGroupName } from '.
 import { autoArchiveDue } from './autoArchive'
 import { normalizeBoardConfig, withMemberRequestVisibility } from './visibility'
 import { messagesFor, type Messages } from './i18n'
+import {
+  matchSpoolmanFilaments,
+  MAX_SPOOLMAN_SPOOLS,
+  spoolmanFilaments,
+  spoolmanStock,
+  type SpoolmanChange,
+  type SpoolmanMatch,
+} from './spoolman'
+import { SPOOLMAN_CATALOGUE } from './spoolmanCatalogue'
 
 export type NewRequestInput = Omit<NewPrintRequest, 'ownerUserId'> & { fileName: string; filePath: string }
 export type NewUploadedRequestInput = Omit<NewPrintRequest, 'ownerUserId' | 'filePath' | 'previewPath' | 'thumbnailPath'> & {
@@ -1289,8 +1298,10 @@ export class STLQuestService {
 
   async recordStockMovement(input: StockMovementInput, identity: Identity) {
     await this.requireUsageTracking(identity)
-    const consumable = (await this.consumables()).find(({ id }) => id === input.consumableId)
+    const consumables = await this.consumables()
+    const consumable = consumables.find(({ id }) => id === input.consumableId)
     if (!consumable) throw new Response(this.text.usage.unknownConsumable, { status: 400 })
+    if ((await this.spoolmanStock(consumables)).has(consumable.id)) throw new Response(this.text.usage.managedBySpoolman, { status: 409 })
     if (input.kind === 'replace' && input.printerId && !(await this.printer(input.printerId)))
       throw new Response(this.text.request.unknownPrinter, { status: 400 })
     const amount =
@@ -1336,7 +1347,85 @@ export class STLQuestService {
 
   async stockLevels(identity: Identity) {
     await this.requireUsageTracking(identity)
-    return stockLevels(await this.consumables(), await this.repository.stockTotals())
+    const consumables = await this.consumables()
+    return stockLevels(consumables, await this.repository.stockTotals(), await this.spoolmanStock(consumables))
+  }
+
+  /** The workspace's Spoolman connection and each filament it sent, with the library filament it counts towards. */
+  async spoolman(identity: Identity) {
+    this.requireAdmin(identity)
+    const connection = await this.repository.spoolmanConnection()
+    const links = await this.repository.listSpoolmanLinks()
+    const consumables = await this.consumables()
+    const { filaments, matches } = await this.spoolmanMatches(consumables)
+    // What matching alone would choose, so a filament linked by hand still shows what automatic would mean.
+    const automatic = matchSpoolmanFilaments(filaments, consumables, [], SPOOLMAN_CATALOGUE)
+    return {
+      ...(connection && { connection }),
+      filaments: filaments.map((filament) => {
+        const link = links.find(({ filamentId }) => filamentId === filament.id)
+        const match = matches.get(filament.id)
+        const automaticId = automatic.get(filament.id)?.consumableId
+        return {
+          ...filament,
+          choice: !link ? ('auto' as const) : (link.consumableId ?? ('none' as const)),
+          ...(match && { match }),
+          ...(automaticId && { automatic: automaticId }),
+        }
+      }),
+    }
+  }
+
+  /** Starts or replaces the workspace's connection with the hash of a new token; the old token stops working at once. */
+  async connectSpoolman(tokenHash: string, identity: Identity) {
+    this.requireAdmin(identity)
+    const replaced = Boolean(await this.repository.spoolmanConnection())
+    await this.repository.connectSpoolman(tokenHash, Date.now())
+    this.changed('settings.changed')
+    this.capture(identity.id, 'spoolman_token_created', { replaced })
+  }
+
+  /** Revokes the token and forgets the spools, so stock goes back to what STL Quest records. */
+  async disconnectSpoolman(identity: Identity) {
+    this.requireAdmin(identity)
+    await this.repository.disconnectSpoolman()
+    this.changed('settings.changed')
+    this.capture(identity.id, 'spoolman_disconnected', {})
+  }
+
+  /** Links a Spoolman filament to a library filament by its ID, to none with `none`, or back to matching with `auto`. */
+  async linkSpoolmanFilament(input: { filamentId: number; choice: string }, identity: Identity) {
+    this.requireAdmin(identity)
+    const { choice } = input
+    if (choice !== 'auto' && choice !== 'none' && !consumablesOfKind(await this.consumables(), 'filament').some(({ id }) => id === choice))
+      throw new Response(this.text.usage.unknownConsumable, { status: 400 })
+    await this.repository.setSpoolmanLink(
+      input.filamentId,
+      choice === 'auto' ? undefined : { consumableId: choice === 'none' ? null : choice },
+      Date.now(),
+    )
+    this.changed('inventory.changed')
+    this.capture(identity.id, 'spoolman_filament_linked', { choice: choice === 'auto' || choice === 'none' ? choice : 'filament' })
+  }
+
+  /** Applies spools Spoolman sent with the workspace's token. */
+  async receiveSpoolman(change: SpoolmanChange) {
+    if ('replace' in change && change.replace.length > MAX_SPOOLMAN_SPOOLS)
+      throw new Response(this.text.spoolman.tooManySpools(MAX_SPOOLMAN_SPOOLS), { status: 413 })
+    const result = await this.repository.receiveSpoolman(change, Date.now(), MAX_SPOOLMAN_SPOOLS)
+    if (!result.received) {
+      if (result.full) throw new Response(this.text.spoolman.tooManySpools(MAX_SPOOLMAN_SPOOLS), { status: 413 })
+      throw new Response(this.text.spoolman.notConnected, { status: 401 })
+    }
+    this.changed('spoolman.received')
+    if (result.first) {
+      const { filaments, matches } = await this.spoolmanMatches(await this.consumables())
+      this.capture('server', 'spoolman_first_received', {
+        filament_count: filaments.length,
+        matched_count: matches.size,
+        spool_count: filaments.reduce((total, filament) => total + filament.spools, 0),
+      })
+    }
   }
 
   /** How far through its life each printer and its wear parts are, from the whole log rather than one capped list of it. */
@@ -1785,6 +1874,23 @@ export class STLQuestService {
 
   private async consumables() {
     return await this.repository.listInventory('consumables')
+  }
+
+  private async spoolmanMatches(
+    consumables: Consumable[],
+  ): Promise<{ filaments: ReturnType<typeof spoolmanFilaments>; matches: Map<number, SpoolmanMatch> }> {
+    const filaments = spoolmanFilaments(await this.repository.listSpoolmanSpools())
+    if (!filaments.length) return { filaments, matches: new Map() }
+    return {
+      filaments,
+      matches: matchSpoolmanFilaments(filaments, consumables, await this.repository.listSpoolmanLinks(), SPOOLMAN_CATALOGUE),
+    }
+  }
+
+  /** Stock of the library filaments Spoolman manages. */
+  private async spoolmanStock(consumables: Consumable[]) {
+    const { filaments, matches } = await this.spoolmanMatches(consumables)
+    return spoolmanStock(filaments, matches)
   }
 
   private async appendUsage(drafts: UsageDraft[], identity: Identity) {

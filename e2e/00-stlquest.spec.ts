@@ -163,6 +163,8 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await filamentDialog.getByRole('button', { name: 'Galaxy Silver' }).click()
   const pricedFilament = page.getByRole('dialog', { name: 'Prusament PLA · Galaxy Silver' })
   await pricedFilament.getByLabel('Price (€/kg)').fill('30')
+  // A material's own slicer applies on the printer it was last recorded on, which only usage tracking knows.
+  await expect(pricedFilament.getByRole('combobox', { name: 'Slicer' })).toHaveCount(0)
   await screenshot(page, 'filament-dialog')
   await pricedFilament.getByRole('button', { name: 'Add colour' }).click()
   await expect(page.getByRole('button', { name: 'Edit Prusament PLA · Galaxy Silver' })).toContainText('€30.00/kg')
@@ -177,6 +179,10 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   // A supply comes from the catalogue too, priced by the litre as it is used.
   await page.getByRole('button', { name: 'Add supply' }).click()
   const supplyPicker = page.getByRole('dialog', { name: 'Add supply' })
+  // A branded supply shows its maker's product photo, as catalogue resins and wear parts do.
+  await supplyPicker.getByRole('textbox', { name: 'Search by brand, name, or type' }).fill('Glue Stick')
+  const supplyPhoto = supplyPicker.getByRole('button', { name: 'Add Glue Stick', exact: true }).locator('img')
+  await expect.poll(() => supplyPhoto.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth)).toBeGreaterThan(0)
   await supplyPicker.getByRole('textbox', { name: 'Search by brand, name, or type' }).fill('IPA')
   await screenshot(page, 'supply-picker')
   await supplyPicker.getByRole('button', { name: 'Add Isopropyl alcohol (IPA)' }).click()
@@ -1883,6 +1889,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   const newColours = page.getByRole('dialog', { name: 'Prusament PLA' })
   await expect(newColours.getByText('Needs a colour and a price to save')).toBeVisible()
   await expect(newColours.getByRole('button', { name: 'Galaxy Silver (in your list)' })).toBeVisible()
+  await expect(newColours.getByRole('combobox', { name: 'Slicer' })).toBeVisible()
   // A price typed before the colours never saves the first colour alone, however long the second takes.
   await newColours.getByLabel('Price (€/kg)').fill('28')
   await newColours.getByRole('button', { name: 'Lipstick Red' }).click()
@@ -2076,6 +2083,51 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
       .click()
     await expect(requestCard(page, name)).toHaveCount(0)
   }
+  // Spoolman sends its spools with a write-only token, and a filament they match takes its stock from them.
+  await page.goto('/settings/spoolman')
+  await page.getByRole('button', { name: 'Create token' }).click()
+  const spoolmanToken = (await page.getByText(/^stlq_spoolman_/).textContent())!
+  await screenshot(page, 'spoolman-token')
+  const spool = (id: number, filament: Record<string, unknown>, remaining_weight: number) => ({ id, remaining_weight, filament })
+  const sentSpools = await page.request.post('/api/spoolman/spools', {
+    headers: { authorization: `Bearer ${spoolmanToken}` },
+    data: {
+      spools: [
+        spool(1, { id: 7, name: 'Galaxy Silver', material: 'PLA', external_id: 'prusament_pla_galaxysilver_1000_175_n' }, 640),
+        spool(2, { id: 8, name: 'Red', material: 'PLA', color_hex: 'cc0000', vendor: { name: 'Generic' } }, 300),
+      ],
+    },
+  })
+  expect(sentSpools.status()).toBe(204)
+  expect(
+    (await page.request.post('/api/spoolman/spools', { headers: { authorization: 'Bearer stlq_spoolman_wrong' }, data: {} })).status(),
+  ).toBe(401)
+  await page.reload()
+  await expect(page.getByRole('region', { name: 'Spoolman' })).toContainText('Receiving')
+  await expect(page.getByRole('combobox', { name: 'What Galaxy Silver counts towards' })).toContainText(
+    'Automatic · Prusament PLA · Galaxy Silver',
+  )
+  await choose(page.getByRole('combobox', { name: 'What Generic Red counts towards' }), 'Prusament PLA · Galaxy Silver')
+  await expect(page.getByText('PLA · 1 spool · Chosen by hand')).toBeVisible()
+  await screenshot(page, 'spoolman-filaments')
+  await page.getByLabel('Settings sections').getByRole('link', { name: 'Consumables' }).click()
+  await page.getByRole('button', { expanded: false }).filter({ hasText: '3 colours' }).click()
+  await page.getByRole('button', { name: 'Edit Prusament PLA · Galaxy Silver' }).click()
+  const spoolmanStock = page.getByRole('dialog', { name: 'Prusament PLA · Galaxy Silver' })
+  await expect(spoolmanStock).toContainText('940 g on hand')
+  await expect(spoolmanStock).toContainText('Managed by Spoolman · 2 spools')
+  await expect(spoolmanStock.getByRole('button', { name: 'Add stock' })).toHaveCount(0)
+  await screenshot(page, 'spoolman-managed-stock')
+  await spoolmanStock.getByRole('button', { name: 'Done' }).click()
+  await page.goto('/settings/spoolman')
+  await page.getByRole('button', { name: 'Disconnect' }).click()
+  await page.getByRole('alertdialog', { name: 'Disconnect Spoolman?' }).getByRole('button', { name: 'Disconnect' }).click()
+  await expect(page.getByRole('region', { name: 'Spoolman' })).toContainText('Not connected')
+  expect(
+    (
+      await page.request.post('/api/spoolman/spools', { headers: { authorization: `Bearer ${spoolmanToken}` }, data: { spools: [] } })
+    ).status(),
+  ).toBe(401)
   await page.goto('/settings/printers')
   await page.getByRole('button', { name: 'Edit Elegoo Mars 3' }).click()
   // A wear part is added from the printer itself, without leaving for Consumables.

@@ -1,0 +1,60 @@
+{
+  "images": [
+    {
+      "presetId": "supply-bambu-lab-cleaning-wipes",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/cleaning-wipes-50-pcs",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/4345a63dc6174bb49eef902f5e2259f3/SL009_1.png",
+      "src": "/supply-presets/supply-bambu-lab-cleaning-wipes.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "supply-bambu-lab-glue-stick",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/glue-stick-for-build-plate",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/708193b80d6144719ac58d775761caf6/1_7185691f-b551-4cb4-9a22-4ded834dfa48.png",
+      "src": "/supply-presets/supply-bambu-lab-glue-stick.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "supply-bambu-lab-liquid-glue",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/liquid-glue-for-build-plate",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/bf24bd0039be4632921cfe3f03ad77d2/1834ea701b187eae9ad52a49fb604e5d.png",
+      "src": "/supply-presets/supply-bambu-lab-liquid-glue.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "supply-bambu-lab-lubricant-grease",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/lubricant-grease",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/63b204f225494a0c9b19e2374f238f9a/FAZ030.jpg",
+      "src": "/supply-presets/supply-bambu-lab-lubricant-grease.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "supply-bambu-lab-lubricant-oil",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/lubricant-oil",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/d09a4d73595549a0a3b8b04b15d10f8f/FAZ031.jpg",
+      "src": "/supply-presets/supply-bambu-lab-lubricant-oil.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "supply-bambu-lab-molecular-sieve-desiccant",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/molecular-sieve-desiccant",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/71c89dd174db4dd283fc2d46d7736bea/SAA063.png",
+      "src": "/supply-presets/supply-bambu-lab-molecular-sieve-desiccant.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "supply-bambu-lab-silicone-desiccant",
+      "sourcePageUrl": "https://eu.store.bambulab.com/products/silicone-desiccant",
+      "sourceUrl": "https://store.bblcdn.eu/s8/default/a9391a343ed346faa8f05db7081076bc/SAA029.png",
+      "src": "/supply-presets/supply-bambu-lab-silicone-desiccant.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "supply-formlabs-resin-washing-solution",
+      "sourcePageUrl": "https://formlabs.com/de/products/resin-washing-solution/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/8d/4c/8d4c06fb-5a16-453f-937a-f2255c09d873/08132024_resin_wash_solution_021-sh-softness_shadow_store.png",
+      "src": "/supply-presets/supply-formlabs-resin-washing-solution.webp",
+      "checkedAt": "2026-11-22"
+    }
+  ]
+}

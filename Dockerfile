@@ -13,11 +13,11 @@ COPY src ./src
 COPY public ./public
 COPY catalogs/printers/catalog.generated.json catalogs/printers/index.generated.json ./catalogs/printers/
 COPY catalogs/resins/catalog.generated.json catalogs/resins/images.json ./catalogs/resins/
-COPY catalogs/filaments/catalog.generated.json ./catalogs/filaments/catalog.generated.json
+COPY catalogs/filaments/catalog.generated.json catalogs/filaments/spoolman.generated.json ./catalogs/filaments/
 COPY catalogs/electricity/catalog.generated.json ./catalogs/electricity/catalog.generated.json
 COPY catalogs/equipment/catalog.json catalogs/equipment/images.json ./catalogs/equipment/
-COPY catalogs/parts/catalog.json ./catalogs/parts/catalog.json
-COPY catalogs/supplies/catalog.json ./catalogs/supplies/catalog.json
+COPY catalogs/parts/catalog.json catalogs/parts/images.json ./catalogs/parts/
+COPY catalogs/supplies/catalog.json catalogs/supplies/images.json ./catalogs/supplies/
 COPY scripts/checkBuiltAssets.ts scripts/posthogSourceMaps.ts scripts/previewModels.ts scripts/seedPreview.ts ./scripts/
 COPY tsconfig.json vite.config.ts ./
 ARG VITE_POSTHOG_PROJECT_TOKEN VITE_POSTHOG_HOST POSTHOG_UPLOAD_SOURCEMAPS POSTHOG_CLI_PROJECT_ID POSTHOG_CLI_HOST
