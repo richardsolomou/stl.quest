@@ -7,7 +7,7 @@ import {
   type FilamentConsumable,
   type ResinConsumable,
 } from './consumables'
-import { supplyUnitPrice, type EquipmentItem } from './equipment'
+import { defaultFinishing, supplyUnitPrice, type EquipmentItem } from './equipment'
 import { printingPower } from './equipmentPresets'
 import { DEFAULT_MATERIAL_ESTIMATE_SETTINGS, validMaterialEstimateSettings, type MaterialEstimateSettings } from './printEstimates'
 import type { PrinterProfile, PrintType } from './types'
@@ -340,11 +340,11 @@ export type RequestPriceInput = {
 }
 
 /**
- * Prices every copy on its own plate with no hands-on time, on the printer given and the material the calculator offers
- * first; a partial estimate prices nothing rather than understating it.
+ * Prices every copy on its own plate with no hands-on time, on the printer given, the material the calculator offers
+ * first, and the workspace's own wash and cure; a partial estimate prices nothing rather than understating it.
  */
 export function priceRequest(
-  { rates, consumables, printer }: Pick<PrintCostInput, 'rates' | 'consumables' | 'printer'>,
+  { rates, consumables, printer, equipment = [] }: Pick<PrintCostInput, 'rates' | 'consumables' | 'printer' | 'equipment'>,
   request: RequestPriceInput,
 ) {
   if (request.material === undefined || request.minutes === undefined) return undefined
@@ -356,7 +356,18 @@ export function priceRequest(
     handsOnMinutes: 0,
   }
   const material = consumablesOfKind(consumables, request.printType)[0]
-  return { job, result: costPrint({ rates, printType: request.printType, job, consumables, printer, material }) }
+  return {
+    job,
+    result: costPrint({
+      rates,
+      printType: request.printType,
+      job,
+      consumables,
+      printer,
+      material,
+      equipment: defaultFinishing(equipment, request.printType),
+    }),
+  }
 }
 
 /** Prices a request on each active printer of its print type, so the operator can compare where to run it. */
@@ -365,10 +376,11 @@ export function priceRequestOnPrinters<Printer extends CostedPrinter & Pick<Prin
   printers: Printer[],
   request: RequestPriceInput,
   consumables: Consumable[],
+  equipment: EquipmentItem[] = [],
 ) {
   return printers
     .filter((printer) => !printer.archived && printer.printType === request.printType)
-    .map((printer) => ({ printer, quote: priceRequest({ rates, consumables, printer }, request) }))
+    .map((printer) => ({ printer, quote: priceRequest({ rates, consumables, printer, equipment }, request) }))
 }
 
 function suppliedPrice(consumables: Consumable[], consumableId: string) {

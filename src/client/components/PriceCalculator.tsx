@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { consumablesOfKind, type Consumable } from '../../core/consumables'
-import { servesPrintType, type EquipmentItem } from '../../core/equipment'
+import { chosenFinishing, servesPrintType, type EquipmentItem } from '../../core/equipment'
 import {
   costBasis,
   costPrint,
@@ -71,6 +71,7 @@ export function PriceCalculator({
         saved={query.data.saved}
         printers={printers}
         consumables={consumables}
+        equipment={equipment}
       />
     )
   }
@@ -115,13 +116,14 @@ function LoadedPriceCalculator({
   const [job, setJob] = useState(() => (prefill ? { ...emptyJob, ...prefill.job } : emptyJob))
   const [printerId, setPrinterId] = useState<Choice>(prefill?.printerId)
   const [materialId, setMaterialId] = useState<Choice>()
-  const [equipmentIds, setEquipmentIds] = useState<string[]>([])
+  // Undefined counts the workspace's own wash and cure until the user picks.
+  const [equipmentIds, setEquipmentIds] = useState<string[]>()
   const choices = printers.filter((printer) => printer.printType === printType)
   const printer = picked(choices, printerId)
   const materials: JobMaterial[] = consumablesOfKind(consumables, printType)
   const material = picked(materials, materialId)
   const usable = equipment.filter((item) => servesPrintType(item, printType))
-  const chosenEquipment = usable.filter((item) => equipmentIds.includes(item.id))
+  const chosenEquipment = chosenFinishing(usable, printType, equipmentIds)
   const picks = { rates, printType, consumables, material, equipment: chosenEquipment }
   const cost = (on?: PrinterProfile) => costPrint({ ...picks, job, printer: on })
   const result = cost(printer)
@@ -132,7 +134,7 @@ function LoadedPriceCalculator({
     setPrintType(next)
     setPrinterId(undefined)
     setMaterialId(undefined)
-    setEquipmentIds([])
+    setEquipmentIds(undefined)
     setJob((current) => ({ ...current, materialAmount: 0, materialUnit: next === 'resin' ? 'ml' : 'g' }))
   }
 

@@ -120,7 +120,7 @@ export const requests: typeof en = {
   cost: {
     label: 'Coût estimé',
     suggested: (price, quantity) => (quantity > 1 ? `${price} suggéré pour l’ensemble des ${quantity} copies` : `${price} suggéré`),
-    hint: 'D’après vos tarifs et l’imprimante attribuée, avec une matière et une finition typiques, un plateau par copie et aucun temps de manipulation.',
+    hint: 'D’après vos tarifs et l’imprimante attribuée, avec votre première matière et les stations de lavage et de polymérisation que vous avez configurées, ou une station typique si vous n’en avez aucune, un plateau par copie et aucun temps de manipulation.',
     openCalculator: 'Ouvrir dans le calculateur',
     onPrinter: (printer: string) => `sur ${printer}`,
     compare: (count: number, range: string) => `${range} sur ${count} imprimantes`,
