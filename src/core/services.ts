@@ -2059,10 +2059,13 @@ export class STLQuestService {
     }
     if (!transactionId) return
     await this.repository.updatePrintJob(job.id, { transactionId })
-    // Spools the bridge stored while this was recording were not part of it, and the bridge will not send them again.
+    // Spools or a sliced file the bridge stored while this was recording were not part of it, and the bridge will not
+    // send them again.
     const stored = (await this.repository.listPrintJobs()).find(({ id }) => id === job.id)
-    if (stored?.filamentUsage && !sameSpoolUsage(job.filamentUsage, stored.filamentUsage))
-      await this.recordPrintAgain({ ...job, transactionId, filamentUsage: stored.filamentUsage })
+    const newSpools = stored?.filamentUsage && !sameSpoolUsage(job.filamentUsage, stored.filamentUsage)
+    const newFile = !job.slicedPlate && typeof stored?.slicedPlate === 'object'
+    if (stored && (newSpools || newFile))
+      await this.recordPrintAgain({ ...job, transactionId, filamentUsage: stored.filamentUsage, slicedPlate: stored.slicedPlate })
   }
 
   /**
@@ -2197,7 +2200,10 @@ export class STLQuestService {
     )
     const slicedPlate = printSlicedPlate(sliced, assignments, stopped)
     await this.repository.updatePrintJob(job.id, { slicedPlate })
-    const recorded = await this.recordPrintAgain({ ...job, slicedPlate })
+    let recorded = await this.recordPrintAgain({ ...job, slicedPlate })
+    // An end event that recorded after the read above could not see this file, so it replaces that recording too.
+    const meanwhile = !recorded && !job.transactionId && (await this.repository.listPrintJobs()).find(({ id }) => id === job.id)
+    if (meanwhile && meanwhile.transactionId) recorded = await this.recordPrintAgain({ ...meanwhile, slicedPlate })
     this.changed('print.received')
     this.capture('server', 'print_sliced_file_received', {
       outcome: job.outcome,

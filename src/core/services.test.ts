@@ -4770,6 +4770,50 @@ describe('STLQuestService crash recovery', () => {
           expect([await grams(turret), await grams(hull)]).toEqual([expect.closeTo(8 / 6, 6), expect.closeTo(40 / 6, 6)])
         })
 
+        it('splits a print whose file arrived while its end was being recorded', async () => {
+          const { hull, turret } = await twoPrints()
+          await service.receivePrint({ ...finished, outcome: 'printing', runId: '7' })
+          const file = await hullAndTurretFile(hull, turret)
+          let reached!: () => void
+          const atRecord = new Promise<void>((resolve) => (reached = resolve))
+          let release!: () => void
+          const gate = new Promise<void>((resolve) => (release = resolve))
+          const recordPlate = repository.recordPlate.bind(repository)
+          vi.spyOn(repository, 'recordPlate').mockImplementationOnce(async (...args) => {
+            reached()
+            await gate
+            return await recordPlate(...args)
+          })
+          let sliced!: Promise<void>
+          const listPlates = repository.listPlates.bind(repository)
+          vi.spyOn(repository, 'listPlates').mockImplementationOnce(async () => {
+            sliced = receiveSliced(service, { runId: '7' }, file)
+            await atRecord
+            return await listPlates()
+          })
+
+          await service.receivePrint({ ...finished, runId: '7' })
+          release()
+          await sliced
+
+          expect([await grams(hull), await grams(turret)]).toEqual([expect.closeTo(30, 6), expect.closeTo(10, 6)])
+        })
+
+        it('splits a print whose end was recorded while its file was being taken in', async () => {
+          const { hull, turret } = await twoPrints()
+          await service.receivePrint({ ...finished, outcome: 'printing', runId: '7' })
+          await service.receivePrint({ ...finished, minutes: undefined, runId: '7' })
+          const listRequests = repository.listRequests.bind(repository)
+          vi.spyOn(repository, 'listRequests').mockImplementationOnce(async () => {
+            await service.receivePrint({ ...finished, runId: '7' })
+            return await listRequests()
+          })
+
+          await receiveSliced(service, { runId: '7' }, await hullAndTurretFile(hull, turret))
+
+          expect([await grams(hull), await grams(turret)]).toEqual([expect.closeTo(30, 6), expect.closeTo(10, 6)])
+        })
+
         it('does not move a failed plate’s copies twice', async () => {
           const { hull, turret } = await twoPrints()
           await service.receivePrint({ ...finished, outcome: 'failed', progress: 50, runId: '7' })
