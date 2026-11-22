@@ -28,6 +28,10 @@ OrcaSlicer, UVtools, and PrusaSlicer content is licensed under AGPL-3.0-only. Th
 
 Resin names, categories, and available density values under `catalogs/resins/catalog.generated.json` are derived from pinned [PrusaSlicer](https://github.com/prusa3d/PrusaSlicer) SLA material profiles, selected official HeyGears material pages, and Formlabs' official materials listing and safety data sheets. Their revisions or checked dates and exact source URLs are recorded alongside the generated presets. PrusaSlicer content is licensed under AGPL-3.0-only; manufacturer names and product data remain the property of their respective owners.
 
+## Filament catalog
+
+Filament products and colours under `catalogs/filaments/catalog.generated.json` and `catalogs/filaments/spoolman.generated.json` are derived from [SpoolmanDB](https://github.com/Donkie/SpoolmanDB), licensed under MIT; the license text is included in `LICENSES/SpoolmanDB-MIT.txt`. Bambu Lab colour codes are derived from [Bambu Studio](https://github.com/bambulab/BambuStudio), licensed under AGPL-3.0-only; the license text is included in `LICENSES/BambuStudio-AGPL-3.0.txt`. Their pinned revisions are recorded in `catalogs/filaments/sources.json`. Manufacturer names and product data remain the property of their respective owners.
+
 ## Electricity price catalog
 
 Country electricity averages under `catalogs/electricity/catalog.generated.json` are adapted from Eurostat dataset `nrg_pc_204`, accessed 27 August 2026. Reuse of Eurostat statistical data is authorised with source acknowledgement under the [Eurostat copyright and reuse policy](https://ec.europa.eu/eurostat/help/copyright-notice). Eurostat is not responsible for STL Quest's selection, presentation, or use of the data.

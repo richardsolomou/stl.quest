@@ -2,22 +2,22 @@ import { describe, expect, it } from 'vitest'
 import type { Consumable, FilamentConsumable } from '../consumables'
 import type { FilamentPreset } from '../filamentPresets'
 import generated from '../../../catalogs/filaments/catalog.generated.json'
-import { BAMBU_LAB_EU_HTML, BAMBU_LAB_EU_TEXT } from './fixtures'
+import { BAMBU_LAB_EU_FRENCH_TEXT, BAMBU_LAB_EU_GERMAN_TEXT, BAMBU_LAB_EU_HTML, BAMBU_LAB_EU_TEXT } from './fixtures'
 import { parseOrderEmail, type OrderLine } from './orderEmail'
 import { matchOrderLine, orderLineAmount, orderLinePrice, orderRestock, type OrderRestockChoice } from './orderRestock'
 
-const preset = (id: string, name: string, colours: [string, string][], brand = 'Bambu Lab'): FilamentPreset => ({
+const preset = (id: string, name: string, colours: [string, string, string?][], brand = 'Bambu Lab'): FilamentPreset => ({
   id,
   brand,
   name,
-  colors: colours.map(([en, hex]) => ({ hex, names: { en } })),
+  colors: colours.map(([en, hex, code]) => ({ hex, names: { en }, ...(code && { code }) })),
   source: { id: 'spoolmandb', url: 'https://example.com' },
 })
 
 const catalogue = [
   preset('filament-bambu-lab-pla', 'PLA Basic', [
-    ['Gray', '#8E9089'],
-    ['Jade White', '#FFFFFF'],
+    ['Gray', '#8E9089', '10103'],
+    ['Jade White', '#FFFFFF', '10100'],
   ]),
   preset('filament-bambu-lab-matte-pla', 'Matte PLA', [['Charcoal', '#000000']]),
   preset('filament-bambu-lab-hf-petg', 'HF PETG', [['Black', '#000000']]),
@@ -101,8 +101,36 @@ describe('matchOrderLine', () => {
     expect(matchOrderLine('bambu-lab', line(), [filament({ archived: true })], catalogue, none).kind).toBe('catalogue')
   })
 
+  it('matches a colour by its code whatever name the email gives it', () => {
+    expect(matchOrderLine('bambu-lab', line({ colour: { name: 'Grau', code: '10103' } }), [filament()], catalogue, none)).toEqual({
+      kind: 'library',
+      consumableId: 'basic-gray',
+    })
+  })
+
+  it('offers the catalogue colour a code names in another language', () => {
+    expect(matchOrderLine('bambu-lab', line({ colour: { name: 'Jade-Weiß', code: '10100' } }), [], catalogue, none)).toEqual({
+      kind: 'catalogue',
+      presetId: 'filament-bambu-lab-pla',
+      colour: { name: 'Jade White', hex: '#FFFFFF' },
+    })
+  })
+
+  it('matches by colour name when the catalogue lacks the code', () => {
+    expect(matchOrderLine('bambu-lab', line({ colour: { name: 'Gray', code: '99999' } }), [filament()], catalogue, none).kind).toBe(
+      'library',
+    )
+  })
+
+  it('matches a code only among the shop’s own brand', () => {
+    const other = [preset('filament-other-pla', 'PLA Basic', [['Grau', '#808080', '10103']], 'Other Brand')]
+    expect(matchOrderLine('bambu-lab', line({ colour: { name: 'Grau', code: '10103' } }), [], other, none)).toEqual({ kind: 'unmatched' })
+  })
+
   it('leaves an unknown product unmatched', () => {
-    expect(matchOrderLine('bambu-lab', line({ product: 'PLA Mystery' }), [filament()], catalogue, none)).toEqual({ kind: 'unmatched' })
+    expect(matchOrderLine('bambu-lab', line({ product: 'PLA Mystery', colour: { name: 'Gray' } }), [filament()], catalogue, none)).toEqual({
+      kind: 'unmatched',
+    })
   })
 })
 
@@ -232,6 +260,18 @@ describe('the filament catalogue', () => {
       { kind: 'catalogue', presetId: 'filament-bambu-lab-hf-petg', colour: { name: 'Black', hex: '#000000' } },
       { kind: 'catalogue', presetId: 'filament-bambu-lab-pla', colour: { name: 'Bambu Green', hex: '#00AE42' } },
       { kind: 'catalogue', presetId: 'filament-bambu-lab-silk-pla', colour: { name: 'Gold', hex: '#E5B03D' } },
+    ])
+  })
+
+  it('names every Bambu Lab filament of the German and French sample orders by its code', () => {
+    const presets = generated.presets as FilamentPreset[]
+    const lines = [BAMBU_LAB_EU_GERMAN_TEXT, BAMBU_LAB_EU_FRENCH_TEXT].flatMap((email) => parseOrderEmail(email)?.lines ?? [])
+    expect(lines.map((orderLine) => matchOrderLine('bambu-lab', orderLine, [], presets, none))).toEqual([
+      { kind: 'catalogue', presetId: 'filament-bambu-lab-pla', colour: { name: 'Jade White', hex: '#FFFFFF' } },
+      { kind: 'catalogue', presetId: 'filament-bambu-lab-pla', colour: { name: 'Gray', hex: '#8E9089' } },
+      { kind: 'catalogue', presetId: 'filament-bambu-lab-pla', colour: { name: 'Jade White', hex: '#FFFFFF' } },
+      { kind: 'catalogue', presetId: 'filament-bambu-lab-matte-pla', colour: { name: 'Charcoal', hex: '#000000' } },
+      { kind: 'catalogue', presetId: 'filament-bambu-lab-hf-petg', colour: { name: 'Black', hex: '#000000' } },
     ])
   })
 })
