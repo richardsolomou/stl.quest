@@ -35,6 +35,7 @@ import { NumberInput } from '../priceCalculator/fields'
 import { currencySymbol, formatNumber, formatRate } from '../priceCalculator/format'
 import { EquipmentIcon } from './EquipmentIcon'
 import { EquipmentPresetPicker } from './EquipmentPresetPicker'
+import { PurchaseDateField } from './PurchaseDate'
 
 const SERVES = [...PRINT_TYPES, 'both'] as const
 
@@ -483,6 +484,9 @@ function WearFields({ draft, onChange }: { draft: EquipmentItem; onChange: (patc
         </Field>
       </div>
       {perHour && <p className="text-xs text-muted-foreground">{copy.perHour(perHour)}</p>}
+      <div className="sm:w-1/2 sm:pr-1.5">
+        <PurchaseDateField id="equipment-purchased-on" value={draft.purchasedOn} onChange={(purchasedOn) => onChange({ purchasedOn })} />
+      </div>
     </FieldSet>
   )
 }

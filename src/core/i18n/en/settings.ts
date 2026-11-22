@@ -382,11 +382,14 @@ export const settings = {
     },
     needs: {
       title: 'What you need',
-      description: 'What is running out, and what your printers use that the list below is missing.',
-      allSet: 'Nothing needed. Everything tracked is above its minimum, and your printers have the parts the catalogue knows.',
+      description: 'What is running out or wearing out, and what your printers use that the list below is missing.',
+      allSet:
+        'Nothing needed. Everything tracked is above its minimum, no wear part is nearly worn, and your printers have the parts the catalogue knows.',
       untracked: (count: number) =>
         `Nothing tracked is running low, but ${count} ${count === 1 ? 'item has' : 'items have'} no stock recorded, so ${count === 1 ? 'it is' : 'they are'} not checked. Add stock to track ${count === 1 ? 'it' : 'them'}.`,
       runningOut: 'Running out',
+      wearingOut: 'Wearing out',
+      wornOn: (printer: string) => `on ${printer}`,
       missing: 'Not in your list',
       partFits: (model: string, printers: number) => `${model} · ${printers} printer${printers === 1 ? '' : 's'}`,
       partGeneric: (printType: string, printers: number) => `Every ${printType} printer · ${printers}`,
@@ -529,6 +532,16 @@ export const settings = {
       archive: 'Archive',
     },
   },
+  purchaseDate: {
+    label: 'Purchase date',
+    placeholder: 'Pick a date',
+    age: (years: number, months: number) => {
+      const parts = [years && `${years} year${years === 1 ? '' : 's'}`, months && `${months} month${months === 1 ? '' : 's'}`].filter(
+        Boolean,
+      )
+      return parts.length ? `Bought ${parts.join(', ')} ago.` : 'Bought less than a month ago.'
+    },
+  },
   printers: {
     sections: { resin: 'Resin printers', filament: 'Filament printers' },
     addOfType: { resin: 'Add resin printer', filament: 'Add filament printer' },
@@ -582,6 +595,11 @@ export const settings = {
     row: {
       open: (name: string) => `Edit ${name}`,
       fallbackName: (position: number) => `Printer ${position}`,
+      hours: (run: string, lifespan?: string) => (lifespan ? `${run} / ${lifespan} h` : `${run} h`),
+      partDue: (part: string) => `${part} due`,
+      partNearlyWorn: (part: string) => `${part} nearly worn`,
+      pastLifespan: 'Past its lifespan',
+      nearLifespan: 'Nearing its lifespan',
     },
     dialog: {
       newTitle: 'New printer',
@@ -610,6 +628,8 @@ export const settings = {
       wearHint:
         'Enter what you paid, including tax, shipping, and add-on modules, less anything you expect to sell it for. The lifespan covers the frame and mechanics, as wear parts are costed on their own; most machines last 2,000–10,000 print hours.',
       wearPerHour: (cost: string) => `Wears ${cost} per print hour.`,
+      lifetime: (run: string, lifespan?: string) => (lifespan ? `${run} of ${lifespan} print hours run` : `${run} print hours run`),
+      pastLifespan: 'Past its lifespan',
       addOns: 'Add-on modules',
       addOnsHint: 'Modules bolted onto this printer that draw power while printing, such as a pulsing release module or an AMS.',
       addOnSearch: 'Add a module…',

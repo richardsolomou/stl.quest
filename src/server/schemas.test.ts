@@ -301,6 +301,16 @@ describe('server input schemas', () => {
     expect(printer(rs).data?.item).toMatchObject(rs)
   })
 
+  it('keeps a printer’s purchase date', () => {
+    expect(printer({ id: 'rs', name: 'Reflex RS', printType: 'resin', purchasedOn: '2025-03-14' }).data?.item).toMatchObject({
+      purchasedOn: '2025-03-14',
+    })
+  })
+
+  it('rejects a purchase date that is not a calendar day', () => {
+    expect(printer({ id: 'rs', name: 'Reflex RS', printType: 'resin', purchasedOn: '2025-02-30' }).success).toBe(false)
+  })
+
   it('rejects a wash station as a printer add-on', () => {
     expect(
       printer({ id: 'rs', name: 'Reflex RS', printType: 'resin', addOnPresetIds: ['postprocess-formlabs-form-wash-v2'] }).success,
@@ -451,6 +461,10 @@ describe('equipment schema', () => {
 
   it('accepts a wash station with a supply', () => {
     expect(equipment(wash).success).toBe(true)
+  })
+
+  it('keeps a purchase date', () => {
+    expect(equipment({ ...wash, purchasedOn: '2024-06-01' }).data?.item).toMatchObject({ purchasedOn: '2024-06-01' })
   })
 
   it('keeps a supply whose consumable it cannot check', () => {

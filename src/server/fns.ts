@@ -1878,6 +1878,15 @@ export const getStockLevels = createServerFn({ method: 'GET' })
     }),
   )
 
+export const getPrinterLifetimes = createServerFn({ method: 'GET' })
+  .validator(workspaceInputSchema)
+  .handler(async ({ data }) =>
+    rpc(async () => {
+      const context = await workspaceContext(await app(), data.workspaceSlug)
+      return { lifetimes: await context.service.printerLifetimes(context.identity) }
+    }),
+  )
+
 export const getUsagePrefills = createServerFn({ method: 'GET' })
   .validator(workspaceInputSchema)
   .handler(async ({ data }) =>

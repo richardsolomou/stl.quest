@@ -172,6 +172,7 @@ const equipmentItemSchema = z
       .max(MAX_CONSUMABLES),
     purchasePrice: z.number().nonnegative().max(10_000_000).optional(),
     lifespanHours: z.number().positive().max(10_000_000).optional(),
+    purchasedOn: z.iso.date().optional(),
   })
   .superRefine(({ supplies }, context) => {
     const supplied = new Set<string>()
@@ -246,6 +247,7 @@ const printerProfileSchema = z.object({
   printType: z.enum(PRINT_TYPES),
   purchasePrice: z.number().positive().max(10_000_000).optional(),
   lifespanHours: z.number().positive().max(10_000_000).optional(),
+  purchasedOn: z.iso.date().optional(),
   powerWatts: z.number().positive().max(100_000).optional(),
   addOnPresetIds: z
     .array(id.refine(isPrinterAddOn, 'not a printer add-on'))

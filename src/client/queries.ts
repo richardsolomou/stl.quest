@@ -31,6 +31,7 @@ import {
   sessionInfo,
   listUsage,
   getStockLevels,
+  getPrinterLifetimes,
   getUsagePrefills,
   getUsageBackfillPreview,
   getChargedPrints,
@@ -163,6 +164,8 @@ export const usagePeriodQuery = (workspaceSlug: string, period: { from: number; 
   })
 export const stockQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['stock', workspaceSlug], queryFn: () => getStockLevels({ data: { workspaceSlug } }) })
+export const printerLifetimesQuery = (workspaceSlug: string) =>
+  queryOptions({ queryKey: ['printer-lifetimes', workspaceSlug], queryFn: () => getPrinterLifetimes({ data: { workspaceSlug } }) })
 export const usagePrefillsQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['usage-prefills', workspaceSlug], queryFn: () => getUsagePrefills({ data: { workspaceSlug } }) })
 export const platesQuery = (workspaceSlug: string) =>

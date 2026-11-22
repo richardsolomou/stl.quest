@@ -3,21 +3,23 @@ import { useQuery } from '@tanstack/react-query'
 import { Check, Info, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import type { Consumable } from '../../../core/consumables'
+import { consumablesOfKind, type Consumable } from '../../../core/consumables'
+import { wearingParts } from '../../../core/maintenance'
 import { getPrinterPreset } from '../../../core/printerPresets'
 import { missingMaterials, missingWearParts, untrackedConsumables, type PartSuggestion } from '../../../core/stock'
 import type { PrinterProfile, PrintType } from '../../../core/types'
 import type { StockLevel } from '../../../core/usage'
 import { useI18n } from '../../i18n'
-import { catalogueQuery } from '../../queries'
+import { catalogueQuery, printerLifetimesQuery } from '../../queries'
 import { formatNumber } from '../priceCalculator/format'
 import { formatStock, LowMarker, StockMovementForm } from './ConsumableStock'
+import { ReplacedButton, WearText } from './PrinterMaintenance'
 
 // A farm with many models could otherwise push the consumables themselves off the first screen.
 const SHOWN_PER_LIST = 4
 
 /**
- * What to buy: tracked consumables that are low or gone, then what the fleet uses that the library lacks, from the
+ * What to buy: tracked consumables that are low or gone, wear parts nearly worn or due on a printer, then what the fleet uses that the library lacks, from the
  * parts catalogue and missing materials. Adding one opens it to be priced.
  */
 export function SupplyNeeds({
@@ -51,7 +53,13 @@ export function SupplyNeeds({
   const materials = missingMaterials(library, printers).filter(({ printType }) => printTypes.includes(printType))
   const catalogue = useQuery(catalogueQuery('parts')).data ?? []
   const parts = missingWearParts(library, printers, catalogue).filter(({ printType }) => printTypes.includes(printType))
-  const nothing = runningOut.length === 0 && materials.length === 0 && parts.length === 0
+  const lifetimes = useQuery(printerLifetimesQuery(workspaceSlug)).data?.lifetimes ?? []
+  const wearing = wearingParts(lifetimes).flatMap(({ printerId, wear }) => {
+    const printer = printers.find(({ id }) => id === printerId)
+    const part = consumablesOfKind(library, 'part').find(({ id }) => id === wear.consumableId)
+    return printer && !printer.archived && part ? [{ printer, part, wear }] : []
+  })
+  const nothing = runningOut.length === 0 && wearing.length === 0 && materials.length === 0 && parts.length === 0
   const untracked = untrackedConsumables(library, levels)
 
   const modelName = (printerPresetId: string) => {
@@ -95,6 +103,22 @@ export function SupplyNeeds({
                 )
               }
               action={<RestockPopover workspaceSlug={workspaceSlug} consumable={consumable} onHand={level.onHand} />}
+            />
+          ))}
+        </NeedList>
+      )}
+      {wearing.length > 0 && (
+        <NeedList title={copy.wearingOut} count={wearing.length}>
+          {wearing.map(({ printer, part, wear }) => (
+            <NeedRow
+              key={`${printer.id}-${part.id}`}
+              name={part.name}
+              detail={
+                <>
+                  {copy.wornOn(printer.name)} · <WearText wear={wear} />
+                </>
+              }
+              action={<ReplacedButton printerId={printer.id} part={part} />}
             />
           ))}
         </NeedList>
