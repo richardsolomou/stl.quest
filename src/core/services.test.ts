@@ -3760,6 +3760,17 @@ describe('STLQuestService crash recovery', () => {
         return id
       }
 
+      async function linkOnly() {
+        const id = await repository.createRequest({
+          name: 'Link',
+          sourceUrl: 'https://example.com/model',
+          quantity: 1,
+          ownerUserId: requester.id,
+        })
+        await repository.updateRequest(id, { printerId: fdm.id })
+        return id
+      }
+
       async function plate(...requestIds: string[]) {
         return await service.createPlate(
           { printerId: fdm.id, otherStuff: false, items: requestIds.map((requestId) => ({ requestId, status: 'todo', copies: 1 })) },
@@ -3780,6 +3791,44 @@ describe('STLQuestService crash recovery', () => {
       async function printing(requestId: string) {
         return (await service.listUsage({ requestId }, admin)).filter((event) => event.stage === 'printing')
       }
+
+      it('lists a plate’s models named by their request tags', async () => {
+        const requestId = await filamentPrint()
+        const { id } = await plate(requestId)
+        const { number } = (await repository.getRequest(requestId))!
+
+        expect((await service.plateModels(id, admin)).models).toEqual([
+          { requestId, name: `SQ-${number} model.stl`, path: 'todo/model.stl', copies: 1 },
+        ])
+      })
+
+      it('leaves prints without a model out of a plate’s models', async () => {
+        const kept = await filamentPrint()
+        const { id } = await plate(kept, await linkOnly())
+
+        expect(await service.plateModels(id, admin)).toMatchObject({ models: [{ requestId: kept }], skipped: 1 })
+      })
+
+      it('refuses a plate with no models at all', async () => {
+        const { id } = await plate(await linkOnly())
+
+        await expect(service.plateModels(id, admin)).rejects.toMatchObject({ status: 409 })
+      })
+
+      it('keeps a plate’s models from members', async () => {
+        const { id } = await plate(await filamentPrint())
+
+        await expect(service.plateModels(id, requester)).rejects.toMatchObject({ status: 403 })
+      })
+
+      it('keeps a plate’s models within its workspace', async () => {
+        const { id } = await plate(await filamentPrint())
+        const other = await repository.scoped((await repository.createWorkspace({ id: admin.id }, 'Second farm')).id)
+        await other.setSetting(USAGE_TRACKING_SETTING, true)
+        const otherService = new STLQuestService(other, assets, staging, eventBus(), telemetry, { remove: removeTusUpload })
+
+        await expect(otherService.plateModels(id, admin)).rejects.toMatchObject({ status: 404 })
+      })
 
       it('lets only admins plan a plate', async () => {
         const requestId = await filamentPrint()

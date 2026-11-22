@@ -8,7 +8,6 @@ import {
   printJobLink,
   printerNamed,
   printerRunCounts,
-  taggedRequestNumber,
   type PrintJob,
 } from './printJobs'
 
@@ -59,24 +58,6 @@ describe('displayedGrams', () => {
 
   it('leaves unknown grams out', () => {
     expect(displayedGrams('Unknown')).toBeUndefined()
-  })
-})
-
-describe('taggedRequestNumber', () => {
-  it('finds the tag a downloaded file carries', () => {
-    expect(taggedRequestNumber('SQ-142 Plasma')).toBe(142)
-  })
-
-  it('finds a tag after underscores became spaces', () => {
-    expect(taggedRequestNumber('Plate 1 SQ-7 Hull')).toBe(7)
-  })
-
-  it('ignores a tag inside another word', () => {
-    expect(taggedRequestNumber('XSQ-7')).toBeUndefined()
-  })
-
-  it('takes no tag when the name has two', () => {
-    expect(taggedRequestNumber('SQ-7 SQ-8 plate')).toBeUndefined()
   })
 })
 

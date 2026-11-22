@@ -1,5 +1,6 @@
 import { wearPartsFor, type Consumable } from './consumables'
 import { printerCostPerMinute, type CostedPrinter, type PriceCalculatorSettings } from './priceCalculator'
+import { taggedRequestNumber } from './request'
 import { consumed, priced, supplied, type UsageDraft, type UsageEvent } from './usage'
 import { workflow, type StatusId } from './workflow'
 
@@ -17,6 +18,16 @@ import { workflow, type StatusId } from './workflow'
 export const MAX_PLATE_PRINTS = 100
 export const MAX_PLATE_OBJECTS = 1_000
 export const MAX_PLATE_FILAMENTS = 32
+/**
+ * The most model data one plate file is built from, each model counted once however many copies it has: models are
+ * converted one at a time, so this bounds the server's memory and how long a slicer waits for the file.
+ */
+export const MAX_PLATE_FILE_BYTES = 256 * 1024 * 1024
+
+/** What a plate's combined file is saved as, which slicers also take as the project's name. */
+export function plateFileName(number: number) {
+  return `stlquest-plate-${number}.3mf`
+}
 
 export const PLATE_SPLIT_METHODS = ['measured', 'volume', 'estimate', 'even'] as const
 export type PlateSplitMethod = (typeof PLATE_SPLIT_METHODS)[number]
@@ -89,25 +100,27 @@ export type PlateSplit = {
 const MODEL_EXTENSION = /\.(stl|3mf|obj|step|stp|amf|ply|oltp)(?=$|[^a-z0-9])/i
 /** What slicers append to a cut or duplicated object: `_A`, `_B_A`, ` (2)`, `-1`. */
 const SLICER_SUFFIX = /(?:_[a-z]|\s*\(\d+\)|-\d+)+$/i
+/** The `SQ-<n> ` that downloads and plate files put in front of a model's name. */
+const REQUEST_TAG_PREFIX = /^SQ-\d+\s+/i
 
 /**
  * A slicer object's name reduced to the model it came from: lower case, without a folder, and without the extension
  * or anything a cut, connector, or copy added after it.
  */
 export function slicedObjectStem(label: string) {
-  const name = label.trim().split(/[\\/]/).at(-1) ?? ''
+  const name = (label.trim().split(/[\\/]/).at(-1) ?? '').replace(REQUEST_TAG_PREFIX, '')
   const extension = MODEL_EXTENSION.exec(name)
   const stem = extension ? name.slice(0, extension.index) : name.replace(SLICER_SUFFIX, '')
   return stem.trim().toLowerCase()
 }
 
 /**
- * The print each object belongs to, by its model's file name, or else the print's name; when several fit, the longest
- * name wins, so `Hull_Bolter` is not taken for `Hull`.
+ * The print each object belongs to: by the request tag a downloaded or plate file named it with, else by its model's
+ * file name, or else the print's name; when several names fit, the longest wins, so `Hull_Bolter` is not taken for `Hull`.
  */
 export function matchSlicedObjects(
   objects: { name?: string }[],
-  prints: { requestId: string; name: string; fileName?: string }[],
+  prints: { requestId: string; number?: number; name: string; fileName?: string }[],
 ): (string | undefined)[] {
   const stems = prints
     .flatMap(({ requestId, name, fileName }) => [
@@ -118,6 +131,9 @@ export function matchSlicedObjects(
     .sort((left, right) => right.stem.length - left.stem.length)
   return objects.map(({ name }) => {
     if (!name) return undefined
+    const tag = taggedRequestNumber(name)
+    const tagged = tag === undefined ? undefined : prints.find(({ number }) => number === tag)
+    if (tagged) return tagged.requestId
     const stem = slicedObjectStem(name)
     return stems.find((candidate) => candidate.stem === stem)?.requestId
   })

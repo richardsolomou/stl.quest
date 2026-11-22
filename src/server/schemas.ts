@@ -484,6 +484,7 @@ export const moveCopiesBatchSchema = z.object({
 })
 
 export const slicerLinkSchema = z.object({ requestId: id, slicer: z.enum(SLICER_IDS) })
+export const plateSlicerLinkSchema = z.object({ plateId: id, slicer: z.enum(SLICER_IDS).optional() })
 
 const settingsItemId = z.string().trim().min(1).max(200)
 const usageAmount = z.number().positive().max(1_000_000)

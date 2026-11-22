@@ -25,6 +25,7 @@ import { DialogProblem } from '../DialogProblem'
 import { DialogShell } from '../DialogShell'
 import { formatUsageAmount } from '../spend/format'
 import { PlateMaterialField, plateMaterialChoice, type MaterialDraft } from './PlateMaterialField'
+import { PlateSlicerButton } from './PlateSlicerButton'
 
 export type PlateMode = 'view' | 'file' | 'totals'
 
@@ -108,7 +109,10 @@ function PlateSummary({ plate, onRecord, onClose }: { plate: PlateView; onRecord
         </>
       }
     >
-      {!recording && <p className="text-sm text-muted-foreground">{copy.dialog.notRecorded}</p>}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        {!recording && <p className="min-w-48 flex-1 text-sm text-muted-foreground">{copy.dialog.notRecorded}</p>}
+        <PlateSlicerButton plate={plate} size="sm" />
+      </div>
       <table className="w-full text-sm" data-plate-prints>
         <thead>
           <tr className="border-b border-border text-left text-xs text-muted-foreground">
@@ -545,7 +549,7 @@ function PlateRecorder({
 }
 
 function printOf(item: PlateView['items'][number]) {
-  return { requestId: item.requestId, name: item.name, fileName: item.fileName }
+  return { requestId: item.requestId, number: item.number, name: item.name, fileName: item.fileName }
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {

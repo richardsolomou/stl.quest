@@ -28,6 +28,13 @@ export const plates: typeof en = {
   uploadFile: 'Importer le fichier du trancheur',
   enterTotals: 'Saisir les totaux',
   open: 'Ouvrir le plateau',
+  slicer: {
+    download: 'Télécharger le fichier du plateau',
+    opensPlate:
+      'Le plateau s’ouvre comme un projet à part, chaque exemplaire étant un objet nommé par l’étiquette SQ de sa demande. Le slicer demande d’abord si un plateau est déjà chargé.',
+    skipped: (count: number) =>
+      `${count} ${count === 1 ? 'impression n’a' : 'impressions n’ont'} pas de fichier de modèle, ${count === 1 ? 'elle n’y est donc pas' : 'elles n’y sont donc pas'}.`,
+  },
   plan: {
     description: (prints, copies) =>
       `${prints} ${prints === 1 ? 'impression' : 'impressions'}, ${copies} ${copies === 1 ? 'exemplaire' : 'exemplaires'}. Une fois tranché, enregistrez ce que le trancheur indique comme consommation.`,

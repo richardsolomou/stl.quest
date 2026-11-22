@@ -66,6 +66,18 @@ describe('matchSlicedObjects', () => {
     expect(matchSlicedObjects([{ name: 'Turret' }], [{ requestId: 'linked', name: 'Turret' }])).toEqual(['linked'])
   })
 
+  it('matches an object by the request tag a plate file named it with', () => {
+    expect(matchSlicedObjects([{ name: 'SQ-12 Chrimera_Turret.stl' }], [hull, { ...turret, number: 12 }])).toEqual(['turret'])
+  })
+
+  it('prefers the tag over a file name that fits another print', () => {
+    expect(matchSlicedObjects([{ name: 'SQ-12 Chrimera_Turret.stl' }], [{ ...hull, number: 12 }, turret])).toEqual(['hull'])
+  })
+
+  it('falls back to the file name when the tag names no print on the plate', () => {
+    expect(matchSlicedObjects([{ name: 'SQ-99 Chrimera_Turret.stl' }], [hull, { ...turret, number: 12 }])).toEqual(['turret'])
+  })
+
   it('leaves an object of a model not on the plate unmatched', () => {
     expect(matchSlicedObjects([{ name: 'Benchy.stl' }], [hull, turret])).toEqual([undefined])
   })

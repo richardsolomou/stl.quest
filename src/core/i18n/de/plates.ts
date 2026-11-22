@@ -29,6 +29,13 @@ export const plates: typeof en = {
   uploadFile: 'Slicer-Datei hochladen',
   enterTotals: 'Summen eingeben',
   open: 'Druckplatte öffnen',
+  slicer: {
+    download: 'Druckplattendatei herunterladen',
+    opensPlate:
+      'Die Druckplatte öffnet sich als eigenes Projekt, jedes Exemplar als Objekt mit dem SQ-Kennzeichen seiner Anfrage. Ist schon eine Druckplatte geladen, fragt der Slicer zuerst.',
+    skipped: (count: number) =>
+      `${count} ${count === 1 ? 'Druck hat' : 'Drucke haben'} keine Modelldatei und ${count === 1 ? 'fehlt' : 'fehlen'} darin.`,
+  },
   plan: {
     description: (prints, copies) =>
       `${prints} ${prints === 1 ? 'Druck' : 'Drucke'}, ${copies} ${copies === 1 ? 'Exemplar' : 'Exemplare'}. Sobald sie gesliced ist, erfasse, was der Slicer als Verbrauch angibt.`,

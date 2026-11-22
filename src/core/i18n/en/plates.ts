@@ -26,6 +26,13 @@ export const plates = {
   uploadFile: 'Upload slicer file',
   enterTotals: 'Enter totals',
   open: 'Open plate',
+  slicer: {
+    download: 'Download plate file',
+    opensPlate:
+      'The plate opens as its own project with each copy as an object named by its request’s SQ tag. The slicer asks first when a plate is already loaded.',
+    skipped: (count: number) =>
+      `${count} ${count === 1 ? 'print has' : 'prints have'} no model file, so ${count === 1 ? 'it is' : 'they are'} not in it.`,
+  },
   plan: {
     description: (prints: number, copies: number) =>
       `${prints} ${prints === 1 ? 'print' : 'prints'}, ${copies} ${copies === 1 ? 'copy' : 'copies'}. Once it’s sliced, record what the slicer says it used.`,

@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import type { Locator, Page } from '@playwright/test'
+import { request as httpRequest, type Locator, type Page } from '@playwright/test'
+import { strFromU8, unzipSync } from 'fflate'
 import { expect, test } from './fixtures/test'
 import { expectWithinViewportWidth } from './fixtures/layout'
 import { boxStl } from './fixtures/stl'
@@ -31,7 +32,9 @@ test('runs a plate as one and sends it back to print again when Bambuddy reports
   const printerDialog = page.getByRole('dialog', { name: /printer/i })
   await printerDialog.getByRole('group', { name: 'Print type' }).getByRole('button', { name: 'Filament' }).click()
   await printerDialog.getByLabel('Name', { exact: true }).fill(printer)
-  await page.getByRole('dialog', { name: printer }).getByRole('button', { name: 'Done' }).click()
+  const printerSettings = page.getByRole('dialog', { name: printer })
+  await choose(printerSettings.getByRole('combobox', { name: 'Slicer' }), 'OrcaSlicer')
+  await printerSettings.getByRole('button', { name: 'Done' }).click()
 
   await page.goto('/')
   for (const name of prints) await upload(page, name)
@@ -47,6 +50,45 @@ test('runs a plate as one and sends it back to print again when Bambuddy reports
   await expect(station.getByRole('button', { name: 'Move plate to Finishing' })).toBeVisible()
   await station.scrollIntoViewIfNeeded()
   await screenshot(page, 'plate-run-station')
+
+  // The plate opens in OrcaSlicer as one 3MF the slicer fetches without the session, every copy named by its tag.
+  await page.evaluate(() => {
+    const navigation = (window as unknown as { navigation: EventTarget }).navigation
+    navigation.addEventListener('navigate', (event) => {
+      const navigate = event as Event & { destination: { url: string } }
+      if (!navigate.destination.url.startsWith('orcaslicer:')) return
+      document.body.dataset.slicerUrl = navigate.destination.url
+      event.preventDefault()
+    })
+  })
+  const openPlate = station.locator(`[data-plate="${plateNumber}"]`).getByRole('button', { name: 'Open in OrcaSlicer' })
+  await openPlate.click()
+  await expect(page.getByText('Opening in OrcaSlicer…')).toBeVisible()
+  await screenshot(page, 'plate-run-opening-in-slicer')
+  const slicerUrl = new URL((await page.locator('body').getAttribute('data-slicer-url'))!)
+  const slicer = await httpRequest.newContext()
+  const served = await slicer.get(slicerUrl.searchParams.get('file')!)
+  expect(served.status()).toBe(200)
+  expect(served.headers()['content-disposition']).toBe(`attachment; filename="stlquest-plate-${plateNumber}.3mf"`)
+  const model = strFromU8(unzipSync(new Uint8Array(await served.body()))['3D/3dmodel.model'])
+  expect([...model.matchAll(/<object id="\d+" name="([^"]+)"/g)].map((match) => match[1].replace(/^SQ-\d+ /, 'SQ-n '))).toEqual(
+    prints.map((name) => `SQ-n ${name}.stl`),
+  )
+  expect(model.match(/<item /g)).toHaveLength(prints.length)
+  await slicer.dispose()
+  await expect(page.getByText('Opening in OrcaSlicer…')).toHaveCount(0, { timeout: 10_000 })
+  await page.setViewportSize({ width: 320, height: 800 })
+  await openPlate.scrollIntoViewIfNeeded()
+  await expectWithinViewportWidth(page, openPlate)
+  await screenshot(page, 'plate-run-station-mobile')
+  await station.getByRole('button', { name: new RegExp(`^Plate #${plateNumber} `) }).click()
+  const plateDialog = page.getByRole('dialog', { name: `Plate #${plateNumber}` })
+  await expectWithinViewportWidth(page, plateDialog.getByRole('button', { name: 'Open in OrcaSlicer' }))
+  await screenshot(page, 'plate-dialog-mobile')
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await screenshot(page, 'plate-dialog')
+  await page.keyboard.press('Escape')
+  await expect(plateDialog).toHaveCount(0)
 
   // Moving one of its cards on its own moves the whole plate.
   await station.getByRole('button', { name: `Off the printer: ${prints[0]}` }).click()

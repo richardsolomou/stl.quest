@@ -1,4 +1,5 @@
 import { heldByPlates, printingPlate, type Plate } from './plates'
+import { taggedRequestNumber } from './request'
 
 /**
  * Prints a printer actually ran, as Bambuddy (github.com/maziggy/bambuddy) reports them through its generic webhook.
@@ -85,12 +86,6 @@ export function displayedMinutes(text?: string) {
 export function displayedGrams(text?: string) {
   const match = /^(\d+(?:\.\d+)?)\s*g?$/i.exec(known(text) ?? '')
   return match ? Number(match[1]) : undefined
-}
-
-/** The request number of the one `SQ-<n>` tag in a job or file name, which downloads from STL Quest carry. */
-export function taggedRequestNumber(name?: string) {
-  const tags = [...new Set([...(name ?? '').matchAll(/(?<![\p{L}\p{N}])SQ-(\d{1,9})(?!\p{N})/giu)].map((match) => Number(match[1])))]
-  return tags.length === 1 ? tags[0] : undefined
 }
 
 /** The print event a Bambuddy notification is, or none for notifications that are not about a print's start or end. */

@@ -149,6 +149,7 @@ import {
   unlinkOwnAccountSchema,
   updateRequestSchema,
   slicerLinkSchema,
+  plateSlicerLinkSchema,
 } from './schemas'
 import { authorizedRequestAsset, requestPrintType } from './requestAssetAccess'
 import { beginCloudStorageAuthorization } from './cloudConnections'
@@ -164,6 +165,7 @@ import { checkForReleaseUpdate } from './releases'
 import { storageDirectories } from './storageDirectories'
 import { resolveStorageInput, storageChangeRequiresMigration, storageConfigurationKind, storageLocationChanged } from './storageConfig'
 import { publicOrigin } from './origins'
+import { checkedPlateModels } from './plateFile'
 import {
   buildStorageCandidate,
   emptyStorageInventory,
@@ -2194,5 +2196,28 @@ export const createSlicerLink = createServerFn({ method: 'POST' })
         print_type: await requestPrintType(context.repository, request),
       })
       return { path: instance.signSlicerLink({ workspaceId: context.workspace.id, requestId: request.id, userId: context.identity.id }) }
+    }),
+  )
+
+/**
+ * A short-lived link to one file holding every model on a plate, each copy its own object named by its request's tag,
+ * for a slicer to fetch without the browser session; it is refused up front when the plate cannot become one file.
+ */
+export const createPlateSlicerLink = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(plateSlicerLinkSchema))
+  .handler(async ({ data }) =>
+    workspaceMutation(data.workspaceSlug, async (context) => {
+      const { models, copies, skipped } = await checkedPlateModels(context, data.plateId)
+      const instance = await app()
+      instance.telemetry.capture(context.identity.id, 'slicer_plate_link_created', {
+        slicer: data.slicer ?? 'none',
+        request_count: models.length,
+        copy_count: copies,
+        skipped_count: skipped,
+      })
+      return {
+        path: instance.signSlicerLink({ workspaceId: context.workspace.id, plateId: data.plateId, userId: context.identity.id }),
+        skipped,
+      }
     }),
   )

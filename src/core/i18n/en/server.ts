@@ -134,6 +134,9 @@ export const server = {
     invalidCharge: 'enter what was charged as an amount of zero or more',
     printerNeeded: 'choose the printer this plate runs on',
     onRunningPlate: (number: number) => `these copies are on plate #${number}; move the plate instead`,
+    noModels: 'no print on this plate has a model file',
+    tooLarge: (limit: string) =>
+      `this plate’s models add up to more than ${limit}, the most one plate file holds; download them one at a time instead`,
   },
   prints: {
     notFound: 'print not found',

@@ -493,7 +493,7 @@ async function createApp() {
 
     /**
      * The workspace a signed slicer link opens, as the member who asked for it, or undefined once the link no longer
-     * verifies or that member has left the workspace; the caller still checks the member may see the request.
+     * verifies or that member has left the workspace; the caller still checks the member may see what it names.
      */
     const slicerLinkWorkspace = async (payload: string, signature: string) => {
       const claims = verifySlicerLink(authSecret, payload, signature)
@@ -502,7 +502,7 @@ async function createApp() {
       if (!membership) return undefined
       return {
         ...(await runtime(membership)),
-        requestId: claims.requestId,
+        link: claims,
         identity: { id: claims.userId, role: identityRole(membership.role) },
       }
     }
