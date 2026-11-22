@@ -11,13 +11,14 @@ import {
   consumablesOfKind,
   partCostPerHour,
   partCostPerPlate,
+  newWearPart,
   wearPartGroups,
   withConsumablePrice,
   type Consumable,
   type WearPartGroup,
 } from '../../../core/consumables'
 import { filamentFromPreset, type FilamentPreset } from '../../../core/filamentPresets'
-import { genericPartPresets, partPresetsForPrinter, type PartPreset } from '../../../core/partPresets'
+import { partPresetsForGroup } from '../../../core/partPresets'
 import { findPreset } from '../../../core/presets'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS, TYPICAL_RESIN_DENSITY_GRAMS_PER_ML } from '../../../core/priceCalculator'
 import { getPrinterPreset } from '../../../core/printerPresets'
@@ -35,7 +36,7 @@ import { catalogueQuery, consumablesQuery, priceCalculatorSettingsQuery, printer
 import { signalProductTourProgress } from '../../productTour'
 import { useUsageTracking, useWorkspacePrintTypes, useWorkspaceSlug } from '../../workspace'
 import { UsageTrackingInvite } from '../UsageTracking'
-import { currencySymbol, formatMoney, formatNumber } from '../priceCalculator/format'
+import { currencySymbol, formatMoney, formatNumber, formatRate } from '../priceCalculator/format'
 import { QueryState } from '../QueryState'
 import { AlsoPrints } from './AlsoPrints'
 import { ConsumableDialog } from './ConsumableDialog'
@@ -87,6 +88,7 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
     useQuery(priceCalculatorSettingsQuery(workspaceSlug)).data?.settings.currency ?? DEFAULT_PRICE_CALCULATOR_SETTINGS.currency
   const symbol = currencySymbol(currency, locale)
   const money = (value: number) => formatMoney(value, currency, locale)
+  const rate = (value: number) => formatRate(value, currency, locale)
   const profiles = useQuery(printersQuery(workspaceSlug)).data?.profiles
   const printers = useMemo(() => profiles ?? [], [profiles])
   const printTypes = useWorkspacePrintTypes()
@@ -123,20 +125,9 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
 
   const addMaterial = (kind: PrintType) => setPicking({ kind })
   const addSupply = () => setEditing({ id: createId(), kind: 'supply', name: '', unit: 'ml', price: Number.NaN })
-  const addCustomPart = (group: WearPartGroup) =>
-    setEditing({
-      id: createId(),
-      kind: 'part',
-      name: '',
-      printType: group.printType,
-      ...(group.printerPresetId && { printerPresetId: group.printerPresetId }),
-      ...(group.printerId && { printerId: group.printerId }),
-      price: Number.NaN,
-      lifespan: Number.NaN,
-      lifespanUnit: group.printType === 'resin' ? 'plates' : 'hours',
-    })
+  const addCustomPart = (group: WearPartGroup) => setEditing(newWearPart(createId(), group))
   const addPart = (group: LabelledGroup) =>
-    !partCatalogue || partPresets(partCatalogue, group).length ? setPicking({ kind: 'part', group }) : addCustomPart(group)
+    !partCatalogue || partPresetsForGroup(partCatalogue, group).length ? setPicking({ kind: 'part', group }) : addCustomPart(group)
   // The catalogue knows no prices, so a part from it opens unpriced, with its list price as a hint.
   const addPresetPart = (suggestion: Pick<PartSuggestion, 'preset' | 'printerPresetId'> & { printerId?: string }) =>
     setEditing(withConsumablePrice(partFromPreset(createId(), suggestion), Number.NaN))
@@ -184,6 +175,7 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
             }
             level={levels.find(({ consumableId }) => consumableId === consumable.id)}
             money={money}
+            rate={rate}
             onOpen={() => setEditing(consumable)}
           />
         )}
@@ -353,7 +345,7 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
       {picking?.kind === 'part' && (
         <PartPicker
           title={copy.parts.addTo(picking.group.label)}
-          presets={partCatalogue && partPresets(partCatalogue, picking.group)}
+          presets={partCatalogue && partPresetsForGroup(partCatalogue, picking.group)}
           had={presetIds(picking.group.parts.map(({ partPresetId }) => partPresetId))}
           onSelect={(preset) =>
             addPresetPart({ preset, printerPresetId: picking.group.printerPresetId, printerId: picking.group.printerId })
@@ -371,7 +363,7 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
           level={levels.find(({ consumableId }) => consumableId === editing.id)}
           printers={printers}
           symbol={symbol}
-          money={money}
+          rate={rate}
           onSave={saveItem}
           onArchive={() => archive(editing)}
           onClose={() => setEditing(null)}
@@ -379,11 +371,6 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
       )}
     </SettingsPage>
   )
-}
-
-/** The catalogue parts a wear-part group can add: its model's own, or those every printer of its type takes. */
-function partPresets(parts: readonly PartPreset[], group: WearPartGroup) {
-  return group.printerPresetId ? partPresetsForPrinter(parts, group.printerPresetId) : genericPartPresets(parts, group.printType)
 }
 
 function presetIds(ids: (string | undefined)[]) {
@@ -455,6 +442,7 @@ function ConsumableRow({
   preset,
   level,
   money,
+  rate,
   onOpen,
 }: {
   consumable: Consumable
@@ -462,6 +450,7 @@ function ConsumableRow({
   preset?: ResinPreset | FilamentPreset
   level?: StockLevel
   money: (value: number) => string
+  rate: (value: number) => string
   onOpen: () => void
 }) {
   const { t, locale } = useI18n()
@@ -492,7 +481,7 @@ function ConsumableRow({
     }
     if (item.kind === 'supply') return copy.supplies.units[item.unit]
     const cost =
-      item.lifespanUnit === 'plates' ? copy.parts.perPlate(money(partCostPerPlate(item))) : copy.parts.perHour(money(partCostPerHour(item)))
+      item.lifespanUnit === 'plates' ? copy.parts.perPlate(rate(partCostPerPlate(item))) : copy.parts.perHour(rate(partCostPerHour(item)))
     return [copy.parts.lasts(formatNumber(item.lifespan, locale), copy.parts.units[item.lifespanUnit]), cost].join(' · ')
   }
 

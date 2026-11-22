@@ -23,6 +23,14 @@ describe('calculator rate format', () => {
     expect(formatRate(0.1494, 'EUR')).toBe('€0.149')
   })
 
+  it('keeps two significant digits on a sub-cent rate', () => {
+    expect(formatRate(23.98 / 5_000, 'EUR')).toBe('€0.0048')
+  })
+
+  it('does not round a tiny rate to zero', () => {
+    expect(formatRate(2.99 / 1_000, 'EUR')).toBe('€0.003')
+  })
+
   it('keeps the currency digits on a rate of one or more', () => {
     expect(formatRate(1.234, 'EUR')).toBe('€1.23')
   })

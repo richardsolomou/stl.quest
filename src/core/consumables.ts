@@ -163,6 +163,21 @@ export function wearPartGroups(consumables: Consumable[], fleet: PrinterProfile[
   return [...typeGroups, ...modelGroups, ...customGroups, ...leftModels, ...leftPrinters]
 }
 
+/** A wear part of the user's own for a group, unpriced and with no lifespan until entered; resin parts wear by the plate, filament ones by the hour. */
+export function newWearPart(id: string, group: Pick<WearPartGroup, 'printType' | 'printerPresetId' | 'printerId'>): PartConsumable {
+  return {
+    id,
+    kind: 'part',
+    name: '',
+    printType: group.printType,
+    ...(group.printerPresetId && { printerPresetId: group.printerPresetId }),
+    ...(group.printerId && { printerId: group.printerId }),
+    price: Number.NaN,
+    lifespan: Number.NaN,
+    lifespanUnit: group.printType === 'resin' ? 'plates' : 'hours',
+  }
+}
+
 /** What a consumable is bought at: per litre of resin, per kilogram of filament, and per supply unit or part. */
 export function consumablePrice(consumable: Consumable) {
   if (consumable.kind === 'resin') return consumable.pricePerLitre

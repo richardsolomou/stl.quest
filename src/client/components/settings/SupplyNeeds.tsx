@@ -1,11 +1,11 @@
 import { useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Check, Plus } from 'lucide-react'
+import { Check, Info, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { Consumable } from '../../../core/consumables'
 import { getPrinterPreset } from '../../../core/printerPresets'
-import { missingMaterials, missingWearParts, type PartSuggestion } from '../../../core/stock'
+import { missingMaterials, missingWearParts, untrackedConsumables, type PartSuggestion } from '../../../core/stock'
 import type { PrinterProfile, PrintType } from '../../../core/types'
 import type { StockLevel } from '../../../core/usage'
 import { useI18n } from '../../i18n'
@@ -50,6 +50,7 @@ export function SupplyNeeds({
   const catalogue = useQuery(catalogueQuery('parts')).data ?? []
   const parts = missingWearParts(library, printers, catalogue).filter(({ printType }) => printTypes.includes(printType))
   const nothing = runningOut.length === 0 && materials.length === 0 && parts.length === 0
+  const untracked = untrackedConsumables(library, levels)
 
   const modelName = (printerPresetId: string) => {
     const preset = getPrinterPreset(printerPresetId)
@@ -64,8 +65,12 @@ export function SupplyNeeds({
         </h2>
         {nothing && (
           <p className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
-            <Check aria-hidden="true" className="size-4 shrink-0 text-success" />
-            {copy.allSet}
+            {untracked ? (
+              <Info aria-hidden="true" className="size-4 shrink-0" />
+            ) : (
+              <Check aria-hidden="true" className="size-4 shrink-0 text-success" />
+            )}
+            {untracked ? copy.untracked(untracked) : copy.allSet}
           </p>
         )}
       </div>

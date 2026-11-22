@@ -2,6 +2,7 @@ import { consumablesOfKind, wearPartsFor, type Consumable, type PartConsumable, 
 import { genericPartPresets, partPresetsForPrinter, type PartCategory, type PartPreset } from './partPresets'
 import { findPreset } from './presets'
 import { PRINT_TYPES, type PrinterProfile, type PrintType } from './types'
+import type { StockLevel } from './usage'
 
 /** What one restock adds when the consumable names no pack size: a 1 L bottle of resin, a 1 kg spool, or one item. */
 export function packSize(consumable: Consumable) {
@@ -9,6 +10,12 @@ export function packSize(consumable: Consumable) {
   if (consumable.kind === 'resin' || consumable.kind === 'filament') return 1_000
   if (consumable.kind === 'part' || consumable.unit === 'item') return 1
   return undefined
+}
+
+/** How many consumables in use have never been stocked, counted, or given a minimum, so nothing checks whether they run low. */
+export function untrackedConsumables(consumables: Consumable[], levels: StockLevel[]) {
+  const tracked = new Set(levels.flatMap((level) => (level.tracked ? [level.consumableId] : [])))
+  return consumables.filter((consumable) => !consumable.archived && !tracked.has(consumable.id)).length
 }
 
 /** A catalogue wear part a fleet's printers take that the library has nothing for. */

@@ -8,6 +8,7 @@ import {
   wearPartGroups,
   wearPartsFor,
   type Consumable,
+  newWearPart,
 } from './consumables'
 import { workspacePrintTypes } from './printTypes'
 import type { PrinterProfile } from './types'
@@ -208,5 +209,22 @@ describe('consumable units', () => {
 
   it('prices a wear part per item', () => {
     expect(consumableUnitPrice(tank)).toBe(60)
+  })
+})
+
+describe('new wear part', () => {
+  it('belongs to a custom printer alone', () => {
+    expect(newWearPart('p', { printType: 'filament', printerId: 'own' })).toMatchObject({ printerId: 'own', lifespanUnit: 'hours' })
+  })
+
+  it('belongs to a catalogue model', () => {
+    expect(newWearPart('p', { printType: 'resin', printerPresetId: 'resin-x' })).toMatchObject({
+      printerPresetId: 'resin-x',
+      lifespanUnit: 'plates',
+    })
+  })
+
+  it('starts unpriced', () => {
+    expect(newWearPart('p', { printType: 'resin' }).price).toBeNaN()
   })
 })

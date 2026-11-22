@@ -255,6 +255,7 @@ export const settings: typeof en = {
       needs: (fields: string) => `Il manque ${fields} pour enregistrer`,
       fields: { name: 'un nom', price: 'un prix', density: 'une densité', lifespan: 'une durée de vie' },
       densityHint: 'La plupart des résines font environ 1,1 g/mL.',
+      priceHint: 'Ce que vous payez, taxes et livraison comprises.',
     },
     resins: {
       title: 'Résines',
@@ -289,8 +290,10 @@ export const settings: typeof en = {
       leftFleet: 'Plus dans votre parc',
       customPrinter: 'Imprimante personnalisée',
       removedPrinter: 'Imprimante supprimée',
-      price: (symbol: string) => `Prix (${symbol})`,
-      lifespan: 'Dure',
+      price: (symbol: string) => `Prix par pièce (${symbol})`,
+      lifespan: 'Durée de vie',
+      lifespanHint:
+        'Donnée en couches ? Environ 1 000 couches font un plateau. Remplacée tous les quelques mois ? Saisissez les heures d’impression qu’elle tourne sur cette période.',
       lifespanUnit: 'Unité de durée de vie',
       units: { plates: 'plateaux', hours: 'heures d’impression' },
       perPlate: (cost: string) => `${cost} par plateau`,
@@ -307,13 +310,14 @@ export const settings: typeof en = {
       resin: 'Taille de bouteille (L)',
       filament: 'Taille de bobine (kg)',
       part: 'Pièces par lot',
+      partHint: 'Facultatif. Permet de réapprovisionner par lot ; le prix reste par pièce.',
       supply: { ml: 'Taille du lot (L)', g: 'Taille du lot (kg)', item: 'Pièces par lot' },
       hint: 'Facultatif. Permet de réapprovisionner par lot.',
     },
     listPrice: (seller: string, price: string, date: string) => `${seller} l’affichait à ${price} le ${date}.`,
     listPackPrice: (seller: string, pack: number, price: string, each: string, date: string) =>
       `${seller} affichait un lot de ${pack} à ${price} (${each} pièce) le ${date}.`,
-    listPriceHint: 'Saisissez ce que vous payez.',
+    listPriceHint: 'Saisissez ce que vous payez, taxes et livraison comprises.',
     listPriceSource: 'Page boutique',
     stock: {
       title: 'Stock',
@@ -357,6 +361,8 @@ export const settings: typeof en = {
       title: 'Ce qu’il vous faut',
       description: 'Ce qui s’épuise, et ce que vos imprimantes utilisent mais qui manque dans la liste ci-dessous.',
       allSet: 'Rien à prévoir. Tout ce qui est suivi dépasse son minimum, et vos imprimantes ont les pièces connues du catalogue.',
+      untracked: (count: number) =>
+        `Rien de suivi ne s’épuise, mais ${count} ${count === 1 ? 'article n’a' : 'articles n’ont'} aucun stock enregistré et ne ${count === 1 ? 'est' : 'sont'} donc pas vérifié${count === 1 ? '' : 's'}. Ajoutez du stock pour ${count === 1 ? 'le' : 'les'} suivre.`,
       runningOut: 'Bientôt épuisé',
       missing: 'Absent de votre liste',
       partFits: (model: string, printers: number) => `${model} · ${printers} imprimante${printers > 1 ? 's' : ''}`,
@@ -481,7 +487,8 @@ export const settings: typeof en = {
       minutesPerUse: 'Minutes par utilisation',
       minutesHint: 'Un cycle de lavage, de polymérisation ou de séchage.',
       supplies: 'Fournitures consommées',
-      suppliesHint: 'Ce que chaque cycle consomme, dans l’unité du consommable.',
+      suppliesHint:
+        'Ce que chaque cycle consomme, dans l’unité du consommable. Pour un bain, divisez son volume par le nombre de cycles entre deux changements : 8 L changés tous les 40 cycles font 200 ml.',
       supplyAmount: (name: string) => `Quantité de ${name} par utilisation`,
       removeSupply: (name: string) => `Retirer ${name}`,
       missingSupply: 'N’est plus dans les consommables',
@@ -492,9 +499,9 @@ export const settings: typeof en = {
       noConsumables: 'Votre liste de consommables est vide.',
       units: { ml: 'ml', g: 'g', item: 'pièces', plate: 'plateaux', minute: 'min' },
       wear: 'Usure',
-      wearHint: 'Facultatif. Répartit son prix d’achat sur ses heures de fonctionnement.',
+      wearHint: 'Facultatif. Répartit ce que vous avez payé, taxes et livraison comprises, sur ses heures de fonctionnement.',
       purchasePrice: (symbol: string) => `Prix d’achat (${symbol})`,
-      lifespanHours: 'Durée de vie (heures)',
+      lifespanHours: 'Durée de vie (heures d’utilisation)',
       perHour: (cost: string) => `${cost} par heure d’utilisation`,
       archive: 'Archiver',
     },
@@ -579,6 +586,8 @@ export const settings: typeof en = {
         `Les devis comptent une usure typique de ${cost} par heure d’impression tant que vous n’indiquez pas le prix de cette imprimante et ses heures d’impression.`,
       purchasePrice: (symbol: string) => `Prix d’achat (${symbol})`,
       lifespanHours: 'Durée de vie (heures d’impression)',
+      wearHint:
+        'Saisissez ce que vous avez payé, taxes, livraison et modules compris, moins ce que vous comptez en tirer à la revente. La durée de vie couvre le châssis et la mécanique, les pièces d’usure étant comptées à part ; la plupart des machines durent 2 000 à 10 000 heures d’impression.',
       wearPerHour: (cost: string) => `Usure de ${cost} par heure d’impression.`,
       addOns: 'Modules ajoutés',
       addOnsHint:
@@ -594,7 +603,8 @@ export const settings: typeof en = {
         title: 'Entretien',
         hint: 'Les pièces d’usure de cette imprimante, comptées sur les impressions depuis leur dernier remplacement.',
         empty: 'Aucune pièce d’usure pour cette imprimante.',
-        manage: 'Les ajouter dans Consommables',
+        add: 'Ajouter une pièce',
+        editLabel: (part: string) => `Modifier ${part}`,
         wear: (used: string, lifespan: string, unit: 'plates' | 'hours') =>
           `${used} sur ${lifespan} ${unit === 'plates' ? 'impressions' : 'heures d’impression'}`,
         due: 'À remplacer',

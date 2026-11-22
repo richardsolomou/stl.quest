@@ -1,18 +1,26 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from '@tanstack/react-router'
+import { Plus } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { FieldError } from '@/components/ui/field'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
-import { wearPartsFor, type PartConsumable } from '../../../core/consumables'
+import { newWearPart, wearPartsFor, withConsumablePrice, type Consumable, type PartConsumable } from '../../../core/consumables'
+import { partPresetsForGroup } from '../../../core/partPresets'
+import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from '../../../core/priceCalculator'
+import { partFromPreset } from '../../../core/stock'
 import { partWear, type PartWear } from '../../../core/maintenance'
 import type { PrinterProfile } from '../../../core/types'
 import type { StockLevel } from '../../../core/usage'
 import { useI18n } from '../../i18n'
-import { consumablesQuery, stockQuery, usageQuery } from '../../queries'
+import { createId } from '../../id'
+import { useInventory } from '../../inventory'
+import { catalogueQuery, consumablesQuery, priceCalculatorSettingsQuery, printersQuery, stockQuery, usageQuery } from '../../queries'
 import { useWorkspaceSlug } from '../../workspace'
-import { formatNumber } from '../priceCalculator/format'
+import { currencySymbol, formatNumber, formatRate } from '../priceCalculator/format'
+import { ConsumableDialog } from './ConsumableDialog'
+import { PartPicker } from './ConsumablePicker'
 import { useStockMovements } from './ConsumableStock'
 
 // From here a part reads as nearly worn, so a replacement can be ordered in time.
@@ -23,36 +31,44 @@ const NEARLY_WORN = 0.8
  * Logging a replacement takes a spare off the shelf and starts the count again.
  */
 export function PrinterMaintenance({ printer }: { printer: PrinterProfile }) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const copy = t.settings.printers.dialog.maintenance
   const workspaceSlug = useWorkspaceSlug()
   const consumables = useQuery(consumablesQuery(workspaceSlug)).data?.consumables
   const events = useQuery(usageQuery(workspaceSlug, { printerId: printer.id })).data?.events
   const levels = useQuery(stockQuery(workspaceSlug)).data?.stock ?? []
+  const printers = useQuery(printersQuery(workspaceSlug)).data?.profiles ?? []
+  const catalogue = useQuery(catalogueQuery('parts')).data
+  const currency =
+    useQuery(priceCalculatorSettingsQuery(workspaceSlug)).data?.settings.currency ?? DEFAULT_PRICE_CALCULATOR_SETTINGS.currency
+  const { save, setArchived } = useInventory('consumables')
+  const [picking, setPicking] = useState(false)
+  const [editing, setEditing] = useState<Consumable | null>(null)
   if (!consumables || !events) return null
   const parts = wearPartsFor(consumables, printer.printType, printer)
+  // A catalogue printer's parts belong to its model, as on the Consumables page; a custom printer's to it alone.
+  const group = printer.presetId
+    ? { printType: printer.printType, printerPresetId: printer.presetId }
+    : { printType: printer.printType, printerId: printer.id }
+  const presets = catalogue && partPresetsForGroup(catalogue, group)
+  const add = () => (!catalogue || presets?.length ? setPicking(true) : setEditing(newWearPart(createId(), group)))
+  const failed = () => void toast.error(t.settings.consumables.notSaved)
+  const archive = (part: Consumable) => {
+    setEditing(null)
+    setArchived(part.id, true).catch(failed)
+  }
   return (
     <section className="grid gap-2" aria-labelledby="printer-maintenance">
-      <div className="grid gap-0.5">
-        <h3 id="printer-maintenance" className="text-sm font-medium">
-          {copy.title}
-        </h3>
-        <p className="text-sm text-muted-foreground">
-          {parts.length ? (
-            copy.hint
-          ) : (
-            <>
-              {copy.empty}{' '}
-              <Link
-                to="/settings/$section"
-                params={{ section: 'consumables' }}
-                className="font-medium text-foreground underline underline-offset-2"
-              >
-                {copy.manage}
-              </Link>
-            </>
-          )}
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="grid gap-0.5">
+          <h3 id="printer-maintenance" className="text-sm font-medium">
+            {copy.title}
+          </h3>
+          <p className="text-sm text-muted-foreground">{parts.length ? copy.hint : copy.empty}</p>
+        </div>
+        <Button type="button" size="sm" variant="outline" onClick={add}>
+          <Plus /> {copy.add}
+        </Button>
       </div>
       {parts.length > 0 && (
         <ul className="grid divide-y rounded-lg border bg-muted/20 px-3">
@@ -64,9 +80,35 @@ export function PrinterMaintenance({ printer }: { printer: PrinterProfile }) {
               part={part}
               wear={partWear(events, printer.id, part)}
               level={levels.find(({ consumableId }) => consumableId === part.id)}
+              onEdit={() => setEditing(part)}
             />
           ))}
         </ul>
+      )}
+      {picking && (
+        <PartPicker
+          title={t.settings.consumables.parts.addTo(printer.name)}
+          presets={presets}
+          had={new Set(parts.flatMap(({ partPresetId }) => (partPresetId ? [partPresetId] : [])))}
+          onSelect={(preset) => setEditing(withConsumablePrice(partFromPreset(createId(), { preset, ...group }), Number.NaN))}
+          onCustom={() => setEditing(newWearPart(createId(), group))}
+          onClose={() => setPicking(false)}
+        />
+      )}
+      {editing && (
+        <ConsumableDialog
+          key={editing.id}
+          consumable={editing}
+          isNew={!consumables.some(({ id }) => id === editing.id)}
+          workspaceSlug={workspaceSlug}
+          level={levels.find(({ consumableId }) => consumableId === editing.id)}
+          printers={printers}
+          symbol={currencySymbol(currency, locale)}
+          rate={(value) => formatRate(value, currency, locale)}
+          onSave={save}
+          onArchive={() => archive(editing)}
+          onClose={() => setEditing(null)}
+        />
       )}
     </section>
   )
@@ -78,12 +120,14 @@ function WearPartRow({
   part,
   wear,
   level,
+  onEdit,
 }: {
   workspaceSlug: string
   printerId: string
   part: PartConsumable
   wear: PartWear
   level?: StockLevel
+  onEdit: () => void
 }) {
   const { t, locale } = useI18n()
   const copy = t.settings.printers.dialog.maintenance
@@ -100,7 +144,14 @@ function WearPartRow({
     <li className="grid gap-1.5 py-2.5">
       <div className="flex min-w-0 items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium [overflow-wrap:anywhere]">{part.name}</p>
+          <button
+            type="button"
+            className="cursor-pointer text-left text-sm font-medium [overflow-wrap:anywhere] underline-offset-2 hover:underline"
+            aria-label={copy.editLabel(part.name)}
+            onClick={onEdit}
+          >
+            {part.name}
+          </button>
           <p className={cn('font-mono text-xs tabular-nums', wear.due ? 'font-semibold text-destructive' : 'text-muted-foreground')}>
             {wear.due && `${copy.due} · `}
             {copy.wear(formatNumber(wear.used, locale, wear.unit === 'hours' ? 1 : 0), formatNumber(wear.lifespan, locale), wear.unit)}
