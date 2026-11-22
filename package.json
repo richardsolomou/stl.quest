@@ -1,6 +1,6 @@
 {
   "name": "stl.quest",
-  "version": "2.13.0",
+  "version": "2.14.0",
   "private": true,
   "description": "A private 3D-print request and production queue for resin and filament printers.",
   "homepage": "https://stl.quest",

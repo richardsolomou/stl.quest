@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.14.0
+
+### Minor Changes
+
+- 7146d2d: Open a whole plate in its printer's slicer, or download it as one 3MF, so that every copy on the plate arrives as its own object named with its request's SQ tag and a sliced plate file maps its objects back to their prints by that tag.
+
 ## 2.13.0
 
 ### Minor Changes
