@@ -13,7 +13,7 @@ import { requestDownloadHref } from '../boardDownload'
 import { signalProductTourProgress } from '../productTour'
 import { consumablesQuery, printersQuery, usagePrefillsQuery } from '../queries'
 import { useI18n } from '../i18n'
-import { useWorkspaceSlug } from '../workspace'
+import { useUsageTracking, useWorkspaceSlug } from '../workspace'
 
 export function RequestDownloadButton({ request, isAdmin }: { request: PublicPrintRequest; isAdmin: boolean }) {
   const { t } = useI18n()
@@ -38,16 +38,18 @@ export function RequestDownloadButton({ request, isAdmin }: { request: PublicPri
 }
 
 /**
- * The slicer the request's printer sends its files to, or the material last printed on that printer when it names its
- * own; only admins set printers up, so only they see it.
+ * The slicer the request's printer sends its files to, or the material last recorded on that printer when it names its
+ * own, which only usage tracking knows; only admins set printers up, so only they see it.
  */
 function useRequestSlicer(request: PublicPrintRequest, isAdmin: boolean) {
   const workspaceSlug = useWorkspaceSlug()
+  const tracking = useUsageTracking()
   const printer = useQuery({ ...printersQuery(workspaceSlug), enabled: isAdmin }).data?.profiles.find(
     ({ id }) => id === request.printer?.id,
   )
-  const consumables = useQuery({ ...consumablesQuery(workspaceSlug), enabled: Boolean(printer) }).data?.consumables
-  const loaded = useQuery({ ...usagePrefillsQuery(workspaceSlug), enabled: Boolean(printer) }).data?.materials[printer?.id ?? '']
+  const materials = Boolean(printer) && tracking
+  const consumables = useQuery({ ...consumablesQuery(workspaceSlug), enabled: materials }).data?.consumables
+  const loaded = useQuery({ ...usagePrefillsQuery(workspaceSlug), enabled: materials }).data?.materials[printer?.id ?? '']
   const material = consumables?.find((consumable) => consumable.id === loaded && !consumable.archived)
   return resolvedSlicer(printer, material && (material.kind === 'resin' || material.kind === 'filament') ? material : undefined)
 }

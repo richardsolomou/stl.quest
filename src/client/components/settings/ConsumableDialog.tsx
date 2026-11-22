@@ -319,7 +319,7 @@ export function ConsumableDialog({
         )}
         <StockFields consumable={draft} tracking={tracking} onChange={setDraft} />
       </div>
-      {(draft.kind === 'resin' || draft.kind === 'filament') && (
+      {tracking && (draft.kind === 'resin' || draft.kind === 'filament') && (
         <SlicerField
           id="consumable-slicer"
           printType={draft.kind}
