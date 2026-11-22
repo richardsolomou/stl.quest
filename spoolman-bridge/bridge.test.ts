@@ -564,6 +564,52 @@ describe('sendSlicedFiles', () => {
     expect(skipped).toEqual(new Set(['5']))
   })
 
+  it('moves on to the next run when STL Quest fails on one', async () => {
+    const reader = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const target = href(url)
+      if (target.startsWith('http://bambuddy:8000/')) return new Response(file)
+      if (init?.method !== 'POST')
+        return json({
+          runs: [
+            { run_id: '5', archive_id: '12' },
+            { run_id: '6', archive_id: '13' },
+          ],
+        })
+      await new Response(init.body).arrayBuffer()
+      return new Response(null, { status: target.includes('run_id=5') ? 500 : 204 })
+    })
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), reader)
+
+    expect(calls(reader).filter((call) => call.startsWith('POST'))).toHaveLength(2)
+  })
+
+  it('sends a file STL Quest failed on again next poll', async () => {
+    const skipped = new Set<string>()
+    const reader = fetcher({ upload: 500 })
+
+    await sendSlicedFiles(bambuddy, runs, skipped, reader)
+    await sendSlicedFiles(bambuddy, runs, skipped, reader)
+
+    expect(calls(reader).filter((call) => call.startsWith('POST'))).toHaveLength(2)
+  })
+
+  it('does not tell STL Quest a file it failed on is unavailable', async () => {
+    const reader = fetcher({ upload: 503 })
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), reader)
+
+    expect(calls(reader).filter((call) => call.startsWith('DELETE'))).toEqual([])
+  })
+
+  it('says STL Quest failed on a file', async () => {
+    const log = vi.fn()
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), fetcher({ upload: 500 }), log)
+
+    expect(log).toHaveBeenCalledWith('STL Quest answered 500 for the sliced file of run 5; sending it again next poll')
+  })
+
   it('says a key without archive access was refused', async () => {
     const reader = fetcher({ download: () => json({ detail: 'Forbidden' }, 403) })
 

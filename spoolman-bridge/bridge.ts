@@ -314,6 +314,7 @@ export async function syncPrints(
 
 /** The most a sliced file may be for STL Quest to take it, as `MAX_SLICED_FILE_BYTES` in STL Quest says. */
 export const MAX_SLICED_FILE_BYTES = 64 * 1024 * 1024
+const SERVER_ERRORS = Array.from({ length: 100 }, (_, index) => 500 + index)
 /** Sliced files sent a poll at most; each can be tens of MB. */
 const MAX_SLICED_PER_POLL = 3
 /** Downloading a large file from Bambuddy and sending it on can take a while on a slow uplink. */
@@ -376,12 +377,16 @@ export async function sendSlicedFiles(
     }
     const query = new URLSearchParams({ run_id: runId, ...(printed?.plate_id && { plate: String(printed.plate_id) }) })
     const response = await stlQuest(config, `${config.slicedUrl}?${query}`, file.body, fetcher, {
-      passed: [404, 413, 422],
+      passed: [404, 413, 422, ...SERVER_ERRORS],
       timeoutMs: SLICED_TIMEOUT_MS,
     })
     if (response.ok) log(`sent the sliced file of run ${runId} to STL Quest`)
     else if (response.status === 404) log(`STL Quest has not received run ${runId} yet; sending its sliced file again next poll`)
-    else await skip(await refusalOf(response), response.status !== 422)
+    else if (response.status >= 500) {
+      // One file failing must not hold back the runs after it.
+      await response.body?.cancel()
+      log(`STL Quest answered ${response.status} for the sliced file of run ${runId}; sending it again next poll`)
+    } else await skip(await refusalOf(response), response.status !== 422)
   }
 }
 
