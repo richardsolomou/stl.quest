@@ -67,16 +67,19 @@ export type SpoolmanFilament = {
 /** A Spoolman filament someone linked by hand; a null consumable keeps it linked to none. */
 export type SpoolmanLink = { filamentId: number; consumableId: string | null }
 
-/** How a Spoolman filament found its library filament: chosen by hand, by its SpoolmanDB ID, or by brand, material, and colour. */
-export type SpoolmanMatch = { consumableId: string; by: 'manual' | 'catalogue' | 'colour' }
+/**
+ * How a Spoolman filament found its library filament: chosen by hand, by its SpoolmanDB ID, by brand, material, and
+ * colour, or by its name among the filaments of its brand and material.
+ */
+export type SpoolmanMatch = { consumableId: string; by: 'manual' | 'catalogue' | 'colour' | 'name' }
 
 /**
  * The filament catalogue as matching reads it: each SpoolmanDB ID stem's catalogue product and colour name, and each
- * product's brand and material.
+ * product's brand, material, and name.
  */
 export type SpoolmanCatalogue = {
   colours: Record<string, readonly [presetId: string, colour: string]>
-  presets: Record<string, readonly [brand: string, material: string]>
+  presets: Record<string, readonly [brand: string, material: string, product: string]>
 }
 
 /**
@@ -125,8 +128,9 @@ export function spoolmanFilaments(spools: SpoolmanSpool[]): SpoolmanFilament[] {
 
 /**
  * The library filament each Spoolman filament is: the one linked by hand, else the catalogue colour its SpoolmanDB ID
- * names, else the only catalogued filament of its brand, material, and colour. A match that fits more than one library
- * filament is left for someone to link.
+ * names, else the only catalogued filament of its brand, material, and colour, else the only one of those (or, without
+ * a colour hex, of its brand and material) its name fits. A match that fits more than one library filament is left for
+ * someone to link.
  */
 export function matchSpoolmanFilaments(
   filaments: SpoolmanFilament[],
@@ -151,23 +155,48 @@ export function matchSpoolmanFilaments(
       matches.set(filament.id, { consumableId: byCatalogue, by: 'catalogue' })
       continue
     }
-    const byColour =
-      filament.vendor && filament.material && filament.colourHex
-        ? only(
-            library.filter(({ filamentPresetId, colour }) => {
-              const preset = filamentPresetId ? catalogue.presets[filamentPresetId] : undefined
-              return (
-                preset &&
-                sameText(preset[0], filament.vendor) &&
-                sameText(preset[1], filament.material) &&
-                colour?.hex.toUpperCase() === filament.colourHex!.toUpperCase()
-              )
-            }),
-          )
-        : undefined
-    if (byColour) matches.set(filament.id, { consumableId: byColour, by: 'colour' })
+    if (!filament.vendor || !filament.material) continue
+    const candidates = library.filter(({ filamentPresetId, colour }) => {
+      const preset = filamentPresetId ? catalogue.presets[filamentPresetId] : undefined
+      return (
+        preset &&
+        sameText(preset[0], filament.vendor) &&
+        sameText(preset[1], filament.material) &&
+        (!filament.colourHex || colour?.hex.toUpperCase() === filament.colourHex.toUpperCase())
+      )
+    })
+    const byColour = filament.colourHex && only(candidates)
+    if (byColour) {
+      matches.set(filament.id, { consumableId: byColour, by: 'colour' })
+      continue
+    }
+    const byName =
+      filament.name &&
+      only(
+        candidates.filter(({ filamentPresetId, colour }) =>
+          namesFilament(filament.name!, catalogue.presets[filamentPresetId!], colour?.name),
+        ),
+      )
+    if (byName) matches.set(filament.id, { consumableId: byName, by: 'name' })
   }
   return matches
+}
+
+/**
+ * Whether a name typed into Spoolman, such as "PLA Basic Black" or "Matte Charcoal", is this catalogue product in this
+ * colour: it gives every word of the colour and nothing the product and colour don't, in any order, with or without
+ * the brand and material.
+ */
+function namesFilament(name: string, [brand, material, product]: readonly [string, string, string], colour: string | undefined) {
+  const words = (value: string) =>
+    value
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter(Boolean)
+  const colourWords = words(colour ?? '')
+  const known = new Set([...words(brand), ...words(material), ...words(product), ...colourWords])
+  const given = new Set(words(name))
+  return colourWords.length > 0 && colourWords.every((word) => given.has(word)) && [...given].every((word) => known.has(word))
 }
 
 /** Stock per library filament from the Spoolman filaments matched to it. */

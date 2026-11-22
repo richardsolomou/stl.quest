@@ -58,6 +58,7 @@ A Spoolman filament finds its library filament in this order:
 1. **Chosen by hand** under **Settings → Spoolman → Filaments**, including **Not counted**.
 2. **Its SpoolmanDB entry.** Filaments Spoolman imported from [SpoolmanDB](https://github.com/Donkie/SpoolmanDB) keep its ID as `external_id`, such as `bambulab_pla_mattecharcoal_1000_175_n`. STL Quest's filament catalogue comes from SpoolmanDB and records each colour's ID without the weight, diameter, and spool type, so the ID finds the catalogue product and colour (Matte PLA · Charcoal), then the library filament with that product and colour. SpoolmanDB's IDs carry the product line only through the colour's name ("Matte Charcoal", "White Marble"), so an ID two catalogue colours share is not used.
 3. **Brand, material, and colour**: the only catalogued library filament whose brand, material, and colour hex match the Spoolman filament.
+4. **Brand, material, and name**: when several catalogued library filaments share that brand, material, and colour hex, or the Spoolman filament has no hex, the only one of them its name fits. A name fits when it gives every word of the colour and no word that the catalogue product and colour don't, in any order and with or without the brand and material, so "PLA Basic Black", "Matte Charcoal", and "PLA Matte Charcoal" each find one product, while "Black" is left alone when the library has two black products.
 
 A match that fits more than one library filament is left for you to choose.
 

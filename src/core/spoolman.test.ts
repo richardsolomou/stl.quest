@@ -9,6 +9,7 @@ import {
   type SpoolmanLink,
   type SpoolmanSpool,
 } from './spoolman'
+import { SPOOLMAN_CATALOGUE } from './spoolmanCatalogue'
 
 const spool = (overrides: Partial<SpoolmanSpool> = {}): SpoolmanSpool => ({
   id: 1,
@@ -40,8 +41,9 @@ const catalogue: SpoolmanCatalogue = {
     bambulab_pla_mattecharcoal: ['filament-bambu-lab-matte-pla', 'Charcoal'],
   },
   presets: {
-    'filament-bambu-lab-pla': ['Bambu Lab', 'PLA'],
-    'filament-bambu-lab-matte-pla': ['Bambu Lab', 'PLA'],
+    'filament-bambu-lab-pla': ['Bambu Lab', 'PLA', 'PLA Basic'],
+    'filament-bambu-lab-matte-pla': ['Bambu Lab', 'PLA', 'Matte PLA'],
+    'filament-bambu-lab-silk-pla': ['Bambu Lab', 'PLA', 'Silk+ PLA'],
   },
 }
 
@@ -95,9 +97,71 @@ describe('matchSpoolmanFilaments', () => {
     })
   })
 
-  it('leaves a fallback that fits two library filaments unmatched', () => {
+  it('leaves a fallback that fits two library filaments and has no name unmatched', () => {
     const matte = filament({ id: 'matte', filamentPresetId: 'filament-bambu-lab-matte-pla', colour: { name: 'Charcoal', hex: '#000000' } })
-    expect(match([spool({ externalId: undefined })], [filament(), matte])).toBeUndefined()
+    expect(match([spool({ externalId: undefined, filamentName: undefined })], [filament(), matte])).toBeUndefined()
+  })
+
+  describe('by name, for a filament typed into Spoolman', () => {
+    const basic = filament({ name: 'Bambu Lab PLA Basic · Black' })
+    const matte = filament({
+      id: 'matte',
+      name: 'Bambu Lab Matte PLA · Charcoal',
+      filamentPresetId: 'filament-bambu-lab-matte-pla',
+      colour: { name: 'Charcoal', hex: '#000000' },
+    })
+    const typed = (filamentName: string, overrides: Partial<SpoolmanSpool> = {}) =>
+      spool({ externalId: undefined, filamentName, ...overrides })
+
+    it('tells two products of one colour apart by the product in the name', () => {
+      expect(match([typed('PLA Basic Black')], [basic, matte])).toEqual({ consumableId: 'basic-black', by: 'name' })
+    })
+
+    it('matches a name without the brand or material words', () => {
+      expect(match([typed('Matte Charcoal')], [basic, matte])?.consumableId).toBe('matte')
+    })
+
+    it('matches a name with the material words in another order', () => {
+      expect(match([typed('PLA Matte Charcoal')], [basic, matte])?.consumableId).toBe('matte')
+    })
+
+    it('matches a name that includes the brand, ignoring case and punctuation', () => {
+      expect(match([typed('bambu-lab matte pla, CHARCOAL')], [basic, matte])?.consumableId).toBe('matte')
+    })
+
+    it('matches a name that gives only the colour when one candidate has it', () => {
+      expect(match([typed('Charcoal')], [basic, matte])?.consumableId).toBe('matte')
+    })
+
+    it('leaves a name that fits two candidates unmatched', () => {
+      const silk = filament({ id: 'silk', filamentPresetId: 'filament-bambu-lab-silk-pla', colour: { name: 'Black', hex: '#000000' } })
+      expect(match([typed('Black')], [basic, silk])).toBeUndefined()
+    })
+
+    it('leaves a name that names no candidate unmatched', () => {
+      expect(match([typed('Galaxy Black')], [basic, matte])).toBeUndefined()
+    })
+
+    it('needs the name to give the colour, not only the product', () => {
+      expect(match([typed('Matte PLA')], [basic, matte])).toBeUndefined()
+    })
+
+    it('matches by name when Spoolman has no colour hex', () => {
+      expect(match([typed('Matte Charcoal', { colourHex: undefined })], [basic, matte])).toEqual({ consumableId: 'matte', by: 'name' })
+    })
+
+    it('needs the brand to agree when matching by name', () => {
+      expect(match([typed('Matte Charcoal', { colourHex: undefined, vendor: 'Polymaker' })], [basic, matte])).toBeUndefined()
+    })
+
+    it('tells PLA Basic Black from Matte Charcoal with the generated catalogue', () => {
+      const found = matchSpoolmanFilaments(spoolmanFilaments([typed('PLA Basic Black')]), [basic, matte], [], SPOOLMAN_CATALOGUE)
+      expect(found.get(10)).toEqual({ consumableId: 'basic-black', by: 'name' })
+    })
+
+    it('keeps matching by colour when only one candidate has it', () => {
+      expect(match([typed('Something Else')], [basic])).toEqual({ consumableId: 'basic-black', by: 'colour' })
+    })
   })
 
   it('ignores archived library filaments', () => {

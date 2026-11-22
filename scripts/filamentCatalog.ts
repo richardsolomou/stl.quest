@@ -109,7 +109,7 @@ export function parseSpoolmanFilaments(files: { path: string; contents: string }
 
 /**
  * What matching Spoolman filaments needs: each SpoolmanDB ID stem's product and colour, leaving out a stem two colours
- * share, and each product's brand and material.
+ * share, and each product's brand, material, and name.
  */
 function spoolmanCatalogue(presets: ParsedPreset[]): SpoolmanCatalogue {
   const found = new Map<string, [string, string][]>()
@@ -122,7 +122,9 @@ function spoolmanCatalogue(presets: ParsedPreset[]): SpoolmanCatalogue {
         .flatMap(([stem, owners]): [string, [string, string]][] => (owners.length === 1 ? [[stem, owners[0]]] : []))
         .sort(([left], [right]) => left.localeCompare(right)),
     ),
-    presets: Object.fromEntries(presets.flatMap((preset) => (preset.colors ? [[preset.id, [preset.brand, preset.type ?? '']]] : []))),
+    presets: Object.fromEntries(
+      presets.flatMap((preset) => (preset.colors ? [[preset.id, [preset.brand, preset.type ?? '', preset.name]]] : [])),
+    ),
   }
 }
 
