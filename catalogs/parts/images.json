@@ -426,6 +426,22 @@
       "checkedAt": "2026-11-22"
     },
     {
+      "presetId": "part-formlabs-build-platform-2-print-surface",
+      "sourcePageUrl": "https://dental.formlabs.com/products/build-platform-2/",
+      "sourceUrl": "https://dental-media.formlabs.com/filer_public_thumbnails/filer_public/79/b6/79b683a9-21a3-4060-b401-bcf330823d21/bp2-1_1.png__640x0_subsampling-2.png",
+      "note": "Shows the whole Build Platform 2; the print surface is its stainless sheet, and Formlabs has no photo of the surface alone.",
+      "src": "/part-presets/part-formlabs-build-platform-2-print-surface.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "part-formlabs-build-platform-2l-print-surface",
+      "sourcePageUrl": "https://formlabs.com/support/Printing-with-the-Build-Platform-2L/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/13/d7/13d7e3c3-b9ff-4f4b-9ed7-3854feff1bd8/optimized_for_web_png-formlabs_build20platform202l_02628129.png",
+      "note": "Shows the whole Build Platform 2L; the print surface is its stainless sheet, and Formlabs has no photo of the surface alone.",
+      "src": "/part-presets/part-formlabs-build-platform-2l-print-surface.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
       "presetId": "part-formlabs-form-3-resin-tank-v2-1",
       "sourcePageUrl": "https://formlabs.com/products/form-3-resin-tank/",
       "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/76/25/7625d5d8-0596-459c-a44b-67a593b8d036/12222020_f3_tank_v2_1_013.png",
