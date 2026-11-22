@@ -974,7 +974,8 @@ export const settings = {
     used: 'Deleting it also changes:',
     requests: (count: number) => `${count} ${count === 1 ? 'print loses its' : 'prints lose their'} printer`,
     plates: (count: number) => `${count} ${count === 1 ? 'plate loses its' : 'plates lose their'} printer`,
-    usage: (count: number) => `${count} usage ${count === 1 ? 'record keeps its' : 'records keep their'} cost but no longer link to it`,
+    usage: (count: number) =>
+      `${count} usage ${count === 1 ? 'record keeps its cost but no longer links' : 'records keep their cost but no longer link'} to it`,
     stock: (count: number) => `${count} stock ${count === 1 ? 'movement no longer links' : 'movements no longer link'} to it`,
     supplies: (count: number) => `${count} ${count === 1 ? 'piece of equipment stops' : 'pieces of equipment stop'} using it`,
     parts: (count: number) => `${count} wear ${count === 1 ? 'part stays' : 'parts stay'} in Consumables, without a printer`,

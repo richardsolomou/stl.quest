@@ -27,6 +27,8 @@ export function partWear(events: UsageEvent[], printerId: string, part: PartCons
       event.stage === 'printing' &&
       event.unit === 'minute' &&
       event.consumableId === undefined &&
+      // A deleted part's own wear keeps its minutes but loses its ID, so it would otherwise read as the printer's run.
+      event.deletedItemKind === undefined &&
       (replacedAt === undefined || event.createdAt > replacedAt),
   )
   const used =
