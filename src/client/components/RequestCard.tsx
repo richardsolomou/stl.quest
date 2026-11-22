@@ -376,8 +376,8 @@ export function RequestCard({
           </span>
           {notes}
           {cells}
+          {plateBadge && <span className="mt-2 flex text-ticket-muted">{plateBadge}</span>}
           <span className="mt-2 flex items-start gap-2 border-t border-dashed border-ticket-foreground/20 pt-2 font-mono text-[11px] leading-tight text-ticket-muted uppercase">
-            {plateBadge}
             <span className="min-w-0 flex-1 break-words" title={showPrinter ? request.printer?.name : undefined}>
               {meta.join(' · ')}
             </span>

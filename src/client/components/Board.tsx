@@ -1100,7 +1100,8 @@ export function Board({
 
 /**
  * The plates a station shows: those not recorded yet, and recorded ones while any of their prints is still printing, so
- * a plate leaves the station once its run is off the printer.
+ * a plate leaves the station once its run is off the printer. A plate whose print failed or was cancelled already
+ * recorded that run, so it leaves too.
  */
 function platesOnStations(
   plates: PlateView[],
@@ -1110,7 +1111,9 @@ function platesOnStations(
   const printing = new Set(requests.filter((request) => (countsOf(request).in_progress ?? 0) > 0).map(({ id }) => id))
   const byPrinter = new Map<string, PlateView[]>()
   for (const plate of plates) {
-    if (!plate.printerId || (plate.recording && !plate.items.some(({ requestId }) => printing.has(requestId)))) continue
+    const ended = plate.print?.outcome === 'failed' || plate.print?.outcome === 'cancelled'
+    if (!plate.printerId || (!plate.stage && ended) || (plate.recording && !plate.items.some(({ requestId }) => printing.has(requestId))))
+      continue
     byPrinter.set(plate.printerId, [...(byPrinter.get(plate.printerId) ?? []), plate])
   }
   return byPrinter
