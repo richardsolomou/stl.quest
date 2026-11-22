@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyFilamentPatches, parseSpoolmanFilaments } from './filamentCatalog'
+import { applyColourCodes, applyFilamentPatches, parseSpoolmanFilaments, type GeneratedFilamentPreset } from './filamentCatalog'
 
 const source = { id: 'spoolmandb', webRepository: 'https://github.com/Donkie/SpoolmanDB', revision: 'revision', catalogPath: 'filaments' }
 
@@ -121,5 +121,59 @@ describe('SpoolmanDB IDs for matching Spoolman filaments', () => {
 
   it('keeps each product’s brand and material', () => {
     expect(read([basic]).spoolman.presets['filament-brand-pla']).toEqual(['Brand', 'PLA'])
+  })
+})
+
+describe('manufacturer colour codes', () => {
+  const preset = (name: string, colours: [string, string][], brand = 'Bambu Lab'): GeneratedFilamentPreset => ({
+    id: `filament-${name}`,
+    brand,
+    name,
+    colors: colours.map(([en, hex]) => ({ hex, names: { en } })),
+    source: { id: 'spoolmandb', url: 'https://example.com' },
+  })
+  const entry = (product: string, code: string, en: string, hex: string) => ({
+    fila_type: product,
+    fila_color_code: code,
+    fila_color_name: { en, de: `${en} (de)` },
+    fila_color: [`${hex}FF`],
+  })
+  const codes = (presets: GeneratedFilamentPreset[], ...entries: ReturnType<typeof entry>[]) =>
+    applyColourCodes(presets, 'Bambu Lab', JSON.stringify({ data: entries })).flatMap((found) =>
+      (found.colors ?? []).map((colour) => [found.name, colour.names.en, colour.code]),
+    )
+
+  it('records the code of a colour whose product, name, and hex agree', () => {
+    expect(codes([preset('PLA Basic', [['Gray', '#8E9089']])], entry('PLA Basic', '10103', 'Gray', '#8E9089'))).toEqual([
+      ['PLA Basic', 'Gray', '10103'],
+    ])
+  })
+
+  it('finds a product whose words come in another order', () => {
+    expect(codes([preset('Matte PLA', [['Charcoal', '#000000']])], entry('PLA Matte', '11101', 'Charcoal', '#000000'))).toEqual([
+      ['Matte PLA', 'Charcoal', '11101'],
+    ])
+  })
+
+  it('leaves a colour without a code when its hex differs', () => {
+    expect(codes([preset('PLA Basic', [['Gray', '#8E9089']])], entry('PLA Basic', '10103', 'Gray', '#808080'))).toEqual([
+      ['PLA Basic', 'Gray', undefined],
+    ])
+  })
+
+  it('leaves a colour without a code when two codes claim it', () => {
+    expect(
+      codes(
+        [preset('Silk PLA', [['White', '#FFFFFF']])],
+        entry('PLA Silk', '13105', 'White', '#FFFFFF'),
+        entry('PLA Silk+', '13110', 'White', '#FFFFFF'),
+      ),
+    ).toEqual([['Silk PLA', 'White', undefined]])
+  })
+
+  it('codes only the manufacturer’s own products', () => {
+    expect(codes([preset('PLA Basic', [['Gray', '#8E9089']], 'Other')], entry('PLA Basic', '10103', 'Gray', '#8E9089'))).toEqual([
+      ['PLA Basic', 'Gray', undefined],
+    ])
   })
 })

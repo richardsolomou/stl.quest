@@ -11,6 +11,17 @@ export function inviteCookiePath() {
   return appPath('/api/auth')
 }
 
+/** Sets the invite cookie for a social sign-in, secure whenever the browser reached the app over https. */
+export function writeInviteCookie(token: string) {
+  setCookie(INVITE_COOKIE, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: requestProtocol(getRequest()) === 'https',
+    path: inviteCookiePath(),
+    maxAge: 10 * 60,
+  })
+}
+
 /** Clears the invite cookie; it must name the path it was set under or the browser keeps it. */
 export function expiredInviteCookie() {
   return `${INVITE_COOKIE}=; Path=${inviteCookiePath()}; HttpOnly; SameSite=Lax; Max-Age=0`

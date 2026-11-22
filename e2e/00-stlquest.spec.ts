@@ -2248,13 +2248,16 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await page.setViewportSize({ width: 1280, height: 720 })
   // A pasted order confirmation restocks what it lists; a filament Spoolman manages is added there instead.
   await restockFromOrder(page)
-  const jadeRow = page.locator('[data-order-lines] li').filter({ hasText: 'PLA Basic · Jade White' })
+  const jadeRow = page.locator('[data-order-lines] li').filter({ hasText: '10100' })
   await expect(jadeRow.getByRole('combobox')).toContainText('Add to your list')
   await screenshot(page, 'order-restock-review')
   await page.getByRole('dialog', { name: 'Restock from an order' }).getByRole('button', { name: 'Restock 1' }).click()
   await expect(page.getByText('Restocked 1 filament')).toBeVisible()
-  await restockFromOrder(page)
+  // A German store's email names the colour in German, and its code still finds the filament.
+  await restockFromOrder(page, 'Jade-Weiß (10100) / Filament mit Spule / 1 kg')
+  await expect(jadeRow).toContainText('PLA Basic · Jade-Weiß')
   await expect(jadeRow.getByRole('combobox')).toContainText('Bambu Lab PLA Basic · Jade White')
+  await screenshot(page, 'order-restock-german')
   await page.keyboard.press('Escape')
   const jadeSpool = await page.request.post('/api/spoolman/spools', {
     headers: { authorization: `Bearer ${spoolmanToken}` },
@@ -2265,7 +2268,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     },
   })
   expect(jadeSpool.status()).toBe(204)
-  await restockFromOrder(page)
+  await restockFromOrder(page, 'Blanc de jade (10100) / Filament avec bobine / 1 kg')
   await expect(jadeRow).toContainText('Managed by Spoolman, so add this spool there.')
   await expect(
     page.getByRole('dialog', { name: 'Restock from an order' }).getByRole('button', { name: 'Restock', exact: true }),
@@ -2512,24 +2515,14 @@ function requestCardTag(card: Locator, tagPath: string) {
   return card.locator(`[data-tag-dot^="${tagPath}"]`)
 }
 
-/** Opens the order restock dialog and reads a made-up Bambu Lab order for one spool of PLA Basic in Jade White. */
-async function restockFromOrder(page: Page) {
+/** Opens the order restock dialog and reads a made-up Bambu Lab order for one spool of PLA Basic in Jade White, in the variant's language. */
+async function restockFromOrder(page: Page, variant = 'Jade White (10100) / Filament with spool / 1 kg') {
   await page.goto('/settings/consumables')
   await page.getByRole('button', { name: 'Restock from an order' }).click()
   const dialog = page.getByRole('dialog', { name: 'Restock from an order' })
   await dialog
     .getByLabel('Order confirmation email')
-    .fill(
-      [
-        'Bambu Lab EU Store',
-        'Order summary',
-        'PLA Basic × 1',
-        'Jade White (10100) / Filament with spool / 1 kg',
-        '€19.99',
-        'Total',
-        '€19.99 EUR',
-      ].join('\n'),
-    )
+    .fill(['Bambu Lab EU Store', 'Order summary', 'PLA Basic × 1', variant, '€19.99', 'Total', '€19.99 EUR'].join('\n'))
   await dialog.getByRole('button', { name: 'Read order' }).click()
   await expect(dialog.locator('[data-order-lines]')).toBeVisible()
 }

@@ -5,6 +5,12 @@
       "repository": "https://github.com/Donkie/SpoolmanDB",
       "revision": "8e391c16be4bfde29dfc184e2f0b9a8d154ab550",
       "license": "MIT"
+    },
+    {
+      "id": "bambustudio",
+      "repository": "https://github.com/bambulab/BambuStudio",
+      "revision": "8e524a39d4c4cd0541801c1c46d2f77debb0bf1d",
+      "license": "AGPL-3.0-only"
     }
   ],
   "presets": [
@@ -7395,97 +7401,113 @@
           "hex": "#DFD1A7",
           "names": {
             "en": "Beige"
-          }
+          },
+          "code": "40401"
         },
         {
           "hex": "#7248BD",
           "names": {
             "en": "Lavender"
-          }
+          },
+          "code": "40701"
         },
         {
           "hex": "#789D4A",
           "names": {
             "en": "Olive"
-          }
+          },
+          "code": "40502"
         },
         {
           "hex": "#FFC72C",
           "names": {
             "en": "Tangerine Yellow"
-          }
+          },
+          "code": "40402"
         },
         {
           "hex": "#489FDF",
           "names": {
             "en": "Azure"
-          }
+          },
+          "code": "40601"
         },
         {
           "hex": "#0C2340",
           "names": {
             "en": "Navy Blue"
-          }
+          },
+          "code": "40602"
         },
         {
           "hex": "#FFFFFF",
           "names": {
             "en": "White"
-          }
+          },
+          "code": "40100"
         },
         {
           "hex": "#87909A",
           "names": {
             "en": "Silver"
-          }
+          },
+          "code": "40102"
         },
         {
           "hex": "#D32941",
           "names": {
             "en": "Red"
-          }
+          },
+          "code": "40200"
         },
         {
           "hex": "#FF6A13",
           "names": {
             "en": "Orange"
-          }
+          },
+          "code": "40300"
         },
         {
           "hex": "#FCE900",
           "names": {
             "en": "Yellow"
-          }
+          },
+          "code": "40400"
         },
         {
           "hex": "#7AE1BF",
           "names": {
             "en": "Mint"
-          }
+          },
+          "code": "40501"
         },
         {
           "hex": "#00AE42",
           "names": {
             "en": "Bambu Green"
-          }
+          },
+          "code": "40500"
         },
         {
           "hex": "#0A2CA5",
           "names": {
             "en": "Blue"
-          }
+          },
+          "code": "40600"
         },
         {
           "hex": "#AF1685",
           "names": {
             "en": "Purple"
-          }
+          },
+          "code": "40700"
         },
         {
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "40101"
         }
       ],
       "source": {
@@ -7504,49 +7526,57 @@
           "hex": "#FFFFFF",
           "names": {
             "en": "White"
-          }
+          },
+          "code": "41100"
         },
         {
           "hex": "#C6C6C6",
           "names": {
             "en": "Gray"
-          }
+          },
+          "code": "41102"
         },
         {
           "hex": "#FFE133",
           "names": {
             "en": "Yellow"
-          }
+          },
+          "code": "41400"
         },
         {
           "hex": "#F48438",
           "names": {
             "en": "Orange"
-          }
+          },
+          "code": "41300"
         },
         {
           "hex": "#E83100",
           "names": {
             "en": "Red"
-          }
+          },
+          "code": "41200"
         },
         {
           "hex": "#61BF36",
           "names": {
             "en": "Green"
-          }
+          },
+          "code": "41500"
         },
         {
           "hex": "#0C3B95",
           "names": {
             "en": "Blue"
-          }
+          },
+          "code": "41600"
         },
         {
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "41101"
         }
       ],
       "source": {
@@ -7565,13 +7595,15 @@
           "hex": "#FFFFFF",
           "names": {
             "en": "White"
-          }
+          },
+          "code": "14102"
         },
         {
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "14103"
         }
       ],
       "source": {
@@ -7590,37 +7622,43 @@
           "hex": "#FFFAF2",
           "names": {
             "en": "White"
-          }
+          },
+          "code": "45100"
         },
         {
           "hex": "#8A949E",
           "names": {
             "en": "Gray"
-          }
+          },
+          "code": "45102"
         },
         {
           "hex": "#E02928",
           "names": {
             "en": "Red"
-          }
+          },
+          "code": "45200"
         },
         {
           "hex": "#00A6A0",
           "names": {
             "en": "Green"
-          }
+          },
+          "code": "45500"
         },
         {
           "hex": "#2140B4",
           "names": {
             "en": "Blue"
-          }
+          },
+          "code": "45600"
         },
         {
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "45101"
         },
         {
           "hex": "#F5F1DD",
@@ -7645,7 +7683,8 @@
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "46101"
         }
       ],
       "source": {
@@ -7675,43 +7714,50 @@
           "hex": "#ED0000",
           "names": {
             "en": "Red"
-          }
+          },
+          "code": "53200"
         },
         {
           "hex": "#F9EF41",
           "names": {
             "en": "Yellow"
-          }
+          },
+          "code": "53400"
         },
         {
           "hex": "#5898DD",
           "names": {
             "en": "Blue"
-          }
+          },
+          "code": "53600"
         },
         {
           "hex": "#90FF1A",
           "names": {
             "en": "Neon Green"
-          }
+          },
+          "code": "53500"
         },
         {
           "hex": "#FFFFFF",
           "names": {
             "en": "White"
-          }
+          },
+          "code": "53100"
         },
         {
           "hex": "#939393",
           "names": {
             "en": "Gray"
-          }
+          },
+          "code": "53102"
         },
         {
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "53101"
         }
       ],
       "source": {
@@ -7730,19 +7776,22 @@
           "hex": "#FFFFFF",
           "names": {
             "en": "White"
-          }
+          },
+          "code": "63101"
         },
         {
           "hex": "#A8A8AA",
           "names": {
             "en": "Grey"
-          }
+          },
+          "code": "63102"
         },
         {
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "63100"
         }
       ],
       "source": {
@@ -7761,25 +7810,29 @@
           "hex": "#684A43",
           "names": {
             "en": "Brown"
-          }
+          },
+          "code": "13203"
         },
         {
           "hex": "#3B665E",
           "names": {
             "en": "Green"
-          }
+          },
+          "code": "13503"
         },
         {
           "hex": "#424379",
           "names": {
             "en": "Nebulae"
-          }
+          },
+          "code": "13504"
         },
         {
           "hex": "#594177",
           "names": {
             "en": "Purple"
-          }
+          },
+          "code": "13602"
         }
       ],
       "source": {
@@ -7852,19 +7905,22 @@
           "hex": "#FFD00B",
           "names": {
             "en": "Yellow"
-          }
+          },
+          "code": "33400"
         },
         {
           "hex": "#F75403",
           "names": {
             "en": "Orange"
-          }
+          },
+          "code": "33300"
         },
         {
           "hex": "#00AE42",
           "names": {
             "en": "Green"
-          }
+          },
+          "code": "33500"
         },
         {
           "hex": "#EB3A3A",
@@ -7876,61 +7932,71 @@
           "hex": "#002E96",
           "names": {
             "en": "Blue"
-          }
+          },
+          "code": "33600"
         },
         {
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "33102"
         },
         {
           "hex": "#FFFFFF",
           "names": {
             "en": "White"
-          }
+          },
+          "code": "33100"
         },
         {
           "hex": "#F9DFB9",
           "names": {
             "en": "Cream"
-          }
+          },
+          "code": "33401"
         },
         {
           "hex": "#6EE53C",
           "names": {
             "en": "Lime Green"
-          }
+          },
+          "code": "33501"
         },
         {
           "hex": "#39541A",
           "names": {
             "en": "Forest Green"
-          }
+          },
+          "code": "33502"
         },
         {
           "hex": "#1F79E5",
           "names": {
             "en": "Lake Blue"
-          }
+          },
+          "code": "33601"
         },
         {
           "hex": "#875718",
           "names": {
             "en": "Peanut Brown"
-          }
+          },
+          "code": "33801"
         },
         {
           "hex": "#ADB1B2",
           "names": {
             "en": "Gray"
-          }
+          },
+          "code": "33101"
         },
         {
           "hex": "#515151",
           "names": {
             "en": "Dark Gray"
-          }
+          },
+          "code": "33103"
         }
       ],
       "source": {
@@ -7949,37 +8015,43 @@
           "hex": "#FFFFFF",
           "names": {
             "en": "White"
-          }
+          },
+          "code": "51102"
         },
         {
           "hex": "#F3E600",
           "names": {
             "en": "Yellow"
-          }
+          },
+          "code": "51400"
         },
         {
           "hex": "#0072CE",
           "names": {
             "en": "Blue"
-          }
+          },
+          "code": "51600"
         },
         {
           "hex": "#C8102E",
           "names": {
             "en": "Red"
-          }
+          },
+          "code": "51200"
         },
         {
           "hex": "#898D8D",
           "names": {
             "en": "Gray"
-          }
+          },
+          "code": "51101"
         },
         {
           "hex": "#101820",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "51100"
         }
       ],
       "source": {
@@ -7998,43 +8070,50 @@
           "hex": "#FFFFFF",
           "names": {
             "en": "White"
-          }
+          },
+          "code": "16103"
         },
         {
           "hex": "#999D9D",
           "names": {
             "en": "Gray"
-          }
+          },
+          "code": "16101"
         },
         {
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "16100"
         },
         {
           "hex": "#C6001A",
           "names": {
             "en": "Red"
-          }
+          },
+          "code": "16200"
         },
         {
           "hex": "#EFE255",
           "names": {
             "en": "Yellow"
-          }
+          },
+          "code": "16400"
         },
         {
           "hex": "#4DAFDA",
           "names": {
             "en": "Cyan"
-          }
+          },
+          "code": "16600"
         },
         {
           "hex": "#004EA8",
           "names": {
             "en": "Blue"
-          }
+          },
+          "code": "16601"
         }
       ],
       "source": {
@@ -8053,13 +8132,15 @@
           "hex": "#F7F3F0",
           "names": {
             "en": "White Marble"
-          }
+          },
+          "code": "13103"
         },
         {
           "hex": "#AD4E38",
           "names": {
             "en": "Red Granite"
-          }
+          },
+          "code": "13201"
         }
       ],
       "source": {
@@ -8078,49 +8159,57 @@
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "35101"
         },
         {
           "hex": "#FFFFFF",
           "names": {
             "en": "White"
-          }
+          },
+          "code": "35100"
         },
         {
           "hex": "#FABBCB",
           "names": {
             "en": "Pink"
-          }
+          },
+          "code": "35700"
         },
         {
           "hex": "#A7A4E0",
           "names": {
             "en": "Violet"
-          }
+          },
+          "code": "35702"
         },
         {
           "hex": "#B9D9EB",
           "names": {
             "en": "Baby Blue"
-          }
+          },
+          "code": "35600"
         },
         {
           "hex": "#BCE194",
           "names": {
             "en": "Avocado Green"
-          }
+          },
+          "code": "35501"
         },
         {
           "hex": "#C0DF16",
           "names": {
             "en": "Lime"
-          }
+          },
+          "code": "35500"
         },
         {
           "hex": "#7F7E83",
           "names": {
             "en": "Gray"
-          }
+          },
+          "code": "35102"
         }
       ],
       "source": {
@@ -8139,151 +8228,176 @@
           "hex": "#FFFFFF",
           "names": {
             "en": "Ivory White"
-          }
+          },
+          "code": "11100"
         },
         {
           "hex": "#D3B7A7",
           "names": {
             "en": "Latte Brown"
-          }
+          },
+          "code": "11800"
         },
         {
           "hex": "#E8DBB7",
           "names": {
             "en": "Desert Tan"
-          }
+          },
+          "code": "11401"
         },
         {
           "hex": "#9B9EA0",
           "names": {
             "en": "Ash Gray"
-          }
+          },
+          "code": "11102"
         },
         {
           "hex": "#AE96D4",
           "names": {
             "en": "Lilac Purple"
-          }
+          },
+          "code": "11700"
         },
         {
           "hex": "#E8AFCF",
           "names": {
             "en": "Sakura Pink"
-          }
+          },
+          "code": "11201"
         },
         {
           "hex": "#F99963",
           "names": {
             "en": "Mandarin Orange"
-          }
+          },
+          "code": "11300"
         },
         {
           "hex": "#F7D959",
           "names": {
             "en": "Lemon Yellow"
-          }
+          },
+          "code": "11400"
         },
         {
           "hex": "#DE4343",
           "names": {
             "en": "Scarlet Red"
-          }
+          },
+          "code": "11200"
         },
         {
           "hex": "#BB3D43",
           "names": {
             "en": "Dark Red"
-          }
+          },
+          "code": "11202"
         },
         {
           "hex": "#7D6556",
           "names": {
             "en": "Dark Brown"
-          }
+          },
+          "code": "11801"
         },
         {
           "hex": "#68724D",
           "names": {
             "en": "Dark Green"
-          }
+          },
+          "code": "11501"
         },
         {
           "hex": "#61C680",
           "names": {
             "en": "Grass Green"
-          }
+          },
+          "code": "11500"
         },
         {
           "hex": "#A3D8E1",
           "names": {
             "en": "Ice Blue"
-          }
+          },
+          "code": "11601"
         },
         {
           "hex": "#0078BF",
           "names": {
             "en": "Marine Blue"
-          }
+          },
+          "code": "11600"
         },
         {
           "hex": "#042F56",
           "names": {
             "en": "Dark Blue"
-          }
+          },
+          "code": "11602"
         },
         {
           "hex": "#000000",
           "names": {
             "en": "Charcoal"
-          }
+          },
+          "code": "11101"
         },
         {
           "hex": "#CBC6B8",
           "names": {
             "en": "Bone White"
-          }
+          },
+          "code": "11103"
         },
         {
           "hex": "#950051",
           "names": {
             "en": "Plum"
-          }
+          },
+          "code": "11204"
         },
         {
           "hex": "#56B7E6",
           "names": {
             "en": "Sky Blue"
-          }
+          },
+          "code": "11603"
         },
         {
           "hex": "#C2E189",
           "names": {
             "en": "Apple Green"
-          }
+          },
+          "code": "11502"
         },
         {
           "hex": "#4D3324",
           "names": {
             "en": "Dark Chocolate"
-          }
+          },
+          "code": "11802"
         },
         {
           "hex": "#AE835B",
           "names": {
             "en": "Caramel"
-          }
+          },
+          "code": "11803"
         },
         {
           "hex": "#B15533",
           "names": {
             "en": "Terracotta"
-          }
+          },
+          "code": "11203"
         },
         {
           "hex": "#757575",
           "names": {
             "en": "Nardo Gray"
-          }
+          },
+          "code": "11104"
         }
       ],
       "source": {
@@ -8345,7 +8459,8 @@
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "72100"
         }
       ],
       "source": {
@@ -8364,49 +8479,57 @@
           "hex": "#EAEAE4",
           "names": {
             "en": "White"
-          }
+          },
+          "code": "72102"
         },
         {
           "hex": "#FFCE00",
           "names": {
             "en": "Yellow"
-          }
+          },
+          "code": "72400"
         },
         {
           "hex": "#C5ED48",
           "names": {
             "en": "Lime"
-          }
+          },
+          "code": "72500"
         },
         {
           "hex": "#75AED8",
           "names": {
             "en": "Blue"
-          }
+          },
+          "code": "72600"
         },
         {
           "hex": "#FF4800",
           "names": {
             "en": "Orange"
-          }
+          },
+          "code": "72200"
         },
         {
           "hex": "#5B492F",
           "names": {
             "en": "Brown"
-          }
+          },
+          "code": "72800"
         },
         {
           "hex": "#353533",
           "names": {
             "en": "Gray"
-          }
+          },
+          "code": "72103"
         },
         {
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "72104"
         }
       ],
       "source": {
@@ -8425,7 +8548,8 @@
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "70100"
         }
       ],
       "source": {
@@ -8444,31 +8568,36 @@
           "hex": "#0090DA",
           "names": {
             "en": "Cyan"
-          }
+          },
+          "code": "18600"
         },
         {
           "hex": "#E24585",
           "names": {
             "en": "Magenta"
-          }
+          },
+          "code": "18200"
         },
         {
           "hex": "#FCE300",
           "names": {
             "en": "Yellow"
-          }
+          },
+          "code": "18400"
         },
         {
           "hex": "#000000",
           "names": {
             "en": "Key"
-          }
+          },
+          "code": "18101"
         },
         {
           "hex": "#FFFFFF",
           "names": {
             "en": "White"
-          }
+          },
+          "code": "18100"
         }
       ],
       "source": {
@@ -8499,13 +8628,15 @@
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "60101"
         },
         {
           "hex": "#FFFFFF",
           "names": {
             "en": "White"
-          }
+          },
+          "code": "60100"
         }
       ],
       "source": {
@@ -8524,7 +8655,8 @@
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "71100"
         }
       ],
       "source": {
@@ -8543,7 +8675,8 @@
           "hex": "#FFFFFF",
           "names": {
             "en": "White"
-          }
+          },
+          "code": "30106"
         },
         {
           "hex": "#F9F7F2",
@@ -8555,7 +8688,8 @@
           "hex": "#7F7E83",
           "names": {
             "en": "Gray"
-          }
+          },
+          "code": "30107"
         },
         {
           "hex": "#688197",
@@ -8573,19 +8707,22 @@
           "hex": "#D6001C",
           "names": {
             "en": "Red"
-          }
+          },
+          "code": "30201"
         },
         {
           "hex": "#FF671F",
           "names": {
             "en": "Orange"
-          }
+          },
+          "code": "30301"
         },
         {
           "hex": "#FCE300",
           "names": {
             "en": "Yellow"
-          }
+          },
+          "code": "30402"
         },
         {
           "hex": "#7CD82B",
@@ -8597,7 +8734,8 @@
           "hex": "#009639",
           "names": {
             "en": "Green"
-          }
+          },
+          "code": "30502"
         },
         {
           "hex": "#0069B1",
@@ -8621,13 +8759,15 @@
           "hex": "#4F2C1D",
           "names": {
             "en": "Dark Brown"
-          }
+          },
+          "code": "30800"
         },
         {
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "30105"
         }
       ],
       "source": {
@@ -8646,19 +8786,22 @@
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "31100"
         },
         {
           "hex": "#565656",
           "names": {
             "en": "Titan Gray"
-          }
+          },
+          "code": "31101"
         },
         {
           "hex": "#16B08E",
           "names": {
             "en": "Malachite Green"
-          }
+          },
+          "code": "31500"
         },
         {
           "hex": "#324585",
@@ -8670,13 +8813,15 @@
           "hex": "#583061",
           "names": {
             "en": "Violet Purple"
-          }
+          },
+          "code": "31700"
         },
         {
           "hex": "#9F332A",
           "names": {
             "en": "Brick Red"
-          }
+          },
+          "code": "31200"
         }
       ],
       "source": {
@@ -8695,181 +8840,211 @@
           "hex": "#FFFFFF",
           "names": {
             "en": "Jade White"
-          }
+          },
+          "code": "10100"
         },
         {
           "hex": "#F7E6DE",
           "names": {
             "en": "Beige"
-          }
+          },
+          "code": "10201"
         },
         {
           "hex": "#E4BD68",
           "names": {
             "en": "Gold"
-          }
+          },
+          "code": "10401"
         },
         {
           "hex": "#A6A9AA",
           "names": {
             "en": "Silver"
-          }
+          },
+          "code": "10102"
         },
         {
           "hex": "#8E9089",
           "names": {
             "en": "Gray"
-          }
+          },
+          "code": "10103"
         },
         {
           "hex": "#847D48",
           "names": {
             "en": "Bronze"
-          }
+          },
+          "code": "10801"
         },
         {
           "hex": "#9D432C",
           "names": {
             "en": "Brown"
-          }
+          },
+          "code": "10800"
         },
         {
           "hex": "#6F5034",
           "names": {
             "en": "Cocoa Brown"
-          }
+          },
+          "code": "10802"
         },
         {
           "hex": "#9D2235",
           "names": {
             "en": "Maroon Red"
-          }
+          },
+          "code": "10205"
         },
         {
           "hex": "#C12E1F",
           "names": {
             "en": "Red"
-          }
+          },
+          "code": "10200"
         },
         {
           "hex": "#EC008C",
           "names": {
             "en": "Magenta"
-          }
+          },
+          "code": "10202"
         },
         {
           "hex": "#F55A74",
           "names": {
             "en": "Pink"
-          }
+          },
+          "code": "10203"
         },
         {
           "hex": "#F5547C",
           "names": {
             "en": "Hot Pink"
-          }
+          },
+          "code": "10204"
         },
         {
           "hex": "#FF6A13",
           "names": {
             "en": "Orange"
-          }
+          },
+          "code": "10300"
         },
         {
           "hex": "#FF9016",
           "names": {
             "en": "Pumpkin Orange"
-          }
+          },
+          "code": "10301"
         },
         {
           "hex": "#FEC600",
           "names": {
             "en": "Sunflower Yellow"
-          }
+          },
+          "code": "10402"
         },
         {
           "hex": "#F4EE2A",
           "names": {
             "en": "Yellow"
-          }
+          },
+          "code": "10400"
         },
         {
           "hex": "#BECF00",
           "names": {
             "en": "Bright Green"
-          }
+          },
+          "code": "10503"
         },
         {
           "hex": "#00AE42",
           "names": {
             "en": "Bambu Green"
-          }
+          },
+          "code": "10501"
         },
         {
           "hex": "#3F8E43",
           "names": {
             "en": "Mistletoe Green"
-          }
+          },
+          "code": "10502"
         },
         {
           "hex": "#00B1B7",
           "names": {
             "en": "Turquoise"
-          }
+          },
+          "code": "10605"
         },
         {
           "hex": "#0086D6",
           "names": {
             "en": "Cyan"
-          }
+          },
+          "code": "10603"
         },
         {
           "hex": "#0A2989",
           "names": {
             "en": "Blue"
-          }
+          },
+          "code": "10601"
         },
         {
           "hex": "#0056B8",
           "names": {
             "en": "Cobalt Blue"
-          }
+          },
+          "code": "10604"
         },
         {
           "hex": "#5E43B7",
           "names": {
             "en": "Purple"
-          }
+          },
+          "code": "10700"
         },
         {
           "hex": "#482960",
           "names": {
             "en": "Indigo Purple"
-          }
+          },
+          "code": "10701"
         },
         {
           "hex": "#5B6579",
           "names": {
             "en": "Blue Gray"
-          }
+          },
+          "code": "10602"
         },
         {
           "hex": "#D1D3D5",
           "names": {
             "en": "Light Gray"
-          }
+          },
+          "code": "10104"
         },
         {
           "hex": "#545454",
           "names": {
             "en": "Dark Gray"
-          }
+          },
+          "code": "10105"
         },
         {
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "10101"
         }
       ],
       "source": {
@@ -8888,43 +9063,50 @@
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "14100"
         },
         {
           "hex": "#4D5054",
           "names": {
             "en": "Lava Gray"
-          }
+          },
+          "code": "14101"
         },
         {
           "hex": "#69398E",
           "names": {
             "en": "Iris Purple"
-          }
+          },
+          "code": "14700"
         },
         {
           "hex": "#2842AD",
           "names": {
             "en": "Royal Blue"
-          }
+          },
+          "code": "14601"
         },
         {
           "hex": "#6E88BC",
           "names": {
             "en": "Jeans Blue"
-          }
+          },
+          "code": "14600"
         },
         {
           "hex": "#5C9748",
           "names": {
             "en": "Matcha Green"
-          }
+          },
+          "code": "14500"
         },
         {
           "hex": "#951E23",
           "names": {
             "en": "Burgundy Red"
-          }
+          },
+          "code": "14200"
         }
       ],
       "source": {
@@ -8943,37 +9125,43 @@
           "hex": "#4F3F24",
           "names": {
             "en": "Black Walnut"
-          }
+          },
+          "code": "13107"
         },
         {
           "hex": "#4C241C",
           "names": {
             "en": "Rosewood"
-          }
+          },
+          "code": "13204"
         },
         {
           "hex": "#995F11",
           "names": {
             "en": "Clay Brown"
-          }
+          },
+          "code": "13801"
         },
         {
           "hex": "#918669",
           "names": {
             "en": "Classic Birch"
-          }
+          },
+          "code": "13505"
         },
         {
           "hex": "#D6CCA3",
           "names": {
             "en": "White Oak"
-          }
+          },
+          "code": "13106"
         },
         {
           "hex": "#C98935",
           "names": {
             "en": "Ochre Yellow"
-          }
+          },
+          "code": "13403"
         }
       ],
       "source": {
@@ -8992,7 +9180,8 @@
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "76100"
         }
       ],
       "source": {
@@ -9017,25 +9206,29 @@
           "hex": "#F7CED7",
           "names": {
             "en": "Milky Pink"
-          }
+          },
+          "code": "17200"
         },
         {
           "hex": "#FFB673",
           "names": {
             "en": "Apricot"
-          }
+          },
+          "code": "17300"
         },
         {
           "hex": "#A4DBE8",
           "names": {
             "en": "Baby Blue"
-          }
+          },
+          "code": "17600"
         },
         {
           "hex": "#000000",
           "names": {
             "en": "Absolute Black"
-          }
+          },
+          "code": "17101"
         }
       ],
       "source": {
@@ -9054,7 +9247,8 @@
           "hex": "#F0F1A8",
           "names": {
             "en": "Clear"
-          }
+          },
+          "code": "66400"
         }
       ],
       "source": {
@@ -9079,85 +9273,99 @@
           "hex": "#EAECEB",
           "names": {
             "en": "Silver"
-          }
+          },
+          "code": "13104"
         },
         {
           "hex": "#EEB1C1",
           "names": {
             "en": "Pink"
-          }
+          },
+          "code": "13202"
         },
         {
           "hex": "#4CE4A0",
           "names": {
             "en": "Green"
-          }
+          },
+          "code": "13502"
         },
         {
           "hex": "#E5B03D",
           "names": {
             "en": "Gold"
-          }
+          },
+          "code": "13401"
         },
         {
           "hex": "#147BD1",
           "names": {
             "en": "Blue"
-          }
+          },
+          "code": "13601"
         },
         {
           "hex": "#854CE4",
           "names": {
             "en": "Purple"
-          }
+          },
+          "code": "13701"
         },
         {
           "hex": "#5E4B3C",
           "names": {
             "en": "Copper"
-          }
+          },
+          "code": "13300"
         },
         {
           "hex": "#5F6367",
           "names": {
             "en": "Titan Gray"
-          }
+          },
+          "code": "13108"
         },
         {
           "hex": "#D02727",
           "names": {
             "en": "Candy Red"
-          }
+          },
+          "code": "13205"
         },
         {
           "hex": "#018814",
           "names": {
             "en": "Candy Green"
-          }
+          },
+          "code": "13506"
         },
         {
           "hex": "#BA9594",
           "names": {
             "en": "Rose Gold"
-          }
+          },
+          "code": "13206"
         },
         {
           "hex": "#A8C6EE",
           "names": {
             "en": "Baby Blue"
-          }
+          },
+          "code": "13603"
         },
         {
           "hex": "#96DCB9",
           "names": {
             "en": "Mint"
-          }
+          },
+          "code": "13507"
         },
         {
           "hex": "#F3CFB2",
           "names": {
             "en": "Champagne"
-          }
+          },
+          "code": "13404"
         }
       ],
       "source": {
@@ -9263,7 +9471,8 @@
           "hex": "#FFFFFF",
           "names": {
             "en": "White"
-          }
+          },
+          "code": "65104"
         }
       ],
       "source": {
@@ -9288,7 +9497,8 @@
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "65103"
         }
       ],
       "source": {
@@ -9307,43 +9517,50 @@
           "hex": "#F4D53F",
           "names": {
             "en": "Yellow"
-          }
+          },
+          "code": "12401"
         },
         {
           "hex": "#FFFFFF",
           "names": {
             "en": "White"
-          }
+          },
+          "code": "12107"
         },
         {
           "hex": "#DC3A27",
           "names": {
             "en": "Orange"
-          }
+          },
+          "code": "12301"
         },
         {
           "hex": "#AFB1AE",
           "names": {
             "en": "Gray"
-          }
+          },
+          "code": "12105"
         },
         {
           "hex": "#959698",
           "names": {
             "en": "Silver"
-          }
+          },
+          "code": "12106"
         },
         {
           "hex": "#009BD8",
           "names": {
             "en": "Cyan"
-          }
+          },
+          "code": "12601"
         },
         {
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "12104"
         }
       ],
       "source": {
@@ -9484,13 +9701,15 @@
           "hex": "#F68B1B",
           "names": {
             "en": "Neon Orange"
-          }
+          },
+          "code": "51305"
         },
         {
           "hex": "#C3E2D6",
           "names": {
             "en": "Light Cyan"
-          }
+          },
+          "code": "51500"
         }
       ],
       "source": {
@@ -9509,13 +9728,15 @@
           "hex": "#FFFFFF",
           "names": {
             "en": "White"
-          }
+          },
+          "code": "51105"
         },
         {
           "hex": "#000000",
           "names": {
             "en": "Black"
-          }
+          },
+          "code": "51103"
         }
       ],
       "source": {
@@ -9534,49 +9755,57 @@
           "hex": "#8E8E8E",
           "names": {
             "en": "Translucent Gray"
-          }
+          },
+          "code": "32100"
         },
         {
           "hex": "#61B0FF",
           "names": {
             "en": "Translucent Light Blue"
-          }
+          },
+          "code": "32600"
         },
         {
           "hex": "#748C45",
           "names": {
             "en": "Translucent Olive"
-          }
+          },
+          "code": "32500"
         },
         {
           "hex": "#C9A381",
           "names": {
             "en": "Translucent Brown"
-          }
+          },
+          "code": "32800"
         },
         {
           "hex": "#77EDD7",
           "names": {
             "en": "Translucent Teal"
-          }
+          },
+          "code": "32501"
         },
         {
           "hex": "#FF911A",
           "names": {
             "en": "Translucent Orange"
-          }
+          },
+          "code": "32300"
         },
         {
           "hex": "#D6ABFF",
           "names": {
             "en": "Translucent Purple"
-          }
+          },
+          "code": "32700"
         },
         {
           "hex": "#F9C1BD",
           "names": {
             "en": "Translucent Pink"
-          }
+          },
+          "code": "32200"
         },
         {
           "hex": "#FFFFFF",
@@ -9601,61 +9830,71 @@
           "hex": "#009FA1",
           "names": {
             "en": "Teal"
-          }
+          },
+          "code": "13612"
         },
         {
           "hex": "#96D8AF",
           "names": {
             "en": "Light Jade"
-          }
+          },
+          "code": "13510"
         },
         {
           "hex": "#0047BB",
           "names": {
             "en": "Blue"
-          }
+          },
+          "code": "13611"
         },
         {
           "hex": "#F5DBAB",
           "names": {
             "en": "Mellow Yellow"
-          }
+          },
+          "code": "13410"
         },
         {
           "hex": "#8344B0",
           "names": {
             "en": "Purple"
-          }
+          },
+          "code": "13710"
         },
         {
           "hex": "#F5B6CD",
           "names": {
             "en": "Cherry Pink"
-          }
+          },
+          "code": "13211"
         },
         {
           "hex": "#F74E02",
           "names": {
             "en": "Orange"
-          }
+          },
+          "code": "13301"
         },
         {
           "hex": "#B8CDE9",
           "names": {
             "en": "Ice Blue"
-          }
+          },
+          "code": "13610"
         },
         {
           "hex": "#B50011",
           "names": {
             "en": "Red"
-          }
+          },
+          "code": "13210"
         },
         {
           "hex": "#B8ACD6",
           "names": {
             "en": "Lavender"
-          }
+          },
+          "code": "13711"
         }
       ],
       "source": {

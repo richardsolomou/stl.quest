@@ -6,7 +6,8 @@ export type FilamentPreset = {
   name: string
   type?: string
   densityGramsPerCm3?: number
-  colors?: { hex: string; names: { en: string; de?: string; fr?: string } }[]
+  /** Each colour, with the manufacturer's code for it when known, such as Bambu Lab's 10103 for PLA Basic Gray. */
+  colors?: { hex: string; names: { en: string; de?: string; fr?: string }; code?: string }[]
   source: { id: string; url: string }
 }
 

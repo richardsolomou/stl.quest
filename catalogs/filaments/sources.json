@@ -2,6 +2,7 @@
   "sources": [
     {
       "id": "spoolmandb",
+      "kind": "filaments",
       "repository": "https://github.com/Donkie/SpoolmanDB.git",
       "webRepository": "https://github.com/Donkie/SpoolmanDB",
       "branch": "main",
@@ -10,6 +11,19 @@
       "license": "MIT",
       "licensePath": "LICENSE",
       "licenseOutput": "LICENSES/SpoolmanDB-MIT.txt"
+    },
+    {
+      "id": "bambustudio",
+      "kind": "colour-codes",
+      "brand": "Bambu Lab",
+      "repository": "https://github.com/bambulab/BambuStudio.git",
+      "webRepository": "https://github.com/bambulab/BambuStudio",
+      "branch": "master",
+      "revision": "8e524a39d4c4cd0541801c1c46d2f77debb0bf1d",
+      "catalogPath": "resources/profiles/BBL/filament/filaments_color_codes.json",
+      "license": "AGPL-3.0-only",
+      "licensePath": "LICENSE",
+      "licenseOutput": "LICENSES/BambuStudio-AGPL-3.0.txt"
     }
   ]
 }

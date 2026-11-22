@@ -6,7 +6,7 @@ import { imageContentType } from '../core/coverImage'
 import { sourceCoverChange } from '../core/request'
 import { inviteIsActive } from '../core/invites'
 import { createServerFn } from '@tanstack/react-start'
-import { getRequest, setCookie } from '@tanstack/react-start/server'
+import { getRequest } from '@tanstack/react-start/server'
 import { resolveAuthAdapterConfig } from '../adapters/auth'
 import {
   brandedEmailParts,
@@ -163,7 +163,7 @@ import { systemDiagnostics } from './operations'
 import { checkForReleaseUpdate } from './releases'
 import { storageDirectories } from './storageDirectories'
 import { resolveStorageInput, storageChangeRequiresMigration, storageConfigurationKind, storageLocationChanged } from './storageConfig'
-import { publicOrigin } from './origins'
+import { publicOrigin, publicUrl } from './origins'
 import {
   buildStorageCandidate,
   emptyStorageInventory,
@@ -175,13 +175,12 @@ import {
 import { assertStorageAllowed, hostedStorageRequiresRemote, localStorageEnabled, storageConfigured } from './storagePolicy'
 import { HOSTED_OWNED_WORKSPACE_LIMIT, hostedDeployment } from './hosted'
 import { cloudStorageApp, requireCloudStorageApp, setCloudStorageApp } from './cloudStorage'
-import { INVITE_COOKIE, inviteCookiePath, normalizeAuthHeaders, writeAuthCookies } from './authCookies'
+import { normalizeAuthHeaders, writeAuthCookies, writeInviteCookie } from './authCookies'
 import { mutationRpc, rpc } from './rpc'
 import { requestLocale, serverMessages } from './locale'
 import { LOCALES } from '../core/i18n/locales'
 import { workspaceMutation } from './workspaceRpc'
 import { resolveSourceImage } from './sourcePreview'
-import { appPath } from '../basePath'
 import { SPOOLMAN_TOKEN_PREFIX } from '../core/spoolman'
 
 const INVITE_TTL = 7 * 24 * 60 * 60 * 1000
@@ -959,7 +958,7 @@ export const createInvite = createServerFn({ method: 'POST' })
         recipientEmail: data.email,
         expiresAt: Date.now() + INVITE_TTL,
       })
-      const url = `${new URL(getRequest().url).origin}${appPath(`/invite/${token}`)}`
+      const url = inviteUrl(getRequest(), token)
       if (data.email) {
         try {
           await sendInviteEmail(mailer!, await readEmailBranding(context.repository), {
@@ -1037,13 +1036,7 @@ export const beginProviderInvite = createServerFn({ method: 'POST' })
       if (!instance.authCapabilities.socialProviders.includes(data.provider)) {
         throw new Response(errors().auth.providerNotEnabled(data.provider), { status: 400 })
       }
-      setCookie(INVITE_COOKIE, data.token, {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: new URL(getRequest().url).protocol === 'https:',
-        path: inviteCookiePath(),
-        maxAge: 10 * 60,
-      })
+      writeInviteCookie(data.token)
       return { provider: data.provider }
     }),
   )
@@ -1912,13 +1905,16 @@ export const getStockLevels = createServerFn({ method: 'GET' })
     }),
   )
 
+export function inviteUrl(request: Request, token: string) {
+  return publicUrl(request, `/invite/${token}`)
+}
+
 /** Where the bridge reaches this app and its ingest endpoint, from the public origin so a TLS proxy's https survives. */
 export function spoolmanUrls(request: Request) {
-  const origin = publicOrigin(request)
   return {
-    appUrl: `${origin}${appPath('')}`,
-    ingestUrl: `${origin}${appPath('/api/spoolman/spools')}`,
-    printsUrl: `${origin}${appPath('/api/bambuddy/events')}`,
+    appUrl: publicUrl(request, ''),
+    ingestUrl: publicUrl(request, '/api/spoolman/spools'),
+    printsUrl: publicUrl(request, '/api/bambuddy/events'),
   }
 }
 

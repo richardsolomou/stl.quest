@@ -1,3 +1,4 @@
+import { normalizedWords } from '../src/core/orders/orderText'
 import { spoolmanDbStem, type SpoolmanCatalogue } from '../src/core/spoolman'
 import { encodePath, normalizeBrand, slug } from './resinCatalog'
 
@@ -8,7 +9,7 @@ export type FilamentCatalogSource = {
   catalogPath: string
 }
 
-export type FilamentColor = { hex: string; names: { en: string } }
+export type FilamentColor = { hex: string; names: { en: string }; code?: string }
 
 /** A colour as parsing finds it, with the SpoolmanDB ID stems of every entry it was gathered from. */
 type ParsedColor = FilamentColor & { spoolmanIds: string[] }
@@ -131,6 +132,43 @@ export function applyFilamentPatches(presets: GeneratedFilamentPreset[], patches
   }
   return presets.map((preset) => ({ ...preset, ...patches[preset.id] }))
 }
+
+/** One of Bambu Studio's `filaments_color_codes.json` entries: a product, a colour code, and its names and hex values. */
+type ColourCodeEntry = { fila_type: string; fila_color_code: string; fila_color_name: { en?: string }; fila_color: string[] }
+
+/**
+ * Records a manufacturer's colour codes, as Bambu Studio lists them, on the catalogue colours they name. A code joins a
+ * colour only when the product's words, the English name, and the hex value all agree, and two codes claiming one colour
+ * leave it without either, since SpoolmanDB folds some products the manufacturer sells apart (Silk and Silk+ PLA).
+ */
+export function applyColourCodes(presets: GeneratedFilamentPreset[], brand: string, contents: string) {
+  const { data } = JSON.parse(contents) as { data: ColourCodeEntry[] }
+  const claims = new Map<FilamentColor, Set<string>>()
+  for (const entry of data) {
+    const hex = entry.fila_color[0]?.slice(0, 7).toUpperCase()
+    const found = presets.flatMap((preset) =>
+      preset.brand === brand && wordKey(preset.name) === wordKey(entry.fila_type)
+        ? (preset.colors ?? []).filter(
+            (colour) => colour.hex === hex && wordKey(colour.names.en) === wordKey(entry.fila_color_name.en ?? ''),
+          )
+        : [],
+    )
+    if (found.length === 1) claims.set(found[0], (claims.get(found[0]) ?? new Set()).add(entry.fila_color_code))
+  }
+  return presets.map((preset) =>
+    preset.colors?.some((colour) => claims.get(colour)?.size === 1)
+      ? {
+          ...preset,
+          colors: preset.colors.map((colour) => {
+            const codes = claims.get(colour)
+            return codes?.size === 1 ? { ...colour, code: [...codes][0] } : colour
+          }),
+        }
+      : preset,
+  )
+}
+
+const wordKey = (text: string) => normalizedWords(text).toSorted().join(' ')
 
 /**
  * The words SpoolmanDB's product attributes add to a name that does not already say them. `finish` is left out: entries of
