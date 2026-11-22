@@ -2,6 +2,7 @@ import { execFile as execFileCallback } from 'node:child_process'
 import { request } from 'node:https'
 import { promisify } from 'node:util'
 import type { Page } from '@playwright/test'
+import { e2eContainer } from './fixtures/environment'
 import { expect, test } from './fixtures/test'
 import { boxStl } from './fixtures/stl'
 
@@ -50,8 +51,7 @@ test('authenticates and receives realtime updates through an HTTPS proxy', async
 })
 
 async function foreignOriginStatus(publicURL: URL) {
-  const port = process.env.PLAYWRIGHT_PORT ?? '4173'
-  const proxy = `stlquest-e2e-https-proxy${port === '4173' ? '' : `-${port}`}`
+  const proxy = e2eContainer('https-proxy')
   const { stdout: ca } = await execFile('docker', ['exec', proxy, 'cat', '/tmp/caddy-data/caddy/pki/authorities/local/root.crt'])
   return new Promise<number | undefined>((resolve, reject) => {
     const probe = request(

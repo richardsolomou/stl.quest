@@ -1,20 +1,29 @@
 #!/bin/sh
 set -eu
 
+# PLAYWRIGHT_PORT names the run (see e2e/fixtures/environment.ts); the peripheral projects run alongside on port + 200.
+port=${PLAYWRIGHT_PORT:-4173}
+peripheral_port=$((port + 200))
+suffix() { if [ "$1" = 4173 ]; then printf ''; else printf -- '-%s' "$1"; fi; }
+STLQUEST_E2E_IMAGE=${STLQUEST_E2E_IMAGE:-$(sh scripts/e2eImage.sh)}
+export STLQUEST_E2E_IMAGE
+
 cleanup() {
-  docker rm -f stlquest-e2e-main stlquest-e2e-self-hosted stlquest-e2e-hosted stlquest-e2e-https stlquest-e2e-https-proxy stlquest-e2e-preview stlquest-e2e-base-path stlquest-e2e-main-4373 stlquest-e2e-self-hosted-4373 stlquest-e2e-hosted-4373 stlquest-e2e-https-4373 stlquest-e2e-https-proxy-4373 stlquest-e2e-preview-4373 stlquest-e2e-base-path-4373 >/dev/null 2>&1 || true
+  for name in main self-hosted hosted https https-proxy preview base-path; do
+    docker rm -f "stlquest-e2e-$name$(suffix "$port")" "stlquest-e2e-$name$(suffix "$peripheral_port")" >/dev/null 2>&1 || true
+  done
 }
 trap cleanup EXIT INT TERM
 cleanup
 if [ "$#" -gt 0 ]; then
-  ./node_modules/.bin/playwright test "$@"
+  PLAYWRIGHT_PORT=$port ./node_modules/.bin/playwright test "$@"
   exit
 fi
 
 status=0
-./node_modules/.bin/playwright test --project chromium &
+PLAYWRIGHT_PORT=$port ./node_modules/.bin/playwright test --project chromium &
 core=$!
-PLAYWRIGHT_PORT=4373 ./node_modules/.bin/playwright test --project hosted-managed --project self-hosted-http --project self-hosted-https --project preview-seed --project base-path &
+PLAYWRIGHT_PORT=$peripheral_port ./node_modules/.bin/playwright test --project hosted-managed --project self-hosted-http --project self-hosted-https --project preview-seed --project base-path &
 peripheral=$!
 wait "$core" || status=1
 wait "$peripheral" || status=1

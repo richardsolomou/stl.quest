@@ -6,6 +6,7 @@ import {
   prepareAuthRequest,
   secureResponseCookies,
   writeAuthCookies,
+  writeInviteCookie,
 } from './authCookies'
 
 const { getRequestMock, setCookieMock } = vi.hoisted(() => ({
@@ -189,5 +190,21 @@ describe('invite cookie', () => {
     vi.stubEnv('BASE_PATH', '/stlquest')
     expect(inviteCookiePath()).toBe('/stlquest/api/auth')
     vi.unstubAllEnvs()
+  })
+})
+
+describe('invite cookie', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('is secure when a reverse proxy forwards HTTPS', () => {
+    getRequestMock.mockReturnValue(new Request('http://container:3000/_serverFn/x', { headers: { 'x-forwarded-proto': 'https' } }))
+    writeInviteCookie('token')
+    expect(setCookieMock).toHaveBeenCalledWith('stlquest_invite', 'token', expect.objectContaining({ secure: true }))
+  })
+
+  it('stays usable over direct HTTP', () => {
+    getRequestMock.mockReturnValue(new Request('http://nas.local/_serverFn/x'))
+    writeInviteCookie('token')
+    expect(setCookieMock).toHaveBeenCalledWith('stlquest_invite', 'token', expect.objectContaining({ secure: false }))
   })
 })

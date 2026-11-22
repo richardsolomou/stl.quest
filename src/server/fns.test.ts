@@ -8,6 +8,7 @@ import {
   nextSmtpConfig,
   nextEmailTemplates,
   parseEmailLogo,
+  inviteUrl,
   spoolmanUrls,
   storedPriceCalculatorSettings,
 } from './fns'
@@ -206,6 +207,20 @@ describe('spoolman urls', () => {
         headers: { host: 'stl.quest', 'x-forwarded-proto': 'https' },
       })
       expect(spoolmanUrls(request).ingestUrl).toBe('https://stl.quest/api/spoolman/spools')
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+})
+
+describe('invite urls', () => {
+  it('uses the public https origin behind a TLS proxy', () => {
+    vi.stubEnv('BETTER_AUTH_URL', '')
+    try {
+      const request = new Request('http://127.0.0.1:3000/_serverFn/x', {
+        headers: { host: 'stl.quest', 'x-forwarded-proto': 'https' },
+      })
+      expect(inviteUrl(request, 'token')).toBe('https://stl.quest/invite/token')
     } finally {
       vi.unstubAllEnvs()
     }
