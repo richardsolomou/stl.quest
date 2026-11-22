@@ -2,6 +2,7 @@ import type { Consumable } from '../../core/consumables'
 import type { EquipmentItem } from '../../core/equipment'
 import type { InventoryItems, InventoryKind } from '../../core/inventory'
 import { normalizePrinterProfile } from '../../core/printers'
+import type { SlicerId } from '../../core/slicers'
 import { consumables, equipment, printers } from '../schema'
 
 export const inventoryTables = { printers, equipment, consumables }
@@ -30,6 +31,7 @@ export function inventoryItem<Kind extends InventoryKind>(kind: Kind, row: Row<K
       lifespanHours: defined(printer.lifespanHours),
       powerWatts: defined(printer.powerWatts),
       addOnPresetIds: JSON.parse(printer.addOnPresetIdsJson) as string[],
+      ...(printer.slicer !== null && { slicer: printer.slicer as SlicerId }),
       ...archived,
     }) as InventoryItems[Kind]
   }
@@ -62,8 +64,16 @@ function consumable(row: Row<'consumables'>, archived: { archived?: boolean }): 
     ...archived,
   }
   const preset = (field: string) => (row.presetId !== null ? { [field]: row.presetId } : {})
+  const slicer = row.slicer !== null ? { slicer: row.slicer as SlicerId } : {}
   if (row.kind === 'resin')
-    return { ...shared, kind: 'resin', ...preset('resinPresetId'), pricePerLitre: row.price, densityGramsPerMl: row.densityGramsPerMl ?? 0 }
+    return {
+      ...shared,
+      kind: 'resin',
+      ...preset('resinPresetId'),
+      pricePerLitre: row.price,
+      densityGramsPerMl: row.densityGramsPerMl ?? 0,
+      ...slicer,
+    }
   if (row.kind === 'filament')
     return {
       ...shared,
@@ -71,6 +81,7 @@ function consumable(row: Row<'consumables'>, archived: { archived?: boolean }): 
       ...preset('filamentPresetId'),
       ...(row.colourJson !== null && { colour: JSON.parse(row.colourJson) as { name: string; hex: string } }),
       pricePerKg: row.price,
+      ...slicer,
     }
   if (row.kind === 'part')
     return {
@@ -101,6 +112,7 @@ export function inventoryColumns<Kind extends InventoryKind>(kind: Kind, item: I
       lifespanHours: printer.lifespanHours ?? null,
       powerWatts: printer.powerWatts ?? null,
       addOnPresetIdsJson: JSON.stringify(printer.addOnPresetIds ?? []),
+      slicer: printer.slicer ?? null,
     } satisfies InventoryColumns<'printers'> as unknown as InventoryColumns<Kind>
   }
   if (kind === 'equipment') {
@@ -129,6 +141,7 @@ export function inventoryColumns<Kind extends InventoryKind>(kind: Kind, item: I
     printerPresetId: null,
     printerId: null,
     unit: null,
+    slicer: null,
   }
   const shared = {
     ...unset,
@@ -139,13 +152,20 @@ export function inventoryColumns<Kind extends InventoryKind>(kind: Kind, item: I
   }
   const columns: InventoryColumns<'consumables'> =
     library.kind === 'resin'
-      ? { ...shared, presetId: library.resinPresetId ?? null, price: library.pricePerLitre, densityGramsPerMl: library.densityGramsPerMl }
+      ? {
+          ...shared,
+          presetId: library.resinPresetId ?? null,
+          price: library.pricePerLitre,
+          densityGramsPerMl: library.densityGramsPerMl,
+          slicer: library.slicer ?? null,
+        }
       : library.kind === 'filament'
         ? {
             ...shared,
             presetId: library.filamentPresetId ?? null,
             price: library.pricePerKg,
             colourJson: library.colour ? JSON.stringify(library.colour) : null,
+            slicer: library.slicer ?? null,
           }
         : library.kind === 'part'
           ? {

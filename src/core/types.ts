@@ -9,6 +9,7 @@ import type { InventoryReferences } from './inventoryDeletion'
 import type { Plate, PlateItem, PlateRecording } from './plates'
 import type { PriceCalculatorCurrency } from './priceCalculator'
 import type { ChargedPrint } from './spend'
+import type { SlicerId } from './slicers'
 
 export type Role = 'admin' | 'requester'
 export type AccountRole = 'super_admin' | 'requester'
@@ -75,6 +76,8 @@ export type PrinterProfile = PrinterSummary & {
   powerWatts?: number
   /** Catalogue equipment bolted onto this printer, such as a pulsing release module, whose printing power adds to its own. */
   addOnPresetIds?: string[]
+  /** Which slicer this printer's files open in (see `SLICERS`). */
+  slicer?: SlicerId
   archived?: boolean
 }
 
@@ -91,6 +94,8 @@ export type Invite = {
 
 export type PrintRequest = {
   id: string
+  /** Counts up per workspace and makes the request's tag (see `requestTag`). */
+  number: number
   name: string
   fileName?: string
   filePath?: string

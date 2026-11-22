@@ -4,9 +4,15 @@ import { dataMigrations as appliedDataMigrations } from '../schema'
 import { legacyCostingMigration } from './0001LegacyCosting'
 import { inventoryTablesMigration } from './0002InventoryTables'
 import { markupPercentMigration } from './0003MarkupPercent'
+import { requestNumbersMigration } from './0004RequestNumbers'
 import type { DataMigration, MigrationLog, SchemaMigrator } from './types'
 
-export const dataMigrations: readonly DataMigration[] = [legacyCostingMigration, inventoryTablesMigration, markupPercentMigration]
+export const dataMigrations: readonly DataMigration[] = [
+  legacyCostingMigration,
+  inventoryTablesMigration,
+  markupPercentMigration,
+  requestNumbersMigration,
+]
 
 /**
  * Brings the database up to date: each pending data migration runs in its own transaction, together with the record

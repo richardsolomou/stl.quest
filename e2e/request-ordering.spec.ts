@@ -4,8 +4,8 @@ import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures/test'
 import { expectTablesFitWidth, expectWithinViewportWidth } from './fixtures/layout'
 import { boxStl } from './fixtures/stl'
+import { enterAdminWorkspace, password } from './fixtures/workspace'
 
-const password = 'correct-horse-battery-staple'
 const captureScreenshots = process.env.CAPTURE_E2E_SCREENSHOTS === '1'
 
 test('requesters own queue priority while admins move work between stages', async ({ page, browser }) => {
@@ -253,34 +253,6 @@ test('requesters own queue priority while admins move work between stages', asyn
 // The board settings pane links to Members too, so section navigation is scoped to the settings nav.
 function settingsSection(page: Page, name: string) {
   return page.getByLabel('Settings sections').getByRole('link', { name, exact: true })
-}
-
-async function enterAdminWorkspace(page: Page) {
-  await page.goto('/')
-  const setupButton = page.getByRole('button', { name: 'Set up STL Quest' })
-  const signInButton = page.getByRole('button', { name: 'Sign in', exact: true })
-  await expect(setupButton.or(signInButton)).toBeVisible()
-  if (await signInButton.isVisible()) {
-    await page.getByLabel('Email').fill('owner@example.com')
-    await page.getByLabel('Password').fill(password)
-    await signInButton.click()
-    await expect(page.getByRole('region', { name: 'Board filters' }).getByRole('button', { name: 'Add a print' })).toBeVisible()
-    return
-  }
-
-  await setupButton.click()
-  await page.getByLabel('Name').fill('Owner')
-  await page.getByLabel('Email').fill('owner@example.com')
-  await page.getByLabel('Password').fill(password)
-  await page.getByLabel('Password').press('Enter')
-  await page.getByRole('button', { name: 'Use this folder' }).click()
-  if (!(await page.getByRole('button', { name: /^Edit / }).count())) {
-    await page.getByRole('button', { name: 'Add printer' }).click()
-    await page.getByRole('button', { name: 'Custom printer' }).click()
-    await page.getByLabel('Name', { exact: true }).fill('Resin printer')
-    await page.getByRole('button', { name: 'Done' }).click()
-  }
-  await page.getByRole('button', { name: 'Save and continue' }).click()
 }
 
 async function upload(page: Page, name: string, size: number, copies = 1) {

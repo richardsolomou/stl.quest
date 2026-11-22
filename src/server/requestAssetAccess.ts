@@ -14,3 +14,9 @@ export async function authorizedRequestAsset(context: RequestAssetContext, reque
   if (!(await memberSeesOnlyOwnRequests(context.repository, context.identity))) return request
   return request.ownerUserId === context.identity.id ? request : undefined
 }
+
+/** What a request prints as for telemetry: its assigned printer's type, else the type it asked for. */
+export async function requestPrintType(repository: Pick<Repository, 'listInventory'>, request: PrintRequest) {
+  const printer = request.printerId ? (await repository.listInventory('printers')).find(({ id }) => id === request.printerId) : undefined
+  return printer?.printType ?? request.requestedPrintType
+}

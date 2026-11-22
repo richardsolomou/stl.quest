@@ -523,6 +523,17 @@ export const settings: typeof en = {
       archive: 'Archiver',
     },
   },
+  slicer: {
+    label: 'Slicer',
+    none: 'Aucun',
+    printers: 'Celui de son imprimante',
+    opens: (slicer) =>
+      `Les impressions s’ouvrent directement dans ${slicer}. Définissez d’abord un dossier de téléchargement dans ses préférences.`,
+    downloads: (slicer) =>
+      `${slicer} ne peut pas ouvrir un fichier depuis un lien : les impressions sont donc téléchargées pour que vous les y ouvriez.`,
+    unset: 'Choisissez-en un pour y ouvrir ou télécharger les impressions de cette imprimante.',
+    material: 'Seulement si ce matériau demande un autre slicer que son imprimante.',
+  },
   printers: {
     sections: { resin: 'Imprimantes résine', filament: 'Imprimantes filament' },
     addOfType: { resin: 'Ajouter une imprimante résine', filament: 'Ajouter une imprimante filament' },

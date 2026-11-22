@@ -10,6 +10,8 @@ export const requests = sqliteTable(
     workspaceId: text('workspace_id')
       .notNull()
       .references(() => organization.id, { onDelete: 'cascade' }),
+    /** One more than the workspace's highest when the request is made, so it makes the request's `SQ-<number>` tag; set on every row. */
+    number: integer('number'),
     name: text().notNull(),
     fileName: text('file_name'),
     filePath: text('file_path'),
@@ -50,6 +52,7 @@ export const requests = sqliteTable(
     index('requests_created').on(table.createdAt),
     index('requests_workspace_created').on(table.workspaceId, table.createdAt),
     uniqueIndex('requests_workspace_id_unique').on(table.workspaceId, table.id),
+    uniqueIndex('requests_workspace_number_unique').on(table.workspaceId, table.number),
     index('requests_print_type').on(table.printType),
     index('requests_printer_id').on(table.printerId),
     index('requests_owner_user_id').on(table.ownerUserId),

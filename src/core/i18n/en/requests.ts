@@ -108,6 +108,14 @@ export const requests = {
     loadingThumbnail: 'Loading thumbnail',
   },
   downloadModel: 'Download model',
+  slicer: {
+    open: (slicer: string) => `Open in ${slicer}`,
+    download: (slicer: string) => `Download for ${slicer}`,
+    opening: (slicer: string) => `Opening in ${slicer}…`,
+    opensModel: 'It is added to the plate that is already open.',
+    opensProject: 'A 3MF opens as its own project, and the slicer asks first when a plate is already loaded.',
+    failed: 'The slicer link could not be made.',
+  },
   charge: {
     label: 'Charged',
     placeholder: 'Not recorded',

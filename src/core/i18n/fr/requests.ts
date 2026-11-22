@@ -110,6 +110,14 @@ export const requests: typeof en = {
     loadingThumbnail: 'Chargement de la miniature',
   },
   downloadModel: 'Télécharger le modèle',
+  slicer: {
+    open: (slicer) => `Ouvrir dans ${slicer}`,
+    download: (slicer) => `Télécharger pour ${slicer}`,
+    opening: (slicer) => `Ouverture dans ${slicer}…`,
+    opensModel: 'Il est ajouté au plateau déjà ouvert.',
+    opensProject: 'Un 3MF s’ouvre comme un projet à part, et le slicer demande d’abord si un plateau est déjà chargé.',
+    failed: 'Le lien pour le slicer n’a pas pu être créé.',
+  },
   charge: {
     label: 'Facturé',
     placeholder: 'Non renseigné',

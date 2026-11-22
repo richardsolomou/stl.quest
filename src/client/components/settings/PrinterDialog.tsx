@@ -37,6 +37,7 @@ import { UsageTrackingInvite } from '../UsageTracking'
 import { PrinterMaintenance } from './PrinterMaintenance'
 import { PrinterPresetImage } from './PrinterPresetImage'
 import { PrinterPresetPicker } from './PrinterPresetPicker'
+import { SlicerField } from './SlicerField'
 
 const DIMENSIONS = [
   ['widthMm', 'width'],
@@ -146,6 +147,7 @@ function PrinterFields({
       presetId: next.id,
       printType: next.printType,
       addOnPresetIds: next.printType === current.printType ? current.addOnPresetIds : undefined,
+      slicer: next.printType === current.printType ? current.slicer : undefined,
       widthMm: next.widthMm,
       depthMm: next.depthMm,
       heightMm: next.heightMm,
@@ -199,6 +201,12 @@ function PrinterFields({
       </Field>
 
       {!preset && <CustomPrinterSpec draft={draft} onChange={onChange} />}
+      <SlicerField
+        id="printer-slicer"
+        printType={draft.printType}
+        value={draft.slicer}
+        onChange={(slicer) => onChange((current) => ({ ...current, slicer }))}
+      />
       <PrinterWear draft={draft} currency={currency} onChange={onChange} />
       <PrinterAddOns draft={draft} onChange={onChange} />
     </>
@@ -225,7 +233,7 @@ function CustomPrinterSpec({
           className="w-full sm:w-72"
           value={draft.printType}
           options={PRINT_TYPES.map((value) => ({ value, label: printTypes[value] }))}
-          onChange={(printType) => onChange((current) => ({ ...current, printType, addOnPresetIds: undefined }))}
+          onChange={(printType) => onChange((current) => ({ ...current, printType, addOnPresetIds: undefined, slicer: undefined }))}
         />
       </Field>
 

@@ -26,6 +26,7 @@ export const printers = sqliteTable(
     lifespanHours: real('lifespan_hours'),
     powerWatts: real('power_watts'),
     addOnPresetIdsJson: text('add_on_preset_ids_json').notNull().default('[]'),
+    slicer: text('slicer'),
     archivedAt: integer('archived_at'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
@@ -94,6 +95,8 @@ export const consumables = sqliteTable(
     printerPresetId: text('printer_preset_id'),
     printerId: text('printer_id'),
     unit: text({ enum: ['ml', 'g', 'item'] }),
+    /** A resin or filament's own slicer, used instead of its printer's. */
+    slicer: text('slicer'),
     minimumStock: real('minimum_stock'),
     packSize: real('pack_size'),
     archivedAt: integer('archived_at'),

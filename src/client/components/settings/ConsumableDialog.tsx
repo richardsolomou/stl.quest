@@ -49,6 +49,7 @@ import { useAutosave } from '../../useAutosave'
 import { useUsageTracking } from '../../workspace'
 import { AutosaveStatus } from '../AutosaveStatus'
 import { ColourSwatch } from '../ColourSwatch'
+import { SlicerField } from './SlicerField'
 import { DialogShell } from '../DialogShell'
 import { formatNumber } from '../priceCalculator/format'
 import { StockPanel, useStockMovements } from './ConsumableStock'
@@ -318,6 +319,15 @@ export function ConsumableDialog({
         )}
         <StockFields consumable={draft} tracking={tracking} onChange={setDraft} />
       </div>
+      {(draft.kind === 'resin' || draft.kind === 'filament') && (
+        <SlicerField
+          id="consumable-slicer"
+          printType={draft.kind}
+          value={draft.slicer}
+          material
+          onChange={(slicer) => setDraft({ ...draft, slicer })}
+        />
+      )}
       {!openedNew && tracking && <StockPanel workspaceSlug={workspaceSlug} consumable={draft} level={level} printers={printers} />}
     </DialogShell>
   )

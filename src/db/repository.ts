@@ -3916,11 +3916,18 @@ export class DrizzleRepository implements Repository {
     if (hasFile !== Boolean(request.fileName) || hasFile !== Boolean(request.filePath) || (!hasFile && !request.sourceUrl?.trim())) {
       throw new Response('invalid request source', { status: 400 })
     }
+    await this.lockWorkspace(db, workspaceId)
+    const last = await db
+      .select({ number: max(requests.number) })
+      .from(requests)
+      .where(eq(requests.workspaceId, workspaceId))
+      .get()
     await db
       .insert(requests)
       .values({
         id,
         workspaceId,
+        number: (last?.number ?? 0) + 1,
         name: request.name,
         fileName: request.fileName,
         filePath: request.filePath,

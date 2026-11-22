@@ -89,3 +89,14 @@ function validOptionalEstimate(value: unknown) {
   return value === undefined || value === null || (typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 1_000_000)
 }
 import type { PrintType } from './types'
+
+/** How a request is named outside STL Quest, such as in a slicer's object list, so plate objects can be traced back to it. */
+export function requestTag(number: number) {
+  return `SQ-${number}`
+}
+
+/** The name a downloaded model is saved as: its file name behind the request's tag, unless it already starts with it. */
+export function taggedFileName(number: number, fileName: string) {
+  const tag = requestTag(number)
+  return fileName.startsWith(`${tag} `) ? fileName : `${tag} ${fileName}`
+}
