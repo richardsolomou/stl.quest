@@ -4,6 +4,7 @@ import path from 'node:path'
 import { assertRevisions, checkoutSource, writeSourceLicense } from './catalogSources'
 import type { SpoolmanCatalogue } from '../src/core/spoolman'
 import {
+  applyColourCodes,
   applyFilamentPatches,
   parseSpoolmanFilaments,
   type FilamentCatalogSource,
@@ -11,7 +12,10 @@ import {
   type GeneratedFilamentPreset,
 } from './filamentCatalog'
 
+/** SpoolmanDB's filaments, or a manufacturer's colour codes for its own brand's colours. */
 type Source = FilamentCatalogSource & {
+  kind: 'filaments' | 'colour-codes'
+  brand?: string
   repository: string
   branch: string
   license: string
@@ -39,15 +43,23 @@ function synchronizeCatalog() {
   try {
     const parsed: GeneratedFilamentPreset[] = []
     const spoolman: SpoolmanCatalogue = { colours: {}, presets: {} }
+    const colourCodes: { brand: string; contents: string }[] = []
     for (const source of manifest.sources) {
       const checkout = checkoutSource(temporaryRoot, source, update)
+      writeSourceLicense(root, checkout, source)
+      if (source.kind === 'colour-codes') {
+        colourCodes.push({ brand: source.brand!, contents: readFileSync(path.join(checkout, source.catalogPath), 'utf8') })
+        continue
+      }
       const read = parseSpoolmanFilaments(jsonFiles(checkout, path.join(checkout, source.catalogPath)), source)
       parsed.push(...read.presets)
       Object.assign(spoolman.colours, read.spoolman.colours)
       Object.assign(spoolman.presets, read.spoolman.presets)
-      writeSourceLicense(root, checkout, source)
     }
-    const presets = applyFilamentPatches(parsed, overrides.patches)
+    const presets = colourCodes.reduce(
+      (coded, { brand, contents }) => applyColourCodes(coded, brand, contents),
+      applyFilamentPatches(parsed, overrides.patches),
+    )
     const sources = manifest.sources.map(({ id, webRepository: repository, revision, license }) => ({ id, repository, revision, license }))
     validateCatalog(presets, sources)
     validateSpoolman(spoolman, presets)
@@ -82,6 +94,17 @@ function validateCatalog(presets: GeneratedFilamentPreset[], sources: CatalogSou
     if (!sourceIds.has(preset.source.id)) throw new Error(`Unknown source ${preset.source.id} for ${preset.id}`)
   }
   if (presets.length < 300) throw new Error(`Filament catalog unexpectedly small: ${presets.length} presets`)
+  const codes = new Set<string>()
+  for (const preset of presets) {
+    for (const { code } of preset.colors ?? []) {
+      if (code === undefined) continue
+      // Order emails are read by the five-digit code after a colour's name, so no other code could ever match.
+      if (!/^\d{5}$/.test(code)) throw new Error(`Colour code ${code} of ${preset.id} is not five digits`)
+      if (codes.has(`${preset.brand} ${code}`)) throw new Error(`Duplicate ${preset.brand} colour code ${code}`)
+      codes.add(`${preset.brand} ${code}`)
+    }
+  }
+  if (codes.size < 200) throw new Error(`Filament catalog unexpectedly has only ${codes.size} colour codes`)
 }
 
 /** Keeps each pair on one line, as the formatter does. */

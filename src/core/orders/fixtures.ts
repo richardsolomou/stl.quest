@@ -45,6 +45,7 @@ Alex Example
 Germany
 `
 
+/** The German store prints Bambu Lab's German colour names, beside the same codes. */
 export const BAMBU_LAB_EU_GERMAN_TEXT = `Bambu Lab EU Store
 Bestellung #TEST-0002
 
@@ -52,16 +53,44 @@ Vielen Dank für Ihren Einkauf!
 
 Bestellübersicht
 
-PLA Basic - Jade White (10100) / Nachfüllpackung / 1 kg × 1
+PLA Basic - Jade-Weiß (10100) / Nachfüllung / 1 kg × 1
 16,99 €
 
-PLA Basic - Gray (10103) / Mit Spule / 1 kg × 2
+PLA Basic - Grau (10103) / Filament mit Spule / 1 kg × 2
 39,98 €
 
 Zwischensumme
 56,97 €
 Gesamt
 56,97 € EUR
+`
+
+/** The French store prints Bambu Lab's French colour names, beside the same codes. */
+export const BAMBU_LAB_EU_FRENCH_TEXT = `Bambu Lab EU Store
+Commande #TEST-0004
+
+Merci pour votre achat !
+
+Récapitulatif de la commande
+
+PLA Basic × 2
+Blanc de jade (10100) / Recharge / 1 kg
+33,98 €
+
+PLA Matte × 1
+Anthracite (11101) / Filament avec bobine / 1 kg
+21,99 €
+
+PETG HF × 1
+Noir (33102) / Recharge / 1 kg
+19,99 €
+
+Sous-total
+75,96 €
+Expédition
+0,00 €
+Total
+75,96 € EUR
 `
 
 export const BAMBU_LAB_EU_HTML = `<!DOCTYPE html>
