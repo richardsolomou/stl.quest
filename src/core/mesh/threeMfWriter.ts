@@ -3,7 +3,8 @@ import { InvalidMeshError } from './stl'
 /**
  * The parts of a plain 3MF (core specification only) holding several models, each placed once per copy. Slicers that
  * did not write the file import it as geometry under their current settings: OrcaSlicer names each object after the
- * object's `name`, and makes every build item of one object an object of its own.
+ * object's `name` and makes every build item of one object an object of its own, but when the file holds one object,
+ * those extra copies take the file's name instead (see `plateFileName`).
  */
 
 export const THREE_MF_CONTENT_TYPES =
@@ -20,7 +21,7 @@ export type PlateMesh = { vertices: Float32Array; triangles: Uint32Array; width:
 
 /**
  * Indexes a triangle list, sharing corners at exactly the same position as STL readers do, so the slicer sees a
- * closed mesh rather than loose triangles; triangles that collapse to a line or point are dropped.
+ * closed mesh rather than loose triangles; triangles that collapse to a line or point are dropped, and a model with none left is refused.
  */
 export function plateMesh(positions: Float32Array): PlateMesh {
   const corners = positions.length / 3
@@ -29,7 +30,13 @@ export function plateMesh(positions: Float32Array): PlateMesh {
   let vertices = new Float32Array(3 * 1024)
   let count = 0
   let slots = new Int32Array(1 << 12).fill(-1)
-  const hash = (x: number, y: number, z: number) => Math.imul(x, 73856093) ^ Math.imul(y, 19349663) ^ Math.imul(z, 83492791)
+  // Round coordinates leave a float's low bits zero, so the bits are mixed before the table masks them.
+  const hash = (x: number, y: number, z: number) => {
+    let h = Math.imul(x, 73856093) ^ Math.imul(y, 19349663) ^ Math.imul(z, 83492791)
+    h = Math.imul(h ^ (h >>> 16), 0x85ebca6b)
+    h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35)
+    return h ^ (h >>> 16)
+  }
   const insert = (table: Int32Array, vertex: number) => {
     floats.set(vertices.subarray(vertex * 3, vertex * 3 + 3))
     let slot = hash(bits[0], bits[1], bits[2]) & (table.length - 1)
@@ -72,6 +79,8 @@ export function plateMesh(positions: Float32Array): PlateMesh {
     triangles[kept++] = b
     triangles[kept++] = c
   }
+  // The 3MF core specification requires at least one triangle per mesh.
+  if (!kept) throw new InvalidMeshError('model has no triangle with any area')
   vertices = vertices.slice(0, count * 3)
   const min = [Infinity, Infinity, Infinity]
   const max = [-Infinity, -Infinity, -Infinity]

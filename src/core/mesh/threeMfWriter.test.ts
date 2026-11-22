@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { strToU8, zipSync } from 'fflate'
 import { XMLParser } from 'fast-xml-parser'
+import { InvalidMeshError } from './stl'
 import { parseThreeMf } from './threeMf'
 import {
   arrangeFootprints,
@@ -43,6 +44,22 @@ describe('plateMesh', () => {
   it('drops triangles whose corners coincide', () => {
     const sliver = new Float32Array([...quad, 1, 1, 3, 1, 1, 3, 2, 2, 3])
     expect(plateMesh(sliver).triangles.length / 3).toBe(2)
+  })
+
+  it('refuses a model whose every triangle collapses', () => {
+    expect(() => plateMesh(new Float32Array([1, 1, 3, 1, 1, 3, 2, 2, 3]))).toThrow(InvalidMeshError)
+  })
+
+  // A model on a millimetre grid shares its corners' low float bits, which a table keyed on raw bits piles into a few slots.
+  it('indexes a model on a round grid quickly', () => {
+    const grid = new Float32Array(100_000 * 9)
+    for (let index = 0; index < 100_000; index++) {
+      const [x, y] = [index % 1000, Math.floor(index / 1000)]
+      grid.set([x, y, 0, x + 1, y, 0, x, y + 1, index % 7], index * 9)
+    }
+    const started = performance.now()
+    plateMesh(grid)
+    expect(performance.now() - started).toBeLessThan(1000)
   })
 
   it('treats negative zero as zero', () => {
