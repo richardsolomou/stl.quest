@@ -2350,6 +2350,8 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
       await page.request.post('/api/spoolman/restocks', { headers: bridge, data: { id: restocks[0].id, error: 'Spoolman is busy' } })
     ).status(),
   ).toBe(204)
+  // The page may not have subscribed to realtime yet when the bridge reports straight after it loads.
+  await page.reload()
   await expect(spoolsToAdd).toContainText('Spoolman refused it: Spoolman is busy')
   await spoolsToAdd.scrollIntoViewIfNeeded()
   await screenshot(page, 'spoolman-restock-failed')

@@ -12,6 +12,7 @@ test('signs in over direct self-hosted HTTP', async ({ page }) => {
 
   await page.context().clearCookies()
   await page.reload()
+  await expect(page.locator('form[data-hydrated="true"]')).toBeVisible()
   await page.getByLabel('Email').fill('owner@example.com')
   await page.getByLabel('Password').fill('wrong-password')
   await page.getByRole('button', { name: 'Sign in' }).click()
