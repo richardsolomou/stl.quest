@@ -20,10 +20,11 @@ import {
 } from '../../../core/orders/orderRestock'
 import { parseOrderEmail, type OrderLine, type ParsedOrder } from '../../../core/orders/orderEmail'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS, type PriceCalculatorCurrency } from '../../../core/priceCalculator'
+import { storeCurrency } from '../../../core/stores'
 import { restockFromOrder, undoUsage } from '../../../server/fns'
 import { createId } from '../../id'
 import { useI18n } from '../../i18n'
-import { catalogueQuery, priceCalculatorSettingsQuery, stockQuery } from '../../queries'
+import { catalogueQuery, priceCalculatorSettingsQuery, stockQuery, storesQuery } from '../../queries'
 import { invalidateQueries } from '../../queryState'
 import { ColourSwatch } from '../ColourSwatch'
 import { DialogShell } from '../DialogShell'
@@ -127,6 +128,7 @@ function OrderReview({
   const currency =
     useQuery(priceCalculatorSettingsQuery(workspaceSlug)).data?.settings.currency ?? DEFAULT_PRICE_CALCULATOR_SETTINGS.currency
   const levels = useQuery(stockQuery(workspaceSlug)).data?.stock
+  const stores = useQuery(storesQuery(workspaceSlug)).data?.stores ?? []
   const catalogue = useQuery(catalogueQuery('filaments')).data
   const managed = useMemo(() => new Set(levels?.flatMap((level) => (level.spoolman ? [level.consumableId] : []))), [levels])
   const rows = useMemo<Row[] | undefined>(
@@ -150,7 +152,21 @@ function OrderReview({
     if (chosen === ADD) return row.match.kind === 'catalogue' ? [{ line: row.line, add: row.match }] : []
     return [{ line: row.line, consumableId: chosen }]
   })
-  const input = catalogue && orderRestock(order, choices, { consumables, catalogue, currency, updatePrices, newId: createId })
+  const input = catalogue && orderRestock(order, choices, { consumables, stores, catalogue, currency, updatePrices, newId: createId })
+  // A consumable from a store in the order's currency takes its price even when the workspace's differs.
+  const takesPrices =
+    priced ||
+    choices.some((choice) => {
+      const consumable = 'consumableId' in choice && consumables.find(({ id }) => id === choice.consumableId)
+      return (
+        consumable &&
+        order.currency ===
+          storeCurrency(
+            stores.find(({ id }) => id === consumable.storeId),
+            currency,
+          )
+      )
+    })
   const callRestock = useServerFn(restockFromOrder)
   const callUndo = useServerFn(undoUsage)
   const restock = useMutation({
@@ -211,7 +227,7 @@ function OrderReview({
               />
             ))}
           </ul>
-          {priced ? (
+          {takesPrices ? (
             <label className="flex items-start gap-2.5 text-sm" htmlFor="order-update-prices">
               <Checkbox id="order-update-prices" className="mt-0.5" checked={updatePrices} onCheckedChange={setUpdatePrices} />
               <span className="grid gap-0.5">

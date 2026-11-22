@@ -2161,7 +2161,7 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     const database = createDatabase(':memory:')
     const migrated = await DrizzleRepository.create(database)
 
-    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 49 })
+    expect(await database.get(drizzleSql`SELECT count(*) count FROM __drizzle_migrations`)).toEqual({ count: 51 })
     await migrated.close()
   })
 
@@ -2219,6 +2219,35 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     await Promise.all([rename('saturn', 'Saturn bay 1'), rename('mk4', 'MK4 bay 2')])
 
     expect((await repository.listInventory('printers')).map(({ name }) => name)).toEqual(['Saturn bay 1', 'MK4 bay 2'])
+  })
+
+  it('changes a store and what it sells together', async () => {
+    await stock(repository, 'stores', [{ id: 'amazon', name: 'Amazon US' }])
+    await stock(repository, 'consumables', [{ ...ipa, storeId: 'amazon' }])
+
+    await repository.changeStores((stores, consumables) => ({
+      stores: stores.map((store) => ({ ...store, currency: 'USD', exchangeRate: 0.9, exchangeRateCurrency: 'EUR' })),
+      consumables: consumables.map((item) => ({ ...item, price: 11 }) as Consumable),
+    }))
+
+    expect([await repository.listInventory('stores'), (await repository.listInventory('consumables'))[0]]).toEqual([
+      [{ id: 'amazon', name: 'Amazon US', currency: 'USD', exchangeRate: 0.9, exchangeRateCurrency: 'EUR' }],
+      { ...ipa, storeId: 'amazon', price: 11 },
+    ])
+  })
+
+  it('reprices what a deleted store sold as it leaves the store', async () => {
+    await stock(repository, 'stores', [{ id: 'amazon', name: 'Amazon US', archived: true }])
+    await stock(repository, 'consumables', [{ ...ipa, storeId: 'amazon' }])
+
+    await repository.deleteInventoryItem(
+      'stores',
+      'amazon',
+      () => {},
+      (item) => ({ ...item, price: 9 }) as Consumable,
+    )
+
+    expect((await repository.listInventory('consumables'))[0]).toEqual({ ...ipa, price: 9 })
   })
 
   it('refuses a change that drops an item rather than archiving it', async () => {

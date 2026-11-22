@@ -2,10 +2,11 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { Calculator, ChevronRight, Info } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { priceRequest, priceRequestOnPrinters } from '../../core/priceCalculator'
+import { DEFAULT_PRICE_CALCULATOR_SETTINGS, priceRequest, priceRequestOnPrinters } from '../../core/priceCalculator'
 import type { PublicPrintRequest } from '../../core/types'
 import { calculatorSearch } from '../calculatorSearch'
-import { consumablesQuery, equipmentQuery, priceCalculatorSettingsQuery, printersQuery } from '../queries'
+import { usePricedConsumables } from '../inventory'
+import { equipmentQuery, priceCalculatorSettingsQuery, printersQuery } from '../queries'
 import { useWorkspaceSlug } from '../workspace'
 import { DetailRow } from './DetailRow'
 import { requestPrintEstimate } from '../../core/printEstimates'
@@ -20,7 +21,7 @@ export function RequestCostEstimate({ request }: { request: PublicPrintRequest }
   const printerData = useQuery(printersQuery(workspaceSlug)).data
   const printers = printerData?.profiles ?? []
   const printerRuns = printerData?.runs ?? []
-  const consumables = useQuery(consumablesQuery(workspaceSlug)).data?.consumables ?? []
+  const consumables = usePricedConsumables(workspaceSlug, query.data?.settings.currency ?? DEFAULT_PRICE_CALCULATOR_SETTINGS.currency)
   const equipment = useQuery(equipmentQuery(workspaceSlug)).data?.equipment ?? []
   const estimate = requestPrintEstimate(request)
   if (!request.printType || !estimate || !query.data?.saved) return null

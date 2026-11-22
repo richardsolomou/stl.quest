@@ -10,6 +10,7 @@ import { newWearPart, wearPartsFor, withConsumablePrice, type Consumable, type P
 import { partPresetsForGroup } from '../../../core/partPresets'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS, measuredFailurePercent, MIN_MEASURED_FAILURE_RUNS } from '../../../core/priceCalculator'
 import { partFromPreset } from '../../../core/stock'
+import { boughtWhereSold } from '../../../core/stores'
 import { wearLevel, type PartWear, type WearLevel } from '../../../core/maintenance'
 import type { PrinterProfile } from '../../../core/types'
 import type { StockLevel } from '../../../core/usage'
@@ -26,7 +27,7 @@ import {
   storesQuery,
 } from '../../queries'
 import { useWorkspaceSlug } from '../../workspace'
-import { currencySymbol, formatNumber, formatRate } from '../priceCalculator/format'
+import { formatNumber } from '../priceCalculator/format'
 import { ConsumableDialog } from './ConsumableDialog'
 import { PartPicker } from './ConsumablePicker'
 import { useStockMovements } from './ConsumableStock'
@@ -36,7 +37,7 @@ import { useStockMovements } from './ConsumableStock'
  * Logging a replacement takes a spare off the shelf and starts the count again.
  */
 export function PrinterMaintenance({ printer }: { printer: PrinterProfile }) {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const copy = t.settings.printers.dialog.maintenance
   const workspaceSlug = useWorkspaceSlug()
   const consumables = useQuery(consumablesQuery(workspaceSlug)).data?.consumables
@@ -102,7 +103,9 @@ export function PrinterMaintenance({ printer }: { printer: PrinterProfile }) {
           groups={
             presets && [{ items: presets.map((preset) => ({ preset, had: parts.some(({ partPresetId }) => partPresetId === preset.id) })) }]
           }
-          onSelect={({ preset }) => setEditing(withConsumablePrice(partFromPreset(createId(), { preset, ...group }), Number.NaN))}
+          onSelect={({ preset }) =>
+            setEditing(boughtWhereSold(withConsumablePrice(partFromPreset(createId(), { preset, ...group }), Number.NaN), stores, preset))
+          }
           onCustom={() => setEditing(newWearPart(createId(), group))}
           onClose={() => setPicking(false)}
         />
@@ -117,8 +120,7 @@ export function PrinterMaintenance({ printer }: { printer: PrinterProfile }) {
           workspaceSlug={workspaceSlug}
           level={levels.find(({ consumableId }) => consumableId === editing.id)}
           printers={printers}
-          symbol={currencySymbol(currency, locale)}
-          rate={(value) => formatRate(value, currency, locale)}
+          currency={currency}
           onSave={save}
           onArchive={() => archive(editing)}
           onClose={() => setEditing(null)}

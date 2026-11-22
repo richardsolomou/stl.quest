@@ -448,9 +448,14 @@ export const createInventoryItem = createServerFn({ method: 'POST' })
 
 export const updateInventoryItem = createServerFn({ method: 'POST' })
   .validator(inWorkspace(inventoryItemSchema))
-  .handler(async ({ data: { workspaceSlug, inventory, item } }) =>
-    workspaceMutation(workspaceSlug, async (context) => ({
-      items: await context.service.updateInventoryItem(inventory, item, context.identity),
+  .handler(async ({ data }) =>
+    workspaceMutation(data.workspaceSlug, async (context) => ({
+      items: await context.service.updateInventoryItem(
+        data.inventory,
+        data.item,
+        context.identity,
+        data.inventory === 'stores' ? data.shippingTakenOut : undefined,
+      ),
     })),
   )
 
