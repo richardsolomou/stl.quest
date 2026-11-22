@@ -1592,19 +1592,23 @@ export class STLQuestService {
 
   /**
    * Adds several consumables under one lock, such as the colours of one filament, so they land together or not at all.
-   * While stock is tracked, each can start counted at `onHand`, in its own unit, as one undoable step.
+   * While stock is tracked, each is counted at `onHand`, in its own unit, as one undoable step. A retry of the same add
+   * is safe: items already stored under the same IDs are kept as they are, and each count records only the difference.
    */
   async createConsumables(items: Consumable[], onHand: number | undefined, identity: Identity) {
     if (onHand !== undefined) await this.requireUsageTracking(identity)
-    const library = await this.changeInventory('consumables', identity, (current) => {
-      if (items.some((item) => current.some(({ id }) => id === item.id))) throw new Response(this.text.inventory.exists, { status: 409 })
-      return [...current, ...items.map((item) => ({ ...item, archived: undefined }))]
-    })
+    const library = await this.changeInventory('consumables', identity, (current) => [
+      ...current,
+      ...items.filter((item) => !current.some(({ id }) => id === item.id)).map((item) => ({ ...item, archived: undefined })),
+    ])
     if (onHand !== undefined) {
-      await this.appendUsage(
-        items.map((item) => ({ stage: 'stock', kind: 'correction', ...consumed(item), amount: onHand })),
-        identity,
-      )
+      const stored = items.map((item) => library.find(({ id }) => id === item.id) ?? item)
+      const levels = stockLevels(stored, await this.repository.stockTotals())
+      const corrections = stored.flatMap((item, index) => {
+        const amount = onHand - levels[index].onHand
+        return amount ? [{ stage: 'stock' as const, kind: 'correction' as const, ...consumed(item), amount }] : []
+      })
+      if (corrections.length) await this.appendUsage(corrections, identity)
     }
     this.capture(identity.id, 'consumables_added', {
       item_count: items.length,

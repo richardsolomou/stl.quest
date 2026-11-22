@@ -284,8 +284,9 @@ export const settings: typeof en = {
       chosen: (count: number) => `${count} ${count === 1 ? 'choisie' : 'choisies'}`,
       inList: (colour: string) => `${colour} (dans votre liste)`,
       colourCount: (count: number) => `${count} couleur${count === 1 ? '' : 's'}`,
-      addColours: (count: number) => `Ajouter ${count} couleurs`,
-      addedColours: (count: number, product: string) => `${count} couleurs de ${product} ajoutées`,
+      addColours: (count: number) => (count === 1 ? 'Ajouter la couleur' : `Ajouter ${count} couleurs`),
+      addedColours: (count: number, product: string) =>
+        `${count} ${count === 1 ? 'couleur' : 'couleurs'} de ${product} ${count === 1 ? 'ajoutée' : 'ajoutées'}`,
       sharePrice: (count: number) =>
         count === 1 ? 'Appliquer ce prix à l’autre couleur' : `Appliquer ce prix aux ${count} autres couleurs`,
       sharedPrice: (count: number) => (count === 1 ? '1 autre couleur mise à jour' : `${count} autres couleurs mises à jour`),

@@ -29,11 +29,11 @@ export function filamentsInColours(
   draft: FilamentConsumable,
   preset: FilamentPreset,
   colours: FilamentColour[],
-  newId: () => string,
+  newId: (colour: FilamentColour) => string,
 ): FilamentConsumable[] {
   return colours.map((colour) => ({
     ...draft,
-    id: newId(),
+    id: newId(colour),
     colour,
     name: filamentConsumableName(preset, colour),
   }))

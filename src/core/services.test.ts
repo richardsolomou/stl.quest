@@ -10,7 +10,7 @@ import { DrizzleRepository } from '../db/repository'
 import { organization, requests, requestStatuses, user } from '../db/schema'
 import type { EventBus, Identity, Notifier, PrinterProfile, Telemetry } from './types'
 import { STLQuestService } from './services'
-import { consumablesOfKind, MAX_CONSUMABLES, type Consumable } from './consumables'
+import { consumablePrice, consumablesOfKind, MAX_CONSUMABLES, type Consumable } from './consumables'
 import { MAX_EQUIPMENT, type EquipmentItem } from './equipment'
 import { PRINTERS_SKIPPED_SETTING } from './printers'
 import { summariseSpend } from './spend'
@@ -2820,11 +2820,26 @@ describe('STLQuestService crash recovery', () => {
         }).toEqual({ library: [grey.id, black.id, white.id], published: [['inventory.changed']] })
       })
 
-      it('adds none when one of them is already stored', async () => {
-        await stock('consumables', [white])
+      it('keeps one already stored, as a retried add left it, and adds the rest', async () => {
+        await stock('consumables', [{ ...white, pricePerKg: 30 }])
 
-        await expect(inventory.createConsumables([black, white], undefined, admin)).rejects.toMatchObject({ status: 409 })
-        expect(await repository.listInventory('consumables')).toEqual([white])
+        await inventory.createConsumables([black, white], undefined, admin)
+
+        expect((await repository.listInventory('consumables')).map((item) => ({ id: item.id, pricePerKg: consumablePrice(item) }))).toEqual(
+          [
+            { id: white.id, pricePerKg: 30 },
+            { id: black.id, pricePerKg: 24 },
+          ],
+        )
+      })
+
+      it('counts stock once when the same add is retried', async () => {
+        await repository.setSetting(USAGE_TRACKING_SETTING, true)
+        await inventory.createConsumables([black, white], 1_000, admin)
+
+        await inventory.createConsumables([black, white], 1_000, admin)
+
+        expect((await inventory.stockLevels(admin)).map(({ onHand }) => onHand)).toEqual([1_000, 1_000])
       })
 
       it('adds none when they would pass the limit', async () => {

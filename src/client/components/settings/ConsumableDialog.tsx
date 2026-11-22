@@ -31,6 +31,7 @@ import {
   stockedColours,
   type FilamentPreset,
 } from '../../../core/filamentPresets'
+import { errorMessage } from '../../../core/error'
 import { partPresetUnitPrice } from '../../../core/partPresets'
 import { findPreset } from '../../../core/presets'
 import { getPrinterPreset } from '../../../core/printerPresets'
@@ -128,22 +129,30 @@ export function ConsumableDialog({
     await onSave(item)
     stored.current = true
   }
-  const autosave = useAutosave({ value: draft, valid: missing.length === 0 && !several, save })
+  // Picked colours are added together by Add, so a new catalogue filament never autosaves mid-pick and leaves the picker.
+  const autosave = useAutosave({ value: draft, valid: missing.length === 0 && !picksSeveral, save })
+  // One ID per colour for the life of the dialog, so retrying an add that half-failed cannot add a colour twice.
+  const colourIds = useRef(new Map<string, string>())
+  const colourId = (colour: FilamentColour) => {
+    const key = `${colour.name}|${colour.hex}`
+    if (!colourIds.current.has(key)) colourIds.current.set(key, createId())
+    return colourIds.current.get(key)!
+  }
   const [adding, setAdding] = useState(false)
   const addColours = async () => {
     if (draft.kind !== 'filament' || !filamentPreset || missing.length) return
     setAdding(true)
     try {
-      await onAddColours(filamentsInColours(draft, filamentPreset, colours, createId), tracking ? onHand : undefined)
+      await onAddColours(filamentsInColours(draft, filamentPreset, colours, colourId), tracking ? onHand : undefined)
       toast(copy.filaments.addedColours(colours.length, `${filamentPreset.brand} ${filamentPreset.name}`))
       onClose()
-    } catch {
-      toast.error(copy.notSaved)
+    } catch (error) {
+      toast.error(errorMessage(error, copy.notSaved))
       setAdding(false)
     }
   }
   const close = async () => {
-    if (several) {
+    if (picksSeveral) {
       if (missing.length) onClose()
       else await addColours()
       return
@@ -207,7 +216,7 @@ export function ConsumableDialog({
               {copy.archive}
             </Button>
           )}
-          {several ? (
+          {picksSeveral ? (
             <Button type="button" disabled={missing.length > 0 || adding} onClick={() => void addColours()}>
               {adding && <Spinner />} {copy.filaments.addColours(colours.length)}
             </Button>
