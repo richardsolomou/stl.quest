@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { MAX_ARCHIVE_FILES, MAX_ARCHIVE_MODELS, uniqueArchiveNames } from '../../core/archive'
+import { taggedFileName } from '../../core/request'
 import { app } from '../../server/app'
 import { zipAssets } from '../../server/assetDownloads'
 import { authorizedRequestAsset } from '../../server/requestAssetAccess'
@@ -26,7 +27,7 @@ export const Route = createFileRoute('/api/files/batch')({
             if (!printRequest?.filePath || !printRequest.fileName) return new Response('not found', { status: 404 })
             if (!(await context.assets.stat(printRequest.filePath).catch(() => undefined)))
               return new Response('file missing in storage', { status: 404 })
-            return { path: printRequest.filePath, fileName: printRequest.fileName }
+            return { path: printRequest.filePath, fileName: taggedFileName(printRequest.number, printRequest.fileName) }
           }
           const models = new Map<string, { path: string; fileName: string }>()
           for (let start = 0; start < ids.length; start += CHECK_CONCURRENCY) {

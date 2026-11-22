@@ -69,6 +69,19 @@ describe('request context', () => {
     logged.mockRestore()
   })
 
+  it('logs the path a route names in place of one that carries a credential', async () => {
+    const logged = vi.spyOn(logger, 'info').mockImplementation(() => logger)
+
+    await withRequestContext(
+      new Request('http://print.test/api/slicer/claims/signature', { method: 'POST' }),
+      async () => new Response('not found', { status: 404 }),
+      '/api/slicer/…',
+    )
+
+    expect(logged).toHaveBeenCalledWith(expect.objectContaining({ path: '/api/slicer/…' }), 'request completed')
+    logged.mockRestore()
+  })
+
   it('links logs to a verified person and browser session', async () => {
     const logged = vi.spyOn(logger, 'info').mockImplementation(() => logger)
 

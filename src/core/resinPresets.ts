@@ -9,6 +9,8 @@ export type ResinPreset = {
   densityGramsPerMl?: number
   densitySource?: { url: string; note: string }
   source: { id: string; url: string }
+  /** The manufacturer's product photo, served from the app's own files. */
+  image?: { src: string }
 }
 
 export function resinPresetName(preset: Pick<ResinPreset, 'brand' | 'name'>) {

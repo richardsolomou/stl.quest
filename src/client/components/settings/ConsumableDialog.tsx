@@ -33,6 +33,7 @@ import {
 } from '../../../core/filamentPresets'
 import { errorMessage } from '../../../core/error'
 import { partPresetUnitPrice } from '../../../core/partPresets'
+import { supplyPresetUnitPrice, type SupplyPreset } from '../../../core/supplyPresets'
 import { findPreset } from '../../../core/presets'
 import { getPrinterPreset } from '../../../core/printerPresets'
 import { resinPresetName, type ResinPreset } from '../../../core/resinPresets'
@@ -49,6 +50,7 @@ import { useAutosave } from '../../useAutosave'
 import { useUsageTracking } from '../../workspace'
 import { AutosaveStatus } from '../AutosaveStatus'
 import { ColourSwatch } from '../ColourSwatch'
+import { SlicerField } from './SlicerField'
 import { DialogShell } from '../DialogShell'
 import { formatNumber } from '../priceCalculator/format'
 import { StockPanel, useStockMovements } from './ConsumableStock'
@@ -107,6 +109,8 @@ export function ConsumableDialog({
   const resins = useQuery({ ...catalogueQuery('resins'), enabled: draft.kind === 'resin' }).data
   const filaments = useQuery({ ...catalogueQuery('filaments'), enabled: draft.kind === 'filament' }).data
   const parts = useQuery({ ...catalogueQuery('parts'), enabled: draft.kind === 'part' }).data
+  const supplies = useQuery({ ...catalogueQuery('supplies'), enabled: draft.kind === 'supply' }).data
+  const supplyPreset = draft.kind === 'supply' ? findPreset(supplies, draft.supplyPresetId) : undefined
   const preset =
     draft.kind === 'resin'
       ? findPreset(resins, draft.resinPresetId)
@@ -185,7 +189,9 @@ export function ConsumableDialog({
   const nameField = useRef<HTMLInputElement>(null)
   const priceField = useRef<HTMLInputElement>(null)
   const picksColour = draft.kind === 'filament' && !draft.colour && Boolean(findPreset(filaments, draft.filamentPresetId)?.colors?.length)
-  const [initialFocus] = useState(() => (!isNew || picksColour ? undefined : preset ? priceField : nameField))
+  const [initialFocus] = useState(() =>
+    !isNew || picksColour ? undefined : preset || (draft.kind === 'supply' && draft.supplyPresetId) ? priceField : nameField,
+  )
   const needs = new Intl.ListFormat(locale, { type: 'conjunction' }).format(missing.map((field) => copy.dialog.fields[field]))
 
   return (
@@ -275,8 +281,8 @@ export function ConsumableDialog({
         <AmountField
           id="consumable-price"
           inputRef={priceField}
-          // A part's list-price hint needs the width.
-          className={draft.kind === 'part' ? 'sm:col-span-2' : undefined}
+          // A part's or catalogue supply's list-price hint needs the width.
+          className={draft.kind === 'part' || supplyPreset?.listPrice ? 'sm:col-span-2' : undefined}
           label={priceLabel(draft, symbol, copy)}
           value={consumablePrice(draft)}
           min={draft.kind === 'resin' || draft.kind === 'filament' ? 0.01 : 0}
@@ -294,6 +300,8 @@ export function ConsumableDialog({
               >
                 {copy.filaments.sharePrice(differing)}
               </Button>
+            ) : supplyPreset?.listPrice ? (
+              <SupplyListPriceHint preset={supplyPreset} />
             ) : (
               copy.dialog.priceHint
             )
@@ -318,6 +326,15 @@ export function ConsumableDialog({
         )}
         <StockFields consumable={draft} tracking={tracking} onChange={setDraft} />
       </div>
+      {tracking && (draft.kind === 'resin' || draft.kind === 'filament') && (
+        <SlicerField
+          id="consumable-slicer"
+          printType={draft.kind}
+          value={draft.slicer}
+          material
+          onChange={(slicer) => setDraft({ ...draft, slicer })}
+        />
+      )}
       {!openedNew && tracking && <StockPanel workspaceSlug={workspaceSlug} consumable={draft} level={level} printers={printers} />}
     </DialogShell>
   )
@@ -331,7 +348,21 @@ function priceLabel(consumable: Consumable, symbol: string, copy: Messages['sett
 }
 
 /** The catalogue product as a card with what the catalogue knows and Change, or the user's own with a way back to it. */
-function ProductCard({ kind, name, facts, onChange }: { kind: 'resin' | 'filament'; name?: string; facts?: string; onChange: () => void }) {
+function ProductCard({
+  kind,
+  name,
+  facts,
+  image,
+  colour,
+  onChange,
+}: {
+  kind: 'resin' | 'filament'
+  name?: string
+  facts?: string
+  image?: { src: string }
+  colour?: { hex: string }
+  onChange: () => void
+}) {
   const copy = useI18n().t.settings.consumables
   return (
     <section className="grid gap-2" aria-labelledby="consumable-product">
@@ -339,7 +370,7 @@ function ProductCard({ kind, name, facts, onChange }: { kind: 'resin' | 'filamen
         {copy.dialog.product}
       </h3>
       <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/20 p-2.5">
-        <ConsumableIcon consumable={{ kind }} className="size-12" />
+        <ConsumableIcon consumable={{ kind, colour }} image={image} className="size-12" />
         <div className="min-w-0 flex-1 basis-40">
           <p className="font-medium [overflow-wrap:anywhere]">{name ?? copy.picker.custom[kind]}</p>
           <p className="text-xs leading-relaxed text-muted-foreground">{name ? facts : copy.dialog.customHint}</p>
@@ -370,6 +401,7 @@ function ResinProduct({ resin, onChange }: { resin: ResinConsumable; onChange: (
         kind="resin"
         name={preset && resinPresetName(preset)}
         facts={preset && materialFacts(preset, locale)}
+        image={preset?.image}
         onChange={() => setChanging(true)}
       />
       {changing && (
@@ -400,6 +432,7 @@ function FilamentProduct({ filament, onChange }: { filament: FilamentConsumable;
         kind="filament"
         name={preset && `${preset.brand} ${preset.name}`}
         facts={preset && materialFacts(preset, locale)}
+        colour={filament.colour}
         onChange={() => setChanging(true)}
       />
       {changing && (
@@ -608,12 +641,45 @@ function ListPriceHint({ partPresetId }: { partPresetId?: string }) {
   const date = new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(listed.checked))
   const pack = listed.packSize ?? 1
   return (
-    <>
+    <ListedAt url={listed.url}>
       {pack > 1
         ? copy.listPackPrice(preset.brand, pack, money(listed.amount), money(partPresetUnitPrice(preset) ?? 0), date)
-        : copy.listPrice(preset.brand, money(listed.amount), date)}{' '}
-      {copy.listPriceHint}{' '}
-      <a href={listed.url} target="_blank" rel="noreferrer" className="font-medium text-foreground underline underline-offset-2">
+        : copy.listPrice(preset.brand, money(listed.amount), date)}
+    </ListedAt>
+  )
+}
+
+/** The same hint for a catalogue supply, whose pack is priced per litre, kilogram, or item as the supply is. */
+function SupplyListPriceHint({ preset }: { preset: SupplyPreset }) {
+  const { t, locale } = useI18n()
+  const copy = t.settings.consumables
+  const listed = preset.listPrice
+  if (!preset.brand || !listed) return null
+  const money = (amount: number) => new Intl.NumberFormat(locale, { style: 'currency', currency: listed.currency }).format(amount)
+  const date = new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(listed.checked))
+  const scale = enteredUnitScale(preset.unit)
+  const pack = (preset.packSize ?? scale) / scale
+  return (
+    <ListedAt url={listed.url}>
+      {pack === 1 && preset.unit === 'item'
+        ? copy.listPrice(preset.brand, money(listed.amount), date)
+        : copy.listSupplyPrice(
+            preset.brand,
+            `${formatNumber(pack, locale)} ${copy.stockUnits[preset.unit]}`,
+            money(listed.amount),
+            `${money(supplyPresetUnitPrice(preset) ?? 0)}${copy.supplies.perUnit[preset.unit]}`,
+            date,
+          )}
+    </ListedAt>
+  )
+}
+
+function ListedAt({ url, children }: { url: string; children: ReactNode }) {
+  const copy = useI18n().t.settings.consumables
+  return (
+    <>
+      {children} {copy.listPriceHint}{' '}
+      <a href={url} target="_blank" rel="noreferrer" className="font-medium text-foreground underline underline-offset-2">
         {copy.listPriceSource}
       </a>
     </>

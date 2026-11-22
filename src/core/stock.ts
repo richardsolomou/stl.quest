@@ -93,12 +93,19 @@ export function partFromPreset(
 
 const CATEGORY_WORDS: [PartCategory, RegExp][] = [
   ['wash-solvent', /\b(ipa|isopropyl|alcohol|alcool|alkohol)|isopropanol/i],
+  ['lcd-protector', /protect|tempered|schutz/i],
   ['lcd-screen', /\b(lcd|screen|display|bildschirm)|écran/i],
   ['release-film', /\b(n?fep|pfa|acf|film|liner|release)|folie/i],
   ['resin-tank', /\b(tank|vat|cuve|bac)|wanne/i],
+  ['wiping-pad', /\b(wiping|pad|tampon)/i],
+  ['purge-wiper', /\b(purge|wiper|abstreifer)/i],
+  ['cutter', /\b(cutter|blade|klinge|messer|lame|coupe)/i],
   ['nozzle', /\b(nozzle|hotend|buse)|düse/i],
   ['build-sheet', /\b(sheet|pei|plaque|plateau)|platte/i],
+  ['flex-platform', /\bflex|build platform|plateforme|druckplattform/i],
   ['air-filter', /filt(er|re)/i],
+  ['belt', /\b(belt|riemen|courroie)/i],
+  ['ptfe-tube', /\b(ptfe|bowden|tube|schlauch)/i],
 ]
 
 /** The kind of wear part a library part is: its catalogue part's, or else the one its name suggests. */
@@ -108,9 +115,10 @@ export function partCategory(part: PartConsumable, catalogue: readonly PartPrese
   return CATEGORY_WORDS.find(([, words]) => words.test(part.name))?.[0]
 }
 
+/** Parts of one kind are alternatives, such as a smooth or a satin sheet, unless the catalogue names each its own set. */
 function lacking(presets: PartPreset[], owned: PartConsumable[], catalogue: readonly PartPreset[]) {
-  const had = new Set(owned.map((part) => partCategory(part, catalogue)))
-  return presets.filter((preset) => !had.has(preset.category))
+  const had = new Set(owned.map((part) => findPreset(catalogue, part.partPresetId)?.set ?? partCategory(part, catalogue)))
+  return presets.filter((preset) => !had.has(preset.set ?? preset.category))
 }
 
 /** Stock is entered in litres, kilograms, or items, and kept in the consumable's own unit. */

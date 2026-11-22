@@ -24,8 +24,10 @@ export const printers = sqliteTable(
     heightMm: real('height_mm'),
     purchasePrice: real('purchase_price'),
     lifespanHours: real('lifespan_hours'),
+    purchasedOn: text('purchased_on'),
     powerWatts: real('power_watts'),
     addOnPresetIdsJson: text('add_on_preset_ids_json').notNull().default('[]'),
+    slicer: text('slicer'),
     archivedAt: integer('archived_at'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
@@ -55,6 +57,7 @@ export const equipment = sqliteTable(
     suppliesJson: text('supplies_json').notNull().default('[]'),
     purchasePrice: real('purchase_price'),
     lifespanHours: real('lifespan_hours'),
+    purchasedOn: text('purchased_on'),
     archivedAt: integer('archived_at'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
@@ -70,7 +73,7 @@ export const equipment = sqliteTable(
 
 /**
  * Resins, filaments, wear parts, and supplies in one table: `price` is per litre, per kilogram, or per unit as the kind
- * is bought, `preset_id` is the resin, filament, or part catalogue entry, and the remaining columns belong to one kind.
+ * is bought, `preset_id` is the resin, filament, part, or supply catalogue entry, and the remaining columns belong to one kind.
  * A part's `printer_id` is the custom printer it belongs to; it has no foreign key, since a part may name a printer that
  * no longer exists, which the library shows as a group of its own.
  */
@@ -94,6 +97,8 @@ export const consumables = sqliteTable(
     printerPresetId: text('printer_preset_id'),
     printerId: text('printer_id'),
     unit: text({ enum: ['ml', 'g', 'item'] }),
+    /** A resin or filament's own slicer, used instead of its printer's. */
+    slicer: text('slicer'),
     minimumStock: real('minimum_stock'),
     packSize: real('pack_size'),
     archivedAt: integer('archived_at'),

@@ -222,11 +222,12 @@ export const settings = {
       },
       changeTitle: 'Change product',
       changeDescription: 'Pick the product it is, or keep it as your own.',
-      custom: { resin: 'Custom resin', filament: 'Custom filament', part: 'Custom part' },
+      custom: { resin: 'Custom resin', filament: 'Custom filament', part: 'Custom part', supply: 'Custom supply' },
       customDescription: {
         resin: 'A resin the catalogue does not list.',
         filament: 'A filament the catalogue does not list.',
         part: 'A part the catalogue does not list.',
+        supply: 'A supply the catalogue does not list.',
       },
       customChange: 'Not from the catalogue',
       customChangeDescription: 'Keep its details and enter them yourself.',
@@ -237,6 +238,18 @@ export const settings = {
       noMatch: (query: string) => `Nothing in the catalogue matches “${query}”.`,
       addOwn: (query: string) => `Add “${query}” as your own`,
       partsDescription: 'Pick a part the catalogue knows for these printers, or enter your own.',
+      suppliesDescription: 'Pick a supply the catalogue knows, or enter your own.',
+      forEquipment: 'Named for your equipment',
+      supplyCategories: {
+        'wash-fluid': 'Wash fluids',
+        gloves: 'Gloves',
+        'paper-towels': 'Paper towels',
+        'filter-funnel': 'Filter funnels',
+        'plate-cleaner': 'Plate cleaners',
+        'plate-adhesive': 'Plate adhesives',
+        desiccant: 'Desiccants',
+        lubricant: 'Lubricants',
+      },
     },
     dialog: {
       newTitle: { resin: 'New resin', filament: 'New filament', supply: 'New supply', part: 'New wear part' },
@@ -326,6 +339,8 @@ export const settings = {
     listPrice: (seller: string, price: string, date: string) => `${seller} listed it at ${price} on ${date}.`,
     listPackPrice: (seller: string, pack: number, price: string, each: string, date: string) =>
       `${seller} listed a pack of ${pack} at ${price} (${each} each) on ${date}.`,
+    listSupplyPrice: (seller: string, pack: string, price: string, unitPrice: string, date: string) =>
+      `${seller} listed ${pack} at ${price} (${unitPrice}) on ${date}.`,
     listPriceHint: 'Enter what you pay, tax and shipping included.',
     listPriceSource: 'Store page',
     stock: {
@@ -375,11 +390,14 @@ export const settings = {
     },
     needs: {
       title: 'What you need',
-      description: 'What is running out, and what your printers use that the list below is missing.',
-      allSet: 'Nothing needed. Everything tracked is above its minimum, and your printers have the parts the catalogue knows.',
+      description: 'What is running out or wearing out, and what your printers use that the list below is missing.',
+      allSet:
+        'Nothing needed. Everything tracked is above its minimum, no wear part is nearly worn, and your printers have the parts the catalogue knows.',
       untracked: (count: number) =>
         `Nothing tracked is running low, but ${count} ${count === 1 ? 'item has' : 'items have'} no stock recorded, so ${count === 1 ? 'it is' : 'they are'} not checked. Add stock to track ${count === 1 ? 'it' : 'them'}.`,
       runningOut: 'Running out',
+      wearingOut: 'Wearing out',
+      wornOn: (printer: string) => `on ${printer}`,
       missing: 'Not in your list',
       partFits: (model: string, printers: number) => `${model} · ${printers} printer${printers === 1 ? '' : 's'}`,
       partGeneric: (printType: string, printers: number) => `Every ${printType} printer · ${printers}`,
@@ -510,6 +528,8 @@ export const settings = {
       addSupplyEmpty: 'No other consumables.',
       notInLibrary: 'Not listed?',
       addToConsumables: 'Add it to Consumables',
+      suggested: 'Named by its maker',
+      makerNames: (maker: string, supplies: string) => `${maker} names ${supplies} for it.`,
       noConsumables: 'Your consumables library is empty.',
       units: { ml: 'ml', g: 'g', item: 'items', plate: 'plates', minute: 'min' },
       wear: 'Wear',
@@ -519,6 +539,26 @@ export const settings = {
       perHour: (cost: string) => `${cost} per hour of use`,
       archive: 'Archive',
     },
+  },
+  purchaseDate: {
+    label: 'Purchase date',
+    placeholder: 'Pick a date',
+    age: (years: number, months: number) => {
+      const parts = [years && `${years} year${years === 1 ? '' : 's'}`, months && `${months} month${months === 1 ? '' : 's'}`].filter(
+        Boolean,
+      )
+      return parts.length ? `Bought ${parts.join(', ')} ago.` : 'Bought less than a month ago.'
+    },
+  },
+  slicer: {
+    label: 'Slicer',
+    none: 'None',
+    printers: 'Its printer’s slicer',
+    opens: (slicer: string) => `Prints open straight in ${slicer}. Set a download folder in its preferences first.`,
+    downloads: (slicer: string) => `${slicer} cannot open a file from a link, so prints download for you to open in it.`,
+    unset: 'Choose one to open or download this printer’s prints for it.',
+    material:
+      'Only when this material needs a different slicer from its printer. It applies on the printer this material was last recorded on.',
   },
   printers: {
     sections: { resin: 'Resin printers', filament: 'Filament printers' },
@@ -573,6 +613,11 @@ export const settings = {
     row: {
       open: (name: string) => `Edit ${name}`,
       fallbackName: (position: number) => `Printer ${position}`,
+      hours: (run: string, lifespan?: string) => (lifespan ? `${run} / ${lifespan} h` : `${run} h`),
+      partDue: (part: string) => `${part} due`,
+      partNearlyWorn: (part: string) => `${part} nearly worn`,
+      pastLifespan: 'Past its lifespan',
+      nearLifespan: 'Nearing its lifespan',
     },
     dialog: {
       newTitle: 'New printer',
@@ -601,6 +646,8 @@ export const settings = {
       wearHint:
         'Enter what you paid, including tax, shipping, and add-on modules, less anything you expect to sell it for. The lifespan covers the frame and mechanics, as wear parts are costed on their own; most machines last 2,000–10,000 print hours.',
       wearPerHour: (cost: string) => `Wears ${cost} per print hour.`,
+      lifetime: (run: string, lifespan?: string) => (lifespan ? `${run} of ${lifespan} print hours run` : `${run} print hours run`),
+      pastLifespan: 'Past its lifespan',
       addOns: 'Add-on modules',
       addOnsHint: 'Modules bolted onto this printer that draw power while printing, such as a pulsing release module or an AMS.',
       addOnSearch: 'Add a module…',

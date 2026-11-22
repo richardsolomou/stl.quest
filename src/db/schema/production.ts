@@ -10,6 +10,8 @@ export const requests = sqliteTable(
     workspaceId: text('workspace_id')
       .notNull()
       .references(() => organization.id, { onDelete: 'cascade' }),
+    /** Taken from the workspace's `last_request_number` when the request is made, so it makes the request's `SQ-<number>` tag. */
+    number: integer('number'),
     name: text().notNull(),
     fileName: text('file_name'),
     filePath: text('file_path'),
@@ -50,6 +52,7 @@ export const requests = sqliteTable(
     index('requests_created').on(table.createdAt),
     index('requests_workspace_created').on(table.workspaceId, table.createdAt),
     uniqueIndex('requests_workspace_id_unique').on(table.workspaceId, table.id),
+    uniqueIndex('requests_workspace_number_unique').on(table.workspaceId, table.number),
     index('requests_print_type').on(table.printType),
     index('requests_printer_id').on(table.printerId),
     index('requests_owner_user_id').on(table.ownerUserId),
@@ -267,6 +270,7 @@ export const usageEvents = sqliteTable(
     index('usage_events_transaction').on(table.workspaceId, table.transactionId),
     index('usage_events_created').on(table.workspaceId, table.createdAt),
     index('usage_events_superseded').on(table.workspaceId, table.supersededBy),
+    index('usage_events_printer').on(table.workspaceId, table.printerId),
     foreignKey({
       columns: [table.workspaceId, table.printerId],
       foreignColumns: [printers.workspaceId, printers.id],

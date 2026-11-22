@@ -23,6 +23,7 @@ const part = (overrides: Partial<PartConsumable>): PartConsumable => ({
   lifespanUnit: 'plates',
   ...overrides,
 })
+const getPart = (id: string) => parts.find((preset) => preset.id === id)!
 const suggested = (consumables: Consumable[], fleet: PrinterProfile[]) =>
   missingWearParts(consumables, fleet, parts).map(({ preset }) => preset.id)
 
@@ -41,6 +42,12 @@ describe('pack size', () => {
 })
 
 describe('missing wear parts', () => {
+  it('keeps suggesting a part needed alongside another of its kind', () => {
+    const a2l: PrinterProfile = { id: 'a2l', name: 'A2L', printType: 'filament', presetId: 'filament-bambu-lab-a2l' }
+    const yBelt = partFromPreset('y-belt', { preset: getPart('part-bambu-lab-y-belt-a2l'), printerPresetId: a2l.presetId })
+    expect(suggested([yBelt], [a2l])).toContain('part-bambu-lab-x-belt-a2l')
+  })
+
   it('suggests a fleet model’s catalogue parts', () => {
     expect(suggested([], [form4])).toContain('part-formlabs-form-4-resin-tank')
   })
@@ -135,12 +142,32 @@ describe('part from the catalogue', () => {
 })
 
 describe('part category', () => {
+  it('reads a flexible steel sheet as a build sheet, not a flex platform', () => {
+    expect(partCategory(part({ name: 'Satin Flexible Steel Sheet' }), parts)).toBe('build-sheet')
+  })
+
   it('reads a German name', () => {
     expect(partCategory(part({ name: 'Ersatzdüse 0,4' }), parts)).toBe('nozzle')
   })
 
   it('reads an air filter in a compound word', () => {
     expect(partCategory(part({ name: 'Aktivkohlefilter X2D' }), parts)).toBe('air-filter')
+  })
+
+  it('reads a screen protector as a protector, not a screen', () => {
+    expect(partCategory(part({ name: 'LCD screen protector' }), parts)).toBe('lcd-protector')
+  })
+
+  it('reads a nozzle wiping pad as a pad, not a nozzle', () => {
+    expect(partCategory(part({ name: 'Nozzle wiping pad' }), parts)).toBe('wiping-pad')
+  })
+
+  it('reads a belt', () => {
+    expect(partCategory(part({ name: 'XY belt' }), parts)).toBe('belt')
+  })
+
+  it('reads a filament cutter', () => {
+    expect(partCategory(part({ name: 'Filament cutter blade' }), parts)).toBe('cutter')
   })
 })
 

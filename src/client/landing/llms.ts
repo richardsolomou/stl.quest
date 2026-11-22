@@ -2,6 +2,7 @@ import { LATEST_DOCUMENTATION_URL, REPOSITORY_URL } from '@/client/sourceCode'
 import { MODEL_FORMATS } from '@/core/assetKeys'
 import { formatBytes } from '@/core/format'
 import { storagePlans } from '@/core/plans'
+import { SLICERS } from '@/core/slicers'
 import { workflow } from '@/core/workflow'
 import {
   LOCAL_STORAGE,
@@ -19,6 +20,10 @@ const list = (items: readonly string[], type: Intl.ListFormatType = 'conjunction
 /** The site summarised for answer engines (https://llmstxt.org), with its facts read from the application rather than restated. */
 export function llmsText() {
   const stages = list(workflow.statuses.map((status) => status.label))
+  const opensInSlicer = list(
+    SLICERS.filter((slicer) => slicer.openUrl).map((slicer) => slicer.name),
+    'disjunction',
+  )
   const [truenas, unraid] = NAS_CATALOGUES
   const remoteStorage = STORAGE_PROVIDERS.filter((provider) => provider !== LOCAL_STORAGE)
   return `# STL Quest
@@ -30,9 +35,10 @@ STL Quest replaces spreadsheets and chat threads for hobbyists printing for frie
 ## What it does
 
 - The board: the queue as a backlog, tickets hanging in firing order, printing grouped by printer with idle printers flagged, and finished prints grouped by who is collecting them. It works on phones as well as desktops.
-- Catalogues: printers, resins, filaments (from SpoolmanDB, with every colour), equipment, and wear parts for each printer model ship with the app, so operators pick products instead of typing specifications and enter only their own prices.
+- Catalogues: printers, resins, filaments (from SpoolmanDB, with every colour), equipment, wear parts for each printer model, and supplies such as wash fluids and gloves ship with the app, so operators pick products instead of typing specifications and enter only their own prices.
 - Quotes: a calculator turns the slicer's material and print time into a suggested price from printer, material, wear-part, electricity, and labour costs, and prices a batch of prints selected on the board.
-- Usage and stock, off until an admin turns it on: the board asks what each print used as it moves into printing and finishing, and counts stock against reorder levels, wear-part maintenance, and spend.
+- Slicers: each printer names the slicer its prints go to, and a material can name its own. A print opens straight in ${opensInSlicer} through a short-lived link, or downloads for any other slicer, named with its request tag such as \`SQ-142 Plasma.3mf\`.
+- Usage and stock, off until an admin turns it on: the board asks what each print used as it moves into printing and finishing, and counts stock against reorder levels, wear-part maintenance, each printer's print hours against its lifespan, and spend.
 
 ## Ways to run it
 

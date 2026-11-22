@@ -1,5 +1,5 @@
 {
-  "id": "3dd27357-cd7e-470c-86d1-a0324c077262",
+  "id": "eec61eaf-8d01-4e59-a1c6-54c350f89e4c",
   "prevId": "13217eae-faf3-42dc-940a-bfbd8b5a21cf",
   "version": "7",
   "dialect": "postgresql",
@@ -1703,6 +1703,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "purchased_on": {
+          "name": "purchased_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "archived_at": {
           "name": "archived_at",
           "type": "bigint",
@@ -1857,6 +1863,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "purchased_on": {
+          "name": "purchased_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "power_watts": {
           "name": "power_watts",
           "type": "double precision",
@@ -1944,241 +1956,6 @@
           "value": "\"printers\".\"print_type\" IN ('resin', 'filament')"
         }
       },
-      "isRLSEnabled": false
-    },
-    "public.spoolman_connections": {
-      "name": "spoolman_connections",
-      "schema": "",
-      "columns": {
-        "workspace_id": {
-          "name": "workspace_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "token_hash": {
-          "name": "token_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "received_at": {
-          "name": "received_at",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "spoolman_connections_workspace_id_organization_id_fk": {
-          "name": "spoolman_connections_workspace_id_organization_id_fk",
-          "tableFrom": "spoolman_connections",
-          "tableTo": "organization",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "spoolman_connections_token_hash_unique": {
-          "name": "spoolman_connections_token_hash_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "token_hash"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.spoolman_links": {
-      "name": "spoolman_links",
-      "schema": "",
-      "columns": {
-        "workspace_id": {
-          "name": "workspace_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "filament_id": {
-          "name": "filament_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "consumable_id": {
-          "name": "consumable_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "spoolman_links_workspace_id_organization_id_fk": {
-          "name": "spoolman_links_workspace_id_organization_id_fk",
-          "tableFrom": "spoolman_links",
-          "tableTo": "organization",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "spoolman_links_workspace_consumable_fk": {
-          "name": "spoolman_links_workspace_consumable_fk",
-          "tableFrom": "spoolman_links",
-          "tableTo": "consumables",
-          "columnsFrom": [
-            "workspace_id",
-            "consumable_id"
-          ],
-          "columnsTo": [
-            "workspace_id",
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "spoolman_links_workspace_id_filament_id_pk": {
-          "name": "spoolman_links_workspace_id_filament_id_pk",
-          "columns": [
-            "workspace_id",
-            "filament_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.spoolman_spools": {
-      "name": "spoolman_spools",
-      "schema": "",
-      "columns": {
-        "workspace_id": {
-          "name": "workspace_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "filament_id": {
-          "name": "filament_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "filament_name": {
-          "name": "filament_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "vendor": {
-          "name": "vendor",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "material": {
-          "name": "material",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "colour_hex": {
-          "name": "colour_hex",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "external_id": {
-          "name": "external_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "remaining_grams": {
-          "name": "remaining_grams",
-          "type": "double precision",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "archived": {
-          "name": "archived",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "spoolman_spools_workspace_id_spoolman_connections_workspace_id_fk": {
-          "name": "spoolman_spools_workspace_id_spoolman_connections_workspace_id_fk",
-          "tableFrom": "spoolman_spools",
-          "tableTo": "spoolman_connections",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "workspace_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "spoolman_spools_workspace_id_id_pk": {
-          "name": "spoolman_spools_workspace_id_id_pk",
-          "columns": [
-            "workspace_id",
-            "id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.managed_storage_accounts": {
@@ -3786,6 +3563,27 @@
             },
             {
               "expression": "superseded_by",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "usage_events_printer": {
+          "name": "usage_events_printer",
+          "columns": [
+            {
+              "expression": "workspace_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "printer_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

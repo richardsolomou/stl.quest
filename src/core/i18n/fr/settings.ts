@@ -229,11 +229,17 @@ export const settings: typeof en = {
       },
       changeTitle: 'Changer de produit',
       changeDescription: 'Choisissez le produit qui correspond, ou gardez vos propres valeurs.',
-      custom: { resin: 'Résine personnalisée', filament: 'Filament personnalisé', part: 'Pièce personnalisée' },
+      custom: {
+        resin: 'Résine personnalisée',
+        filament: 'Filament personnalisé',
+        part: 'Pièce personnalisée',
+        supply: 'Fourniture personnalisée',
+      },
       customDescription: {
         resin: 'Une résine que le catalogue ne répertorie pas.',
         filament: 'Un filament que le catalogue ne répertorie pas.',
         part: 'Une pièce que le catalogue ne répertorie pas.',
+        supply: 'Une fourniture que le catalogue ne répertorie pas.',
       },
       customChange: 'Hors catalogue',
       customChangeDescription: 'Garder ses valeurs et les saisir vous-même.',
@@ -244,6 +250,18 @@ export const settings: typeof en = {
       noMatch: (query: string) => `Rien dans le catalogue ne correspond à « ${query} ».`,
       addOwn: (query: string) => `Ajouter « ${query} » vous-même`,
       partsDescription: 'Choisissez une pièce que le catalogue connaît pour ces imprimantes, ou saisissez la vôtre.',
+      suppliesDescription: 'Choisissez une fourniture que le catalogue connaît, ou saisissez la vôtre.',
+      forEquipment: 'Indiquées pour votre équipement',
+      supplyCategories: {
+        'wash-fluid': 'Liquides de lavage',
+        gloves: 'Gants',
+        'paper-towels': 'Essuie-tout',
+        'filter-funnel': 'Entonnoirs filtrants',
+        'plate-cleaner': 'Nettoyants de plateau',
+        'plate-adhesive': 'Adhésifs de plateau',
+        desiccant: 'Déshydratants',
+        lubricant: 'Lubrifiants',
+      },
     },
     dialog: {
       newTitle: { resin: 'Nouvelle résine', filament: 'Nouveau filament', supply: 'Nouvelle fourniture', part: 'Nouvelle pièce d’usure' },
@@ -335,6 +353,8 @@ export const settings: typeof en = {
     listPrice: (seller: string, price: string, date: string) => `${seller} l’affichait à ${price} le ${date}.`,
     listPackPrice: (seller: string, pack: number, price: string, each: string, date: string) =>
       `${seller} affichait un lot de ${pack} à ${price} (${each} pièce) le ${date}.`,
+    listSupplyPrice: (seller: string, pack: string, price: string, unitPrice: string, date: string) =>
+      `${seller} affichait ${pack} à ${price} (${unitPrice}) le ${date}.`,
     listPriceHint: 'Saisissez ce que vous payez, taxes et livraison comprises.',
     listPriceSource: 'Page boutique',
     stock: {
@@ -384,11 +404,14 @@ export const settings: typeof en = {
     },
     needs: {
       title: 'Ce qu’il vous faut',
-      description: 'Ce qui s’épuise, et ce que vos imprimantes utilisent mais qui manque dans la liste ci-dessous.',
-      allSet: 'Rien à prévoir. Tout ce qui est suivi dépasse son minimum, et vos imprimantes ont les pièces connues du catalogue.',
+      description: 'Ce qui s’épuise ou s’use, et ce que vos imprimantes utilisent mais qui manque dans la liste ci-dessous.',
+      allSet:
+        'Rien à prévoir. Tout ce qui est suivi dépasse son minimum, aucune pièce d’usure n’arrive en fin de vie, et vos imprimantes ont les pièces connues du catalogue.',
       untracked: (count: number) =>
         `Rien de suivi ne s’épuise, mais ${count} ${count === 1 ? 'article n’a' : 'articles n’ont'} aucun stock enregistré et ne ${count === 1 ? 'est' : 'sont'} donc pas vérifié${count === 1 ? '' : 's'}. Ajoutez du stock pour ${count === 1 ? 'le' : 'les'} suivre.`,
       runningOut: 'Bientôt épuisé',
+      wearingOut: 'En fin de vie',
+      wornOn: (printer: string) => `sur ${printer}`,
       missing: 'Absent de votre liste',
       partFits: (model: string, printers: number) => `${model} · ${printers} imprimante${printers > 1 ? 's' : ''}`,
       partGeneric: (printType: string, printers: number) => `Toute imprimante ${printType} · ${printers}`,
@@ -521,6 +544,8 @@ export const settings: typeof en = {
       addSupplyEmpty: 'Aucun autre consommable.',
       notInLibrary: 'Absent de la liste ?',
       addToConsumables: 'L’ajouter aux consommables',
+      suggested: 'Indiquée par le fabricant',
+      makerNames: (maker: string, supplies: string) => `${maker} indique ${supplies} pour cet appareil.`,
       noConsumables: 'Votre liste de consommables est vide.',
       units: { ml: 'ml', g: 'g', item: 'pièces', plate: 'plateaux', minute: 'min' },
       wear: 'Usure',
@@ -530,6 +555,26 @@ export const settings: typeof en = {
       perHour: (cost: string) => `${cost} par heure d’utilisation`,
       archive: 'Archiver',
     },
+  },
+  purchaseDate: {
+    label: 'Date d’achat',
+    placeholder: 'Choisir une date',
+    age: (years: number, months: number) => {
+      const parts = [years && `${years} an${years === 1 ? '' : 's'}`, months && `${months} mois`].filter(Boolean)
+      return parts.length ? `Acheté il y a ${parts.join(' et ')}.` : 'Acheté il y a moins d’un mois.'
+    },
+  },
+  slicer: {
+    label: 'Slicer',
+    none: 'Aucun',
+    printers: 'Celui de son imprimante',
+    opens: (slicer) =>
+      `Les impressions s’ouvrent directement dans ${slicer}. Définissez d’abord un dossier de téléchargement dans ses préférences.`,
+    downloads: (slicer) =>
+      `${slicer} ne peut pas ouvrir un fichier depuis un lien : les impressions sont donc téléchargées pour que vous les y ouvriez.`,
+    unset: 'Choisissez-en un pour y ouvrir ou télécharger les impressions de cette imprimante.',
+    material:
+      'Seulement si ce matériau demande un autre slicer que son imprimante. S’applique à l’imprimante sur laquelle ce matériau a été enregistré en dernier.',
   },
   printers: {
     sections: { resin: 'Imprimantes résine', filament: 'Imprimantes filament' },
@@ -586,6 +631,11 @@ export const settings: typeof en = {
     row: {
       open: (name: string) => `Modifier ${name}`,
       fallbackName: (position: number) => `Imprimante ${position}`,
+      hours: (run: string, lifespan?: string) => (lifespan ? `${run} / ${lifespan} h` : `${run} h`),
+      partDue: (part: string) => `${part} à remplacer`,
+      partNearlyWorn: (part: string) => `${part} bientôt en fin de vie`,
+      pastLifespan: 'Durée de vie dépassée',
+      nearLifespan: 'Bientôt en fin de vie',
     },
     dialog: {
       newTitle: 'Nouvelle imprimante',
@@ -614,6 +664,9 @@ export const settings: typeof en = {
       wearHint:
         'Saisissez ce que vous avez payé, taxes, livraison et modules compris, moins ce que vous comptez en tirer à la revente. La durée de vie couvre le châssis et la mécanique, les pièces d’usure étant comptées à part ; la plupart des machines durent 2 000 à 10 000 heures d’impression.',
       wearPerHour: (cost: string) => `Usure de ${cost} par heure d’impression.`,
+      lifetime: (run: string, lifespan?: string) =>
+        lifespan ? `${run} sur ${lifespan} heures d’impression effectuées` : `${run} heures d’impression effectuées`,
+      pastLifespan: 'Durée de vie dépassée',
       addOns: 'Modules ajoutés',
       addOnsHint:
         'Modules montés sur cette imprimante qui consomment de l’électricité pendant l’impression, comme un module de décollement pulsé ou un AMS.',

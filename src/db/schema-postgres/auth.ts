@@ -65,6 +65,8 @@ export const organization = pgTable(
     createdAt: isoDate().notNull(),
     metadata: text(),
     personalOwnerId: text('personal_owner_id').references(() => user.id, { onDelete: 'set null' }),
+    /** The highest request number ever given out, so a deleted request's `SQ-<number>` tag is never reused. */
+    lastRequestNumber: integer('last_request_number').notNull().default(0),
   },
   (table) => [uniqueIndex('organization_personal_owner_unique').on(table.personalOwnerId)],
 )

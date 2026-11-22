@@ -10,21 +10,25 @@ import { newWearPart, wearPartsFor, withConsumablePrice, type Consumable, type P
 import { partPresetsForGroup } from '../../../core/partPresets'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from '../../../core/priceCalculator'
 import { partFromPreset } from '../../../core/stock'
-import { partWear, type PartWear } from '../../../core/maintenance'
+import { wearLevel, type PartWear, type WearLevel } from '../../../core/maintenance'
 import type { PrinterProfile } from '../../../core/types'
 import type { StockLevel } from '../../../core/usage'
 import { useI18n } from '../../i18n'
 import { createId } from '../../id'
 import { useInventory } from '../../inventory'
-import { catalogueQuery, consumablesQuery, priceCalculatorSettingsQuery, printersQuery, stockQuery, usageQuery } from '../../queries'
+import {
+  catalogueQuery,
+  consumablesQuery,
+  priceCalculatorSettingsQuery,
+  printerLifetimesQuery,
+  printersQuery,
+  stockQuery,
+} from '../../queries'
 import { useWorkspaceSlug } from '../../workspace'
 import { currencySymbol, formatNumber, formatRate } from '../priceCalculator/format'
 import { ConsumableDialog } from './ConsumableDialog'
 import { PartPicker } from './ConsumablePicker'
 import { useStockMovements } from './ConsumableStock'
-
-// From here a part reads as nearly worn, so a replacement can be ordered in time.
-const NEARLY_WORN = 0.8
 
 /**
  * The wear parts a saved printer uses, each counted from the prints it ran since the part was last replaced on it.
@@ -35,7 +39,7 @@ export function PrinterMaintenance({ printer }: { printer: PrinterProfile }) {
   const copy = t.settings.printers.dialog.maintenance
   const workspaceSlug = useWorkspaceSlug()
   const consumables = useQuery(consumablesQuery(workspaceSlug)).data?.consumables
-  const events = useQuery(usageQuery(workspaceSlug, { printerId: printer.id })).data?.events
+  const lifetime = usePrinterLifetime(printer.id)
   const levels = useQuery(stockQuery(workspaceSlug)).data?.stock ?? []
   const printers = useQuery(printersQuery(workspaceSlug)).data?.profiles ?? []
   const catalogue = useQuery(catalogueQuery('parts')).data
@@ -44,7 +48,7 @@ export function PrinterMaintenance({ printer }: { printer: PrinterProfile }) {
   const { save, setArchived } = useInventory('consumables')
   const [picking, setPicking] = useState(false)
   const [editing, setEditing] = useState<Consumable | null>(null)
-  if (!consumables || !events) return null
+  if (!consumables || !lifetime) return null
   const parts = wearPartsFor(consumables, printer.printType, printer)
   // A catalogue printer's parts belong to its model, as on the Consumables page; a custom printer's to it alone.
   const group = printer.presetId
@@ -81,10 +85,9 @@ export function PrinterMaintenance({ printer }: { printer: PrinterProfile }) {
           {parts.map((part) => (
             <WearPartRow
               key={part.id}
-              workspaceSlug={workspaceSlug}
               printerId={printer.id}
               part={part}
-              wear={partWear(events, printer.id, part)}
+              wear={lifetime.parts.find(({ consumableId }) => consumableId === part.id) ?? unworn(part)}
               level={levels.find(({ consumableId }) => consumableId === part.id)}
               onEdit={() => setEditing(part)}
             />
@@ -94,9 +97,10 @@ export function PrinterMaintenance({ printer }: { printer: PrinterProfile }) {
       {picking && (
         <PartPicker
           title={t.settings.consumables.parts.addTo(printer.name)}
-          presets={presets}
-          had={new Set(parts.flatMap(({ partPresetId }) => (partPresetId ? [partPresetId] : [])))}
-          onSelect={(preset) => setEditing(withConsumablePrice(partFromPreset(createId(), { preset, ...group }), Number.NaN))}
+          groups={
+            presets && [{ items: presets.map((preset) => ({ preset, had: parts.some(({ partPresetId }) => partPresetId === preset.id) })) }]
+          }
+          onSelect={({ preset }) => setEditing(withConsumablePrice(partFromPreset(createId(), { preset, ...group }), Number.NaN))}
           onCustom={() => setEditing(newWearPart(createId(), group))}
           onClose={() => setPicking(false)}
         />
@@ -121,15 +125,126 @@ export function PrinterMaintenance({ printer }: { printer: PrinterProfile }) {
   )
 }
 
+/** A part just added to the library, which the lifetimes do not list until they are read again. */
+function unworn(part: PartConsumable): PartWear {
+  return { consumableId: part.id, used: 0, lifespan: part.lifespan, unit: part.lifespanUnit, level: 'fresh' }
+}
+
+/** How many print hours a saved printer has run against the lifespan being edited, so the two stay in step. */
+export function PrinterLifetimeLine({ printerId, lifespanHours }: { printerId: string; lifespanHours?: number }) {
+  const { t, locale } = useI18n()
+  const copy = t.settings.printers.dialog
+  const lifetime = usePrinterLifetime(printerId)
+  if (!lifetime) return null
+  const level = wearLevel(lifetime.hours, lifespanHours ?? 0)
+  return (
+    <div className="grid gap-1.5 sm:max-w-md">
+      <p className={cn('font-mono text-xs tabular-nums', level === 'due' ? 'font-semibold text-destructive' : 'text-muted-foreground')}>
+        {level === 'due' && `${copy.pastLifespan} · `}
+        {copy.lifetime(formatNumber(lifetime.hours, locale, 1), lifespanHours ? formatNumber(lifespanHours, locale) : undefined)}
+      </p>
+      {lifespanHours && <WearBar used={lifetime.hours} lifespan={lifespanHours} level={level} />}
+    </div>
+  )
+}
+
+export function usePrinterLifetime(printerId: string) {
+  const workspaceSlug = useWorkspaceSlug()
+  return useQuery(printerLifetimesQuery(workspaceSlug)).data?.lifetimes.find((lifetime) => lifetime.printerId === printerId)
+}
+
+/** The thin bar wear reads as: ink while fresh, amber once nearly worn, red when due. */
+export function WearBar({ used, lifespan, level }: { used: number; lifespan: number; level: WearLevel }) {
+  const ratio = lifespan > 0 ? Math.min(1, used / lifespan) : 0
+  return (
+    <div aria-hidden="true" className="h-1 overflow-hidden rounded-full bg-muted">
+      <div
+        className={cn(
+          'h-full rounded-full',
+          level === 'due' ? 'bg-destructive' : level === 'nearly' ? 'bg-(--stage-in_progress)' : 'bg-foreground/45',
+        )}
+        style={{ width: `${ratio * 100}%` }}
+      />
+    </div>
+  )
+}
+
+/** A part's wear as text, such as "Due · 190 of 190 prints". */
+export function WearText({ wear }: { wear: PartWear }) {
+  const { t, locale } = useI18n()
+  const copy = t.settings.printers.dialog.maintenance
+  return (
+    <span className={cn('font-mono tabular-nums', wear.level === 'due' && 'font-semibold text-destructive')}>
+      {wear.level === 'due' && `${copy.due} · `}
+      {copy.wear(formatNumber(wear.used, locale, wear.unit === 'hours' ? 1 : 0), formatNumber(wear.lifespan, locale), wear.unit)}
+    </span>
+  )
+}
+
+/**
+ * Logs a new part fitted on the printer, taking a spare off the shelf, with Undo until it is closed. A list that drops
+ * the row once the part is fresh again holds the replacement itself, so its Undo outlives the row's own state.
+ */
+export function ReplacedButton({
+  printerId,
+  part,
+  replacement: heldReplacement,
+  onReplacementChange,
+}: {
+  printerId: string
+  part: PartConsumable
+  replacement?: string
+  onReplacementChange?: (transactionId: string | undefined) => void
+}) {
+  const { t } = useI18n()
+  const copy = t.settings.printers.dialog.maintenance
+  const workspaceSlug = useWorkspaceSlug()
+  const { movement, undo } = useStockMovements(workspaceSlug)
+  const [ownReplacement, setOwnReplacement] = useState<string>()
+  const replacement = onReplacementChange ? heldReplacement : ownReplacement
+  const setReplacement = onReplacementChange ?? setOwnReplacement
+  const failed = movement.error != null || undo.error != null
+  return (
+    <div className="grid shrink-0 justify-items-end gap-1">
+      {replacement ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={undo.isPending}
+          onClick={() => undo.mutate(replacement, { onSuccess: () => setReplacement(undefined) })}
+        >
+          {copy.undo}
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          aria-label={copy.replacedLabel(part.name)}
+          disabled={movement.isPending}
+          onClick={() =>
+            movement.mutate(
+              { consumableId: part.id, kind: 'replace', amount: 1, printerId },
+              { onSuccess: ({ transactionId }) => setReplacement(transactionId) },
+            )
+          }
+        >
+          {movement.isPending && <Spinner />} {copy.replaced}
+        </Button>
+      )}
+      {failed && <FieldError className="text-xs">{copy.error}</FieldError>}
+    </div>
+  )
+}
+
 function WearPartRow({
-  workspaceSlug,
   printerId,
   part,
   wear,
   level,
   onEdit,
 }: {
-  workspaceSlug: string
   printerId: string
   part: PartConsumable
   wear: PartWear
@@ -138,9 +253,6 @@ function WearPartRow({
 }) {
   const { t, locale } = useI18n()
   const copy = t.settings.printers.dialog.maintenance
-  const { movement, undo } = useStockMovements(workspaceSlug)
-  const [replacement, setReplacement] = useState<string>()
-  const ratio = wear.lifespan > 0 ? Math.min(1, wear.used / wear.lifespan) : 0
   const spares = level?.tracked ? Math.max(0, level.onHand) : undefined
   const date = new Intl.DateTimeFormat(locale, { dateStyle: 'medium' })
   const details = [
@@ -159,50 +271,14 @@ function WearPartRow({
           >
             {part.name}
           </button>
-          <p className={cn('font-mono text-xs tabular-nums', wear.due ? 'font-semibold text-destructive' : 'text-muted-foreground')}>
-            {wear.due && `${copy.due} · `}
-            {copy.wear(formatNumber(wear.used, locale, wear.unit === 'hours' ? 1 : 0), formatNumber(wear.lifespan, locale), wear.unit)}
+          <p className="text-xs text-muted-foreground">
+            <WearText wear={wear} />
           </p>
         </div>
-        {replacement ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            disabled={undo.isPending}
-            onClick={() => undo.mutate(replacement, { onSuccess: () => setReplacement(undefined) })}
-          >
-            {copy.undo}
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            aria-label={copy.replacedLabel(part.name)}
-            disabled={movement.isPending}
-            onClick={() =>
-              movement.mutate(
-                { consumableId: part.id, kind: 'replace', amount: 1, printerId },
-                { onSuccess: ({ transactionId }) => setReplacement(transactionId) },
-              )
-            }
-          >
-            {movement.isPending && <Spinner />} {copy.replaced}
-          </Button>
-        )}
+        <ReplacedButton printerId={printerId} part={part} />
       </div>
-      <div aria-hidden="true" className="h-1 overflow-hidden rounded-full bg-muted">
-        <div
-          className={cn(
-            'h-full rounded-full',
-            wear.due ? 'bg-destructive' : ratio >= NEARLY_WORN ? 'bg-(--stage-in_progress)' : 'bg-foreground/45',
-          )}
-          style={{ width: `${ratio * 100}%` }}
-        />
-      </div>
+      <WearBar used={wear.used} lifespan={wear.lifespan} level={wear.level} />
       <p className="text-xs text-muted-foreground">{details.join(' · ')}</p>
-      {(movement.error != null || undo.error != null) && <FieldError>{copy.error}</FieldError>}
     </li>
   )
 }

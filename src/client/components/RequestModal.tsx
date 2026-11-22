@@ -212,7 +212,7 @@ export function RequestModal({
   // Distinct keys stop React reusing the Edit button as the submit button, which would submit the form on the same click.
   const viewActions = (request.hasFile || moveAction || canEdit) && (
     <Fragment key="view">
-      {request.hasFile && <RequestDownloadButton request={request} />}
+      {request.hasFile && <RequestDownloadButton request={request} isAdmin={isAdmin} />}
       {moveAction}
       {canEdit && (
         <Button type="button" onClick={() => setEditing(true)}>

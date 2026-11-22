@@ -24,8 +24,10 @@ export const printers = pgTable(
     heightMm: doublePrecision('height_mm'),
     purchasePrice: doublePrecision('purchase_price'),
     lifespanHours: doublePrecision('lifespan_hours'),
+    purchasedOn: text('purchased_on'),
     powerWatts: doublePrecision('power_watts'),
     addOnPresetIdsJson: text('add_on_preset_ids_json').notNull().default('[]'),
+    slicer: text('slicer'),
     archivedAt: bigint('archived_at', { mode: 'number' }),
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),
     updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
@@ -55,6 +57,7 @@ export const equipment = pgTable(
     suppliesJson: text('supplies_json').notNull().default('[]'),
     purchasePrice: doublePrecision('purchase_price'),
     lifespanHours: doublePrecision('lifespan_hours'),
+    purchasedOn: text('purchased_on'),
     archivedAt: bigint('archived_at', { mode: 'number' }),
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),
     updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
@@ -70,7 +73,7 @@ export const equipment = pgTable(
 
 /**
  * Resins, filaments, wear parts, and supplies in one table: `price` is per litre, per kilogram, or per unit as the kind
- * is bought, `preset_id` is the resin, filament, or part catalogue entry, and the remaining columns belong to one kind.
+ * is bought, `preset_id` is the resin, filament, part, or supply catalogue entry, and the remaining columns belong to one kind.
  * A part's `printer_id` is the custom printer it belongs to; it has no foreign key, since a part may name a printer that
  * no longer exists, which the library shows as a group of its own.
  */
@@ -94,6 +97,8 @@ export const consumables = pgTable(
     printerPresetId: text('printer_preset_id'),
     printerId: text('printer_id'),
     unit: text({ enum: ['ml', 'g', 'item'] }),
+    /** A resin or filament's own slicer, used instead of its printer's. */
+    slicer: text('slicer'),
     minimumStock: doublePrecision('minimum_stock'),
     packSize: doublePrecision('pack_size'),
     archivedAt: bigint('archived_at', { mode: 'number' }),

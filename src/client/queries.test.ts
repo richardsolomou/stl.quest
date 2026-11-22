@@ -12,6 +12,7 @@ import type { SettingsSection } from './settingsSections'
 
 const request = {
   id: 'request-1',
+  number: 1,
   name: 'Dragon',
   quantity: 1,
   counts: { pending: 1 },

@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.6.0
+
+### Minor Changes
+
+- 398a423: Show how many print hours each printer has run against its lifespan, list wear parts that are nearly worn or due in What you need and on the printer list, and record when printers and equipment were bought so that you can see how far through its life each machine is and how old it is.
+- e47d1b9: Show manufacturer product photos for catalogue resins and a spool in each filament's colour, so the consumables list and pickers are easier to scan.
+
+## 2.5.0
+
+### Minor Changes
+
+- c71414b: Pick wear parts for the Bambu Lab H2, P2S, X2D, and A2L, the HeyGears Reflex family, and Formlabs flex platforms from the catalogue, including hotends, filters, belts, wipers, cutters, PTFE tubes, screen protectors, and ACF films, add supplies such as wash fluids, gloves, glue, and lubricant from a new supply catalogue that lists what your equipment's maker names first, and choose a catalogue part for one of your printer models from the page's Add wear part, so that fewer parts and supplies have to be entered by hand.
+
 ## 2.4.1
 
 ### Patch Changes

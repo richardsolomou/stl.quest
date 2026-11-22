@@ -1,6 +1,8 @@
 import { z } from 'zod'
+import { isSlicerFor, SLICER_IDS } from '../core/slicers'
 import { notificationKinds, type NotificationKind } from '../core/notifications'
 import { onboardingTaskIds } from '../core/onboarding'
+import { isPastPurchaseDate } from '../core/maintenance'
 import { MAX_AUTO_ARCHIVE_DAYS } from '../core/autoArchive'
 import { MAX_COVER_BYTES } from '../core/coverImage'
 import {
@@ -40,6 +42,8 @@ import {
   MAX_EMAIL_TEMPLATE_SUBJECT_LENGTH,
   type EmailTemplateKind,
 } from '../core/email'
+
+const purchaseDate = z.iso.date().refine((date) => isPastPurchaseDate(date, Date.now()), 'purchase date is in the future')
 
 const id = z.string().min(1).max(100)
 export const removeAdminWorkspaceMemberSchema = z.object({ id, userId: id })
@@ -126,6 +130,10 @@ const consumableSchema = z.discriminatedUnion('kind', [
     resinPresetId: z.string().trim().min(1).max(200).optional(),
     pricePerLitre: z.number().positive().max(100_000),
     densityGramsPerMl: z.number().positive().max(100),
+    slicer: z
+      .enum(SLICER_IDS)
+      .refine((slicer) => isSlicerFor(slicer, 'resin'), 'not a resin slicer')
+      .optional(),
   }),
   z.object({
     ...consumableBaseSchema,
@@ -138,6 +146,10 @@ const consumableSchema = z.discriminatedUnion('kind', [
       })
       .optional(),
     pricePerKg: z.number().positive().max(100_000),
+    slicer: z
+      .enum(SLICER_IDS)
+      .refine((slicer) => isSlicerFor(slicer, 'filament'), 'not a filament slicer')
+      .optional(),
   }),
   z.object({
     ...consumableBaseSchema,
@@ -155,6 +167,7 @@ const consumableSchema = z.discriminatedUnion('kind', [
     kind: z.literal('supply'),
     unit: z.enum(SUPPLY_UNITS),
     price: z.number().nonnegative().max(1_000_000),
+    supplyPresetId: z.string().trim().min(1).max(200).optional(),
   }),
 ])
 const equipmentItemSchema = z
@@ -172,6 +185,7 @@ const equipmentItemSchema = z
       .max(MAX_CONSUMABLES),
     purchasePrice: z.number().nonnegative().max(10_000_000).optional(),
     lifespanHours: z.number().positive().max(10_000_000).optional(),
+    purchasedOn: purchaseDate.optional(),
   })
   .superRefine(({ supplies }, context) => {
     const supplied = new Set<string>()
@@ -246,7 +260,9 @@ const printerProfileSchema = z.object({
   printType: z.enum(PRINT_TYPES),
   purchasePrice: z.number().positive().max(10_000_000).optional(),
   lifespanHours: z.number().positive().max(10_000_000).optional(),
+  purchasedOn: purchaseDate.optional(),
   powerWatts: z.number().positive().max(100_000).optional(),
+  slicer: z.enum(SLICER_IDS).optional(),
   addOnPresetIds: z
     .array(id.refine(isPrinterAddOn, 'not a printer add-on'))
     .max(20)
@@ -449,6 +465,8 @@ export const moveCopiesSchema = z.object({
 export const moveCopiesBatchSchema = z.object({
   moves: z.array(moveCopiesSchema).min(1).max(MAX_BULK_CARDS),
 })
+
+export const slicerLinkSchema = z.object({ requestId: id, slicer: z.enum(SLICER_IDS) })
 
 const settingsItemId = z.string().trim().min(1).max(200)
 const usageAmount = z.number().positive().max(1_000_000)

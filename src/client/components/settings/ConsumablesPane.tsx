@@ -19,12 +19,13 @@ import {
   type WearPartGroup,
 } from '../../../core/consumables'
 import { filamentConsumableName, filamentFromPreset, filamentProductGroups, type FilamentPreset } from '../../../core/filamentPresets'
-import { partPresetsForGroup } from '../../../core/partPresets'
+import { partPresetChoices, type PartPresetChoice } from '../../../core/partPresets'
 import { findPreset } from '../../../core/presets'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS, TYPICAL_RESIN_DENSITY_GRAMS_PER_ML } from '../../../core/priceCalculator'
 import { getPrinterPreset } from '../../../core/printerPresets'
 import { printTypeCopy } from '../../../core/printTypes'
 import { resinFromPreset, type ResinPreset } from '../../../core/resinPresets'
+import { supplyFromPreset, supplyPresetsFor, supplyPresetsForEquipment } from '../../../core/supplyPresets'
 import { partFromPreset, type PartSuggestion } from '../../../core/stock'
 import { PRINT_TYPES, type PrintType } from '../../../core/types'
 import type { StockLevel } from '../../../core/usage'
@@ -33,7 +34,7 @@ import { useConsumableBatch, useInventory } from '../../inventory'
 import { activeItems } from '../../../core/inventory'
 import { createId } from '../../id'
 import { matchesListSearch, showsListSearch } from '../../listSearch'
-import { catalogueQuery, consumablesQuery, priceCalculatorSettingsQuery, printersQuery, stockQuery } from '../../queries'
+import { catalogueQuery, consumablesQuery, equipmentQuery, priceCalculatorSettingsQuery, printersQuery, stockQuery } from '../../queries'
 import { signalProductTourProgress } from '../../productTour'
 import { useUsageTracking, useWorkspacePrintTypes, useWorkspaceSlug } from '../../workspace'
 import { UsageTrackingInvite } from '../UsageTracking'
@@ -44,7 +45,7 @@ import { AlsoPrints } from './AlsoPrints'
 import { ArchivedInventory } from './ArchivedInventory'
 import { ConsumableDialog } from './ConsumableDialog'
 import { ConsumableIcon } from './ConsumableIcon'
-import { materialFacts, MaterialPicker, PartPicker } from './ConsumablePicker'
+import { materialFacts, MaterialPicker, PartPicker, SupplyPicker } from './ConsumablePicker'
 import { LowMarker, StockSummary } from './ConsumableStock'
 import { VirtualList } from './VirtualList'
 import { PrinterPresetImage } from './PrinterPresetImage'
@@ -58,7 +59,7 @@ type ListEntry = ProductEntry | { type: 'item'; consumable: Consumable; nested?:
 // A product line shows this many swatches, fewer on a phone, beside its colour count.
 const PRODUCT_SWATCHES = 12
 const NARROW_PRODUCT_SWATCHES = 3
-type Picking = { kind: PrintType } | { kind: 'part'; group: LabelledGroup }
+type Picking = { kind: PrintType | 'supply' } | { kind: 'part'; group: LabelledGroup }
 
 export function ConsumablesPane() {
   const workspaceSlug = useWorkspaceSlug()
@@ -134,6 +135,8 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
   const resins = useQuery({ ...catalogueQuery('resins'), enabled: picking?.kind === 'resin' }).data
   const filaments = useQuery({ ...catalogueQuery('filaments'), enabled: picking?.kind === 'filament' }).data
   const partCatalogue = useQuery(catalogueQuery('parts')).data
+  const supplyCatalogue = useQuery({ ...catalogueQuery('supplies'), enabled: picking?.kind === 'supply' }).data
+  const equipment = useQuery({ ...equipmentQuery(workspaceSlug), enabled: picking?.kind === 'supply' }).data?.equipment
   const failed = () => void toast.error(copy.notSaved)
   const archive = (item: Consumable) => {
     setEditing(null)
@@ -147,10 +150,13 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
   }
 
   const addMaterial = (kind: PrintType) => setPicking({ kind })
-  const addSupply = () => setEditing({ id: createId(), kind: 'supply', name: '', unit: 'ml', price: Number.NaN })
+  const addSupply = () => setPicking({ kind: 'supply' })
+  const addCustomSupply = (name = '') => setEditing({ id: createId(), kind: 'supply', name, unit: 'ml', price: Number.NaN })
   const addCustomPart = (group: WearPartGroup) => setEditing(newWearPart(createId(), group))
   const addPart = (group: LabelledGroup) =>
-    !partCatalogue || partPresetsForGroup(partCatalogue, group).length ? setPicking({ kind: 'part', group }) : addCustomPart(group)
+    !partCatalogue || partPresetChoices(partCatalogue, group, fleetModels).length
+      ? setPicking({ kind: 'part', group })
+      : addCustomPart(group)
   // The catalogue knows no prices, so a part from it opens unpriced, with its list price as a hint.
   const addPresetPart = (suggestion: Pick<PartSuggestion, 'preset' | 'printerPresetId'> & { printerId?: string }) =>
     setEditing(withConsumablePrice(partFromPreset(createId(), suggestion), Number.NaN))
@@ -164,6 +170,26 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
     return preset ? `${preset.brand} ${preset.model}` : group.printerPresetId
   }
   const allPartGroups = wearPartGroups(saved, printers, printTypes).map((group) => ({ ...group, label: partGroupLabel(group) }))
+  const fleetModels = allPartGroups.flatMap(({ printType, printerPresetId, printerId, printers: count }) =>
+    printerPresetId && printerId === undefined && count > 0 ? [{ printType, printerPresetId }] : [],
+  )
+  // A choice is labelled, and knows which catalogue parts it already has, by the group a part chosen from it joins.
+  const choiceGroup = (group: LabelledGroup, choice: PartPresetChoice) =>
+    choice.printerPresetId === group.printerPresetId
+      ? group
+      : allPartGroups.find((candidate) => candidate.printerId === undefined && candidate.printerPresetId === choice.printerPresetId)
+  const pickerGroups = (group: LabelledGroup) => {
+    if (!partCatalogue) return undefined
+    const choices = partPresetChoices(partCatalogue, group, fleetModels)
+    return choices.map((choice) => {
+      const joins = choiceGroup(group, choice)
+      const had = presetIds(joins?.parts.map(({ partPresetId }) => partPresetId) ?? [])
+      return {
+        title: choices.length > 1 ? joins?.label : undefined,
+        items: choice.presets.map((preset) => ({ preset, printerPresetId: choice.printerPresetId, had: had.has(preset.id) })),
+      }
+    })
+  }
   const typePartGroups = allPartGroups.filter((group) => group.printerPresetId === undefined && group.printerId === undefined)
   // Searching for a model shows its whole group, so a part can be added to it as well as found in it.
   const partGroups = allPartGroups.flatMap((group) => {
@@ -371,14 +397,32 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
           onClose={() => setPicking(null)}
         />
       )}
+      {picking?.kind === 'supply' && (
+        <SupplyPicker
+          presets={supplyCatalogue && supplyPresetsFor(supplyCatalogue, printTypes)}
+          suggested={
+            new Set(
+              supplyPresetsForEquipment(
+                supplyCatalogue ?? [],
+                activeItems(equipment ?? []).map(({ presetId }) => presetId),
+              ).map(({ id }) => id),
+            )
+          }
+          added={presetIds(supplies.map(({ supplyPresetId }) => supplyPresetId))}
+          onSelect={(preset) => setEditing(withConsumablePrice(supplyFromPreset(createId(), preset), Number.NaN))}
+          onCustom={addCustomSupply}
+          onClose={() => setPicking(null)}
+        />
+      )}
       {picking?.kind === 'part' && (
         <PartPicker
-          title={copy.parts.addTo(picking.group.label)}
-          presets={partCatalogue && partPresetsForGroup(partCatalogue, picking.group)}
-          had={presetIds(picking.group.parts.map(({ partPresetId }) => partPresetId))}
-          onSelect={(preset) =>
-            addPresetPart({ preset, printerPresetId: picking.group.printerPresetId, printerId: picking.group.printerId })
+          title={
+            picking.group.printerPresetId || picking.group.printerId
+              ? copy.parts.addTo(picking.group.label)
+              : copy.parts.addTypeWearPart[picking.group.printType]
           }
+          groups={pickerGroups(picking.group)}
+          onSelect={({ preset, printerPresetId }) => addPresetPart({ preset, printerPresetId, printerId: picking.group.printerId })}
           onCustom={() => addCustomPart(picking.group)}
           onClose={() => setPicking(null)}
         />
@@ -527,7 +571,11 @@ function ConsumableRow({
       className={cn(rowClassName, nested && 'bg-muted/20 pl-8 @sm:pl-14')}
       onClick={onOpen}
     >
-      <ConsumableIcon consumable={consumable} className={cn(nested && 'size-8')} />
+      <ConsumableIcon
+        consumable={consumable}
+        image={preset && 'image' in preset ? preset.image : undefined}
+        className={cn(nested && 'size-8')}
+      />
       <span className="min-w-0 flex-1">
         <span className="block font-medium @max-sm:line-clamp-2 @sm:truncate">{name}</span>
         {facts && <span className="block truncate text-xs text-muted-foreground">{facts}</span>}
