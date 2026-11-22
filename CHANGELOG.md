@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.15.1
+
+### Patch Changes
+
+- a075b94: Show each slicer's, Spoolman's, and Bambuddy's own logo in the slicer pickers, on the open and download buttons for prints and plates, and on their settings pages, so that you can tell at a glance which app is about to open.
+- 21d64c5: Log each spool the Spoolman bridge adds or Spoolman refuses, and what it sends for each Bambuddy print, so that its log shows what it did.
+
 ## 2.15.0
 
 ### Minor Changes
