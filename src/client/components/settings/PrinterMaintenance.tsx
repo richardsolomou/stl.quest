@@ -181,13 +181,28 @@ export function WearText({ wear }: { wear: PartWear }) {
   )
 }
 
-/** Logs a new part fitted on the printer, taking a spare off the shelf, with Undo until it is closed. */
-export function ReplacedButton({ printerId, part }: { printerId: string; part: PartConsumable }) {
+/**
+ * Logs a new part fitted on the printer, taking a spare off the shelf, with Undo until it is closed. A list that drops
+ * the row once the part is fresh again holds the replacement itself, so its Undo outlives the row's own state.
+ */
+export function ReplacedButton({
+  printerId,
+  part,
+  replacement: heldReplacement,
+  onReplacementChange,
+}: {
+  printerId: string
+  part: PartConsumable
+  replacement?: string
+  onReplacementChange?: (transactionId: string | undefined) => void
+}) {
   const { t } = useI18n()
   const copy = t.settings.printers.dialog.maintenance
   const workspaceSlug = useWorkspaceSlug()
   const { movement, undo } = useStockMovements(workspaceSlug)
-  const [replacement, setReplacement] = useState<string>()
+  const [ownReplacement, setOwnReplacement] = useState<string>()
+  const replacement = onReplacementChange ? heldReplacement : ownReplacement
+  const setReplacement = onReplacementChange ?? setOwnReplacement
   const failed = movement.error != null || undo.error != null
   return (
     <div className="grid shrink-0 justify-items-end gap-1">

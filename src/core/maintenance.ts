@@ -111,6 +111,14 @@ function wornShare(wear: PartWear) {
 }
 
 /** Whole years and months from a purchase date to today, both calendar dates (`YYYY-MM-DD`); never negative. */
+/**
+ * Whether a `YYYY-MM-DD` purchase date is not in the future anywhere: up to tomorrow in UTC, which is already today in
+ * the easternmost time zones.
+ */
+export function isPastPurchaseDate(purchasedOn: string, now: number) {
+  return purchasedOn <= new Date(now + 86_400_000).toISOString().slice(0, 10)
+}
+
 export function ownedFor(purchasedOn: string, today: string) {
   const [boughtYear, boughtMonth, boughtDay] = purchasedOn.split('-').map(Number)
   const [year, month, day] = today.split('-').map(Number)

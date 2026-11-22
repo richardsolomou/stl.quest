@@ -59,7 +59,11 @@ export function SupplyNeeds({
     const part = consumablesOfKind(library, 'part').find(({ id }) => id === wear.consumableId)
     return printer && !printer.archived && part ? [{ printer, part, wear }] : []
   })
-  const nothing = runningOut.length === 0 && wearing.length === 0 && materials.length === 0 && parts.length === 0
+  // A replaced part is fresh again and leaves the wearing list, so its row is held here to keep its Undo.
+  const [replaced, setReplaced] = useState<Record<string, (typeof wearing)[number] & { transactionId: string }>>({})
+  const rowKey = ({ printer, part }: { printer: { id: string }; part: { id: string } }) => `${printer.id}-${part.id}`
+  const wearingRows = [...wearing, ...Object.values(replaced).filter((row) => !wearing.some((other) => rowKey(other) === rowKey(row)))]
+  const nothing = runningOut.length === 0 && wearingRows.length === 0 && materials.length === 0 && parts.length === 0
   const untracked = untrackedConsumables(library, levels)
 
   const modelName = (printerPresetId: string) => {
@@ -107,20 +111,36 @@ export function SupplyNeeds({
           ))}
         </NeedList>
       )}
-      {wearing.length > 0 && (
-        <NeedList title={copy.wearingOut} count={wearing.length}>
-          {wearing.map(({ printer, part, wear }) => (
-            <NeedRow
-              key={`${printer.id}-${part.id}`}
-              name={part.name}
-              detail={
-                <>
-                  {copy.wornOn(printer.name)} · <WearText wear={wear} />
-                </>
-              }
-              action={<ReplacedButton printerId={printer.id} part={part} />}
-            />
-          ))}
+      {wearingRows.length > 0 && (
+        <NeedList title={copy.wearingOut} count={wearingRows.length}>
+          {wearingRows.map((row) => {
+            const { printer, part, wear } = row
+            const key = rowKey(row)
+            return (
+              <NeedRow
+                key={key}
+                name={part.name}
+                detail={
+                  <>
+                    {copy.wornOn(printer.name)} · <WearText wear={wear} />
+                  </>
+                }
+                action={
+                  <ReplacedButton
+                    printerId={printer.id}
+                    part={part}
+                    replacement={replaced[key]?.transactionId}
+                    onReplacementChange={(transactionId) =>
+                      setReplaced((current) => {
+                        const { [key]: replacedRow, ...rest } = current
+                        return transactionId ? { ...rest, [key]: { ...(replacedRow ?? row), transactionId } } : rest
+                      })
+                    }
+                  />
+                }
+              />
+            )
+          })}
         </NeedList>
       )}
       {materials.length + parts.length > 0 && (

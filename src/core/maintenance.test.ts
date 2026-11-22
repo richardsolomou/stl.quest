@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PartConsumable } from './consumables'
 import {
+  isPastPurchaseDate,
   ownedFor,
   partWear,
   printerAttention,
@@ -155,5 +156,21 @@ describe('owned for', () => {
 
   it('is never negative for a date ahead of today', () => {
     expect(ownedFor('2027-01-01', '2026-11-22')).toEqual({ years: 0, months: 0 })
+  })
+})
+
+describe('past purchase date', () => {
+  const now = Date.UTC(2026, 10, 22, 12)
+
+  it('accepts today', () => {
+    expect(isPastPurchaseDate('2026-11-22', now)).toBe(true)
+  })
+
+  it('accepts tomorrow in UTC, which is already today east of it', () => {
+    expect(isPastPurchaseDate('2026-11-23', now)).toBe(true)
+  })
+
+  it('rejects a later day', () => {
+    expect(isPastPurchaseDate('2026-11-24', now)).toBe(false)
   })
 })
