@@ -1,5 +1,5 @@
 {
-  "id": "f278f9bb-224a-4b43-88b6-e3bd419ec4ce",
+  "id": "eec61eaf-8d01-4e59-a1c6-54c350f89e4c",
   "prevId": "13217eae-faf3-42dc-940a-bfbd8b5a21cf",
   "version": "7",
   "dialect": "postgresql",
@@ -629,13 +629,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "last_request_number": {
-          "name": "last_request_number",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
         }
       },
       "indexes": {
@@ -1527,12 +1520,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "slicer": {
-          "name": "slicer",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "minimum_stock": {
           "name": "minimum_stock",
           "type": "double precision",
@@ -1716,6 +1703,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "purchased_on": {
+          "name": "purchased_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "archived_at": {
           "name": "archived_at",
           "type": "bigint",
@@ -1870,6 +1863,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "purchased_on": {
+          "name": "purchased_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "power_watts": {
           "name": "power_watts",
           "type": "double precision",
@@ -1882,12 +1881,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'[]'"
-        },
-        "slicer": {
-          "name": "slicer",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "archived_at": {
           "name": "archived_at",
@@ -2883,12 +2876,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "number": {
-          "name": "number",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
         "name": {
           "name": "name",
           "type": "text",
@@ -3193,14 +3180,6 @@
           "columns": [
             "workspace_id",
             "id"
-          ]
-        },
-        "requests_workspace_number_unique": {
-          "name": "requests_workspace_number_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "workspace_id",
-            "number"
           ]
         }
       },
@@ -3584,6 +3563,27 @@
             },
             {
               "expression": "superseded_by",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "usage_events_printer": {
+          "name": "usage_events_printer",
+          "columns": [
+            {
+              "expression": "workspace_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "printer_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

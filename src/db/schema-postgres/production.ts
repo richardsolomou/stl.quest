@@ -283,6 +283,7 @@ export const usageEvents = pgTable(
     index('usage_events_transaction').on(table.workspaceId, table.transactionId),
     index('usage_events_created').on(table.workspaceId, table.createdAt),
     index('usage_events_superseded').on(table.workspaceId, table.supersededBy),
+    index('usage_events_printer').on(table.workspaceId, table.printerId),
     foreignKey({
       columns: [table.workspaceId, table.printerId],
       foreignColumns: [printers.workspaceId, printers.id],

@@ -23,6 +23,7 @@ export function normalizePrinterProfile(profile: Partial<PrinterProfile> & Pick<
     printType,
     ...(positiveNumber(profile.purchasePrice) ? { purchasePrice: profile.purchasePrice } : {}),
     ...(positiveNumber(profile.lifespanHours) ? { lifespanHours: profile.lifespanHours } : {}),
+    ...(profile.purchasedOn ? { purchasedOn: profile.purchasedOn } : {}),
     ...(!preset && positiveNumber(profile.powerWatts) ? { powerWatts: profile.powerWatts } : {}),
     ...(profile.addOnPresetIds?.length ? { addOnPresetIds: profile.addOnPresetIds } : {}),
     ...(profile.slicer && isSlicerFor(profile.slicer, printType) ? { slicer: profile.slicer } : {}),

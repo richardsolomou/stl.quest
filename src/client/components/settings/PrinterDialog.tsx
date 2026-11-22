@@ -34,10 +34,11 @@ import { AutosaveStatus } from '../AutosaveStatus'
 import { DialogShell } from '../DialogShell'
 import { currencySymbol, formatNumber, formatRate } from '../priceCalculator/format'
 import { UsageTrackingInvite } from '../UsageTracking'
-import { PrinterMaintenance } from './PrinterMaintenance'
+import { PrinterLifetimeLine, PrinterMaintenance } from './PrinterMaintenance'
 import { PrinterPresetImage } from './PrinterPresetImage'
 import { PrinterPresetPicker } from './PrinterPresetPicker'
 import { SlicerField } from './SlicerField'
+import { PurchaseDateField } from './PurchaseDate'
 
 const DIMENSIONS = [
   ['widthMm', 'width'],
@@ -111,6 +112,7 @@ export function PrinterDialog({
         preset={preset}
         currency={currency}
         error={touched || !isNew ? validation : undefined}
+        lifetime={!isNew && tracking}
         onChange={setDraft}
       />
       {!isNew &&
@@ -128,12 +130,15 @@ function PrinterFields({
   preset,
   currency,
   error,
+  lifetime,
   onChange,
 }: {
   draft: PrinterProfile
   preset?: PrinterPreset
   currency: PriceCalculatorCurrency
   error?: string
+  /** Whether to show how far through its lifespan the saved printer is. */
+  lifetime: boolean
   onChange: (update: (current: PrinterProfile) => PrinterProfile) => void
 }) {
   const { t } = useI18n()
@@ -207,7 +212,7 @@ function PrinterFields({
         value={draft.slicer}
         onChange={(slicer) => onChange((current) => ({ ...current, slicer }))}
       />
-      <PrinterWear draft={draft} currency={currency} onChange={onChange} />
+      <PrinterWear draft={draft} currency={currency} lifetime={lifetime} onChange={onChange} />
       <PrinterAddOns draft={draft} onChange={onChange} />
     </>
   )
@@ -363,14 +368,16 @@ function addOnWatts(preset: EquipmentPreset) {
   return preset.powerProfiles.find(({ phase }) => phase === 'printing')?.watts ?? 0
 }
 
-/** What the printer cost and how long it lasts, which quotes spread across its print hours. */
+/** What the printer cost, when it was bought, and how long it lasts, which quotes spread across its print hours. */
 function PrinterWear({
   draft,
   currency,
+  lifetime,
   onChange,
 }: {
   draft: PrinterProfile
   currency: PriceCalculatorCurrency
+  lifetime: boolean
   onChange: (update: (current: PrinterProfile) => PrinterProfile) => void
 }) {
   const { t, locale } = useI18n()
@@ -401,6 +408,14 @@ function PrinterWear({
           </FieldLabel>
           <OptionalNumber id="printer-lifespan" value={draft.lifespanHours} onChange={set('lifespanHours')} />
         </Field>
+      </div>
+      {lifetime && <PrinterLifetimeLine printerId={draft.id} lifespanHours={draft.lifespanHours} />}
+      <div className="sm:max-w-md">
+        <PurchaseDateField
+          id="printer-purchased-on"
+          value={draft.purchasedOn}
+          onChange={(purchasedOn) => onChange((current) => ({ ...current, purchasedOn }))}
+        />
       </div>
       <p className="text-xs text-muted-foreground">{copy.wearHint}</p>
     </section>

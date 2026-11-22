@@ -42,7 +42,8 @@ export function useStockMovements(workspaceSlug: string) {
   const queryClient = useQueryClient()
   const record = useServerFn(recordStockMovement)
   const undo = useServerFn(undoUsage)
-  const refresh = () => invalidateQueries(queryClient, 'stock', 'usage')
+  // A replacement resets a part's wear, which printer lifetimes report, so they refresh too without waiting for realtime.
+  const refresh = () => invalidateQueries(queryClient, 'stock', 'usage', 'printer-lifetimes')
   return {
     movement: useMutation({
       mutationFn: (input: StockMovementInput) => record({ data: { ...input, workspaceSlug } }),

@@ -3,6 +3,7 @@ import type { StoragePlan } from './plans'
 import type { NotificationKind, NotificationPreferences } from './notifications'
 import type { OnboardingProgress } from './onboarding'
 import type { Locale } from './i18n/locales'
+import type { MaintenanceTotals } from './maintenance'
 import type { StockTotal, UsageEvent, UsageFilters } from './usage'
 import type { InventoryItems, InventoryKind } from './inventory'
 import type { InventoryReferences } from './inventoryDeletion'
@@ -72,6 +73,8 @@ export type PrinterProfile = PrinterSummary & {
   /** For wear: what the printer cost and how many print hours it lasts. */
   purchasePrice?: number
   lifespanHours?: number
+  /** The calendar day it was bought (`YYYY-MM-DD`), for its age. */
+  purchasedOn?: string
   /** What a printer without a catalogue model draws while printing; a catalogue model's own power is used otherwise. */
   powerWatts?: number
   /** Catalogue equipment bolted onto this printer, such as a pulsing release module, whose printing power adds to its own. */
@@ -523,6 +526,8 @@ interface RepositoryShape {
   listUsage(filters: UsageFilters): UsageEvent[]
   /** Live events summed per consumable, kind, and unit, leaving out estimates of past prints, which never moved stock. */
   stockTotals(): StockTotal[]
+  /** Every printer's printing runs over its whole life, and since each part's last replacement on it (see core/maintenance). */
+  maintenanceTotals(): MaintenanceTotals
   /** Every print with a charge, its live spend in this currency or unpriced totalled over all time (see core/spend). */
   chargedPrints(currency: PriceCalculatorCurrency): ChargedPrint[]
   /**

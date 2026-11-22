@@ -31,6 +31,7 @@ import {
   sessionInfo,
   listUsage,
   getStockLevels,
+  getPrinterLifetimes,
   getUsagePrefills,
   getUsageBackfillPreview,
   getChargedPrints,
@@ -42,6 +43,7 @@ import type { FilamentPreset } from '../core/filamentPresets'
 import type { PartPreset } from '../core/partPresets'
 import { estimatePending } from '../core/printEstimates'
 import type { ResinPreset } from '../core/resinPresets'
+import type { SupplyPreset } from '../core/supplyPresets'
 import type { PublicRequestQueryResult, RequestFilters } from '../core/types'
 import { MAX_USAGE_LIST, type UsageEvent, type UsageFilters } from '../core/usage'
 import type { SettingsSection } from './settingsSections'
@@ -162,6 +164,8 @@ export const usagePeriodQuery = (workspaceSlug: string, period: { from: number; 
   })
 export const stockQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['stock', workspaceSlug], queryFn: () => getStockLevels({ data: { workspaceSlug } }) })
+export const printerLifetimesQuery = (workspaceSlug: string) =>
+  queryOptions({ queryKey: ['printer-lifetimes', workspaceSlug], queryFn: () => getPrinterLifetimes({ data: { workspaceSlug } }) })
 export const usagePrefillsQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['usage-prefills', workspaceSlug], queryFn: () => getUsagePrefills({ data: { workspaceSlug } }) })
 export const platesQuery = (workspaceSlug: string) =>
@@ -189,14 +193,31 @@ export const diagnosticsQuery = (workspaceSlug: string) =>
 export const systemDiagnosticsQuery = () =>
   queryOptions({ queryKey: ['system-diagnostics'], queryFn: () => getSystemDiagnostics(), refetchInterval: 30_000 })
 export const integrationsQuery = () => queryOptions({ queryKey: ['integrations'], queryFn: () => getIntegrationSettings() })
-type Catalogues = { electricity: ElectricityPricePreset[]; filaments: FilamentPreset[]; parts: PartPreset[]; resins: ResinPreset[] }
+type Catalogues = {
+  electricity: ElectricityPricePreset[]
+  filaments: FilamentPreset[]
+  parts: PartPreset[]
+  resins: ResinPreset[]
+  supplies: SupplyPreset[]
+}
 // Each catalogue is its own chunk, fetched the first time something shows it, so pages that never do stay small.
 const catalogues: { [Name in keyof Catalogues]: () => Promise<Catalogues[Name]> } = {
   electricity: () => import('../../catalogs/electricity/catalog.generated.json').then(({ default: catalogue }) => catalogue.presets),
   filaments: () =>
     import('../../catalogs/filaments/catalog.generated.json').then(({ default: catalogue }) => catalogue.presets as FilamentPreset[]),
   parts: () => import('../../catalogs/parts/catalog.json').then(({ default: catalogue }) => catalogue.presets as PartPreset[]),
-  resins: () => import('../../catalogs/resins/catalog.generated.json').then(({ default: catalogue }) => catalogue.presets as ResinPreset[]),
+  resins: async () => {
+    const [{ default: catalogue }, { default: images }] = await Promise.all([
+      import('../../catalogs/resins/catalog.generated.json'),
+      import('../../catalogs/resins/images.json'),
+    ])
+    const sources = new Map(images.images.map(({ presetId, src }) => [presetId, src]))
+    return catalogue.presets.map((preset): ResinPreset => {
+      const src = sources.get(preset.id)
+      return src ? { ...preset, image: { src } } : preset
+    })
+  },
+  supplies: () => import('../../catalogs/supplies/catalog.json').then(({ default: catalogue }) => catalogue.presets as SupplyPreset[]),
 }
 export const catalogueQuery = <Name extends keyof Catalogues>(name: Name) =>
   queryOptions({ queryKey: ['catalogue', name], queryFn: (): Promise<Catalogues[Name]> => catalogues[name](), staleTime: Infinity })

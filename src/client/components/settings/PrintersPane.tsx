@@ -17,13 +17,18 @@ import {
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from '../../../core/priceCalculator'
 import { getPrinterPreset, PRINTER_PRESETS, type PrinterPreset } from '../../../core/printerPresets'
 import { PRINT_TYPES, type PrinterProfile } from '../../../core/types'
+import type { Consumable } from '../../../core/consumables'
+import { printerAttention, type PrinterLifetime } from '../../../core/maintenance'
+import { cn } from '@/lib/utils'
+import { formatNumber } from '../priceCalculator/format'
+import { LowMarker } from './ConsumableStock'
 import { skipPrinterSetup } from '../../../server/fns'
 import { createId } from '../../id'
 import { errorMessage } from '../../../core/error'
-import { priceCalculatorSettingsQuery, printersQuery } from '../../queries'
+import { consumablesQuery, priceCalculatorSettingsQuery, printerLifetimesQuery, printersQuery } from '../../queries'
 import { invalidateQueries } from '../../queryState'
 import { useInventory } from '../../inventory'
-import { useWorkspacePrintTypes, useWorkspaceSlug } from '../../workspace'
+import { useUsageTracking, useWorkspacePrintTypes, useWorkspaceSlug } from '../../workspace'
 import { signalProductTourProgress } from '../../productTour'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { AlsoPrints } from './AlsoPrints'
@@ -56,6 +61,9 @@ export function PrintersPane({
   const currency =
     useQuery({ ...priceCalculatorSettingsQuery(workspaceSlug), enabled: !onboarding }).data?.settings.currency ??
     DEFAULT_PRICE_CALCULATOR_SETTINGS.currency
+  const tracking = useUsageTracking()
+  const lifetimes = useQuery({ ...printerLifetimesQuery(workspaceSlug), enabled: tracking && !onboarding }).data?.lifetimes
+  const consumables = useQuery({ ...consumablesQuery(workspaceSlug), enabled: tracking && !onboarding }).data?.consumables
   const [search, setSearch] = useState('')
   const queryClient = useQueryClient()
   const { t } = useI18n()
@@ -269,7 +277,9 @@ export function PrintersPane({
                 />
               }
             >
-              {shown.length > 0 && <PrinterList profiles={shown} all={activeProfiles} onOpen={setEditing} />}
+              {shown.length > 0 && (
+                <PrinterList profiles={shown} all={activeProfiles} lifetimes={lifetimes} consumables={consumables} onOpen={setEditing} />
+              )}
             </SettingsSection>
           )
         })
@@ -369,30 +379,70 @@ export function PrintersPane({
 function PrinterList({
   profiles,
   all,
+  lifetimes,
+  consumables,
   onOpen,
 }: {
   profiles: PrinterProfile[]
   /** Every active printer, which numbers an unnamed one. */
   all: PrinterProfile[]
+  /** How worn each printer is, when usage is tracked. */
+  lifetimes?: PrinterLifetime[]
+  consumables?: Consumable[]
   onOpen: (profile: PrinterProfile) => void
 }) {
   return (
     <VirtualList
       items={profiles}
       getKey={({ id }) => id}
-      renderItem={(profile) => <PrinterRow profile={profile} index={all.indexOf(profile)} onOpen={() => onOpen(profile)} />}
+      renderItem={(profile) => (
+        <PrinterRow
+          profile={profile}
+          index={all.indexOf(profile)}
+          lifetime={lifetimes?.find(({ printerId }) => printerId === profile.id)}
+          consumables={consumables ?? []}
+          onOpen={() => onOpen(profile)}
+        />
+      )}
     />
   )
 }
 
-function PrinterRow({ profile, index, onOpen }: { profile: PrinterProfile; index: number; onOpen: () => void }) {
+function PrinterRow({
+  profile,
+  index,
+  lifetime,
+  consumables,
+  onOpen,
+}: {
+  profile: PrinterProfile
+  index: number
+  lifetime?: PrinterLifetime
+  consumables: Consumable[]
+  onOpen: () => void
+}) {
   const preset = getPrinterPreset(profile.presetId)
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const copy = t.settings.printers
   const displayName = profile.name || copy.row.fallbackName(index + 1)
   // Bay names such as "X1C · A" hide the machine, so the catalogue model shows beneath unless the name already says it.
   const catalogueName = preset && printerModelName(preset)
   const model = catalogueName && catalogueName.toLocaleLowerCase() !== profile.name.trim().toLocaleLowerCase() ? catalogueName : undefined
+  const attention = lifetime && printerAttention(lifetime)
+  const partName = attention?.part && consumables.find(({ id }) => id === attention.part?.consumableId)?.name
+  const status =
+    attention &&
+    (attention.part
+      ? partName && (attention.level === 'due' ? copy.row.partDue : copy.row.partNearlyWorn)(partName)
+      : attention.level === 'due'
+        ? copy.row.pastLifespan
+        : copy.row.nearLifespan)
+  const hours =
+    lifetime &&
+    copy.row.hours(
+      formatNumber(lifetime.hours, locale, 0),
+      lifetime.lifespanHours ? formatNumber(lifetime.lifespanHours, locale) : undefined,
+    )
 
   return (
     <button
@@ -405,7 +455,20 @@ function PrinterRow({ profile, index, onOpen }: { profile: PrinterProfile; index
       <span className="min-w-0 flex-1">
         <span className="block font-medium @max-sm:line-clamp-2 @sm:truncate">{displayName}</span>
         {model && <span className="block truncate text-xs text-muted-foreground">{model}</span>}
+        {status && (
+          <span
+            className={cn(
+              'flex min-w-0 items-center gap-1.5 text-xs',
+              attention.level === 'due' ? 'font-medium text-destructive' : 'text-muted-foreground',
+            )}
+          >
+            {attention.level === 'nearly' && <LowMarker />}
+            <span className="truncate">{status}</span>
+          </span>
+        )}
+        {hours && <span className="block font-mono text-xs text-muted-foreground tabular-nums @sm:hidden">{hours}</span>}
       </span>
+      {hours && <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums @max-sm:hidden">{hours}</span>}
       <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
     </button>
   )

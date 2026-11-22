@@ -29,6 +29,7 @@ export function inventoryItem<Kind extends InventoryKind>(kind: Kind, row: Row<K
       heightMm: defined(printer.heightMm),
       purchasePrice: defined(printer.purchasePrice),
       lifespanHours: defined(printer.lifespanHours),
+      purchasedOn: defined(printer.purchasedOn),
       powerWatts: defined(printer.powerWatts),
       addOnPresetIds: JSON.parse(printer.addOnPresetIdsJson) as string[],
       ...(printer.slicer !== null && { slicer: printer.slicer as SlicerId }),
@@ -49,6 +50,7 @@ export function inventoryItem<Kind extends InventoryKind>(kind: Kind, row: Row<K
       supplies: JSON.parse(item.suppliesJson) as EquipmentItem['supplies'],
       ...(item.purchasePrice !== null && { purchasePrice: item.purchasePrice }),
       ...(item.lifespanHours !== null && { lifespanHours: item.lifespanHours }),
+      ...(item.purchasedOn !== null && { purchasedOn: item.purchasedOn }),
       ...archived,
     } satisfies EquipmentItem as InventoryItems[Kind]
   }
@@ -95,7 +97,7 @@ function consumable(row: Row<'consumables'>, archived: { archived?: boolean }): 
       ...(row.printerId !== null && { printerId: row.printerId }),
       ...preset('partPresetId'),
     }
-  return { ...shared, kind: 'supply', unit: row.unit ?? 'item', price: row.price }
+  return { ...shared, kind: 'supply', unit: row.unit ?? 'item', price: row.price, ...preset('supplyPresetId') }
 }
 
 export function inventoryColumns<Kind extends InventoryKind>(kind: Kind, item: InventoryItems[Kind]): InventoryColumns<Kind> {
@@ -110,6 +112,7 @@ export function inventoryColumns<Kind extends InventoryKind>(kind: Kind, item: I
       heightMm: printer.heightMm ?? null,
       purchasePrice: printer.purchasePrice ?? null,
       lifespanHours: printer.lifespanHours ?? null,
+      purchasedOn: printer.purchasedOn ?? null,
       powerWatts: printer.powerWatts ?? null,
       addOnPresetIdsJson: JSON.stringify(printer.addOnPresetIds ?? []),
       slicer: printer.slicer ?? null,
@@ -128,6 +131,7 @@ export function inventoryColumns<Kind extends InventoryKind>(kind: Kind, item: I
       suppliesJson: JSON.stringify(equipmentItem.supplies),
       purchasePrice: equipmentItem.purchasePrice ?? null,
       lifespanHours: equipmentItem.lifespanHours ?? null,
+      purchasedOn: equipmentItem.purchasedOn ?? null,
     } satisfies InventoryColumns<'equipment'> as unknown as InventoryColumns<Kind>
   }
   const library = item as Consumable
@@ -178,6 +182,6 @@ export function inventoryColumns<Kind extends InventoryKind>(kind: Kind, item: I
               printerPresetId: library.printerPresetId ?? null,
               printerId: library.printerId ?? null,
             }
-          : { ...shared, price: library.price, unit: library.unit }
+          : { ...shared, presetId: library.supplyPresetId ?? null, price: library.price, unit: library.unit }
   return columns as InventoryColumns<Kind>
 }

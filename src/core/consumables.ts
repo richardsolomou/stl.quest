@@ -69,6 +69,8 @@ export type SupplyConsumable = LibraryFields & {
   name: string
   unit: SupplyUnit
   price: number
+  /** The catalogue supply it was added from. */
+  supplyPresetId?: string
 }
 
 export type Consumable = ResinConsumable | FilamentConsumable | PartConsumable | SupplyConsumable

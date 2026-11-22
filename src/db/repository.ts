@@ -92,6 +92,7 @@ import {
   parseOperationPayload,
   type RequestRow,
 } from './repository/mappers'
+import type { MaintenanceTotals } from '../core/maintenance'
 import { MAX_USAGE_LIST, type UsageEvent, type UsageFilters } from '../core/usage'
 import type { PriceCalculatorCurrency } from '../core/priceCalculator'
 import type { Plate, PlateItem, PlateRecording } from '../core/plates'
@@ -2588,6 +2589,83 @@ export class DrizzleRepository implements Repository {
       .groupBy(usageEvents.consumableId, usageEvents.kind, usageEvents.unit)
       .all()
     return rows.flatMap(({ consumableId, ...total }) => (consumableId ? [{ consumableId, ...total }] : []))
+  }
+
+  async maintenanceTotals(): Promise<MaintenanceTotals> {
+    const workspaceId = await this.workspace()
+    const runMinutes = sql<number>`coalesce(sum(${usageEvents.amount}), 0)`.mapWith(Number)
+    // A left join's unmatched row has no ID, and must not count as a plate.
+    const runPlates =
+      sql<number>`coalesce(sum(case when ${usageEvents.id} is null then 0 else coalesce(${usageEvents.copies}, 1) end), 0)`.mapWith(Number)
+    const runs = and(
+      eq(usageEvents.workspaceId, workspaceId),
+      eq(usageEvents.kind, 'use'),
+      eq(usageEvents.stage, 'printing'),
+      eq(usageEvents.unit, 'minute'),
+      isNull(usageEvents.consumableId),
+      // A deleted part's own wear keeps its minutes but loses its ID, so it would otherwise read as the printer's run.
+      isNull(usageEvents.deletedItemKind),
+      isNotNull(usageEvents.printerId),
+      isNull(usageEvents.undoneAt),
+    )
+    const printerRows = await this.database
+      .select({ printerId: usageEvents.printerId, estimated: usageEvents.estimated, minutes: runMinutes, plates: runPlates })
+      .from(usageEvents)
+      .where(runs)
+      .groupBy(usageEvents.printerId, usageEvents.estimated)
+      .all()
+    const lastReplacements = this.database
+      .select({
+        printerId: usageEvents.printerId,
+        consumableId: usageEvents.consumableId,
+        replacedAt: sql<number>`max(${usageEvents.createdAt})`.mapWith(Number).as('replaced_at'),
+      })
+      .from(usageEvents)
+      .where(
+        and(
+          eq(usageEvents.workspaceId, workspaceId),
+          eq(usageEvents.kind, 'replace'),
+          isNotNull(usageEvents.printerId),
+          isNotNull(usageEvents.consumableId),
+          isNull(usageEvents.undoneAt),
+        ),
+      )
+      .groupBy(usageEvents.printerId, usageEvents.consumableId)
+      .as('last_replacements')
+    const replacementRows = await this.database
+      .select({
+        printerId: lastReplacements.printerId,
+        consumableId: lastReplacements.consumableId,
+        replacedAt: lastReplacements.replacedAt,
+        minutes: runMinutes,
+        plates: runPlates,
+      })
+      .from(lastReplacements)
+      .leftJoin(
+        usageEvents,
+        and(
+          runs,
+          eq(usageEvents.estimated, false),
+          eq(usageEvents.printerId, lastReplacements.printerId),
+          sql`${usageEvents.createdAt} > ${lastReplacements.replacedAt}`,
+        ),
+      )
+      .groupBy(lastReplacements.printerId, lastReplacements.consumableId, sql`${lastReplacements.replacedAt}`)
+      .all()
+    const byPrinter = new Map<string, MaintenanceTotals['printers'][number]>()
+    for (const { printerId, estimated, ...total } of printerRows) {
+      if (!printerId) continue
+      const entry = byPrinter.get(printerId) ?? { printerId, all: { minutes: 0, plates: 0 }, recorded: { minutes: 0, plates: 0 } }
+      entry.all = { minutes: entry.all.minutes + total.minutes, plates: entry.all.plates + total.plates }
+      if (!estimated) entry.recorded = total
+      byPrinter.set(printerId, entry)
+    }
+    return {
+      printers: [...byPrinter.values()],
+      replacements: replacementRows.flatMap(({ printerId, consumableId, replacedAt, ...since }) =>
+        printerId && consumableId ? [{ printerId, consumableId, replacedAt, since }] : [],
+      ),
+    }
   }
 
   async chargedPrints(currency: PriceCalculatorCurrency) {

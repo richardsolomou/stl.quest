@@ -71,6 +71,7 @@ import { sameFilamentProduct, withSharedFilamentPrice } from './filamentPresets'
 import type { EquipmentItem } from './equipment'
 import { activeItems, INVENTORY_LIMITS, type InventoryItems, type InventoryKind } from './inventory'
 import { canDeleteInventoryItem, deletedItemKind } from './inventoryDeletion'
+import { printerLifetimes } from './maintenance'
 import {
   DEFAULT_PRICE_CALCULATOR_SETTINGS,
   PRICE_CALCULATOR_SETTING,
@@ -1336,6 +1337,16 @@ export class STLQuestService {
     return stockLevels(await this.consumables(), await this.repository.stockTotals())
   }
 
+  /** How far through its life each printer and its wear parts are, from the whole log rather than one capped list of it. */
+  async printerLifetimes(identity: Identity) {
+    await this.requireUsageTracking(identity)
+    return printerLifetimes(
+      await this.repository.maintenanceTotals(),
+      await this.repository.listInventory('printers'),
+      await this.consumables(),
+    )
+  }
+
   /** Each charged print's whole-life cost and finish, so profit counts it once, against everything it used. */
   async chargedPrints(identity: Identity) {
     await this.requireUsageTracking(identity)
@@ -1737,6 +1748,7 @@ export class STLQuestService {
         filament_count: consumablesOfKind(library, 'filament').length,
         part_count: consumablesOfKind(library, 'part').length,
         supply_count: consumablesOfKind(library, 'supply').length,
+        catalogue_supply_count: consumablesOfKind(library, 'supply').filter((supply) => supply.supplyPresetId).length,
       })
     }
   }

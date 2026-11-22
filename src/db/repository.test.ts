@@ -860,6 +860,121 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     )
   })
 
+  describe('maintenance totals', () => {
+    const tank: Consumable = {
+      id: 'tank',
+      kind: 'part',
+      name: 'Tank',
+      printType: 'resin',
+      price: 119,
+      lifespan: 190,
+      lifespanUnit: 'plates',
+    }
+
+    function run(overrides: Partial<UsageEvent> = {}) {
+      return usageEvent({
+        stage: 'printing',
+        kind: 'use',
+        consumableId: undefined,
+        printerId: 'form-4',
+        amount: 120,
+        unit: 'minute',
+        copies: 2,
+        ...overrides,
+      })
+    }
+
+    function replacement(createdAt: number, overrides: Partial<UsageEvent> = {}) {
+      return usageEvent({
+        transactionId: `replace-${createdAt}`,
+        kind: 'replace',
+        consumableId: 'tank',
+        printerId: 'form-4',
+        amount: 1,
+        unit: 'item',
+        createdAt,
+        ...overrides,
+      })
+    }
+
+    beforeEach(async () => {
+      await stock(repository, 'printers', [{ id: 'form-4', name: 'Form 4', printType: 'resin' }])
+      await stock(repository, 'consumables', [ipa, tank])
+    })
+
+    it('totals every printing run of a printer, estimates of past prints included', async () => {
+      await repository.appendUsageEvents([run(), run({ estimated: true, amount: 60, copies: 1 })])
+
+      expect((await repository.maintenanceTotals()).printers).toEqual([
+        { printerId: 'form-4', all: { minutes: 180, plates: 3 }, recorded: { minutes: 120, plates: 2 } },
+      ])
+    })
+
+    it('leaves undone runs out of a printer’s totals', async () => {
+      await repository.appendUsageEvents([run(), run({ transactionId: 'undone' })])
+      await repository.undoUsageTransaction('undone', 5_000)
+
+      expect((await repository.maintenanceTotals()).printers[0].all.minutes).toBe(120)
+    })
+
+    it('leaves the material and part wear a print recorded out of its runs', async () => {
+      await repository.appendUsageEvents([
+        run(),
+        run({ consumableId: 'tank', unit: 'plate', amount: 2 }),
+        run({ consumableId: 'ipa', unit: 'ml', amount: 40 }),
+      ])
+
+      expect((await repository.maintenanceTotals()).printers[0].all.minutes).toBe(120)
+    })
+
+    it('leaves the wear of a deleted part, which lost its ID, out of the printer’s runs', async () => {
+      await repository.appendUsageEvents([run(), run({ deletedItemKind: 'part', deletedItemName: 'Screen' })])
+
+      expect((await repository.maintenanceTotals()).printers[0].all.minutes).toBe(120)
+    })
+
+    it('counts a run without copies as one plate', async () => {
+      await repository.appendUsageEvents([run({ copies: undefined })])
+
+      expect((await repository.maintenanceTotals()).printers[0].all.plates).toBe(1)
+    })
+
+    it('totals the recorded runs since a part’s last replacement on the printer', async () => {
+      await repository.appendUsageEvents([
+        run({ createdAt: 1_000 }),
+        replacement(2_000),
+        run({ createdAt: 3_000 }),
+        replacement(4_000),
+        run({ createdAt: 5_000, copies: 3 }),
+        run({ createdAt: 6_000, estimated: true }),
+      ])
+
+      expect((await repository.maintenanceTotals()).replacements).toEqual([
+        { printerId: 'form-4', consumableId: 'tank', replacedAt: 4_000, since: { minutes: 120, plates: 3 } },
+      ])
+    })
+
+    it('counts nothing since a replacement no run followed', async () => {
+      await repository.appendUsageEvents([run({ createdAt: 1_000 }), replacement(2_000)])
+
+      expect((await repository.maintenanceTotals()).replacements[0].since).toEqual({ minutes: 0, plates: 0 })
+    })
+
+    it('leaves an undone replacement out', async () => {
+      await repository.appendUsageEvents([replacement(2_000)])
+      await repository.undoUsageTransaction('replace-2000', 3_000)
+
+      expect((await repository.maintenanceTotals()).replacements).toEqual([])
+    })
+
+    it('keeps maintenance totals within their workspace', async () => {
+      await repository.appendUsageEvents([run(), replacement(2_000)])
+      const secondary = await repository.scoped((await repository.createWorkspace({ id: 'owner' }, 'Second farm')).id)
+
+      expect(await secondary.maintenanceTotals()).toEqual({ printers: [], replacements: [] })
+    })
+  })
+
   it('undoes every live event of a transaction once', async () => {
     await stock(repository, 'consumables', [ipa])
     await repository.appendUsageEvents([usageEvent({ id: 'printer' }), usageEvent({ id: 'material' })])
@@ -2003,6 +2118,35 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
       { id: 'black', archived: true },
       { id: 'clear', archived: undefined },
     ])
+  })
+
+  it('keeps a printer’s purchase date', async () => {
+    await stock(repository, 'printers', [{ id: 'saturn', name: 'Saturn', printType: 'resin', purchasedOn: '2025-03-14' }])
+
+    expect((await repository.listInventory('printers'))[0].purchasedOn).toBe('2025-03-14')
+  })
+
+  it('keeps a piece of equipment’s purchase date', async () => {
+    await stock(repository, 'equipment', [
+      {
+        id: 'wash',
+        name: 'Wash',
+        kind: 'wash',
+        stage: 'finishing',
+        powerWatts: 50,
+        minutesPerUse: 10,
+        supplies: [],
+        purchasedOn: '2024-06-01',
+      },
+    ])
+
+    expect((await repository.listInventory('equipment'))[0].purchasedOn).toBe('2024-06-01')
+  })
+
+  it('keeps the catalogue supply a supply was added from', async () => {
+    await stock(repository, 'consumables', [{ ...ipa, supplyPresetId: 'supply-isopropyl-alcohol' }])
+
+    expect(await repository.listInventory('consumables')).toEqual([{ ...ipa, supplyPresetId: 'supply-isopropyl-alcohol' }])
   })
 
   it('keeps edits to different items made at the same time', async () => {
