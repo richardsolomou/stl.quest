@@ -4311,6 +4311,34 @@ describe('STLQuestService crash recovery', () => {
         await expect(service.remove(requestId, admin)).rejects.toMatchObject({ status: 409 })
       })
 
+      it('refuses to move a running plate’s print to another printer', async () => {
+        await stock('printers', [{ id: 'a1', name: 'A1', printType: 'filament' }])
+        const requestId = await queued()
+        await start(requestId)
+
+        await expect(service.update(requestId, { printerId: 'a1' }, admin)).rejects.toMatchObject({ status: 409 })
+      })
+
+      it('refuses a bulk printer assignment that would split a running plate', async () => {
+        await stock('printers', [{ id: 'a1', name: 'A1', printType: 'filament' }])
+        const free = await queued()
+        const held = await queued()
+        await start(held)
+
+        await expect(service.assignRequests([free, held], 'a1', admin)).rejects.toMatchObject({ status: 409 })
+      })
+
+      it('leaves every print where it was when a bulk assignment is refused', async () => {
+        await stock('printers', [{ id: 'a1', name: 'A1', printType: 'filament' }])
+        const free = await queued()
+        const held = await queued()
+        await start(held)
+
+        await service.assignRequests([free, held], 'a1', admin).catch(() => undefined)
+
+        expect((await repository.getRequest(free))?.printerId).not.toBe('a1')
+      })
+
       it('ends running plates when usage tracking is switched off', async () => {
         const { id } = await start(await queued())
 

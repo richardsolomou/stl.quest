@@ -10,6 +10,7 @@ A plate run is the prints that go on one plate of one printer. Select their card
 
 - **Move plate to Finishing** on the printer's station, or moving any of its cards, moves every print on the plate.
 - A move, group move, or delete that would take some of a plate's copies on their own is refused.
+- Its prints stay on its printer: assigning one of them to another printer, on its own or in bulk, is refused.
 - The run ends once its prints leave Printing and Finishing, usually when they are ready, or when usage tracking is switched off.
 
 Choosing only prints already past Printing records a run that already happened, as before.

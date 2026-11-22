@@ -794,6 +794,7 @@ export class STLQuestService {
         previousPrintType,
       )
       printerId = target.printerId
+      if (printerId !== request.printerId) await this.assertPlatePrintersKept([request.id], printerId)
       requestedPrintType = target.requestedPrintType
       fields.printerId = printerId ?? null
       fields.requestedPrintType = requestedPrintType ?? null
@@ -872,6 +873,7 @@ export class STLQuestService {
     ) {
       throw new Response(this.text.request.invalidUpdate, { status: 400 })
     }
+    await this.assertPlatePrintersKept(uniqueIds, printerId)
     for (const id of uniqueIds) await this.update(id, { printerId }, identity)
   }
 
@@ -1694,6 +1696,16 @@ export class STLQuestService {
     this.requireAdmin(identity)
     await this.repository.setSetting(USAGE_TRACKING_SETTING, enabled)
     if (!enabled && (await this.repository.endPlateRuns(Date.now()))) this.changed('plate.changed')
+  }
+
+  /** A running plate's prints print on its printer, so none of them may be put on another. */
+  private async assertPlatePrintersKept(ids: string[], printerId: string | undefined) {
+    if (!(await storedUsageTracking(this.repository))) return
+    const plate = (await this.repository.listPlates()).find(
+      (candidate) =>
+        candidate.stage && candidate.printerId !== printerId && candidate.items.some(({ requestId }) => ids.includes(requestId)),
+    )
+    if (plate) throw new Response(this.text.plates.onRunningPlate(plate.number), { status: 409 })
   }
 
   /** Copies a running plate holds move only with it, so a single move, group move, or delete may not take them. */
