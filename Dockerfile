@@ -16,8 +16,8 @@ COPY catalogs/resins/catalog.generated.json catalogs/resins/images.json ./catalo
 COPY catalogs/filaments/catalog.generated.json ./catalogs/filaments/catalog.generated.json
 COPY catalogs/electricity/catalog.generated.json ./catalogs/electricity/catalog.generated.json
 COPY catalogs/equipment/catalog.json catalogs/equipment/images.json ./catalogs/equipment/
-COPY catalogs/parts/catalog.json ./catalogs/parts/catalog.json
-COPY catalogs/supplies/catalog.json ./catalogs/supplies/catalog.json
+COPY catalogs/parts/catalog.json catalogs/parts/images.json ./catalogs/parts/
+COPY catalogs/supplies/catalog.json catalogs/supplies/images.json ./catalogs/supplies/
 COPY scripts/checkBuiltAssets.ts scripts/posthogSourceMaps.ts scripts/previewModels.ts scripts/seedPreview.ts ./scripts/
 COPY tsconfig.json vite.config.ts ./
 ARG VITE_POSTHOG_PROJECT_TOKEN VITE_POSTHOG_HOST POSTHOG_UPLOAD_SOURCEMAPS POSTHOG_CLI_PROJECT_ID POSTHOG_CLI_HOST

@@ -177,6 +177,10 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   // A supply comes from the catalogue too, priced by the litre as it is used.
   await page.getByRole('button', { name: 'Add supply' }).click()
   const supplyPicker = page.getByRole('dialog', { name: 'Add supply' })
+  // A branded supply shows its maker's product photo, as catalogue resins and wear parts do.
+  await supplyPicker.getByRole('textbox', { name: 'Search by brand, name, or type' }).fill('Glue Stick')
+  const supplyPhoto = supplyPicker.getByRole('button', { name: 'Add Glue Stick', exact: true }).locator('img')
+  await expect.poll(() => supplyPhoto.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth)).toBeGreaterThan(0)
   await supplyPicker.getByRole('textbox', { name: 'Search by brand, name, or type' }).fill('IPA')
   await screenshot(page, 'supply-picker')
   await supplyPicker.getByRole('button', { name: 'Add Isopropyl alcohol (IPA)' }).click()

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { checkCatalogImages } from './catalogImages'
 import { PART_CATEGORIES, type PartPreset } from '../src/core/partPresets'
 import { isHttps, listPriceProblem } from './catalogChecks'
 
@@ -57,4 +58,10 @@ for (const preset of catalog.presets) {
   if (!isHttps(preset.source.url)) fail(preset, 'invalid source URL')
 }
 if (!catalog.presets.length) throw new Error('Part catalog is empty')
-console.log(`Validated ${catalog.presets.length} wear part presets.`)
+const images = checkCatalogImages({
+  imagesPath: path.join(root, 'catalogs/parts/images.json'),
+  publicRoot: path.join(root, 'public'),
+  directory: 'part-presets',
+  presetIds: new Set(catalog.presets.map((preset) => preset.id)),
+})
+console.log(`Validated ${catalog.presets.length} wear part presets and ${images} images.`)

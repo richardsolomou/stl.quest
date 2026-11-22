@@ -200,24 +200,31 @@ type Catalogues = {
   resins: ResinPreset[]
   supplies: SupplyPreset[]
 }
+/** Gives each preset the product photo its catalogue's `images.json` records for it. */
+function withImages<Preset extends { id: string }>(presets: Preset[], images: { presetId: string; src: string }[]) {
+  const sources = new Map(images.map(({ presetId, src }) => [presetId, src]))
+  return presets.map((preset) => {
+    const src = sources.get(preset.id)
+    return src ? { ...preset, image: { src } } : preset
+  })
+}
 // Each catalogue is its own chunk, fetched the first time something shows it, so pages that never do stay small.
 const catalogues: { [Name in keyof Catalogues]: () => Promise<Catalogues[Name]> } = {
   electricity: () => import('../../catalogs/electricity/catalog.generated.json').then(({ default: catalogue }) => catalogue.presets),
   filaments: () =>
     import('../../catalogs/filaments/catalog.generated.json').then(({ default: catalogue }) => catalogue.presets as FilamentPreset[]),
-  parts: () => import('../../catalogs/parts/catalog.json').then(({ default: catalogue }) => catalogue.presets as PartPreset[]),
-  resins: async () => {
-    const [{ default: catalogue }, { default: images }] = await Promise.all([
-      import('../../catalogs/resins/catalog.generated.json'),
-      import('../../catalogs/resins/images.json'),
-    ])
-    const sources = new Map(images.images.map(({ presetId, src }) => [presetId, src]))
-    return catalogue.presets.map((preset): ResinPreset => {
-      const src = sources.get(preset.id)
-      return src ? { ...preset, image: { src } } : preset
-    })
-  },
-  supplies: () => import('../../catalogs/supplies/catalog.json').then(({ default: catalogue }) => catalogue.presets as SupplyPreset[]),
+  parts: () =>
+    Promise.all([import('../../catalogs/parts/catalog.json'), import('../../catalogs/parts/images.json')]).then(
+      ([{ default: catalogue }, { default: images }]) => withImages(catalogue.presets as PartPreset[], images.images),
+    ),
+  resins: () =>
+    Promise.all([import('../../catalogs/resins/catalog.generated.json'), import('../../catalogs/resins/images.json')]).then(
+      ([{ default: catalogue }, { default: images }]) => withImages(catalogue.presets as ResinPreset[], images.images),
+    ),
+  supplies: () =>
+    Promise.all([import('../../catalogs/supplies/catalog.json'), import('../../catalogs/supplies/images.json')]).then(
+      ([{ default: catalogue }, { default: images }]) => withImages(catalogue.presets as SupplyPreset[], images.images),
+    ),
 }
 export const catalogueQuery = <Name extends keyof Catalogues>(name: Name) =>
   queryOptions({ queryKey: ['catalogue', name], queryFn: (): Promise<Catalogues[Name]> => catalogues[name](), staleTime: Infinity })

@@ -27,6 +27,12 @@ Each `lifespanSource` records its `basis`:
 
 Manufacturers mostly replace wear parts on condition rather than on a schedule, so every lifespan is a planning figure that users can override.
 
+## Images
+
+`images.json` records the manufacturer's product image for each part that has one: the store page it came from, the exact image URL, and the date it was checked. Images come from the same store page as the part's list price where it shows the part alone, without sale badges or marketing overlays; where only a near match exists, the image's `note` says how it differs. They are resized to fit 256 pixels, converted to WebP, and committed under `public/part-presets/`, so the application reads only local files. A part without one shows the printer it fits.
+
+To add an image, add its `presetId`, `sourcePageUrl`, and `sourceUrl` to `images.json` and run `tsx scripts/updateCatalogImages.ts`, which downloads only images without a committed file; remove an image's `checkedAt` to replace it, or run `pnpm catalog:update-images` to download all of them again. A refresh keeps the committed file of any image whose source fails and lists it. `pnpm catalog:check` verifies that every image belongs to a catalogue entry, cites HTTPS sources, and has its committed file.
+
 ## Coverage gaps
 
 These were not catalogued because no reliable manufacturer price or lifespan basis was found on the checked date:

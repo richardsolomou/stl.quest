@@ -231,6 +231,7 @@ export function PartPicker({
             aria-label={copy.addPreset(option.preset.name)}
             onClick={() => choose(() => onSelect(option))}
           >
+            <ConsumableIcon consumable={{ kind: 'part' }} image={option.preset.image} className="size-14" />
             <span className="min-w-0 flex-1">
               <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
                 <span className="min-w-0 font-medium [overflow-wrap:anywhere]">{option.preset.name}</span>
@@ -344,6 +345,7 @@ export function SupplyPicker({
             aria-label={copy.addPreset(preset.name)}
             onClick={() => choose(() => onSelect(preset))}
           >
+            <ConsumableIcon consumable={{ kind: 'supply' }} image={preset.image} className="size-14" />
             <span className="min-w-0 flex-1">
               <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
                 <span className="min-w-0 font-medium [overflow-wrap:anywhere]">{preset.name}</span>

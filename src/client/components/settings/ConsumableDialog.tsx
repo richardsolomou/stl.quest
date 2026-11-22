@@ -500,7 +500,11 @@ function PartProduct({ part, printers }: { part: PartConsumable; printers: Print
         {copy.dialog.part}
       </h3>
       <div className="flex items-center gap-3 rounded-lg border bg-muted/20 p-2.5">
-        <PrinterPresetImage printer={printer ?? { printType: part.printType }} className="size-12 rounded-md border bg-muted/40" />
+        {preset?.image ? (
+          <ConsumableIcon consumable={part} image={preset.image} className="size-12" />
+        ) : (
+          <PrinterPresetImage printer={printer ?? { printType: part.printType }} className="size-12 rounded-md border bg-muted/40" />
+        )}
         <div className="min-w-0 flex-1">
           <p className="font-medium [overflow-wrap:anywhere]">{preset ? part.name : copy.picker.custom.part}</p>
           <p className="text-xs leading-relaxed text-muted-foreground">
