@@ -16,6 +16,7 @@ import type { PrinterProfile } from '../../core/types'
 import type { UsageEvent } from '../../core/usage'
 import { dataMigrations, runMigrations } from '.'
 import { inventoryTablesMigration } from './0002InventoryTables'
+import { detachRebalancedPrintsMigration } from './0005DetachRebalancedPrints'
 import type { DataMigration, MigrationLog } from './types'
 
 const silent = (): MigrationLog => ({ info: vi.fn(), warn: vi.fn() })
@@ -311,7 +312,13 @@ describe.each(backends)('upgrading stored inventory (%s)', (dialect) => {
       applied: (await backend.database.select({ id: applied.id }).from(applied).all()).map(({ id }) => id),
       printers: await (await repository.scoped('farm')).listInventory('printers'),
     }).toEqual({
-      applied: ['0001_legacy_costing', '0002_inventory_tables', '0003_markup_percent', '0004_request_numbers'],
+      applied: [
+        '0001_legacy_costing',
+        '0002_inventory_tables',
+        '0003_markup_percent',
+        '0004_request_numbers',
+        '0005_detach_rebalanced_prints',
+      ],
       printers: [resin],
     })
   })
@@ -409,6 +416,86 @@ describe.each(backends)('upgrading stored inventory (%s)', (dialect) => {
         { purchasePrice: 400, lifespanHours: 1_000 },
       ],
       materials: ['legacy-resin-saturn', 'grey', 'legacy-resin'],
+    })
+  })
+
+  describe('detaching rebalanced past prints', () => {
+    const studio: PrinterProfile = { id: 'studio', name: 'Studio', printType: 'resin' }
+
+    /** A workspace that has had both resin printers, with one past print, its estimated printing on `studio`. */
+    async function rebalanced(options: { archived?: boolean; automatic?: boolean; printers?: PrinterProfile[] } = {}) {
+      await released()
+      const workspace = await upgrade()
+      await workspace.changeInventory('printers', () => options.printers ?? [resin, studio])
+      const id = await workspace.createRequest({
+        name: 'Past print',
+        fileName: 'past.stl',
+        filePath: 'past.stl',
+        quantity: 1,
+        ownerUserId: 'maker',
+        printerId: 'studio',
+        automaticPrinterAssignment: options.automatic ?? true,
+      })
+      if (options.archived ?? true) {
+        await backend.database.run(sql`UPDATE requests SET archived_at = 10 WHERE id = ${id}`)
+      }
+      await workspace.appendUsageEvents([
+        {
+          id: 'estimate',
+          transactionId: 'fill',
+          stage: 'printing',
+          kind: 'use',
+          requestId: id,
+          printerId: 'studio',
+          amount: 120,
+          unit: 'minute',
+          estimated: true,
+          createdAt: 10,
+        },
+      ])
+      await backend.database.transaction(async (tx) => await detachRebalancedPrintsMigration.run(tx, silent()))
+      return { workspace, id }
+    }
+
+    async function estimatePrinter() {
+      const rows = await backend.database.all<{ printer_id: string | null }>(sql`SELECT printer_id FROM usage_events WHERE id = 'estimate'`)
+      return rows[0]?.printer_id ?? null
+    }
+
+    it('detaches an archived automatic print from the printer rebalancing gave it', async () => {
+      const { workspace, id } = await rebalanced()
+
+      expect(await workspace.getRequest(id)).toMatchObject({ printerId: undefined, requestedPrintType: 'resin' })
+    })
+
+    it('detaches its estimated usage from that printer', async () => {
+      await rebalanced()
+
+      expect(await estimatePrinter()).toBeNull()
+    })
+
+    it('keeps a print someone assigned by hand on its printer', async () => {
+      const { workspace, id } = await rebalanced({ automatic: false })
+
+      expect((await workspace.getRequest(id))?.printerId).toBe('studio')
+    })
+
+    it('keeps a print still to be printed on its printer', async () => {
+      const { workspace, id } = await rebalanced({ archived: false })
+
+      expect((await workspace.getRequest(id))?.printerId).toBe('studio')
+    })
+
+    it('keeps a past print on the only printer of its type it could have used', async () => {
+      await rebalanced({ printers: [{ ...resin, archived: true }, studio] })
+
+      expect(await estimatePrinter()).toBe('studio')
+    })
+
+    it('keeps a past print on an archived printer, which rebalancing never moved prints off', async () => {
+      await rebalanced({ printers: [resin, { ...studio, archived: true }, { id: 'third', name: 'Third', printType: 'resin' }] })
+
+      expect(await estimatePrinter()).toBe('studio')
     })
   })
 })
