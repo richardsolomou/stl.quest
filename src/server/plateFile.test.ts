@@ -199,7 +199,8 @@ describe('PlateFiles', () => {
     opened.push(plates)
     for (let copies = 1; copies <= MAX_CACHED_PLATES + 2; copies++)
       await new Response((await plates.open('plate', [{ ...models[1], copies }])).stream).arrayBuffer()
-    expect((await plateDirectories()).filter((name) => !before.includes(name))).toHaveLength(MAX_CACHED_PLATES)
+    // Eviction removes the oldest file in the background, so the count settles shortly after the last open.
+    await expect.poll(async () => (await plateDirectories()).filter((name) => !before.includes(name))).toHaveLength(MAX_CACHED_PLATES)
   })
 
   it('does not hold up the next plate while a download is paused', async () => {
