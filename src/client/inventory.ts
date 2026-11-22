@@ -1,8 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
+import type { Consumable } from '../core/consumables'
 import type { InventoryItems, InventoryKind } from '../core/inventory'
-import { createInventoryItem, deleteInventoryItem, setInventoryItemArchived, updateInventoryItem } from '../server/fns'
+import { createConsumables, createInventoryItem, deleteInventoryItem, setInventoryItemArchived, shareFilamentPrice, updateInventoryItem } from '../server/fns'
 import { consumablesQuery, equipmentQuery, printersQuery } from './queries'
+import { invalidateQueries } from './queryState'
 import { useWorkspaceSlug } from './workspace'
 
 const queries = { printers: printersQuery, equipment: equipmentQuery, consumables: consumablesQuery }
@@ -46,4 +48,30 @@ export function useInventory<Kind extends InventoryKind>(kind: Kind) {
     setArchived: async (id: string, archived: boolean) => void (await mutation.mutateAsync({ id, archived })),
     remove: async (id: string) => void (await deletion.mutateAsync(id)),
   }
+}
+
+/**
+ * Changes to several consumables at once, each under one server lock: adding the colours of one filament, counted at
+ * one amount on hand (in the consumable's own unit) while stock is tracked, or giving one filament's price to the other
+ * colours of its product.
+ */
+export function useConsumableBatch() {
+  const workspaceSlug = useWorkspaceSlug()
+  const queryClient = useQueryClient()
+  const create = useServerFn(createConsumables)
+  const share = useServerFn(shareFilamentPrice)
+  const store = ({ items }: { items: Consumable[] }) =>
+    queryClient.setQueryData(consumablesQuery(workspaceSlug).queryKey, { consumables: items })
+  const add = useMutation({
+    mutationFn: ({ items, onHand }: { items: Consumable[]; onHand?: number }) => create({ data: { workspaceSlug, items, onHand } }),
+    onSuccess: async (result, { onHand }) => {
+      store(result)
+      if (onHand !== undefined) await invalidateQueries(queryClient, 'stock', 'usage')
+    },
+  })
+  const sharePrice = useMutation({
+    mutationFn: (consumableId: string) => share({ data: { workspaceSlug, consumableId } }),
+    onSuccess: store,
+  })
+  return { add, sharePrice }
 }

@@ -1,11 +1,13 @@
 import { useRef, useState, type ReactNode, type Ref } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Replace, Search } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import {
   consumablePrice,
@@ -21,7 +23,14 @@ import {
   type PartConsumable,
   type ResinConsumable,
 } from '../../../core/consumables'
-import { filamentConsumableName, type FilamentPreset } from '../../../core/filamentPresets'
+import {
+  filamentConsumableName,
+  filamentsInColours,
+  sameFilamentColour,
+  sameFilamentProduct,
+  stockedColours,
+  type FilamentPreset,
+} from '../../../core/filamentPresets'
 import { partPresetUnitPrice } from '../../../core/partPresets'
 import { findPreset } from '../../../core/presets'
 import { getPrinterPreset } from '../../../core/printerPresets'
@@ -31,6 +40,7 @@ import type { Messages } from '../../../core/i18n'
 import type { PrinterProfile } from '../../../core/types'
 import type { StockLevel } from '../../../core/usage'
 import { useI18n } from '../../i18n'
+import { createId } from '../../id'
 import { matchesListSearch } from '../../listSearch'
 import { catalogueQuery } from '../../queries'
 import { useAutosave } from '../../useAutosave'
@@ -39,32 +49,40 @@ import { AutosaveStatus } from '../AutosaveStatus'
 import { ColourSwatch } from '../ColourSwatch'
 import { DialogShell } from '../DialogShell'
 import { formatNumber } from '../priceCalculator/format'
-import { StockPanel } from './ConsumableStock'
+import { StockPanel, useStockMovements } from './ConsumableStock'
 import { ConsumableIcon } from './ConsumableIcon'
 import { materialFacts, MaterialPicker } from './ConsumablePicker'
 import { PrinterPresetImage } from './PrinterPresetImage'
 
 // Past this many colours, scanning swatches by eye gets slow, so the picker offers a search.
 const SEARCHABLE_COLOURS = 24
+const NO_COLOURS: FilamentColour[] = []
 
 /**
  * Everything about one consumable, saved as it is edited. A catalogue product reads as text with Change, and only what
  * the user owns is a field; a new one is created once nothing it needs is missing, and its stock shows once it is.
+ * A new catalogue filament can pick several colours instead, which are added together with Add once complete, and a new
+ * item can say how much is on hand, which is counted when the dialog closes.
  */
 export function ConsumableDialog({
   consumable,
   isNew,
+  library,
   workspaceSlug,
   level,
   printers,
   symbol,
   rate,
   onSave,
+  onAddColours,
+  onSharePrice,
   onArchive,
   onClose,
 }: {
   consumable: Consumable
   isNew: boolean
+  /** The stored consumables, for the other colours of the same filament. */
+  library: Consumable[]
   workspaceSlug: string
   level?: StockLevel
   printers: PrinterProfile[]
@@ -72,6 +90,10 @@ export function ConsumableDialog({
   /** Formats a per-plate or per-hour cost. */
   rate: (value: number) => string
   onSave: (consumable: Consumable) => Promise<void>
+  /** Adds the colours of one catalogue filament at once, each counted at `onHand` in grams while stock is tracked. */
+  onAddColours: (filaments: FilamentConsumable[], onHand?: number) => Promise<void>
+  /** Gives a stored filament's price to the other colours of its product. */
+  onSharePrice: (id: string) => Promise<void>
   onArchive: () => void
   onClose: () => void
 }) {
@@ -79,14 +101,6 @@ export function ConsumableDialog({
   const copy = t.settings.consumables
   const tracking = useUsageTracking()
   const [draft, setDraft] = useState(consumable)
-  const missing = missingConsumableFields(draft)
-  const autosave = useAutosave({ value: draft, valid: missing.length === 0, save: onSave })
-  const close = async () => {
-    if (await autosave.flush()) onClose()
-  }
-  const archive = async () => {
-    if (await autosave.flush()) onArchive()
-  }
   const resins = useQuery({ ...catalogueQuery('resins'), enabled: draft.kind === 'resin' }).data
   const filaments = useQuery({ ...catalogueQuery('filaments'), enabled: draft.kind === 'filament' }).data
   const parts = useQuery({ ...catalogueQuery('parts'), enabled: draft.kind === 'part' }).data
@@ -98,6 +112,63 @@ export function ConsumableDialog({
         : draft.kind === 'part'
           ? findPreset(parts, draft.partPresetId)
           : undefined
+  // Until a new catalogue filament is stored, its swatches pick several colours; the picks belong to the product shown.
+  const filamentPreset = draft.kind === 'filament' ? findPreset(filaments, draft.filamentPresetId) : undefined
+  const picksSeveral = isNew && Boolean(filamentPreset?.colors?.length)
+  const [picked, setPicked] = useState<{ presetId?: string; colours: FilamentColour[] }>({ colours: [] })
+  const colours = picksSeveral && picked.presetId === filamentPreset?.id ? picked.colours : []
+  const several = colours.length > 1
+  const missing = [...(picksSeveral && colours.length === 0 ? (['colour'] as const) : []), ...missingConsumableFields(draft)]
+  // Stock entered while creating an item is counted once it is stored, when the dialog closes.
+  const [openedNew] = useState(isNew)
+  const [onHand, setOnHand] = useState<number>()
+  const stored = useRef(false)
+  const { movement } = useStockMovements(workspaceSlug)
+  const save = async (item: Consumable) => {
+    await onSave(item)
+    stored.current = true
+  }
+  const autosave = useAutosave({ value: draft, valid: missing.length === 0 && !several, save })
+  const [adding, setAdding] = useState(false)
+  const addColours = async () => {
+    if (draft.kind !== 'filament' || !filamentPreset || missing.length) return
+    setAdding(true)
+    try {
+      await onAddColours(filamentsInColours(draft, filamentPreset, colours, createId), tracking ? onHand : undefined)
+      toast(copy.filaments.addedColours(colours.length, `${filamentPreset.brand} ${filamentPreset.name}`))
+      onClose()
+    } catch {
+      toast.error(copy.notSaved)
+      setAdding(false)
+    }
+  }
+  const close = async () => {
+    if (several) {
+      if (missing.length) onClose()
+      else await addColours()
+      return
+    }
+    if (!(await autosave.flush())) return
+    if (tracking && onHand !== undefined && stored.current) {
+      await movement.mutateAsync({ consumableId: draft.id, kind: 'correction', counted: onHand }).catch(() => toast.error(copy.stock.error))
+    }
+    onClose()
+  }
+  const archive = async () => {
+    if (await autosave.flush()) onArchive()
+  }
+  const siblings = draft.kind === 'filament' && !isNew ? sameFilamentProduct(library, draft) : []
+  const differing = draft.kind === 'filament' ? siblings.filter(({ pricePerKg }) => pricePerKg !== draft.pricePerKg).length : 0
+  const [sharing, setSharing] = useState(false)
+  const sharePrice = async () => {
+    if (!(await autosave.flush())) return
+    setSharing(true)
+    await onSharePrice(draft.id).then(
+      () => toast(copy.filaments.sharedPrice(differing)),
+      () => toast.error(copy.notSaved),
+    )
+    setSharing(false)
+  }
   // A new item opens on what it needs first: its name when it is the user's own, else its price, unless a catalogue
   // filament's colour is still to be picked. An existing one opens without raising a phone's keyboard.
   const nameField = useRef<HTMLInputElement>(null)
@@ -109,7 +180,11 @@ export function ConsumableDialog({
   return (
     <DialogShell
       onClose={() => void close()}
-      title={draft.name.trim() || copy.dialog.newTitle[draft.kind]}
+      title={
+        several && filamentPreset
+          ? `${filamentConsumableName(filamentPreset)} · ${copy.filaments.colourCount(colours.length)}`
+          : draft.name.trim() || copy.dialog.newTitle[draft.kind]
+      }
       status={
         missing.length ? (
           <span className="text-right text-xs text-muted-foreground">{copy.dialog.needs(needs)}</span>
@@ -132,9 +207,15 @@ export function ConsumableDialog({
               {copy.archive}
             </Button>
           )}
-          <Button type="button" onClick={() => void close()}>
-            {t.common.done}
-          </Button>
+          {several ? (
+            <Button type="button" disabled={missing.length > 0 || adding} onClick={() => void addColours()}>
+              {adding && <Spinner />} {copy.filaments.addColours(colours.length)}
+            </Button>
+          ) : (
+            <Button type="button" onClick={() => void close()}>
+              {t.common.done}
+            </Button>
+          )}
         </>
       }
     >
@@ -153,9 +234,23 @@ export function ConsumableDialog({
           />
         </Field>
       )}
-      {draft.kind === 'filament' && (
-        <FilamentColourField filament={draft} onChange={setDraft} onPicked={() => priceField.current?.focus()} />
-      )}
+      {draft.kind === 'filament' &&
+        (picksSeveral && filamentPreset ? (
+          <ColourField
+            key={filamentPreset.id}
+            preset={filamentPreset}
+            selected={colours}
+            stocked={stockedColours(library, filamentPreset.id)}
+            multiple
+            onChange={(next) => {
+              setPicked({ presetId: filamentPreset.id, colours: next })
+              const colour = next.length === 1 ? next[0] : undefined
+              setDraft({ ...draft, colour, name: filamentConsumableName(filamentPreset, colour) })
+            }}
+          />
+        ) : (
+          <FilamentColourField filament={draft} onChange={setDraft} onPicked={() => priceField.current?.focus()} />
+        ))}
       <div className="grid gap-5 sm:grid-cols-2">
         {draft.kind === 'supply' && (
           <UnitField
@@ -175,7 +270,22 @@ export function ConsumableDialog({
           value={consumablePrice(draft)}
           min={draft.kind === 'resin' || draft.kind === 'filament' ? 0.01 : 0}
           description={
-            draft.kind === 'part' && draft.partPresetId ? <ListPriceHint partPresetId={draft.partPresetId} /> : copy.dialog.priceHint
+            draft.kind === 'part' && draft.partPresetId ? (
+              <ListPriceHint partPresetId={draft.partPresetId} />
+            ) : differing > 0 && missing.length === 0 ? (
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                className="h-auto px-0 text-left whitespace-normal"
+                disabled={sharing}
+                onClick={() => void sharePrice()}
+              >
+                {copy.filaments.sharePrice(differing)}
+              </Button>
+            ) : (
+              copy.dialog.priceHint
+            )
           }
           onChange={(price) => setDraft(withConsumablePrice(draft, price))}
         />
@@ -192,9 +302,12 @@ export function ConsumableDialog({
         {draft.kind === 'part' && !draft.partPresetId && <CustomPartFields part={draft} rate={rate} onChange={setDraft} />}
       </div>
       <div className="grid gap-5 sm:grid-cols-2">
+        {openedNew && tracking && draft.kind !== 'part' && (
+          <OnHandField consumable={draft} each={several} value={onHand} onChange={setOnHand} />
+        )}
         <StockFields consumable={draft} tracking={tracking} onChange={setDraft} />
       </div>
-      {!isNew && tracking && <StockPanel workspaceSlug={workspaceSlug} consumable={draft} level={level} printers={printers} />}
+      {!openedNew && tracking && <StockPanel workspaceSlug={workspaceSlug} consumable={draft} level={level} printers={printers} />}
     </DialogShell>
   )
 }
@@ -324,12 +437,12 @@ function FilamentColourField({
     <ColourField
       key={preset?.id}
       preset={preset}
-      colour={filament.colour}
+      selected={filament.colour ? [filament.colour] : []}
       onPicked={() => {
         setChanging(false)
         onPicked()
       }}
-      onChange={(next) => onChange({ ...filament, colour: next, name: preset ? filamentConsumableName(preset, next) : filament.name })}
+      onChange={([next]) => onChange({ ...filament, colour: next, name: preset ? filamentConsumableName(preset, next) : filament.name })}
     />
   )
 }
@@ -496,6 +609,43 @@ function ListPriceHint({ partPresetId }: { partPresetId?: string }) {
   )
 }
 
+/** How much of a new item is on hand, entered in litres, kilograms, or items and kept in its own unit; empty leaves stock untracked. */
+function OnHandField({
+  consumable,
+  each,
+  value,
+  onChange,
+}: {
+  consumable: Consumable
+  /** Whether the amount is for each of several colours being added. */
+  each: boolean
+  value?: number
+  onChange: (value?: number) => void
+}) {
+  const copy = useI18n().t.settings.consumables
+  const unit = consumableUnit(consumable)
+  const scale = enteredUnitScale(unit)
+  return (
+    <Field>
+      <FieldLabel htmlFor="consumable-on-hand">{(each ? copy.onHandEach : copy.onHand)(copy.stockUnits[unit])}</FieldLabel>
+      <Input
+        id="consumable-on-hand"
+        type="number"
+        inputMode="decimal"
+        min={0}
+        step="any"
+        className="tabular-nums"
+        value={value === undefined ? '' : Math.round((value / scale) * 1_000) / 1_000}
+        onChange={(event) => {
+          const entered = event.target.valueAsNumber
+          onChange(Number.isFinite(entered) && entered > 0 ? entered * scale : undefined)
+        }}
+      />
+      <FieldDescription>{each ? copy.onHandEachHint : copy.onHandHint}</FieldDescription>
+    </Field>
+  )
+}
+
 /**
  * How much one pack holds, which quotes price a pack from, and while stock is tracked how little may be left before it
  * counts as running low. Both are entered in litres, kilograms, or items and kept in the consumable's own unit.
@@ -547,34 +697,49 @@ function StockFields<Item extends Consumable>({
   )
 }
 
-/** The catalogue's colours for the product as swatches, or a named colour of one's own when the catalogue has none or not this one. */
+/**
+ * The catalogue's colours for the product as swatches, or a named colour of one's own when the catalogue has none or
+ * not this one. With `multiple`, swatches toggle so several colours can be added at once, and colours the library has
+ * already are dimmed and left out of All colours.
+ */
 function ColourField({
   preset,
-  colour,
+  selected,
+  stocked = NO_COLOURS,
+  multiple = false,
   onPicked,
   onChange,
 }: {
   preset?: FilamentPreset
-  colour?: FilamentColour
-  /** Called when a catalogue swatch is chosen, which settles the colour. */
+  selected: FilamentColour[]
+  stocked?: FilamentColour[]
+  multiple?: boolean
+  /** Called when a single catalogue swatch is chosen, which settles the colour. */
   onPicked?: () => void
-  onChange: (colour?: FilamentColour) => void
+  onChange: (colours: FilamentColour[]) => void
 }) {
   const { t, locale } = useI18n()
   const copy = t.settings.consumables.filaments
   const swatches = (preset?.colors ?? []).map((option) => ({ hex: option.hex, name: option.names[locale] ?? option.names.en }))
+  const colour = selected.length === 1 ? selected[0] : undefined
   const sameHex = (swatch: FilamentColour) => colour !== undefined && swatch.hex.toLowerCase() === colour.hex.toLowerCase()
   const matched = swatches.find((swatch) => sameHex(swatch) && swatch.name === colour?.name) ?? swatches.find(sameHex)
   const [other, setOther] = useState(Boolean(colour && !matched))
   const [hex, setHex] = useState(colour?.hex ?? '#808080')
   const own = !swatches.length || other
   const [search, setSearch] = useState('')
-  const shown = swatches.filter((swatch) => swatch === matched || matchesListSearch(search, [swatch.name]))
+  const isSelected = (swatch: FilamentColour) =>
+    !other && (multiple ? selected.some((chosen) => sameFilamentColour(chosen, swatch)) : swatch === matched)
+  const isStocked = (swatch: FilamentColour) => stocked.some((had) => sameFilamentColour(had, swatch))
+  const shown = swatches.filter((swatch) => isSelected(swatch) || matchesListSearch(search, [swatch.name]))
+  const addable = swatches.filter((swatch) => !isStocked(swatch))
+  const allChosen = addable.length > 0 && addable.every(isSelected)
+  const summary = multiple && !other && selected.length > 1 ? copy.chosen(selected.length) : !other && matched?.name
   return (
     <FieldSet className="gap-2">
       <FieldLegend variant="label" className="mb-0">
         {copy.colour}
-        {matched && !other && <span className="font-normal text-muted-foreground"> · {matched.name}</span>}
+        {summary && <span className="font-normal text-muted-foreground"> · {summary}</span>}
       </FieldLegend>
       {swatches.length > SEARCHABLE_COLOURS && (
         <InputGroup className="max-w-60 bg-field">
@@ -593,28 +758,47 @@ function ColourField({
       {swatches.length > 0 && (
         <div className="flex flex-wrap items-center gap-0.5">
           {shown.map((swatch) => {
-            const selected = !other && swatch === matched
+            const chosen = isSelected(swatch)
+            const had = multiple && isStocked(swatch)
+            const label = had ? copy.inList(swatch.name) : swatch.name
             return (
               <button
                 key={`${swatch.hex}-${swatch.name}`}
                 type="button"
-                aria-label={swatch.name}
-                title={swatch.name}
-                aria-pressed={selected}
+                aria-label={label}
+                title={label}
+                aria-pressed={chosen}
                 className={cn(
                   'grid size-7 cursor-pointer place-items-center rounded-full border-2 border-transparent transition-colors hover:border-foreground/30',
-                  selected && 'border-foreground hover:border-foreground',
+                  chosen && 'border-foreground hover:border-foreground',
+                  had && !chosen && 'opacity-35',
                 )}
                 onClick={() => {
                   setOther(false)
-                  onChange(selected ? undefined : swatch)
-                  if (!selected) onPicked?.()
+                  if (multiple) {
+                    onChange(chosen ? selected.filter((item) => !sameFilamentColour(item, swatch)) : [...(other ? [] : selected), swatch])
+                    return
+                  }
+                  onChange(chosen ? [] : [swatch])
+                  if (!chosen) onPicked?.()
                 }}
               >
                 <ColourSwatch hex={swatch.hex} className="size-5" />
               </button>
             )
           })}
+          {multiple && addable.length > 1 && (
+            <button
+              type="button"
+              className="ml-1 inline-flex h-7 cursor-pointer items-center rounded-full border bg-background px-2.5 text-xs transition-colors hover:border-foreground/40"
+              onClick={() => {
+                setOther(false)
+                onChange(allChosen ? [] : addable)
+              }}
+            >
+              {allChosen ? copy.noColours : copy.allColours}
+            </button>
+          )}
           <button
             type="button"
             aria-pressed={other}
@@ -625,14 +809,12 @@ function ColourField({
             onClick={() => {
               if (other) {
                 setOther(false)
-                onChange(undefined)
+                onChange([])
                 return
               }
               setOther(true)
-              if (matched) {
-                setHex(matched.hex)
-                onChange(undefined)
-              }
+              if (matched) setHex(matched.hex)
+              onChange([])
             }}
           >
             {copy.otherColour}
@@ -648,7 +830,7 @@ function ColourField({
             value={colour?.hex ?? hex}
             onChange={(event) => {
               setHex(event.target.value)
-              if (colour) onChange({ ...colour, hex: event.target.value })
+              if (colour) onChange([{ ...colour, hex: event.target.value }])
             }}
           />
           <Input
@@ -656,11 +838,12 @@ function ColourField({
             placeholder={copy.colourName}
             value={colour?.name ?? ''}
             maxLength={60}
-            onChange={(event) => onChange(event.target.value.trim() ? { name: event.target.value, hex: colour?.hex ?? hex } : undefined)}
+            onChange={(event) => onChange(event.target.value.trim() ? [{ name: event.target.value, hex: colour?.hex ?? hex }] : [])}
           />
         </div>
       )}
       {!swatches.length && <FieldDescription>{copy.colourHint}</FieldDescription>}
+      {multiple && !own && <FieldDescription>{copy.pickSeveral}</FieldDescription>}
     </FieldSet>
   )
 }

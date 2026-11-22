@@ -115,9 +115,11 @@ import {
   updatePrintGroupSchema,
   updatePrintCopyTagsSchema,
   reorderPrintGroupItemSchema,
+  createConsumablesSchema,
   inventoryArchiveSchema,
   inventoryItemRefSchema,
   inventoryItemSchema,
+  shareFilamentPriceSchema,
   reorderRequestSchema,
   requestFiltersSchema,
   repeatRequestSchema,
@@ -462,6 +464,22 @@ export const deleteInventoryItem = createServerFn({ method: 'POST' })
   .handler(async ({ data: { workspaceSlug, inventory, id } }) =>
     workspaceMutation(workspaceSlug, async (context) => ({
       items: await context.service.deleteInventoryItem(inventory, id, context.identity),
+    })),
+  )
+
+export const createConsumables = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(createConsumablesSchema))
+  .handler(async ({ data: { workspaceSlug, items, onHand } }) =>
+    workspaceMutation(workspaceSlug, async (context) => ({
+      items: await context.service.createConsumables(items, onHand, context.identity),
+    })),
+  )
+
+export const shareFilamentPrice = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(shareFilamentPriceSchema))
+  .handler(async ({ data: { workspaceSlug, consumableId } }) =>
+    workspaceMutation(workspaceSlug, async (context) => ({
+      items: await context.service.shareFilamentPrice(consumableId, context.identity),
     })),
   )
 
