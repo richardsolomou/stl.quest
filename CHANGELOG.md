@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.11.1
+
+### Patch Changes
+
+- 7d23d36: Build invite links, notification email links, and the return from connecting cloud storage from the public address, and secure the invite sign-in cookie, so that they keep https behind a TLS proxy.
+- 610d302: Match Bambu Lab order emails from the German, French, and other EU stores by each colour's code, so that translated colour names such as "Jade-Weiß" restock the right filament instead of coming up unmatched.
+
 ## 2.11.0
 
 ### Minor Changes
