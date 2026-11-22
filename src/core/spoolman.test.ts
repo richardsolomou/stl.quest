@@ -44,6 +44,7 @@ const catalogue: SpoolmanCatalogue = {
     'filament-bambu-lab-pla': ['Bambu Lab', 'PLA', 'PLA Basic'],
     'filament-bambu-lab-matte-pla': ['Bambu Lab', 'PLA', 'Matte PLA'],
     'filament-bambu-lab-silk-pla': ['Bambu Lab', 'PLA', 'Silk+ PLA'],
+    'filament-acme-pla': ['Acme', 'PLA', 'PLA'],
   },
 }
 
@@ -129,8 +130,19 @@ describe('matchSpoolmanFilaments', () => {
       expect(match([typed('bambu-lab matte pla, CHARCOAL')], [basic, matte])?.consumableId).toBe('matte')
     })
 
-    it('matches a name that gives only the colour when one candidate has it', () => {
-      expect(match([typed('Charcoal')], [basic, matte])?.consumableId).toBe('matte')
+    it('needs the product in a name when the brand and material have several products', () => {
+      expect(match([typed('Charcoal')], [basic, matte])).toBeUndefined()
+    })
+
+    it('matches a name that gives only the colour when the brand and material have one product', () => {
+      const acme = (id: string, colour: string) =>
+        filament({ id, filamentPresetId: 'filament-acme-pla', colour: { name: colour, hex: '#000000' } })
+      expect(match([typed('Jet', { vendor: 'Acme' })], [acme('black', 'Black'), acme('jet', 'Jet')])?.consumableId).toBe('jet')
+    })
+
+    it('needs the product in a name without a colour hex, even when the brand and material have one product', () => {
+      const acme = filament({ id: 'acme', filamentPresetId: 'filament-acme-pla' })
+      expect(match([typed('Black', { vendor: 'Acme', colourHex: undefined })], [acme])).toBeUndefined()
     })
 
     it('leaves a name that fits two candidates unmatched', () => {
@@ -162,6 +174,80 @@ describe('matchSpoolmanFilaments', () => {
     it('keeps matching by colour when only one candidate has it', () => {
       expect(match([typed('Something Else')], [basic])).toEqual({ consumableId: 'basic-black', by: 'colour' })
     })
+  })
+
+  describe('with the generated catalogue, for a filament typed without a colour hex', () => {
+    const library = (...entries: [id: string, colour: string][]) =>
+      entries.map(([id, colour]) => filament({ id, name: id, filamentPresetId: id, colour: { name: colour, hex: '#123456' } }))
+    const typed = (consumables: Consumable[], vendor: string, material: string, filamentName: string) =>
+      matchSpoolmanFilaments(
+        spoolmanFilaments([spool({ externalId: undefined, colourHex: undefined, vendor, material, filamentName })]),
+        consumables,
+        [],
+        SPOOLMAN_CATALOGUE,
+      ).get(10)
+
+    it('leaves a bare colour unmatched when the brand and material have several products', () => {
+      expect(
+        typed(library(['filament-bambu-lab-tough-pla', 'Black'], ['filament-bambu-lab-pla', 'Jade White']), 'Bambu Lab', 'PLA', 'Black'),
+      ).toBeUndefined()
+    })
+
+    it('never reads PLA+ as PLA', () => {
+      expect(typed(library(['filament-esun-basic-pla', 'Black']), 'eSUN', 'PLA+', 'PLA+ Black')).toBeUndefined()
+    })
+
+    it('reads a partial brand in a colour name as part of the colour', () => {
+      expect(typed(library(['filament-bambu-lab-silk-pla', 'Green']), 'Bambu Lab', 'PLA', 'Bambu Green')).toBeUndefined()
+    })
+
+    it('reads a brand-named colour as a colour, not a brand and a colour', () => {
+      expect(typed(library(['filament-polymaker-panchroma-silk-pla', 'Teal']), 'Polymaker', 'PLA', 'Polymaker Teal')).toBeUndefined()
+    })
+
+    it('reads Inland Blue as a colour, not a brand and a colour', () => {
+      expect(typed(library(['filament-inland-tough-pla', 'Blue']), 'Inland', 'PLA', 'Inland Blue')).toBeUndefined()
+    })
+
+    it('keeps the order of the colour words', () => {
+      expect(
+        typed(library(['filament-novtau-thermochromic-pla', 'Green to Yellow']), 'NOVTAU', 'PLA', 'Thermochromic PLA Yellow to Green'),
+      ).toBeUndefined()
+    })
+
+    it('leaves a product word folded into a colour unmatched', () => {
+      expect(typed(library(['filament-novtau-wood-pla', 'Tone']), 'NOVTAU', 'PLA', 'Wood Tone')).toBeUndefined()
+    })
+
+    it('needs every colour word, not only the last', () => {
+      expect(typed(library(['filament-overture-easy-pla', 'White']), 'Overture', 'PLA', 'Easy PLA Rock White')).toBeUndefined()
+    })
+
+    it('tells Red Raspberry from Raspberry Red', () => {
+      expect(typed(library(['filament-inland-tough-pla', 'Raspberry Red']), 'Inland', 'PLA', 'Tough PLA Red Raspberry')).toBeUndefined()
+    })
+
+    it('matches a name that gives the product and colour in order', () => {
+      expect(
+        typed(
+          library(['filament-novtau-thermochromic-pla', 'Green to Yellow'], ['filament-novtau-wood-pla', 'Tone']),
+          'NOVTAU',
+          'PLA',
+          'NOVTAU Thermochromic PLA Green to Yellow',
+        )?.consumableId,
+      ).toBe('filament-novtau-thermochromic-pla')
+    })
+  })
+
+  it('never reads a PLA+ filament as PLA by colour', () => {
+    const esun = filament({ filamentPresetId: 'filament-esun-basic-pla' })
+    const found = matchSpoolmanFilaments(
+      spoolmanFilaments([spool({ externalId: undefined, vendor: 'eSUN', material: 'PLA+' })]),
+      [esun],
+      [],
+      SPOOLMAN_CATALOGUE,
+    )
+    expect(found.get(10)).toBeUndefined()
   })
 
   it('ignores archived library filaments', () => {

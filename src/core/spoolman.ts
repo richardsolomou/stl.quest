@@ -170,11 +170,23 @@ export function matchSpoolmanFilaments(
       matches.set(filament.id, { consumableId: byColour, by: 'colour' })
       continue
     }
+    const products = Object.entries(catalogue.presets).filter(
+      ([, [brand, material]]) => sameText(brand, filament.vendor) && sameText(material, filament.material),
+    )
+    const presetIds = new Set(products.map(([id]) => id))
+    const colourNames = new Set(
+      Object.values(catalogue.colours)
+        .filter(([presetId]) => presetIds.has(presetId))
+        .map(([, colour]) => words(colour).join(' ')),
+    )
     const byName =
       filament.name &&
       only(
         candidates.filter(({ filamentPresetId, colour }) =>
-          namesFilament(filament.name!, catalogue.presets[filamentPresetId!], colour?.name),
+          namesFilament(filament.name!, catalogue.presets[filamentPresetId!], colour?.name, {
+            bareColour: !!filament.colourHex && products.length === 1,
+            colourNames,
+          }),
         ),
       )
     if (byName) matches.set(filament.id, { consumableId: byName, by: 'name' })
@@ -182,21 +194,35 @@ export function matchSpoolmanFilaments(
   return matches
 }
 
+/** A name's words in order, lowercased, with "+" kept as part of a word so "PLA+" stays apart from "PLA". */
+const words = (value: string) => value.toLowerCase().match(/[\p{L}\p{N}+]+/gu) ?? []
+
 /**
  * Whether a name typed into Spoolman, such as "PLA Basic Black" or "Matte Charcoal", is this catalogue product in this
- * colour: it gives every word of the colour and nothing the product and colour don't, in any order, with or without
- * the brand and material.
+ * colour: after an optional leading brand and material, it is the product and colour in order, where the product may
+ * leave out its material words. A rest that is itself one of the brand's colours for the material ("Wood Tone") reads
+ * only as that colour, and a bare colour fits only when `bareColour` allows it.
  */
-function namesFilament(name: string, [brand, material, product]: readonly [string, string, string], colour: string | undefined) {
-  const words = (value: string) =>
-    value
-      .toLowerCase()
-      .split(/[^\p{L}\p{N}]+/u)
-      .filter(Boolean)
-  const colourWords = words(colour ?? '')
-  const known = new Set([...words(brand), ...words(material), ...words(product), ...colourWords])
-  const given = new Set(words(name))
-  return colourWords.length > 0 && colourWords.every((word) => given.has(word)) && [...given].every((word) => known.has(word))
+function namesFilament(
+  name: string,
+  [brand, material, product]: readonly [string, string, string],
+  colour: string | undefined,
+  { bareColour, colourNames }: { bareColour: boolean; colourNames: Set<string> },
+) {
+  const colourName = words(colour ?? '').join(' ')
+  if (!colourName) return false
+  const materialWords = new Set(words(material))
+  const productNames = [words(product), words(product).filter((word) => !materialWords.has(word))].filter((name) => name.length > 0)
+  const given = words(name).join(' ')
+  return ['', brand, material, `${brand} ${material}`]
+    .map((prefix) => words(prefix).join(' '))
+    .filter((prefix) => !prefix || given.startsWith(`${prefix} `))
+    .map((prefix) => (prefix ? given.slice(prefix.length + 1) : given))
+    .some(
+      (rest) =>
+        (bareColour && rest === colourName) ||
+        (!colourNames.has(rest) && productNames.some((productName) => rest === `${productName.join(' ')} ${colourName}`)),
+    )
 }
 
 /** Stock per library filament from the Spoolman filaments matched to it. */
@@ -211,8 +237,8 @@ export function spoolmanStock(filaments: SpoolmanFilament[], matches: Map<number
   return stock
 }
 
-/** Whether two names read the same, ignoring case, spaces, and punctuation. */
+/** Whether two names read the same, ignoring case, spaces, and punctuation other than "+", so "PLA+" is not "PLA". */
 export function sameText(left: string | undefined, right: string | undefined) {
-  const normalize = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')
+  const normalize = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}+]/gu, '')
   return left !== undefined && right !== undefined && normalize(left) === normalize(right)
 }

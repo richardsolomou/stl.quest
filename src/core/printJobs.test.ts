@@ -115,6 +115,12 @@ describe('printFilaments', () => {
     expect(printFilaments({ grams: 3, filamentDetails: 'Ext TPU: 3.0g' }, [pla, petg], materialOf)).toEqual([{ filament: pla, grams: 3 }])
   })
 
+  it('keeps a PLA+ tray off a PLA filament', () => {
+    expect(printFilaments({ grams: 4, filamentDetails: 'AMS-A T1 PLA+: 4.0g' }, [petg, pla], materialOf)).toEqual([
+      { filament: petg, grams: 4 },
+    ])
+  })
+
   it('adds trays of the same filament together', () => {
     expect(printFilaments({ filamentDetails: 'AMS-A T1 PLA: 2.0g | AMS-A T2 PLA: 3.0g' }, [pla, petg], materialOf)).toEqual([
       { filament: pla, grams: 5 },
