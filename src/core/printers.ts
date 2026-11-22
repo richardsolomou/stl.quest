@@ -118,14 +118,9 @@ export function automaticallyAssignedPrinter(
   const knownAreas = candidates.map(printerArea).filter((area): area is number => area !== undefined)
   const fallbackArea = knownAreas.length ? knownAreas.reduce((sum, area) => sum + area, 0) / knownAreas.length : 1
   const workloads = new Map(candidates.map((printer) => [printer.id, 0]))
-  const completedStatus = workflow.statuses.at(-1)!.id
   for (const request of requests) {
     if (request.id === excludeRequestId || !request.printerId || !workloads.has(request.printerId)) continue
-    const outstandingCopies = Object.entries(request.counts).reduce(
-      (sum, [status, count]) => sum + (status === completedStatus ? 0 : count),
-      0,
-    )
-    workloads.set(request.printerId, workloads.get(request.printerId)! + outstandingCopies)
+    workloads.set(request.printerId, workloads.get(request.printerId)! + outstandingCopies(request))
   }
 
   return candidates.reduce((best, candidate) => {
@@ -133,6 +128,12 @@ export function automaticallyAssignedPrinter(
     const bestScore = workloads.get(best.id)! / (printerArea(best) ?? fallbackArea)
     return score < bestScore ? candidate : best
   })
+}
+
+/** Copies not yet Ready, the only ones a printer still has to print. */
+export function outstandingCopies(request: Pick<PrintRequest, 'counts'>) {
+  const completedStatus = workflow.statuses.at(-1)!.id
+  return Object.entries(request.counts).reduce((sum, [status, count]) => sum + (status === completedStatus ? 0 : count), 0)
 }
 
 export function printerFitsModel(printer: PrinterProfile, model?: ModelDimensions) {

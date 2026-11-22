@@ -39,7 +39,7 @@ import {
 } from '../core/workspaces'
 import { highestStoragePlan, storagePlans, type StoragePlan } from '../core/plans'
 import { ACTIVE_SUBSCRIPTION_STATUSES, BILLABLE_SUBSCRIPTION_STATUSES } from '../core/subscription'
-import { automaticallyAssignedPrinter } from '../core/printers'
+import { automaticallyAssignedPrinter, outstandingCopies } from '../core/printers'
 import type { InventoryItems, InventoryKind } from '../core/inventory'
 import { deletedItemKind, keepsDeletedName, NO_REFERENCES, withoutSupply, type InventoryReferences } from '../core/inventoryDeletion'
 import type { SpoolmanChange, SpoolmanLink, SpoolmanSpool } from '../core/spoolman'
@@ -3183,6 +3183,9 @@ export class DrizzleRepository implements Repository {
         .filter(
           (request) =>
             (!requestIds || requestIds.includes(request.id)) &&
+            // A print already made stays on the printer it was made on, so its recorded and estimated usage keeps meaning.
+            !request.archivedAt &&
+            outstandingCopies(request) > 0 &&
             !profiles.find((profile) => profile.id === request.printerId)?.archived &&
             (request.automaticPrinterAssignment || request.requestedPrintType),
         )

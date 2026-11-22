@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.8.1
+
+### Patch Changes
+
+- 05254f9: Stop automatic assignment from moving prints that are already made onto another printer, and detach past prints it had moved, so a newly added printer no longer shows hours it never ran.
+
+## 2.8.0
+
+### Minor Changes
+
+- 1eebad7: Show manufacturer product photos for catalogue wear parts and supplies, so the consumables list and pickers are easier to scan.
+- 08e7a90: Read filament stock from Spoolman under Settings → Spoolman, through a small bridge next to Spoolman or any tool that sends its spools to STL Quest with a write-only token, so that linked filaments show what their spools have left and what to buy without counting stock twice.
+
 ## 2.7.0
 
 ### Minor Changes

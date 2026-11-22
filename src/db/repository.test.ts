@@ -2407,6 +2407,75 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     await reopened.close()
   })
 
+  it('keeps an archived automatic assignment when the repository reopens', async () => {
+    await stock(repository, 'printers', [
+      { id: 'small', name: 'Small', printType: 'resin' },
+      { id: 'large', name: 'Large', printType: 'resin' },
+    ])
+    await repository.createRequest({
+      name: 'Small printer workload',
+      fileName: 'small-workload.stl',
+      filePath: 'todo/small-workload.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+      printerId: 'small',
+    })
+    const archived = await repository.createRequest({
+      name: 'Printed last month',
+      fileName: 'printed-last-month.stl',
+      filePath: 'todo/printed-last-month.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+      printerId: 'small',
+      automaticPrinterAssignment: true,
+    })
+    await repository.database.update(requests).set({ archivedAt: 123 }).where(eq(requests.id, archived)).run()
+
+    const reopened = await reopenRepository()
+
+    expect(await repository.getRequest(archived)).toMatchObject({ printerId: 'small' })
+    await reopened.close()
+  })
+
+  it('keeps the automatic assignment of a print whose copies are all ready when the repository reopens', async () => {
+    await stock(repository, 'printers', [
+      { id: 'small', name: 'Small', printType: 'resin' },
+      { id: 'large', name: 'Large', printType: 'resin' },
+    ])
+    await repository.createRequest({
+      name: 'Small printer workload',
+      fileName: 'small-workload.stl',
+      filePath: 'todo/small-workload.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+      printerId: 'small',
+    })
+    const printed = await repository.createRequest({
+      name: 'Printed and ready',
+      fileName: 'printed-and-ready.stl',
+      filePath: 'todo/printed-and-ready.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+      printerId: 'small',
+      automaticPrinterAssignment: true,
+    })
+    await repository.database
+      .update(requestStatuses)
+      .set({ quantity: 0 })
+      .where(and(eq(requestStatuses.requestId, printed), eq(requestStatuses.statusId, 'todo')))
+      .run()
+    await repository.database
+      .update(requestStatuses)
+      .set({ quantity: 1 })
+      .where(and(eq(requestStatuses.requestId, printed), eq(requestStatuses.statusId, 'done')))
+      .run()
+
+    const reopened = await reopenRepository()
+
+    expect(await repository.getRequest(printed)).toMatchObject({ printerId: 'small' })
+    await reopened.close()
+  })
+
   it('reconciles added statuses and rejects removed statuses that contain copies', async () => {
     const id = await repository.createRequest({
       name: 'Gear',
