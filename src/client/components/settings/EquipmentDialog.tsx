@@ -22,9 +22,10 @@ import {
 } from '../../../core/equipment'
 import { equipmentFromPreset, equipmentPresetName, getEquipmentPreset, type EquipmentPreset } from '../../../core/equipmentPresets'
 import { DEFAULT_PRICE_CALCULATOR_SETTINGS } from '../../../core/priceCalculator'
+import { supplyPresetsForEquipment } from '../../../core/supplyPresets'
 import { PRINT_TYPES } from '../../../core/types'
 import { useI18n } from '../../i18n'
-import { consumablesQuery, priceCalculatorSettingsQuery } from '../../queries'
+import { catalogueQuery, consumablesQuery, priceCalculatorSettingsQuery } from '../../queries'
 import { useAutosave } from '../../useAutosave'
 import { useWorkspacePrintTypes, useWorkspaceSlug } from '../../workspace'
 import { AutosaveStatus } from '../AutosaveStatus'
@@ -151,7 +152,7 @@ export function EquipmentDialog({
       <WorkflowFields draft={draft} preset={preset} onChange={update} />
       <RunFields draft={draft} preset={preset} onChange={update} />
       <WearFields draft={draft} onChange={update} />
-      <SupplyFields supplies={draft.supplies} onChange={(supplies) => update({ supplies })} />
+      <SupplyFields supplies={draft.supplies} preset={preset} onChange={(supplies) => update({ supplies })} />
     </DialogShell>
   )
 }
@@ -267,20 +268,32 @@ function RunFields({
   )
 }
 
-/** Supplies point at consumables by ID; one the library has lost stays listed, flagged, until it is removed here. */
+/**
+ * Supplies point at consumables by ID; one the library has lost stays listed, flagged, until it is removed here. Those
+ * the model's maker names come first, and any the library lacks are named so they can be added to it.
+ */
 function SupplyFields({
   supplies,
+  preset,
   onChange,
 }: {
   supplies: EquipmentItem['supplies']
+  preset?: EquipmentPreset
   onChange: (supplies: EquipmentItem['supplies']) => void
 }) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const copy = t.settings.equipment.dialog
   const workspaceSlug = useWorkspaceSlug()
   const consumables = useQuery(consumablesQuery(workspaceSlug)).data?.consumables
   const byId = new Map((consumables ?? []).map((consumable) => [consumable.id, consumable]))
   const listed = new Set(supplies.map((supply) => supply.consumableId))
+  const catalogue = useQuery({ ...catalogueQuery('supplies'), enabled: !!preset }).data
+  const named = supplyPresetsForEquipment(catalogue ?? [], [preset?.id])
+  const isNamed = (consumable: Consumable) => consumable.kind === 'supply' && named.some(({ id }) => id === consumable.supplyPresetId)
+  const unstocked = named.filter(
+    ({ id }) =>
+      !(consumables ?? []).some((consumable) => !consumable.archived && consumable.kind === 'supply' && consumable.supplyPresetId === id),
+  )
   const library = t.settings.consumables
   const kindLabels = {
     supply: library.supplies.title,
@@ -292,8 +305,12 @@ function SupplyFields({
   const kindOrder = Object.keys(kindLabels)
   const options = (consumables ?? [])
     .filter((consumable) => !consumable.archived && !listed.has(consumable.id))
-    .sort((a, b) => kindOrder.indexOf(a.kind) - kindOrder.indexOf(b.kind))
-    .map((consumable) => ({ value: consumable.id, label: consumable.name, kind: kindLabels[consumable.kind] }))
+    .sort((a, b) => Number(isNamed(b)) - Number(isNamed(a)) || kindOrder.indexOf(a.kind) - kindOrder.indexOf(b.kind))
+    .map((consumable) => ({
+      value: consumable.id,
+      label: consumable.name,
+      kind: isNamed(consumable) ? copy.suggested : kindLabels[consumable.kind],
+    }))
   const consumablesLink = (
     <Link to="/settings/$section" params={{ section: 'consumables' }} className="underline underline-offset-2">
       {copy.addToConsumables}
@@ -348,6 +365,14 @@ function SupplyFields({
             onChange={(consumableId) => consumableId && onChange([...supplies, { consumableId, amountPerUse: 1 }])}
           />
           <p className="text-xs text-muted-foreground">
+            {preset && unstocked.length > 0 && (
+              <>
+                {copy.makerNames(
+                  preset.brand,
+                  new Intl.ListFormat(locale, { type: 'conjunction' }).format(unstocked.map(({ name }) => name)),
+                )}{' '}
+              </>
+            )}
             {copy.notInLibrary} {consumablesLink}.
           </p>
         </div>

@@ -1964,6 +1964,12 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     ])
   })
 
+  it('keeps the catalogue supply a supply was added from', async () => {
+    await stock(repository, 'consumables', [{ ...ipa, supplyPresetId: 'supply-isopropyl-alcohol' }])
+
+    expect(await repository.listInventory('consumables')).toEqual([{ ...ipa, supplyPresetId: 'supply-isopropyl-alcohol' }])
+  })
+
   it('keeps edits to different items made at the same time', async () => {
     await stock(repository, 'printers', [
       { id: 'saturn', name: 'Saturn', printType: 'resin' },

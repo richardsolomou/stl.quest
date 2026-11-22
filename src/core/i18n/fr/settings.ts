@@ -227,11 +227,17 @@ export const settings: typeof en = {
       },
       changeTitle: 'Changer de produit',
       changeDescription: 'Choisissez le produit qui correspond, ou gardez vos propres valeurs.',
-      custom: { resin: 'Résine personnalisée', filament: 'Filament personnalisé', part: 'Pièce personnalisée' },
+      custom: {
+        resin: 'Résine personnalisée',
+        filament: 'Filament personnalisé',
+        part: 'Pièce personnalisée',
+        supply: 'Fourniture personnalisée',
+      },
       customDescription: {
         resin: 'Une résine que le catalogue ne répertorie pas.',
         filament: 'Un filament que le catalogue ne répertorie pas.',
         part: 'Une pièce que le catalogue ne répertorie pas.',
+        supply: 'Une fourniture que le catalogue ne répertorie pas.',
       },
       customChange: 'Hors catalogue',
       customChangeDescription: 'Garder ses valeurs et les saisir vous-même.',
@@ -242,6 +248,18 @@ export const settings: typeof en = {
       noMatch: (query: string) => `Rien dans le catalogue ne correspond à « ${query} ».`,
       addOwn: (query: string) => `Ajouter « ${query} » vous-même`,
       partsDescription: 'Choisissez une pièce que le catalogue connaît pour ces imprimantes, ou saisissez la vôtre.',
+      suppliesDescription: 'Choisissez une fourniture que le catalogue connaît, ou saisissez la vôtre.',
+      forEquipment: 'Indiquées pour votre équipement',
+      supplyCategories: {
+        'wash-fluid': 'Liquides de lavage',
+        gloves: 'Gants',
+        'paper-towels': 'Essuie-tout',
+        'filter-funnel': 'Entonnoirs filtrants',
+        'plate-cleaner': 'Nettoyants de plateau',
+        'plate-adhesive': 'Adhésifs de plateau',
+        desiccant: 'Déshydratants',
+        lubricant: 'Lubrifiants',
+      },
     },
     dialog: {
       newTitle: { resin: 'Nouvelle résine', filament: 'Nouveau filament', supply: 'Nouvelle fourniture', part: 'Nouvelle pièce d’usure' },
@@ -333,6 +351,8 @@ export const settings: typeof en = {
     listPrice: (seller: string, price: string, date: string) => `${seller} l’affichait à ${price} le ${date}.`,
     listPackPrice: (seller: string, pack: number, price: string, each: string, date: string) =>
       `${seller} affichait un lot de ${pack} à ${price} (${each} pièce) le ${date}.`,
+    listSupplyPrice: (seller: string, pack: string, price: string, unitPrice: string, date: string) =>
+      `${seller} affichait ${pack} à ${price} (${unitPrice}) le ${date}.`,
     listPriceHint: 'Saisissez ce que vous payez, taxes et livraison comprises.',
     listPriceSource: 'Page boutique',
     stock: {
@@ -513,6 +533,8 @@ export const settings: typeof en = {
       addSupplyEmpty: 'Aucun autre consommable.',
       notInLibrary: 'Absent de la liste ?',
       addToConsumables: 'L’ajouter aux consommables',
+      suggested: 'Indiquée par le fabricant',
+      makerNames: (maker: string, supplies: string) => `${maker} indique ${supplies} pour cet appareil.`,
       noConsumables: 'Votre liste de consommables est vide.',
       units: { ml: 'ml', g: 'g', item: 'pièces', plate: 'plateaux', minute: 'min' },
       wear: 'Usure',

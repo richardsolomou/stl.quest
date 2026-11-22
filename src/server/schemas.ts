@@ -154,6 +154,7 @@ const consumableSchema = z.discriminatedUnion('kind', [
     kind: z.literal('supply'),
     unit: z.enum(SUPPLY_UNITS),
     price: z.number().nonnegative().max(1_000_000),
+    supplyPresetId: z.string().trim().min(1).max(200).optional(),
   }),
 ])
 const equipmentItemSchema = z

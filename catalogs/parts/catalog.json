@@ -7,25 +7,25 @@
     {
       "id": "formlabs-store",
       "repository": "https://formlabs.com/store/",
-      "revision": "2026-11-20",
+      "revision": "2026-11-22",
       "license": "manufacturer product data"
     },
     {
       "id": "elegoo-store",
       "repository": "https://us.elegoo.com/",
-      "revision": "2026-11-20",
+      "revision": "2026-11-22",
       "license": "manufacturer product data"
     },
     {
       "id": "anycubic-store",
       "repository": "https://store.anycubic.com/",
-      "revision": "2026-11-20",
+      "revision": "2026-11-22",
       "license": "manufacturer product data"
     },
     {
       "id": "phrozen-store",
       "repository": "https://us.phrozen3d.com/",
-      "revision": "2026-11-20",
+      "revision": "2026-11-22",
       "license": "manufacturer product data"
     },
     {
@@ -37,7 +37,7 @@
     {
       "id": "bambu-lab-store",
       "repository": "https://eu.store.bambulab.com/",
-      "revision": "2026-11-20",
+      "revision": "2026-11-22",
       "license": "manufacturer product data"
     },
     {
@@ -57,6 +57,12 @@
       "repository": "https://formlabs.com/support/",
       "revision": "2026-11-20",
       "license": "manufacturer documentation"
+    },
+    {
+      "id": "heygears-store",
+      "repository": "https://store.heygears.com/",
+      "revision": "2026-11-22",
+      "license": "manufacturer product data"
     }
   ],
   "presets": [
@@ -719,6 +725,13 @@
       "source": {
         "id": "heygears",
         "url": "https://www.heygears.com/hardware/reflex-rs-turbo"
+      },
+      "listPrice": {
+        "amount": 199,
+        "currency": "USD",
+        "url": "https://store.heygears.com/products/amber-screen-set-reflex-rs-series",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax. The Amber Screen Set, with tempered film and screen tape."
       }
     },
     {
@@ -999,7 +1012,9 @@
         "filament-bambu-lab-x1e",
         "filament-bambu-lab-p1p",
         "filament-bambu-lab-p1s",
-        "filament-bambu-lab-a1"
+        "filament-bambu-lab-a1",
+        "filament-bambu-lab-x2d",
+        "filament-bambu-lab-p2s"
       ],
       "lifespan": 500,
       "lifespanUnit": "plates",
@@ -1212,6 +1227,1423 @@
       "source": {
         "id": "creality-store",
         "url": "https://store.creality.com/products/smooth-pei-build-plate-235-235mm"
+      }
+    },
+    {
+      "id": "part-bambu-lab-high-flow-hotend-h2-p2s-x2d-0-4-hardened",
+      "brand": "Bambu Lab",
+      "name": "Bambu High Flow Hotend - H2/P2S/X2D, 0.4 mm Hardened Steel",
+      "category": "nozzle",
+      "printType": "filament",
+      "fits": [
+        "filament-bambu-lab-x2d",
+        "filament-bambu-lab-p2s",
+        "filament-bambu-lab-h2d",
+        "filament-bambu-lab-h2s",
+        "filament-bambu-lab-h2c"
+      ],
+      "lifespan": 500,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab treats the hotend as condition-based maintenance and states no lifespan. 500 print hours is the common brass-nozzle rule of thumb, conservative for hardened steel."
+      },
+      "listPrice": {
+        "amount": 50.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d",
+        "checked": "2026-11-22",
+        "note": "Including VAT. Regular price; €40.79 in a sale on the checked date. The H2C takes it on the left; its right hotend is €69.99."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/bambu-high-flow-hotend-h2-p2s-x2d"
+      }
+    },
+    {
+      "id": "part-bambu-lab-tungsten-carbide-hotend-h2-p2s-x2d-0-4",
+      "brand": "Bambu Lab",
+      "name": "Tungsten Carbide Hotend - H2/P2S/X2D, 0.4 mm",
+      "category": "nozzle",
+      "printType": "filament",
+      "fits": [
+        "filament-bambu-lab-x2d",
+        "filament-bambu-lab-p2s",
+        "filament-bambu-lab-h2d",
+        "filament-bambu-lab-h2s",
+        "filament-bambu-lab-h2c"
+      ],
+      "lifespan": 500,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab treats the hotend as condition-based maintenance and states no lifespan. 500 print hours is the common brass-nozzle rule of thumb, conservative for tungsten carbide."
+      },
+      "listPrice": {
+        "amount": 59.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/tungsten-carbide-hotend-h2-p2s-x2d",
+        "checked": "2026-11-22",
+        "note": "Including VAT. Regular price of the standard-flow hotend; €47.99 in a sale on the checked date. The H2C takes it on the left."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/tungsten-carbide-hotend-h2-p2s-x2d"
+      }
+    },
+    {
+      "id": "part-bambu-lab-hotend-a2l-0-4-stainless",
+      "brand": "Bambu Lab",
+      "name": "Bambu Hotend - A1/A2, A2L 0.4 mm Stainless Steel",
+      "category": "nozzle",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-a2l"],
+      "lifespan": 500,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab treats the hotend as condition-based maintenance and states no lifespan. 500 print hours is the common brass-nozzle rule of thumb, conservative for stainless steel."
+      },
+      "listPrice": {
+        "amount": 9.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/bambu-hotend-a1-a2",
+        "checked": "2026-11-22",
+        "note": "Including VAT. Hardened steel is €11.99."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/bambu-hotend-a1-a2"
+      }
+    },
+    {
+      "id": "part-bambu-lab-external-exhaust-air-filter",
+      "brand": "Bambu Lab",
+      "name": "External Exhaust Air Filter - P2S/X2D",
+      "category": "air-filter",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-p2s", "filament-bambu-lab-x2d"],
+      "lifespan": 1440,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab states no lifespan for the exhaust fan kit’s filter. 1,440 print hours is its stated figure for the chamber’s activated-carbon filter."
+      },
+      "listPrice": {
+        "amount": 10.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/air-filter-for-external-exhaust-fan-kit",
+        "checked": "2026-11-22",
+        "note": "Including VAT. Fits the optional External Exhaust Fan Kit."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/air-filter-for-external-exhaust-fan-kit"
+      }
+    },
+    {
+      "id": "part-bambu-lab-air-filter-x1-p1",
+      "brand": "Bambu Lab",
+      "name": "Activated Carbon Air Filter - X1/P1 Series",
+      "category": "air-filter",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-x1", "filament-bambu-lab-x1-carbon", "filament-bambu-lab-p1s"],
+      "lifespan": 1440,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab states no lifespan for this filter. 1,440 print hours is its stated figure for the H2, P2S, and X2D activated-carbon filters."
+      },
+      "listPrice": {
+        "amount": 6.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/activated-carbon-air-filter-x1-p1-series",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/activated-carbon-air-filter-x1-p1-series"
+      }
+    },
+    {
+      "id": "part-bambu-lab-xy-belt-x2d",
+      "brand": "Bambu Lab",
+      "name": "XY Belt - X2D",
+      "category": "belt",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-x2d"],
+      "lifespan": 5000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab replaces belts when they are worn or broken and states no interval. 5,000 print hours is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 11.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/xy-belt-x2d",
+        "checked": "2026-11-22",
+        "note": "Including VAT. One belt; the X2D uses two."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/xy-belt-x2d"
+      }
+    },
+    {
+      "id": "part-bambu-lab-xy-belt-p2s",
+      "brand": "Bambu Lab",
+      "name": "XY Belt - P2S",
+      "category": "belt",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-p2s"],
+      "lifespan": 5000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab replaces belts when they are worn or broken and states no interval. 5,000 print hours is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 13.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/xy-belt-p2s",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/xy-belt-p2s"
+      }
+    },
+    {
+      "id": "part-bambu-lab-xy-belt-h2",
+      "brand": "Bambu Lab",
+      "name": "XY Belt - H2 Series",
+      "category": "belt",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-h2d", "filament-bambu-lab-h2s", "filament-bambu-lab-h2c"],
+      "lifespan": 5000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab replaces belts when they are worn or broken and states no interval. 5,000 print hours is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 21.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/xy-belt-h2-series",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/xy-belt-h2-series"
+      }
+    },
+    {
+      "id": "part-bambu-lab-xy-belt-x1-p1",
+      "brand": "Bambu Lab",
+      "name": "XY Belt - X1/P1 Series",
+      "category": "belt",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-x1", "filament-bambu-lab-x1-carbon", "filament-bambu-lab-p1p", "filament-bambu-lab-p1s"],
+      "lifespan": 5000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab replaces belts when they are worn or broken and states no interval. 5,000 print hours is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 13.99,
+        "currency": "EUR",
+        "packSize": 2,
+        "url": "https://eu.store.bambulab.com/products/xy-belt",
+        "checked": "2026-11-22",
+        "note": "Including VAT. A pack of two."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/xy-belt"
+      }
+    },
+    {
+      "id": "part-bambu-lab-y-belt-a2l",
+      "brand": "Bambu Lab",
+      "name": "Y Belt - A2L",
+      "category": "belt",
+      "set": "y-belt",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-a2l"],
+      "lifespan": 5000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab replaces belts when they are worn or broken and states no interval. 5,000 print hours is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 14.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/y-belt-a2l",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/y-belt-a2l"
+      }
+    },
+    {
+      "id": "part-bambu-lab-x-belt-a2l",
+      "brand": "Bambu Lab",
+      "name": "X Belt - A2L",
+      "category": "belt",
+      "set": "x-belt",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-a2l"],
+      "lifespan": 5000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab replaces belts when they are worn or broken and states no interval. 5,000 print hours is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 6.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/x-belt-a2l",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/x-belt-a2l"
+      }
+    },
+    {
+      "id": "part-bambu-lab-purge-wiper-x2d",
+      "brand": "Bambu Lab",
+      "name": "Purge Wiper - X2D",
+      "category": "purge-wiper",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-x2d"],
+      "lifespan": 2000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab replaces the purge wiper when it is damaged or deformed and states no interval. 2,000 print hours is a starting point from use, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 15.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/purge-wiper-x2d",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/purge-wiper-x2d"
+      }
+    },
+    {
+      "id": "part-bambu-lab-purge-wiper-p2s",
+      "brand": "Bambu Lab",
+      "name": "Purge Wiper - P2S",
+      "category": "purge-wiper",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-p2s"],
+      "lifespan": 1000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab replaces the purge wiper when it is damaged or deformed and states no interval. 1,000 print hours is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 13.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/purge-wiper-p2s",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/purge-wiper-p2s"
+      }
+    },
+    {
+      "id": "part-bambu-lab-purge-wiper-h2d-h2c",
+      "brand": "Bambu Lab",
+      "name": "Purge Wiper - H2D/H2C",
+      "category": "purge-wiper",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-h2d", "filament-bambu-lab-h2c"],
+      "lifespan": 1000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab replaces the purge wiper when it is damaged or deformed and states no interval. 1,000 print hours is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 21.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/purge-wiper-h2-series",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/purge-wiper-h2-series"
+      }
+    },
+    {
+      "id": "part-bambu-lab-purge-wiper-h2s",
+      "brand": "Bambu Lab",
+      "name": "Purge Wiper - H2S",
+      "category": "purge-wiper",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-h2s"],
+      "lifespan": 1000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab replaces the purge wiper when it is damaged or deformed and states no interval. 1,000 print hours is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 10.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/purge-wiper-h2-series",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/purge-wiper-h2-series"
+      }
+    },
+    {
+      "id": "part-bambu-lab-purge-wiper-a2l",
+      "brand": "Bambu Lab",
+      "name": "Purge Wiper - A2L",
+      "category": "purge-wiper",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-a2l"],
+      "lifespan": 1000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab replaces the purge wiper when it is damaged or deformed and states no interval. 1,000 print hours is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 9.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/purge-wiper-a2l",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/purge-wiper-a2l"
+      }
+    },
+    {
+      "id": "part-bambu-lab-nozzle-wiping-pad-p2s-x2d",
+      "brand": "Bambu Lab",
+      "name": "Nozzle Wiping Pad - P2S/X2D",
+      "category": "wiping-pad",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-p2s", "filament-bambu-lab-x2d"],
+      "lifespan": 500,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab replaces the wiping pad when it ages, cracks, or comes loose and states no interval. 500 print hours is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 5.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/nozzle-wiping-pad-p2s-x2d",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/nozzle-wiping-pad-p2s-x2d"
+      }
+    },
+    {
+      "id": "part-bambu-lab-nozzle-wiping-pad-h2d-h2c",
+      "brand": "Bambu Lab",
+      "name": "Nozzle Wiping Pad - H2D/H2C",
+      "category": "wiping-pad",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-h2d", "filament-bambu-lab-h2c"],
+      "lifespan": 500,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab replaces the wiping pad when it ages, cracks, or comes loose and states no interval. 500 print hours is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 7.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/nozzle-wiping-pad-h2-series",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/nozzle-wiping-pad-h2-series"
+      }
+    },
+    {
+      "id": "part-bambu-lab-nozzle-wiping-pad-h2s",
+      "brand": "Bambu Lab",
+      "name": "Nozzle Wiping Pad - H2S",
+      "category": "wiping-pad",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-h2s"],
+      "lifespan": 500,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab replaces the wiping pad when it ages, cracks, or comes loose and states no interval. 500 print hours is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 5.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/nozzle-wiping-pad-h2-series",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/nozzle-wiping-pad-h2-series"
+      }
+    },
+    {
+      "id": "part-bambu-lab-nozzle-wiper-a2l",
+      "brand": "Bambu Lab",
+      "name": "Nozzle Wiper - A2L",
+      "category": "wiping-pad",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-a2l"],
+      "lifespan": 500,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab replaces the wiping pad when it ages, cracks, or comes loose and states no interval. 500 print hours is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 2.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/nozzle-wiper-a2l",
+        "checked": "2026-11-22",
+        "note": "Including VAT. A pack of three silicone pads with a steel blade.",
+        "packSize": 3
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/nozzle-wiper-a2l"
+      }
+    },
+    {
+      "id": "part-bambu-lab-filament-cutter-x2d",
+      "brand": "Bambu Lab",
+      "name": "Replacement Filament Cutter - X2D",
+      "category": "cutter",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-x2d"],
+      "lifespan": 500,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://eu.store.bambulab.com/products/replacement-filament-cutter",
+        "note": "Bambu Lab says to replace the cutter every 10 to 15 spools of filament, or sooner with abrasive filament. At about 50 print hours a 1 kg spool, 10 spools is 500 print hours."
+      },
+      "listPrice": {
+        "amount": 2.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/replacement-filament-cutter",
+        "checked": "2026-11-22",
+        "note": "Including VAT. The left and right cutters are sold separately at the same price. A pack of three cutters.",
+        "packSize": 3
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/replacement-filament-cutter"
+      }
+    },
+    {
+      "id": "part-bambu-lab-filament-cutter-h2d-h2c",
+      "brand": "Bambu Lab",
+      "name": "Replacement Filament Cutter - H2D/H2C",
+      "category": "cutter",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-h2d", "filament-bambu-lab-h2c"],
+      "lifespan": 500,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://eu.store.bambulab.com/products/replacement-filament-cutter",
+        "note": "Bambu Lab says to replace the cutter every 10 to 15 spools of filament, or sooner with abrasive filament. At about 50 print hours a 1 kg spool, 10 spools is 500 print hours."
+      },
+      "listPrice": {
+        "amount": 4.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/replacement-filament-cutter",
+        "checked": "2026-11-22",
+        "note": "Including VAT. A pack of three cutters.",
+        "packSize": 3
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/replacement-filament-cutter"
+      }
+    },
+    {
+      "id": "part-bambu-lab-filament-cutter-h2s-p2s-a2l",
+      "brand": "Bambu Lab",
+      "name": "Replacement Filament Cutter - H2S/P2S/A2L",
+      "category": "cutter",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-h2s", "filament-bambu-lab-p2s", "filament-bambu-lab-a2l"],
+      "lifespan": 500,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://eu.store.bambulab.com/products/replacement-filament-cutter",
+        "note": "Bambu Lab says to replace the cutter every 10 to 15 spools of filament, or sooner with abrasive filament. At about 50 print hours a 1 kg spool, 10 spools is 500 print hours."
+      },
+      "listPrice": {
+        "amount": 3.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/replacement-filament-cutter",
+        "checked": "2026-11-22",
+        "note": "Including VAT. A pack of three cutters.",
+        "packSize": 3
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/replacement-filament-cutter"
+      }
+    },
+    {
+      "id": "part-bambu-lab-filament-cutter-x1-p1-a1",
+      "brand": "Bambu Lab",
+      "name": "Replacement Filament Cutter - X1C/P1/A1 Series",
+      "category": "cutter",
+      "printType": "filament",
+      "fits": [
+        "filament-bambu-lab-x1-carbon",
+        "filament-bambu-lab-p1p",
+        "filament-bambu-lab-p1s",
+        "filament-bambu-lab-a1",
+        "filament-bambu-lab-a1-mini"
+      ],
+      "lifespan": 500,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://eu.store.bambulab.com/products/replacement-filament-cutter",
+        "note": "Bambu Lab says to replace the cutter every 10 to 15 spools of filament, or sooner with abrasive filament. At about 50 print hours a 1 kg spool, 10 spools is 500 print hours."
+      },
+      "listPrice": {
+        "amount": 3.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/replacement-filament-cutter",
+        "checked": "2026-11-22",
+        "note": "Including VAT. A pack of three cutters.",
+        "packSize": 3
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/replacement-filament-cutter"
+      }
+    },
+    {
+      "id": "part-bambu-lab-ptfe-tube-4m",
+      "brand": "Bambu Lab",
+      "name": "PTFE Tube, 4 m Cut-to-Length",
+      "category": "ptfe-tube",
+      "printType": "filament",
+      "fits": [
+        "filament-bambu-lab-x2d",
+        "filament-bambu-lab-p2s",
+        "filament-bambu-lab-h2d",
+        "filament-bambu-lab-h2s",
+        "filament-bambu-lab-h2c",
+        "filament-bambu-lab-a2l",
+        "filament-bambu-lab-a1",
+        "filament-bambu-lab-a1-mini",
+        "filament-bambu-lab-p1p",
+        "filament-bambu-lab-p1s",
+        "filament-bambu-lab-x1-carbon"
+      ],
+      "lifespan": 2000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Bambu Lab replaces PTFE tubes when their ends wear and states no interval. 2,000 print hours is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 10.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/ptfe-tubes",
+        "checked": "2026-11-22",
+        "note": "Including VAT. White or gray; one roll is cut to each tube’s length."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/ptfe-tubes"
+      }
+    },
+    {
+      "id": "part-bambu-lab-textured-pei-plate-h2d-h2s",
+      "brand": "Bambu Lab",
+      "name": "Bambu Textured PEI Plate - H2D/H2S",
+      "category": "build-sheet",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-h2d", "filament-bambu-lab-h2s"],
+      "lifespan": 500,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://eu.store.bambulab.com/products/bambu-textured-pei-plate",
+        "note": "Bambu Lab states no lifespan. 500 plates is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 59.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/bambu-textured-pei-plate",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/bambu-textured-pei-plate"
+      }
+    },
+    {
+      "id": "part-bambu-lab-textured-pei-plate-h2c-a2l",
+      "brand": "Bambu Lab",
+      "name": "Bambu Textured PEI Plate - H2C/A2L",
+      "category": "build-sheet",
+      "printType": "filament",
+      "fits": ["filament-bambu-lab-h2c", "filament-bambu-lab-a2l"],
+      "lifespan": 500,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://eu.store.bambulab.com/products/bambu-textured-pei-plate",
+        "note": "Bambu Lab states no lifespan. 500 plates is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 55.99,
+        "currency": "EUR",
+        "url": "https://eu.store.bambulab.com/products/bambu-textured-pei-plate",
+        "checked": "2026-11-22",
+        "note": "Including VAT."
+      },
+      "source": {
+        "id": "bambu-lab-store",
+        "url": "https://eu.store.bambulab.com/products/bambu-textured-pei-plate"
+      }
+    },
+    {
+      "id": "part-formlabs-form-studio-1-build-platform-flex",
+      "brand": "Formlabs",
+      "name": "Form Studio 1 Build Platform Flex",
+      "category": "flex-platform",
+      "printType": "resin",
+      "fits": ["resin-formlabs-form-studio-1"],
+      "lifespan": 1000,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Formlabs states no lifespan for its flexible build surfaces, which are replaced once they dent, scratch, or stop releasing parts cleanly. 1,000 plates is a starting point from use, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 153.51,
+        "currency": "EUR",
+        "url": "https://formlabs.com/de/products/form-studio-1-build-platform-flex/",
+        "checked": "2026-11-22",
+        "note": "Including 19% German VAT."
+      },
+      "source": {
+        "id": "formlabs-store",
+        "url": "https://formlabs.com/de/products/form-studio-1-build-platform-flex/"
+      }
+    },
+    {
+      "id": "part-formlabs-form-4-flex-build-platform",
+      "brand": "Formlabs",
+      "name": "Form 4 Flex Build Platform",
+      "category": "flex-platform",
+      "printType": "resin",
+      "fits": ["resin-formlabs-form-4", "resin-formlabs-form-4b"],
+      "lifespan": 500,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Formlabs states no lifespan for its flexible build surfaces, which are replaced once they dent, scratch, or stop releasing parts cleanly. 500 plates is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 296.31,
+        "currency": "EUR",
+        "url": "https://formlabs.com/de/products/form-4-flex-build-platform/",
+        "checked": "2026-11-22",
+        "note": "Including 19% German VAT."
+      },
+      "source": {
+        "id": "formlabs-store",
+        "url": "https://formlabs.com/de/products/form-4-flex-build-platform/"
+      }
+    },
+    {
+      "id": "part-formlabs-form-4l-flex-build-platform",
+      "brand": "Formlabs",
+      "name": "Form 4L Flex Build Platform",
+      "category": "flex-platform",
+      "printType": "resin",
+      "fits": ["resin-formlabs-form-4l", "resin-formlabs-form-4bl"],
+      "lifespan": 500,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Formlabs states no lifespan for its flexible build surfaces, which are replaced once they dent, scratch, or stop releasing parts cleanly. 500 plates is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 950.81,
+        "currency": "EUR",
+        "url": "https://formlabs.com/de/products/form-4l-flex-build-platform/",
+        "checked": "2026-11-22",
+        "note": "Including 19% German VAT."
+      },
+      "source": {
+        "id": "formlabs-store",
+        "url": "https://formlabs.com/de/products/form-4l-flex-build-platform/"
+      }
+    },
+    {
+      "id": "part-formlabs-build-platform-2-print-surface",
+      "brand": "Formlabs",
+      "name": "Build Platform 2 Replacement Print Surface",
+      "category": "flex-platform",
+      "printType": "resin",
+      "fits": ["resin-formlabs-form-3", "resin-formlabs-form-3b", "resin-formlabs-form-3-plus", "resin-formlabs-form-3b-plus"],
+      "lifespan": 500,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Formlabs states no lifespan for its flexible build surfaces, which are replaced once they dent, scratch, or stop releasing parts cleanly. 500 plates is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 83.3,
+        "currency": "EUR",
+        "url": "https://formlabs.com/de/products/build-platform-2-replacement-print-surface/",
+        "checked": "2026-11-22",
+        "note": "Including 19% German VAT. The flexible surface of the Form 3 and 3+ Build Platform 2."
+      },
+      "source": {
+        "id": "formlabs-store",
+        "url": "https://formlabs.com/de/products/build-platform-2-replacement-print-surface/"
+      }
+    },
+    {
+      "id": "part-formlabs-build-platform-2l-print-surface",
+      "brand": "Formlabs",
+      "name": "Build Platform 2L Print Surface",
+      "category": "flex-platform",
+      "printType": "resin",
+      "fits": ["resin-formlabs-form-3l", "resin-formlabs-form-3bl"],
+      "lifespan": 500,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Formlabs states no lifespan for its flexible build surfaces, which are replaced once they dent, scratch, or stop releasing parts cleanly. 500 plates is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 190.4,
+        "currency": "EUR",
+        "url": "https://formlabs.com/de/products/build-platform-2l-print-surface/",
+        "checked": "2026-11-22",
+        "note": "Including 19% German VAT. The flexible surface of the Form 3L Build Platform 2L."
+      },
+      "source": {
+        "id": "formlabs-store",
+        "url": "https://formlabs.com/de/products/build-platform-2l-print-surface/"
+      }
+    },
+    {
+      "id": "part-heygears-release-film-reflex",
+      "brand": "HeyGears",
+      "name": "Reflex Release Film",
+      "category": "release-film",
+      "printType": "resin",
+      "fits": ["resin-heygears-reflex"],
+      "lifespan": 45,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "derived",
+        "url": "https://www.heygears.com/hardware/reflex",
+        "note": "HeyGears states a service life of at least 45,000 layers for the Reflex’s release film.",
+        "statedLayers": 45000
+      },
+      "listPrice": {
+        "amount": 69,
+        "currency": "USD",
+        "packSize": 2,
+        "url": "https://store.heygears.com/products/reflex-release-film-module-v1-0",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax. A pack of two."
+      },
+      "source": {
+        "id": "heygears-store",
+        "url": "https://store.heygears.com/products/reflex-release-film-module-v1-0"
+      }
+    },
+    {
+      "id": "part-heygears-pulsing-release-film-reflex",
+      "brand": "HeyGears",
+      "name": "Reflex Pulsing Release Film",
+      "category": "release-film",
+      "printType": "resin",
+      "fits": ["resin-heygears-reflex", "resin-heygears-reflex-turbo"],
+      "lifespan": 45,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://www.heygears.com/hardware/reflex",
+        "note": "HeyGears states no lifespan for this film. 45 plates is its stated 45,000-layer life for the Reflex’s release film."
+      },
+      "listPrice": {
+        "amount": 99,
+        "currency": "USD",
+        "packSize": 2,
+        "url": "https://store.heygears.com/products/pulsing-release-film",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax. A pack of two, for the Pulsing Release Module."
+      },
+      "source": {
+        "id": "heygears-store",
+        "url": "https://store.heygears.com/products/pulsing-release-film"
+      }
+    },
+    {
+      "id": "part-heygears-release-film-reflex-rs",
+      "brand": "HeyGears",
+      "name": "Reflex RS Release Film",
+      "category": "release-film",
+      "printType": "resin",
+      "fits": ["resin-heygears-reflex-rs"],
+      "lifespan": 45,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://www.heygears.com/hardware/reflex",
+        "note": "HeyGears states no lifespan for this film. 45 plates is its stated 45,000-layer life for the Reflex’s release film."
+      },
+      "listPrice": {
+        "amount": 69,
+        "currency": "USD",
+        "packSize": 2,
+        "url": "https://store.heygears.com/products/reflex-rs-release-film-set",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax. A pack of two."
+      },
+      "source": {
+        "id": "heygears-store",
+        "url": "https://store.heygears.com/products/reflex-rs-release-film-set"
+      }
+    },
+    {
+      "id": "part-heygears-pulsing-release-film-reflex-rs",
+      "brand": "HeyGears",
+      "name": "Reflex RS / RS Turbo Pulsing Release Film",
+      "category": "release-film",
+      "printType": "resin",
+      "fits": ["resin-heygears-reflex-rs", "resin-heygears-reflex-rs-turbo"],
+      "lifespan": 150,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://www.heygears.com/hardware/reflex",
+        "note": "HeyGears states no lifespan for this film. The pulsing module peels each layer more gently than a fixed release, so it outlasts the Reflex's standard film (rated 45,000 layers); 150 plates is a starting point from use, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 99,
+        "currency": "USD",
+        "packSize": 2,
+        "url": "https://store.heygears.com/products/reflex-rs-pulsing-release-film-set",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax. A pack of two, for the Pulsing Release Module."
+      },
+      "source": {
+        "id": "heygears-store",
+        "url": "https://store.heygears.com/products/reflex-rs-pulsing-release-film-set"
+      }
+    },
+    {
+      "id": "part-heygears-release-film-reflex-2",
+      "brand": "HeyGears",
+      "name": "Reflex 2 Series Release Film",
+      "category": "release-film",
+      "printType": "resin",
+      "fits": ["resin-heygears-reflex-2", "resin-heygears-reflex-2-pro"],
+      "lifespan": 45,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://www.heygears.com/hardware/reflex",
+        "note": "HeyGears states no lifespan for this film. 45 plates is its stated 45,000-layer life for the Reflex’s release film."
+      },
+      "listPrice": {
+        "amount": 79,
+        "currency": "USD",
+        "packSize": 2,
+        "url": "https://store.heygears.com/products/reflex-2-series-release-film",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax. A pack of two."
+      },
+      "source": {
+        "id": "heygears-store",
+        "url": "https://store.heygears.com/products/reflex-2-series-release-film"
+      }
+    },
+    {
+      "id": "part-heygears-pulsing-release-film-reflex-2",
+      "brand": "HeyGears",
+      "name": "Reflex 2 Series Pulsing Release Film",
+      "category": "release-film",
+      "printType": "resin",
+      "fits": ["resin-heygears-reflex-2", "resin-heygears-reflex-2-pro"],
+      "lifespan": 45,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "url": "https://www.heygears.com/hardware/reflex",
+        "note": "HeyGears states no lifespan for this film. 45 plates is its stated 45,000-layer life for the Reflex’s release film."
+      },
+      "listPrice": {
+        "amount": 119,
+        "currency": "USD",
+        "packSize": 2,
+        "url": "https://store.heygears.com/products/reflex-2-series-pulsing-release-film",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax. A pack of two; sold out on the checked date."
+      },
+      "source": {
+        "id": "heygears-store",
+        "url": "https://store.heygears.com/products/reflex-2-series-pulsing-release-film"
+      }
+    },
+    {
+      "id": "part-heygears-lcd-reflex",
+      "brand": "HeyGears",
+      "name": "Reflex LCD Screen",
+      "category": "lcd-screen",
+      "printType": "resin",
+      "fits": ["resin-heygears-reflex"],
+      "lifespan": 2000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "HeyGears states no lifespan for this screen. 2,000 print hours is the service life Elegoo and Phrozen state for their mono LCD screens."
+      },
+      "listPrice": {
+        "amount": 189,
+        "currency": "USD",
+        "url": "https://store.heygears.com/products/reflex-lcd-screen",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax."
+      },
+      "source": {
+        "id": "heygears-store",
+        "url": "https://store.heygears.com/products/reflex-lcd-screen"
+      }
+    },
+    {
+      "id": "part-heygears-lcd-reflex-rs",
+      "brand": "HeyGears",
+      "name": "Reflex RS LCD Screen",
+      "category": "lcd-screen",
+      "printType": "resin",
+      "fits": ["resin-heygears-reflex-rs"],
+      "lifespan": 2000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "HeyGears states no lifespan for this screen. 2,000 print hours is the service life Elegoo and Phrozen state for their mono LCD screens."
+      },
+      "listPrice": {
+        "amount": 189,
+        "currency": "USD",
+        "url": "https://store.heygears.com/products/reflex-rs-lcd-screen",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax."
+      },
+      "source": {
+        "id": "heygears-store",
+        "url": "https://store.heygears.com/products/reflex-rs-lcd-screen"
+      }
+    },
+    {
+      "id": "part-heygears-lcd-reflex-2",
+      "brand": "HeyGears",
+      "name": "Reflex 2 Series LCD Screen",
+      "category": "lcd-screen",
+      "printType": "resin",
+      "fits": ["resin-heygears-reflex-2", "resin-heygears-reflex-2-pro"],
+      "lifespan": 2000,
+      "lifespanUnit": "hours",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "HeyGears states no lifespan for this screen. 2,000 print hours is the service life Elegoo and Phrozen state for their mono LCD screens."
+      },
+      "listPrice": {
+        "amount": 269,
+        "currency": "USD",
+        "url": "https://store.heygears.com/products/reflex-2-lcd-screen",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax. Comes with an anti-scratch film."
+      },
+      "source": {
+        "id": "heygears-store",
+        "url": "https://store.heygears.com/products/reflex-2-lcd-screen"
+      }
+    },
+    {
+      "id": "part-heygears-lcd-protector-reflex",
+      "brand": "HeyGears",
+      "name": "Reflex Tempered Glass LCD Screen Protector",
+      "category": "lcd-protector",
+      "printType": "resin",
+      "fits": ["resin-heygears-reflex"],
+      "lifespan": 200,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Screen protectors are replaced once they scratch, cloud, or take resin, and no manufacturer states a lifespan. 200 plates is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 18,
+        "currency": "USD",
+        "packSize": 2,
+        "url": "https://store.heygears.com/products/reflex-tempered-glass-lcd-screen-protector",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax. A pack of two; fitted with the Reflex LCD Screen Tape."
+      },
+      "source": {
+        "id": "heygears-store",
+        "url": "https://store.heygears.com/products/reflex-tempered-glass-lcd-screen-protector"
+      }
+    },
+    {
+      "id": "part-heygears-lcd-protector-reflex-rs",
+      "brand": "HeyGears",
+      "name": "Reflex RS LCD Screen Tempered Film",
+      "category": "lcd-protector",
+      "printType": "resin",
+      "fits": ["resin-heygears-reflex-rs"],
+      "lifespan": 200,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Screen protectors are replaced once they scratch, cloud, or take resin, and no manufacturer states a lifespan. 200 plates is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 18,
+        "currency": "USD",
+        "packSize": 2,
+        "url": "https://store.heygears.com/products/reflex-rs-lcd-screen-tempered-film-kit",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax. A pack of two."
+      },
+      "source": {
+        "id": "heygears-store",
+        "url": "https://store.heygears.com/products/reflex-rs-lcd-screen-tempered-film-kit"
+      }
+    },
+    {
+      "id": "part-heygears-lcd-protector-reflex-2",
+      "brand": "HeyGears",
+      "name": "Reflex 2 LCD Screen Protective Film Kit",
+      "category": "lcd-protector",
+      "printType": "resin",
+      "fits": ["resin-heygears-reflex-2", "resin-heygears-reflex-2-pro"],
+      "lifespan": 200,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Screen protectors are replaced once they scratch, cloud, or take resin, and no manufacturer states a lifespan. 200 plates is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 14,
+        "currency": "USD",
+        "url": "https://store.heygears.com/products/reflex-2-lcd-screen-protective-film-kit",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax. With screen tape; sold out on the checked date."
+      },
+      "source": {
+        "id": "heygears-store",
+        "url": "https://store.heygears.com/products/reflex-2-lcd-screen-protective-film-kit"
+      }
+    },
+    {
+      "id": "part-phrozen-lcd-protector-mighty",
+      "brand": "Phrozen",
+      "name": "LCD Screen Protector for Sonic Mighty 8K / 12K",
+      "category": "lcd-protector",
+      "printType": "resin",
+      "fits": ["resin-phrozen-sonic-mighty-8k", "resin-phrozen-sonic-mighty-12k"],
+      "lifespan": 200,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Screen protectors are replaced once they scratch, cloud, or take resin, and no manufacturer states a lifespan. 200 plates is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 9,
+        "currency": "USD",
+        "url": "https://us.phrozen3d.com/products/mighty-lcd-screen-protector",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax."
+      },
+      "source": {
+        "id": "phrozen-store",
+        "url": "https://us.phrozen3d.com/products/mighty-lcd-screen-protector"
+      }
+    },
+    {
+      "id": "part-phrozen-lcd-protector-mighty-revo",
+      "brand": "Phrozen",
+      "name": "LCD Screen Protector for Sonic Mighty Revo",
+      "category": "lcd-protector",
+      "printType": "resin",
+      "fits": ["resin-phrozen-sonic-mighty-revo"],
+      "lifespan": 200,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Screen protectors are replaced once they scratch, cloud, or take resin, and no manufacturer states a lifespan. 200 plates is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 9,
+        "currency": "USD",
+        "url": "https://us.phrozen3d.com/products/mighty-revo-lcd-screen-protector",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax."
+      },
+      "source": {
+        "id": "phrozen-store",
+        "url": "https://us.phrozen3d.com/products/mighty-revo-lcd-screen-protector"
+      }
+    },
+    {
+      "id": "part-phrozen-lcd-protector-mighty-revo-16k-max",
+      "brand": "Phrozen",
+      "name": "Tempered Glass LCD Screen Protector for Mighty Revo 16K MAX",
+      "category": "lcd-protector",
+      "printType": "resin",
+      "fits": ["resin-phrozen-sonic-mighty-revo-16k-max"],
+      "lifespan": 200,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Screen protectors are replaced once they scratch, cloud, or take resin, and no manufacturer states a lifespan. 200 plates is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 30,
+        "currency": "USD",
+        "packSize": 2,
+        "url": "https://us.phrozen3d.com/products/revomax-13-5-tempered-glass-lcd-screen-protector",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax. A pack of two."
+      },
+      "source": {
+        "id": "phrozen-store",
+        "url": "https://us.phrozen3d.com/products/revomax-13-5-tempered-glass-lcd-screen-protector"
+      }
+    },
+    {
+      "id": "part-elegoo-acf-film-saturn-3-ultra",
+      "brand": "Elegoo",
+      "name": "ACF Film for Saturn 3 Ultra",
+      "category": "release-film",
+      "printType": "resin",
+      "fits": ["resin-elegoo-saturn-3-ultra"],
+      "lifespan": 30,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "No manufacturer states a lifespan for ACF film. 30 plates applies Anycubic’s 30,000-layer figure for its FEP film, a conservative start for ACF."
+      },
+      "listPrice": {
+        "amount": 69.99,
+        "currency": "USD",
+        "packSize": 5,
+        "url": "https://us.elegoo.com/products/acf-film-for-saturn-3-ultra-5-pcs",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax. A pack of five."
+      },
+      "source": {
+        "id": "elegoo-store",
+        "url": "https://us.elegoo.com/products/acf-film-for-saturn-3-ultra-5-pcs"
+      }
+    },
+    {
+      "id": "part-elegoo-acf-film-mars-4-ultra",
+      "brand": "Elegoo",
+      "name": "ACF Film for Mars 4 Ultra",
+      "category": "release-film",
+      "printType": "resin",
+      "fits": ["resin-elegoo-mars-4-ultra"],
+      "lifespan": 30,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "No manufacturer states a lifespan for ACF film. 30 plates applies Anycubic’s 30,000-layer figure for its FEP film, a conservative start for ACF."
+      },
+      "listPrice": {
+        "amount": 47.99,
+        "currency": "USD",
+        "packSize": 5,
+        "url": "https://us.elegoo.com/products/acf-film-for-mars-4-ultra-5-pcs",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax. A pack of five."
+      },
+      "source": {
+        "id": "elegoo-store",
+        "url": "https://us.elegoo.com/products/acf-film-for-mars-4-ultra-5-pcs"
+      }
+    },
+    {
+      "id": "part-anycubic-acf-film-photon-mono-m7",
+      "brand": "Anycubic",
+      "name": "ACF Film for Photon Mono M7 / M7 Pro",
+      "category": "release-film",
+      "printType": "resin",
+      "fits": ["resin-anycubic-photon-mono-m7", "resin-anycubic-photon-mono-m7-pro"],
+      "lifespan": 30,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "No manufacturer states a lifespan for ACF film. 30 plates applies Anycubic’s 30,000-layer figure for its FEP film, a conservative start for ACF."
+      },
+      "listPrice": {
+        "amount": 25.99,
+        "currency": "USD",
+        "packSize": 2,
+        "url": "https://store.anycubic.com/products/acf-film-for-photon-series",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax. A pack of two, from the US store."
+      },
+      "source": {
+        "id": "anycubic-store",
+        "url": "https://store.anycubic.com/products/acf-film-for-photon-series"
+      }
+    },
+    {
+      "id": "part-anycubic-acf-film-photon-mono-m7-max",
+      "brand": "Anycubic",
+      "name": "ACF Film for Photon Mono M7 Max",
+      "category": "release-film",
+      "printType": "resin",
+      "fits": ["resin-anycubic-photon-mono-m7-max"],
+      "lifespan": 30,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "No manufacturer states a lifespan for ACF film. 30 plates applies Anycubic’s 30,000-layer figure for its FEP film, a conservative start for ACF."
+      },
+      "listPrice": {
+        "amount": 33.99,
+        "currency": "USD",
+        "packSize": 2,
+        "url": "https://store.anycubic.com/products/acf-film-for-photon-series",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax. A pack of two, from the US store."
+      },
+      "source": {
+        "id": "anycubic-store",
+        "url": "https://store.anycubic.com/products/acf-film-for-photon-series"
+      }
+    },
+    {
+      "id": "part-anycubic-acf-film-photon-mono-4-ultra",
+      "brand": "Anycubic",
+      "name": "ACF Film for Photon Mono 4 Ultra",
+      "category": "release-film",
+      "printType": "resin",
+      "fits": ["resin-anycubic-photon-mono-4-ultra"],
+      "lifespan": 30,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "No manufacturer states a lifespan for ACF film. 30 plates applies Anycubic’s 30,000-layer figure for its FEP film, a conservative start for ACF."
+      },
+      "listPrice": {
+        "amount": 21,
+        "currency": "USD",
+        "packSize": 2,
+        "url": "https://store.anycubic.com/products/acf-film-for-photon-series",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax. A pack of two, from the US store."
+      },
+      "source": {
+        "id": "anycubic-store",
+        "url": "https://store.anycubic.com/products/acf-film-for-photon-series"
+      }
+    },
+    {
+      "id": "part-anycubic-screen-protector-photon-mono-m7",
+      "brand": "Anycubic",
+      "name": "Screen Protector for Photon Mono M7 / M7 Pro",
+      "category": "lcd-protector",
+      "printType": "resin",
+      "fits": ["resin-anycubic-photon-mono-m7", "resin-anycubic-photon-mono-m7-pro"],
+      "lifespan": 200,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Screen protectors are replaced once they scratch, cloud, or take resin, and no manufacturer states a lifespan. 200 plates is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 17.99,
+        "currency": "USD",
+        "packSize": 5,
+        "url": "https://store.anycubic.com/products/screen-protector",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax. A pack of five, from the US store."
+      },
+      "source": {
+        "id": "anycubic-store",
+        "url": "https://store.anycubic.com/products/screen-protector"
+      }
+    },
+    {
+      "id": "part-anycubic-screen-protector-photon-mono-4",
+      "brand": "Anycubic",
+      "name": "Screen Protector for Photon Mono 4 / 4 Ultra",
+      "category": "lcd-protector",
+      "printType": "resin",
+      "fits": ["resin-anycubic-photon-mono-4", "resin-anycubic-photon-mono-4-ultra"],
+      "lifespan": 200,
+      "lifespanUnit": "plates",
+      "lifespanSource": {
+        "basis": "typical",
+        "note": "Screen protectors are replaced once they scratch, cloud, or take resin, and no manufacturer states a lifespan. 200 plates is an order-of-magnitude starting point, not a measured figure."
+      },
+      "listPrice": {
+        "amount": 16.99,
+        "currency": "USD",
+        "packSize": 5,
+        "url": "https://store.anycubic.com/products/screen-protector",
+        "checked": "2026-11-22",
+        "note": "Excluding sales tax. A pack of five, from the US store."
+      },
+      "source": {
+        "id": "anycubic-store",
+        "url": "https://store.anycubic.com/products/screen-protector"
       }
     }
   ]

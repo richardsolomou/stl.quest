@@ -94,9 +94,10 @@ export function PrinterMaintenance({ printer }: { printer: PrinterProfile }) {
       {picking && (
         <PartPicker
           title={t.settings.consumables.parts.addTo(printer.name)}
-          presets={presets}
-          had={new Set(parts.flatMap(({ partPresetId }) => (partPresetId ? [partPresetId] : [])))}
-          onSelect={(preset) => setEditing(withConsumablePrice(partFromPreset(createId(), { preset, ...group }), Number.NaN))}
+          groups={
+            presets && [{ items: presets.map((preset) => ({ preset, had: parts.some(({ partPresetId }) => partPresetId === preset.id) })) }]
+          }
+          onSelect={({ preset }) => setEditing(withConsumablePrice(partFromPreset(createId(), { preset, ...group }), Number.NaN))}
           onCustom={() => setEditing(newWearPart(createId(), group))}
           onClose={() => setPicking(false)}
         />
