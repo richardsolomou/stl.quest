@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { checkCatalogImages } from './catalogImages'
 import { assertRevisions, checkoutSource, writeSourceLicense } from './catalogSources'
 import { fetchWithRetry } from './catalogFetch'
 import {
@@ -113,7 +114,13 @@ function validateCommittedCatalog() {
     if (!existsSync(path.join(root, source.licenseOutput))) throw new Error(`Missing ${source.id} license file`)
   }
   validateCatalog(catalog.presets, catalog.sources)
-  console.log(`Validated ${catalog.presets.length} resin presets.`)
+  const images = checkCatalogImages({
+    imagesPath: path.join(root, 'catalogs/resins/images.json'),
+    publicRoot: path.join(root, 'public'),
+    directory: 'resin-presets',
+    presetIds: new Set(catalog.presets.map((preset) => preset.id)),
+  })
+  console.log(`Validated ${catalog.presets.length} resin presets and ${images} images.`)
 }
 
 function validateCatalog(presets: GeneratedResinPreset[], sources: CatalogSource[]) {

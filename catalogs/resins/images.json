@@ -1,0 +1,1374 @@
+{
+  "images": [
+    {
+      "presetId": "resin-3djake-blue",
+      "sourcePageUrl": "https://www.3djake.com/3djake/dlp-lcd-resin-dark-blue",
+      "sourceUrl": "https://3d.nice-cdn.com/upload/image/product/large/default/3djake-resin-dark-blue-500-g-289191-en.jpg",
+      "note": "3DJake's discontinued dark blue resin bottle; the profile's exact product is not named on 3DJake",
+      "src": "/resin-presets/resin-3djake-blue.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-3djake-high-precision-blue",
+      "sourcePageUrl": "https://www.3djake.com/3djake/dlp-lcd-resin-dark-blue",
+      "sourceUrl": "https://3d.nice-cdn.com/upload/image/product/large/default/3djake-resin-dark-blue-500-g-289191-en.jpg",
+      "src": "/resin-presets/resin-3djake-high-precision-blue.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-3djake-high-precision-grey",
+      "sourcePageUrl": "https://www.3djake.com/3djake/dlp-lcd-resin-dark-grey",
+      "sourceUrl": "https://3d.nice-cdn.com/upload/image/product/large/default/3djake-resin-dark-grey-500-g-289171-en.jpg",
+      "src": "/resin-presets/resin-3djake-high-precision-grey.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-3dm-abs",
+      "sourcePageUrl": "https://www.prusa3d.com/product/3dm-abs-orange-tough-resin-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/1581.jpg",
+      "src": "/resin-presets/resin-3dm-abs.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-3dm-dent",
+      "sourcePageUrl": "https://www.3dm-shop.com/product-page/3DM-DENT",
+      "sourceUrl": "https://static.wixstatic.com/media/c154ae_5dec11229db8424d9afa8bba22368aff~mv2.jpg",
+      "src": "/resin-presets/resin-3dm-dent.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-3dm-hr-green",
+      "sourcePageUrl": "https://www.3dm-shop.com/product-page/3DM-HR",
+      "sourceUrl": "https://static.wixstatic.com/media/c154ae_904110c267494f1582a85f1af6e1de00~mv2_d_2589_2220_s_2.jpg",
+      "src": "/resin-presets/resin-3dm-hr-green.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-3dm-htr140-high-temperature",
+      "sourcePageUrl": "https://www.3dm-shop.com/product-page/3DM-HTR140",
+      "sourceUrl": "https://static.wixstatic.com/media/c154ae_50341e2428ee40da8b87b322c2c8bdb0~mv2.jpg",
+      "src": "/resin-presets/resin-3dm-htr140-high-temperature.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-3dm-tough-clear",
+      "sourcePageUrl": "https://web.archive.org/web/2022/https://www.prusa3d.com/product/3dm-clear-tough-resin-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/1602.jpg",
+      "src": "/resin-presets/resin-3dm-tough-clear.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-3dm-xpro-white",
+      "sourcePageUrl": "https://www.3dm-shop.com/product-page/3DM-XPRO",
+      "sourceUrl": "https://static.wixstatic.com/media/c154ae_b212ca4ea4f54f2ca1256cdf1c846790~mv2.jpg",
+      "src": "/resin-presets/resin-3dm-xpro-white.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-ameralabs-amd-3-led",
+      "sourcePageUrl": "https://ameralabs.com/shop/amd-3-led/",
+      "sourceUrl": "https://ameralabs.com/wp-content/uploads/AmeraLabs-AMD-3-Resin.webp",
+      "src": "/resin-presets/resin-ameralabs-amd-3-led.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-ameralabs-tgm-7-led",
+      "sourcePageUrl": "https://ameralabs.com/shop/tgm-7-led/",
+      "sourceUrl": "https://ameralabs.com/wp-content/uploads/tgm-7-grey-flexible-durable-resin-1.webp",
+      "src": "/resin-presets/resin-ameralabs-tgm-7-led.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-asiga-denta-model",
+      "sourcePageUrl": "https://www.asiga.com/materials-dental/",
+      "sourceUrl": "https://www.asiga.com/wp-content/uploads/2025/06/Dentamodel-1000-1334.png",
+      "src": "/resin-presets/resin-asiga-denta-model.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-asiga-plasgray",
+      "sourcePageUrl": "https://www.asiga.com/materials-industrial/",
+      "sourceUrl": "https://www.asiga.com/wp-content/uploads/2023/06/Asiga-PlasGRAY-web.jpg",
+      "src": "/resin-presets/resin-asiga-plasgray.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-bluecast-23ls",
+      "sourcePageUrl": "https://3dgarage.shop/en/bluecast-resins/18-bluecast-ls.html",
+      "sourceUrl": "https://3dgarage.shop/49-thickbox_default/bluecast-ls.jpg",
+      "note": "Bottle is labelled 'LS for Formlabs'; the listing is sold as 23LS",
+      "src": "/resin-presets/resin-bluecast-23ls.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-bluecast-ecogray",
+      "sourcePageUrl": "https://3dgarage.shop/en/bluecast-resins/83-bluetech-ecogray-lcddlp.html",
+      "sourceUrl": "https://3dgarage.shop/576-thickbox_default/bluetech-ecogray-lcddlp.jpg",
+      "src": "/resin-presets/resin-bluecast-ecogray.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-bluecast-kera-master-dental",
+      "sourcePageUrl": "https://3dgarage.shop/en/bluecast-resins/58-bluecast-keramaster-dental-model-lcddlp.html",
+      "sourceUrl": "https://3dgarage.shop/231-thickbox_default/bluecast-keramaster-dental-model-lcddlp.jpg",
+      "src": "/resin-presets/resin-bluecast-kera-master-dental.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-bluecast-lcd-dlp-original",
+      "sourcePageUrl": "https://www.bluecast.info/original",
+      "sourceUrl": "https://www.bluecast.info/images/products2/ORIGINAL.png",
+      "src": "/resin-presets/resin-bluecast-lcd-dlp-original.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-bluecast-x-one",
+      "sourcePageUrl": "https://www.bluecast.info/x-one",
+      "sourceUrl": "https://www.bluecast.info/images/products2/X-ONE.png",
+      "src": "/resin-presets/resin-bluecast-x-one.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-bluecast-x10",
+      "sourcePageUrl": "https://www.bluecast.info/x10",
+      "sourceUrl": "https://www.bluecast.info/images/products2/X10.png",
+      "src": "/resin-presets/resin-bluecast-x10.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-bluecast-x5",
+      "sourcePageUrl": "https://www.bluecast.info/x5",
+      "sourceUrl": "https://www.bluecast.info/images/products2/X5.png",
+      "src": "/resin-presets/resin-bluecast-x5.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-druckwege-type-d-dental-model",
+      "sourcePageUrl": "https://web.archive.org/web/2022/https://www.3djake.com/druckwege/type-d-dental-model",
+      "sourceUrl": "https://3d.nice-cdn.com/upload/image/product/large/default/druckwege-type-d-dental-model-beige-254628-en.jpg",
+      "src": "/resin-presets/resin-druckwege-type-d-dental-model.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-druckwege-type-d-standard-pigmentfrei-clear",
+      "sourcePageUrl": "https://web.archive.org/web/2022/https://www.3djake.com/druckwege/type-d-pigment-free",
+      "sourceUrl": "https://3d.nice-cdn.com/upload/image/product/large/default/druckwege-type-d-pigment-free-258041-en.jpg",
+      "src": "/resin-presets/resin-druckwege-type-d-standard-pigmentfrei-clear.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-druckwege-type-d-standard-white",
+      "sourcePageUrl": "https://web.archive.org/web/2022/https://www.3djake.com/druckwege/type-d-white",
+      "sourceUrl": "https://3d.nice-cdn.com/upload/image/product/large/default/druckwege-type-d-white-297276-en.jpg",
+      "note": "Type D Standard bottle from 3DJake's White listing; resin colour not visible",
+      "src": "/resin-presets/resin-druckwege-type-d-standard-white.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-alpha-black",
+      "sourcePageUrl": "https://formlabs.com/global/products/alpha-black-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/b0/f7/b0f72669-3728-4f3e-8256-e6e0d6b35f48/08032026_clerk_silhouettes__377-edit_shadow_store.png",
+      "src": "/resin-presets/resin-formlabs-alpha-black.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-alpha-clear",
+      "sourcePageUrl": "https://formlabs.com/global/products/alpha-clear-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/7c/41/7c41cf47-dec0-4d6c-b092-460ca1b80314/08272026_clerk_silho_17920_shadow_store.png",
+      "src": "/resin-presets/resin-formlabs-alpha-clear.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-alpha-fast",
+      "sourcePageUrl": "https://formlabs.com/global/products/alpha-fast-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/35/00/35009b04-1535-47a4-8580-037edf9dcf97/08042026_clerk_silhouettes__425-edit_shadow_store.png",
+      "src": "/resin-presets/resin-formlabs-alpha-fast.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-alpha-grey",
+      "sourcePageUrl": "https://formlabs.com/global/products/alpha-grey-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/96/65/96659fe5-57de-44ab-b931-e210372bd868/08272026_clerk_silho_16520_shadow_store.png",
+      "src": "/resin-presets/resin-formlabs-alpha-grey.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-alpha-model",
+      "sourcePageUrl": "https://formlabs.com/global/products/alpha-model-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/78/a0/78a07ec8-1e68-4803-b57c-4d0dff49dbdb/07202026_clerk_silhos_100-edit_shadow_store.png",
+      "src": "/resin-presets/resin-formlabs-alpha-model.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-alpha-white",
+      "sourcePageUrl": "https://formlabs.com/global/products/alpha-white-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/21/ff/21ff6e51-1501-42bc-9dc0-b85a7c1001d1/cms_optimized_png-10112026_fs1_silhouettes_030-edit_shadow.png",
+      "src": "/resin-presets/resin-formlabs-alpha-white.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-bego-varseosmile-triniq",
+      "sourcePageUrl": "https://formlabs.com/global/products/bego-varseosmile-triniq-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/bb/e2/bbe22fcc-e3d6-4d35-b234-0f52a4934918/08212024_btq_prints_239-sh-softness_shadow_store.png",
+      "src": "/resin-presets/resin-formlabs-bego-varseosmile-triniq.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-biomed-amber",
+      "sourcePageUrl": "https://formlabs.com/global/products/biomed-amber-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/55/61/5561bd67-77f2-470f-93ec-5f183747661c/biomed_amber2_6.png",
+      "src": "/resin-presets/resin-formlabs-biomed-amber.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-biomed-black",
+      "sourcePageUrl": "https://formlabs.com/global/products/biomed-black-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/fc/cd/fccde464-145b-43c7-935a-ea65cb56bb59/biomed_black_1_1.png",
+      "src": "/resin-presets/resin-formlabs-biomed-black.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-biomed-clear",
+      "sourcePageUrl": "https://formlabs.com/global/products/biomed-clear-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/5d/b2/5db2264f-d07e-422d-afe8-1f9ab58c6e5e/optimized_for_web_png-06302025_biomed_clear_016_no_shadow_1.png",
+      "src": "/resin-presets/resin-formlabs-biomed-clear.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-biomed-durable",
+      "sourcePageUrl": "https://formlabs.com/global/products/biomed-durable-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/fa/30/fa3081cb-0de1-42f8-8215-7d55200613bb/biomed_durable_1.png",
+      "src": "/resin-presets/resin-formlabs-biomed-durable.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-biomed-flex-50a",
+      "sourcePageUrl": "https://formlabs.com/global/products/biomed-flex-50a-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/e5/00/e500abe6-2015-42fe-901a-1dcfdaa654ef/biomed_elastic_v1.png",
+      "src": "/resin-presets/resin-formlabs-biomed-flex-50a.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-biomed-flex-80a",
+      "sourcePageUrl": "https://formlabs.com/global/products/biomed-flex-80a-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/ac/86/ac869d0b-a4d0-4959-8173-bf46624f897e/09082023_bio_flex_082-sh-standard-recovered_store_1.png",
+      "src": "/resin-presets/resin-formlabs-biomed-flex-80a.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-biomed-white",
+      "sourcePageUrl": "https://formlabs.com/global/products/biomed-white-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/40/7b/407b4f0c-3241-46e3-b5cb-da893217eb6e/biomed_white_1_1.png",
+      "src": "/resin-presets/resin-formlabs-biomed-white.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-black-v4-1",
+      "sourcePageUrl": "https://formlabs.com/global/products/black-resin-v4-1/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/d8/54/d8541b9b-950e-49f8-8284-3f518ac20418/black_1_1.png",
+      "src": "/resin-presets/resin-formlabs-black-v4-1.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-black-v5",
+      "sourcePageUrl": "https://formlabs.com/global/products/black-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/fc/1a/fc1af94f-dad4-40f2-a5a0-9c1ebfff8606/03122024_print_silhouettes_033-sh-standard_store.png",
+      "src": "/resin-presets/resin-formlabs-black-v5.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-castable-wax",
+      "sourcePageUrl": "https://formlabs.com/global/products/castable-wax-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/4b/47/4b47e866-ac74-4d3a-80ec-07f36eca988c/castable_wax_1.png",
+      "src": "/resin-presets/resin-formlabs-castable-wax.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-clear-cast",
+      "sourcePageUrl": "https://formlabs.com/global/products/clear-cast-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/c9/f9/c9f96042-4e17-4883-9dcb-1d1c2fa469f2/07182024_clearcast_060-sh-softness_shadow_store.png",
+      "src": "/resin-presets/resin-formlabs-clear-cast.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-clear-v4-1",
+      "sourcePageUrl": "https://formlabs.com/global/products/clear-resin-v4-1/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/11/e5/11e5d20d-14c4-4cee-a5d4-2144247ed8d9/clear1_1.png",
+      "src": "/resin-presets/resin-formlabs-clear-v4-1.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-clear-v5",
+      "sourcePageUrl": "https://formlabs.com/global/products/clear-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/e8/97/e897e622-8088-4b34-8299-b4683e508fc7/04022024_clear_v5_silhouette_091_store.png",
+      "src": "/resin-presets/resin-formlabs-clear-v5.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-color",
+      "sourcePageUrl": "https://formlabs.com/global/products/color-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/17/43/17432dde-a549-495b-9a99-61e96f48fdab/05272025_color_resin_v5_097-edit_shadow_store.png",
+      "src": "/resin-presets/resin-formlabs-color.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-color-base",
+      "sourcePageUrl": "https://formlabs.com/global/products/color-base-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/6e/9e/6e9e5da1-dc23-46d4-948a-5c6a03471744/color-kit_1.png",
+      "src": "/resin-presets/resin-formlabs-color-base.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-custom-tray",
+      "sourcePageUrl": "https://formlabs.com/global/products/custom-tray-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/01/ba/01bafed4-f674-4f1a-a13b-41eb95f3cdbe/custom_tray_1.png",
+      "src": "/resin-presets/resin-formlabs-custom-tray.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-dental-lt-clear",
+      "sourcePageUrl": "https://formlabs.com/global/products/dental-lt-clear-v2-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/36/fd/36fd06cb-b49b-4ae7-ab17-92b683f6522d/dental_lt_clearv2_1.png",
+      "src": "/resin-presets/resin-formlabs-dental-lt-clear.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-dental-lt-comfort",
+      "sourcePageUrl": "https://formlabs.com/global/products/dental-lt-comfort-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/05/ad/05ade462-ed6a-4d2b-89a9-1815d3d35fd6/dental_lt_comfort_1_1.png",
+      "src": "/resin-presets/resin-formlabs-dental-lt-comfort.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-denture-base-v2",
+      "sourcePageUrl": "https://formlabs.com/global/products/denture-base-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/e2/27/e2271bac-d035-4179-aeed-3c266156d4d5/06032026_denture_base_096-edit_shadow_store.png",
+      "src": "/resin-presets/resin-formlabs-denture-base-v2.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-draft",
+      "sourcePageUrl": "https://formlabs.com/global/products/draft-v2-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/fe/f6/fef6cd76-6310-46e3-b678-083c5b0685ba/draft1.png",
+      "src": "/resin-presets/resin-formlabs-draft.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-durable",
+      "sourcePageUrl": "https://formlabs.com/global/products/durable-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/ce/c3/cec346ab-fd68-47c1-8411-38cc99762acb/durable_1.png",
+      "src": "/resin-presets/resin-formlabs-durable.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-esd",
+      "sourcePageUrl": "https://formlabs.com/global/products/esd-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/80/5e/805e0150-f403-443d-a45a-c74708dc07e7/11252021_esd_resin_139_copy_s.png",
+      "src": "/resin-presets/resin-formlabs-esd.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-fast-model",
+      "sourcePageUrl": "https://formlabs.com/global/products/fast-model-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/a5/05/a5050c0d-2c94-4a71-be37-778d76ae6c94/03122024_print_silhouettes_025a-sh-standard_store.png",
+      "src": "/resin-presets/resin-formlabs-fast-model.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-flame-retardant",
+      "sourcePageUrl": "https://formlabs.com/global/products/flame-retardant-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/30/bf/30bf68d7-5c1e-4bee-ad2a-b542e3a2ed65/flame_retardant_1.png",
+      "src": "/resin-presets/resin-formlabs-flame-retardant.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-flexible-50a",
+      "sourcePageUrl": "https://formlabs.com/global/products/flexible-50a-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/81/85/8185a153-4503-4926-be11-93f2f3fa9ba9/01232024_elastic_50a_x7_255-sh-standard_a.png",
+      "src": "/resin-presets/resin-formlabs-flexible-50a.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-flexible-80a",
+      "sourcePageUrl": "https://formlabs.com/global/products/flexible-80a-resin-v1/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/b4/27/b427e2fc-65af-4648-bd61-cb8134647823/flexible_80a_1.png",
+      "src": "/resin-presets/resin-formlabs-flexible-80a.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-grey-pro",
+      "sourcePageUrl": "https://formlabs.com/global/products/grey-pro-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/bf/06/bf06c7b8-ff1c-49ff-b544-471189f17533/grey_pro1.png",
+      "src": "/resin-presets/resin-formlabs-grey-pro.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-grey-v4-1",
+      "sourcePageUrl": "https://formlabs.com/global/products/grey-resin-v4-1/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/e2/9e/e29e25d0-6966-4a62-8ad7-46d19729cf06/03192025_grey_v_41_297_no_shadow_store_1.png",
+      "src": "/resin-presets/resin-formlabs-grey-v4-1.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-grey-v5",
+      "sourcePageUrl": "https://formlabs.com/global/products/grey-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/72/98/72981726-06bd-4615-ac0c-f4b610dc4a34/03122024_print_silhouettes_020a-sh-standard_store.png",
+      "src": "/resin-presets/resin-formlabs-grey-v5.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-high-temp",
+      "sourcePageUrl": "https://formlabs.com/global/products/high-temp-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/a3/a2/a3a29e15-814f-487d-a5e1-cfb3ca78ed2a/high_temp_1.png",
+      "src": "/resin-presets/resin-formlabs-high-temp.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-ibt-flex",
+      "sourcePageUrl": "https://formlabs.com/global/products/ibt-flex-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/07/66/07661f9f-c818-40a4-bf5a-6550345e1db8/ibt_flex_1_1.png",
+      "src": "/resin-presets/resin-formlabs-ibt-flex.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-model-v2",
+      "sourcePageUrl": "https://formlabs.com/global/products/model-resin-v2/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/78/93/78939841-57c2-46db-86c6-ad2cb7c5ee54/model_v2.png",
+      "src": "/resin-presets/resin-formlabs-model-v2.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-model-v3",
+      "sourcePageUrl": "https://formlabs.com/global/products/model-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/ee/c6/eec6cafc-1bb6-4805-bade-be615955d259/model1.png",
+      "src": "/resin-presets/resin-formlabs-model-v3.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-precision-model",
+      "sourcePageUrl": "https://formlabs.com/global/products/precision-model-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/24/08/2408134c-8bca-4dd4-adf7-a42a9e0be1f3/03192024_dsl_quad_x7_380-sh-standard.png",
+      "src": "/resin-presets/resin-formlabs-precision-model.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-premium-teeth",
+      "sourcePageUrl": "https://formlabs.com/global/products/premium-teeth-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/d7/ec/d7ec52bf-d843-4f96-b52a-85488e9873fc/11282023_premiumteeth_153-sh-standard_copy_2_1_store_1_1.png",
+      "src": "/resin-presets/resin-formlabs-premium-teeth.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-rigid-10k",
+      "sourcePageUrl": "https://formlabs.com/global/products/rigid-10k-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/b5/4f/b54fd5af-d49f-43f5-8fd0-f1a64cd9c8e2/rigid_10k_1.png",
+      "src": "/resin-presets/resin-formlabs-rigid-10k.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-rigid-4000",
+      "sourcePageUrl": "https://formlabs.com/global/products/rigid-4000-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/40/25/40258943-a156-41c3-ba61-f0a3ae5b34a9/rigid4000_1.png",
+      "src": "/resin-presets/resin-formlabs-rigid-4000.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-silicone-40a",
+      "sourcePageUrl": "https://formlabs.com/global/products/silicone-40a-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/c8/a2/c8a2da70-a85b-495d-a90b-bbcea9d9c8b3/silicone_1_1.png",
+      "src": "/resin-presets/resin-formlabs-silicone-40a.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-surgical-guide",
+      "sourcePageUrl": "https://formlabs.com/global/products/surgical-guide-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/77/27/772771de-25fa-4c1b-a7f6-33430bb38b8f/surgical_guide_1.png",
+      "src": "/resin-presets/resin-formlabs-surgical-guide.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-tough-1000",
+      "sourcePageUrl": "https://formlabs.com/global/products/tough-1000-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/29/f5/29f5bb90-0773-4d79-9275-d9c576ce9265/09302025_tough_1000_v1_x7_420_shadow_store_1.png",
+      "src": "/resin-presets/resin-formlabs-tough-1000.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-tough-1500",
+      "sourcePageUrl": "https://formlabs.com/global/products/tough-1500-resin-v1/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/b6/9c/b69ca694-d8cf-47bd-be66-148c689726bd/tough-1500-1.png",
+      "src": "/resin-presets/resin-formlabs-tough-1500.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-tough-1500-v2",
+      "sourcePageUrl": "https://formlabs.com/global/products/tough-1500-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/21/c0/21c00e32-fdce-486a-8885-d236a82d95bf/03042025_tough_1500_v2_522_no_shadow_store.png",
+      "src": "/resin-presets/resin-formlabs-tough-1500-v2.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-tough-2000",
+      "sourcePageUrl": "https://formlabs.com/global/products/tough-2000-resin-v1/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/8a/cc/8acc2c08-968f-4cb2-be24-4e784528e5e7/tough2000_1.png",
+      "src": "/resin-presets/resin-formlabs-tough-2000.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-tough-2000-v2",
+      "sourcePageUrl": "https://formlabs.com/global/products/tough-2000-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/69/72/6972e5a3-ef57-4122-aa08-1548c335573e/10152025_tough_2000.png",
+      "src": "/resin-presets/resin-formlabs-tough-2000-v2.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-true-cast",
+      "sourcePageUrl": "https://formlabs.com/global/products/true-cast-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/bd/c1/bdc198db-fba1-47cc-8767-9d99cf3ef0ee/04212025_truecast_sample_x7_237-edit_shadow_store.png",
+      "src": "/resin-presets/resin-formlabs-true-cast.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-white-v4-1",
+      "sourcePageUrl": "https://formlabs.com/global/products/white-resin-v4-1/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/9e/06/9e06848c-7c67-4370-a711-b62d1f4ad126/11082017_medical_171_1.png",
+      "src": "/resin-presets/resin-formlabs-white-v4-1.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-formlabs-white-v5",
+      "sourcePageUrl": "https://formlabs.com/global/products/white-resin/",
+      "sourceUrl": "https://formlabs-media.formlabs.com/filer_public/33/74/3374fb22-6226-47b4-bbd0-a114c570595e/03122024_print_silhouettes_009-sh-standard_store.png",
+      "src": "/resin-presets/resin-formlabs-white-v5.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-forward-am-ultracur3d-el-150-black",
+      "sourcePageUrl": "https://www.igo3d.com/en/basf-ultracur3d-el150-flexible-resin_1",
+      "sourceUrl": "https://www.igo3d.com/media/image/product/8222/lg/basf-ultracur3d-el-150-flexible-resin~2.jpg",
+      "note": "Generic Ultracur3D bottle with natural EL 150 parts; black variant not pictured",
+      "src": "/resin-presets/resin-forward-am-ultracur3d-el-150-black.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-forward-am-ultracur3d-fl-300-black",
+      "sourcePageUrl": "https://www.igo3d.com/en/basf-ultracur3d-fl300-flexible-resin",
+      "sourceUrl": "https://www.igo3d.com/media/image/product/8225/lg/basf-ultracur3d-fl-300-flexible-resin~6.jpg",
+      "note": "Bottle label shows the Clear variant of FL 300",
+      "src": "/resin-presets/resin-forward-am-ultracur3d-fl-300-black.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-forward-am-ultracur3d-rg-35",
+      "sourcePageUrl": "https://www.igo3d.com/en/basf-ultracur3d-rg-35-rigid-resin_7",
+      "sourceUrl": "https://www.igo3d.com/media/image/product/7197/lg/basf-ultracur3d-rg-35-rigid-resin.jpg",
+      "note": "Bottle label shows the black RG 35 B variant",
+      "src": "/resin-presets/resin-forward-am-ultracur3d-rg-35.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-forward-am-ultracur3d-st-45",
+      "sourcePageUrl": "https://www.igo3d.com/basf-ultracur3d-st-45-tough-resin_3",
+      "sourceUrl": "https://www.igo3d.com/media/image/product/7203/lg/basf-ultracur3d-st-45-tough-resin.jpg",
+      "src": "/resin-presets/resin-forward-am-ultracur3d-st-45.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-forward-am-ultracur3d-st-45-m",
+      "sourcePageUrl": "https://forward-am.com/material-portfolio/ultracur3d-photopolymers/tough-line/ultracur3d-st-45/",
+      "sourceUrl": "https://forward-am.com/wp-content/uploads/2021/01/forward-am-ultracur3d-st-45-m.jpg",
+      "src": "/resin-presets/resin-forward-am-ultracur3d-st-45-m.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-forward-am-ultracur3d-st-80",
+      "sourcePageUrl": "https://zortrax.com/resins/ultracur3d-st-80-b/",
+      "sourceUrl": "https://zortrax.com/wp-content/uploads/2022/09/BASF-Ultracur3D-ST-80-ST-80-B.jpg",
+      "note": "Printed part combining ST 80 (clear lid) and ST 80 B (black base) on an orange background; no bottle shot",
+      "src": "/resin-presets/resin-forward-am-ultracur3d-st-80.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-forward-am-ultracur3d-st-80-black",
+      "sourcePageUrl": "https://zortrax.com/resins/ultracur3d-st-80-b/",
+      "sourceUrl": "https://zortrax.com/wp-content/uploads/2022/09/BASF-Ultracur3D-ST-80-ST-80-B.jpg",
+      "note": "Printed part combining ST 80 B (black base) with clear ST 80 on an orange background; no bottle shot",
+      "src": "/resin-presets/resin-forward-am-ultracur3d-st-80-black.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-funtodo-ash-grey",
+      "sourcePageUrl": "https://funtodo.eu/shop/ash-grey/",
+      "sourceUrl": "https://funtodo.eu/wp-content/uploads/2022/02/FunToDo-Ash-Grey-Resin-640-1.jpg",
+      "src": "/resin-presets/resin-funtodo-ash-grey.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-funtodo-castable-blend-red",
+      "sourcePageUrl": "https://funtodo.eu/shop/castable-blend/",
+      "sourceUrl": "https://funtodo.eu/wp-content/uploads/2022/04/FunToDo-Castable-Blend-1.jpg",
+      "src": "/resin-presets/resin-funtodo-castable-blend-red.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-funtodo-industrial-blend-unpigmented",
+      "sourcePageUrl": "https://funtodo.eu/shop/funtodo-resins/standard-blend-unpigmented/",
+      "sourceUrl": "https://funtodo.eu/wp-content/uploads/2022/02/FunToDo-Standard-Blend-Unpigmented-1.jpg",
+      "note": "FunToDo's Standard Blend Unpigmented, assumed renamed successor of Industrial Blend Unpigmented",
+      "src": "/resin-presets/resin-funtodo-industrial-blend-unpigmented.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-funtodo-snow-white",
+      "sourcePageUrl": "https://funtodo.eu/shop/funtodo-resins/snow-white/",
+      "sourceUrl": "https://funtodo.eu/wp-content/uploads/2022/02/FunToDo-Snow-White-1.jpg",
+      "src": "/resin-presets/resin-funtodo-snow-white.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-harz-labs-basic-resin-red",
+      "sourcePageUrl": "https://harzlabs.com/products/materialy/basic-red-v2.html",
+      "sourceUrl": "https://harzlabs.com/upload/iblock/2ba/ctqonwtp37dwr9t8662loquym6thjdgn/EN-Basic-Red-V2-1-kg-front.png",
+      "src": "/resin-presets/resin-harz-labs-basic-resin-red.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-harz-labs-dental-cast-red",
+      "sourcePageUrl": "https://harzlabs.com/products/materialy/dental-cast.html",
+      "sourceUrl": "https://harzlabs.com/upload/iblock/446/mwd3u9fsf4zjm4lohxv2l4ta3jvztl9j/5f725741913bcc5c504bae5e41dd46f0.png",
+      "src": "/resin-presets/resin-harz-labs-dental-cast-red.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-harz-labs-model-resin-black",
+      "sourcePageUrl": "https://harzlabs.com/products/materialy/model.html",
+      "sourceUrl": "https://harzlabs.com/upload/iblock/777/o30mov6gwlah1bqcg0yxkpx5qkvsprga/52f97b12e473634c2711d8b1e2f03485.png",
+      "src": "/resin-presets/resin-harz-labs-model-resin-black.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-henkel-loctite-3d-3843-hdt60-high-toughness",
+      "sourcePageUrl": "https://zortrax.com/resins/loctite-3d-3843-hdt60/",
+      "sourceUrl": "https://zortrax.com/wp-content/uploads/2022/09/Henkel-3843.jpg",
+      "src": "/resin-presets/resin-henkel-loctite-3d-3843-hdt60-high-toughness.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-henkel-loctite-3d-ind475",
+      "sourcePageUrl": "https://www.dynamism.com/material/material-brands/loctite-3d-resin/loctite-ind475-resin-black-1kg.html",
+      "sourceUrl": "https://asset.dynamism.com/media/catalog/product/l/o/loctite_3d_ind475_resin_-_black_-_1kg_product_image.png",
+      "src": "/resin-presets/resin-henkel-loctite-3d-ind475.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-henkel-loctite-3d-pro476",
+      "sourcePageUrl": "https://www.3dprima.com/filament-resin/resin/tough/loctite-3d-pro476-black-resin-1kg_30137_12564",
+      "sourceUrl": "https://cdn03.plentyone.com/ioseuwg7moqp/item/images/30137/full/Loctite-PRO476-Black-Resin-1kg-2737962-30137.jpg",
+      "src": "/resin-presets/resin-henkel-loctite-3d-pro476.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-heygears-pab10",
+      "sourcePageUrl": "https://store.heygears.com/products/modeling-pab10-standard-modeling-resin",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/img_v3_0212u_65634b14-53f1-41ff-be3f-18c9307905eg_1.webp?v=1783232425",
+      "src": "/resin-presets/resin-heygears-pab10.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-heygears-pac10",
+      "sourcePageUrl": "https://store.heygears.com/products/ultraprint-casting-pac10-wax-casting-resin",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/pac10resin.webp?v=1745833144",
+      "src": "/resin-presets/resin-heygears-pac10.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-heygears-pae10",
+      "sourcePageUrl": "https://store.heygears.com/products/ultraprint-tooling-pae10-elastic-tool-resin-50a",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/ToolingPAE10ElasticToolResin_50A_-heygears.webp?v=1745833113",
+      "src": "/resin-presets/resin-heygears-pae10.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-heygears-paf10",
+      "sourcePageUrl": "https://store.heygears.com/products/ultraprint-production-paf10-flexible-production-resin-pvc-like",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/PAF10FlexibleProductionResin_PVC-like_-heygears_9038a221-3fb0-421a-8abb-7e1979ecf081.webp?v=1775801334",
+      "src": "/resin-presets/resin-heygears-paf10.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-heygears-pah10",
+      "sourcePageUrl": "https://store.heygears.com/products/ultraprint-molding-pah10-high-temperature-resistance-resin",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/pah10resin.webp?v=1745833166",
+      "src": "/resin-presets/resin-heygears-pah10.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-heygears-pah270",
+      "sourcePageUrl": "https://store.heygears.com/products/ultraprint-molding-pah270-high-temp-resin-3d-printing",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/1__1_8.webp?v=1761219029",
+      "src": "/resin-presets/resin-heygears-pah270.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-heygears-pam10",
+      "sourcePageUrl": "https://store.heygears.com/products/ultraprint-design-pam10-multi-color-resin",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/pam10resinset.webp?v=1745833177",
+      "src": "/resin-presets/resin-heygears-pam10.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-heygears-pap10",
+      "sourcePageUrl": "https://store.heygears.com/products/ultraprint-production-pap10-precise-detail-resin",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/PAP10_1200.webp?v=1775113506",
+      "src": "/resin-presets/resin-heygears-pap10.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-heygears-parp10",
+      "sourcePageUrl": "https://store.heygears.com/products/ultraprint-modeling-orange-clay-parp10-rapid-prototyping-modeling-resin",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/ModelingOrangeClayPARP10RapidPrototypingModelingResin-heygears.webp?v=1775112784",
+      "src": "/resin-presets/resin-heygears-parp10.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-heygears-pas10",
+      "sourcePageUrl": "https://store.heygears.com/products/ultraprint-modeling-pas10-standard-modeling-resin-new",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/pas10-resin-black-heygears.webp?v=1766038992",
+      "src": "/resin-presets/resin-heygears-pas10.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-heygears-pat10",
+      "sourcePageUrl": "https://store.heygears.com/products/ultraprint-modeling-pat10-transparent-resin",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/pat10.webp?v=1745833173",
+      "src": "/resin-presets/resin-heygears-pat10.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-heygears-pau10",
+      "sourcePageUrl": "https://store.heygears.com/products/ultraprint-modeling-pau10-abs-like-resin",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/pau10resin.webp?v=1775115126",
+      "src": "/resin-presets/resin-heygears-pau10.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-heygears-pau11",
+      "sourcePageUrl": "https://store.heygears.com/products/ultraprint-modeling-pau10-abs-like-resin",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/heygears-pau11-abs-like-resin.webp?v=1775115126",
+      "src": "/resin-presets/resin-heygears-pau11.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-heygears-pau20",
+      "sourcePageUrl": "https://store.heygears.com/products/ultraprint-tooling-pau20-resin",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/PAU20GeneralPurposeToolingResin-heygears-2.webp?v=1745833115",
+      "src": "/resin-presets/resin-heygears-pau20.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-heygears-pawr10",
+      "sourcePageUrl": "https://store.heygears.com/products/ultraprint-production-pawr10-wear-resistant-resin",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/pawr10-resin-for-heygears-3d-printer.webp?v=1775113777",
+      "src": "/resin-presets/resin-heygears-pawr10.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-heygears-paww10",
+      "sourcePageUrl": "https://store.heygears.com/products/paww10-water-washable-resin",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/paww10resin.webp?v=1775113288",
+      "src": "/resin-presets/resin-heygears-paww10.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-heygears-paww20",
+      "sourcePageUrl": "https://store.heygears.com/products/ultraprint-modeling-paww20-water-washable-modeling-resin",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0724/0817/0715/files/PAWW20WaterWashableModelingResin-heygears.webp?v=1775113034",
+      "src": "/resin-presets/resin-heygears-paww20.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-liqcreate-bio-med-clear",
+      "sourcePageUrl": "https://www.liqcreate.com/product/bio-med-clear-biocompatible-resin/",
+      "sourceUrl": "https://www.liqcreate.com/wp-content/uploads/2023/05/Liqcreate-Bio-Med-Clear-1KG-bottle-no-shade-939x939-1.jpg",
+      "src": "/resin-presets/resin-liqcreate-bio-med-clear.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-liqcreate-clear-impact",
+      "sourcePageUrl": "https://www.liqcreate.com/product/clear-impact/",
+      "sourceUrl": "https://www.liqcreate.com/wp-content/uploads/2019/04/Liqcreate-Clear-Impact-1KG-bottle.png",
+      "src": "/resin-presets/resin-liqcreate-clear-impact.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-liqcreate-dental-model-pro-beige",
+      "sourcePageUrl": "https://www.liqcreate.com/product/dental-model-pro-beige/",
+      "sourceUrl": "https://www.liqcreate.com/wp-content/uploads/2021/06/Liqcreate-Dental-Model-Pro-beige-1kg-bottle-no-shade-939x939-1.jpg",
+      "src": "/resin-presets/resin-liqcreate-dental-model-pro-beige.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-liqcreate-dental-model-pro-grey",
+      "sourcePageUrl": "https://www.liqcreate.com/product/dental-model-pro-grey/",
+      "sourceUrl": "https://www.liqcreate.com/wp-content/uploads/2021/06/Liqcreate-Dental-Model-Pro-Grey-1kg-bottle-no-shade-939x939-1.jpg",
+      "src": "/resin-presets/resin-liqcreate-dental-model-pro-grey.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-liqcreate-flexible-x",
+      "sourcePageUrl": "https://www.liqcreate.com/product/flexible-x/",
+      "sourceUrl": "https://www.liqcreate.com/wp-content/uploads/2020/06/Liqcreate-Flexible-X-1KG-bottle-no-shade-939x939-1.jpg",
+      "src": "/resin-presets/resin-liqcreate-flexible-x.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-liqcreate-premium-model",
+      "sourcePageUrl": "https://www.liqcreate.com/product/premium-model/",
+      "sourceUrl": "https://www.liqcreate.com/wp-content/uploads/2019/09/Premium-Model-item-31-08-2019-website.png",
+      "src": "/resin-presets/resin-liqcreate-premium-model.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-liqcreate-strong-x",
+      "sourcePageUrl": "https://www.liqcreate.com/product/strong-x/",
+      "sourceUrl": "https://www.liqcreate.com/wp-content/uploads/2019/04/Liqcreate-Strong-X-1KG-bottle.png",
+      "src": "/resin-presets/resin-liqcreate-strong-x.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-liqcreate-tough-x",
+      "sourcePageUrl": "https://www.liqcreate.com/product/tough-x/",
+      "sourceUrl": "https://www.liqcreate.com/wp-content/uploads/2020/04/Liqcreate-Tough-X-1KG-bottle-no-shade-939x939-1.jpg",
+      "src": "/resin-presets/resin-liqcreate-tough-x.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-liqcreate-wax-castable",
+      "sourcePageUrl": "https://www.liqcreate.com/product/wax-castable/",
+      "sourceUrl": "https://www.liqcreate.com/wp-content/uploads/2020/10/Liqcreate-Wax-Castable-1KG-bottle-no-shade-939x939-1.jpg",
+      "src": "/resin-presets/resin-liqcreate-wax-castable.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-makerjuice-labs-standard-red",
+      "sourcePageUrl": "https://www.matterhackers.com/store/l/makerjuice-g+-red-resin-1-liter/sk/MT0QRQHS",
+      "sourceUrl": "https://img.matterhackers.com/g/Z3M6Ly9taC1wcm9kdWN0LWltYWdlcy9wcm9kL2MyNmQyYzNmLTIxZDEtNGUwMS1iYzM3LWQ1MDEwNzJiMTk3Mg=e365-w900-h675-c",
+      "src": "/resin-presets/resin-makerjuice-labs-standard-red.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-monocure-3d-black-rapid-resin",
+      "sourcePageUrl": "https://www.3dprinters-shop.com/en/inicio/367-monocure-3d-rapid-resin-1-liter-black.html",
+      "sourceUrl": "https://www.3dprinters-shop.com/2010-thickbox_default/monocure-3d-rapid-resin-1-liter-black.jpg",
+      "src": "/resin-presets/resin-monocure-3d-black-rapid-resin.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-monocure-3d-blue-rapid-resin",
+      "sourcePageUrl": "https://www.3dprinters-shop.com/en/inicio/368-monocure-3d-rapid-resin-1-liter-blue.html",
+      "sourceUrl": "https://www.3dprinters-shop.com/2009-thickbox_default/monocure-3d-rapid-resin-1-liter-blue.jpg",
+      "src": "/resin-presets/resin-monocure-3d-blue-rapid-resin.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-monocure-3d-clear-rapid-resin",
+      "sourcePageUrl": "https://www.3dprinters-shop.com/en/inicio/369-monocure-3d-rapid-resin-1-liter-clear.html",
+      "sourceUrl": "https://www.3dprinters-shop.com/2011-thickbox_default/monocure-3d-rapid-resin-1-liter-clear.jpg",
+      "src": "/resin-presets/resin-monocure-3d-clear-rapid-resin.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-monocure-3d-grey-rapid-resin",
+      "sourcePageUrl": "https://www.3dprinters-shop.com/en/inicio/370-monocure-3d-rapid-resin-1-liter-grey.html",
+      "sourceUrl": "https://www.3dprinters-shop.com/2012-thickbox_default/monocure-3d-rapid-resin-1-liter-grey.jpg",
+      "src": "/resin-presets/resin-monocure-3d-grey-rapid-resin.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-monocure-3d-white-rapid-resin",
+      "sourcePageUrl": "https://www.3dprinters-shop.com/en/inicio/371-monocure-3d-rapid-resin-1-liter-white.html",
+      "sourceUrl": "https://www.3dprinters-shop.com/2013-thickbox_default/monocure-3d-rapid-resin-1-liter-white.jpg",
+      "src": "/resin-presets/resin-monocure-3d-white-rapid-resin.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-nextdent-cast-purple",
+      "sourcePageUrl": "https://www.metrodent.com/product/nextdent-cast-3d-printing-material/",
+      "sourceUrl": "https://www.metrodent.com/wp-content/uploads/2019/07/NextDent-Cast.jpg",
+      "src": "/resin-presets/resin-nextdent-cast-purple.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-nextdent-crown-bridge",
+      "sourcePageUrl": "https://ultimate3dprintingstore.com/products/nextdent-c-b-mfh-micro-filled-hybrid-n2",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0789/2979/products/ND_CBMFHN2_1.png?v=1629731065",
+      "note": "NextDent C&B MFH (shade N2), the current crown-and-bridge successor",
+      "src": "/resin-presets/resin-nextdent-crown-bridge.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-nextdent-model-2-0-grey",
+      "sourcePageUrl": "https://ultimate3dprintingstore.com/products/nextdent-model-2-0-grey",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0789/2979/products/ND_Model_2.0_G_1.png?v=1629733489",
+      "src": "/resin-presets/resin-nextdent-model-2-0-grey.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-nextdent-surgical-guide",
+      "sourcePageUrl": "https://ultimate3dprintingstore.com/products/nextdent-sg-surgical-guide",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0789/2979/products/ND_SG_1.png?v=1629735836",
+      "src": "/resin-presets/resin-nextdent-surgical-guide.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-peopoly-deft-white",
+      "sourcePageUrl": "https://peopoly.net/products/deft-resin-by-peopoly",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/1660/9083/files/uvresindeftwhite.jpg?v=1762942018",
+      "src": "/resin-presets/resin-peopoly-deft-white.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-peopoly-neo-clear",
+      "sourcePageUrl": "https://peopoly.net/products/neo-resin-by-peopoly",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/1660/9083/products/12-1.jpg?v=1762942045",
+      "src": "/resin-presets/resin-peopoly-neo-clear.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-photocentric-hard-grey",
+      "sourcePageUrl": "https://www.idig3dprinting.co.uk/shop/brand/photocentric/hard-grey-daylight-sla-resin/",
+      "sourceUrl": "https://www.idig3dprinting.co.uk/wp-content/uploads/2016/06/hard-grey-day-resin.jpg",
+      "src": "/resin-presets/resin-photocentric-hard-grey.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-primacreator-flex-clear",
+      "sourcePageUrl": "https://primacreator.com/products/copy-of-primacreator-value-uv-dlp-dlp-resin-flex",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/2424/8853/products/Resin-Value-FLEX-Clear-1000-2_e074ca6b-794b-4c2c-afc0-b848f8ea20ac.png?v=1574677886",
+      "src": "/resin-presets/resin-primacreator-flex-clear.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-primacreator-tough-clear",
+      "sourcePageUrl": "https://primacreator.com/products/primacreator-value-uv-dlp-dlp-resin-tough",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/2424/8853/products/Resin-Value-TOUGH-Clear-1000-2.png?v=1574679493",
+      "src": "/resin-presets/resin-primacreator-tough-clear.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-primacreator-tough-light-grey",
+      "sourcePageUrl": "https://primacreator.com/products/primacreator-value-uv-dlp-dlp-resin-tough",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/2424/8853/products/Resin-Value-TOUGH-Light-Grey-1000-2.png?v=1574679493",
+      "src": "/resin-presets/resin-primacreator-tough-light-grey.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-primacreator-tough-white",
+      "sourcePageUrl": "https://primacreator.com/products/primacreator-value-uv-dlp-dlp-resin-tough",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/2424/8853/products/Resin-Value-TOUGH-White-1000-2.png?v=1574679493",
+      "src": "/resin-presets/resin-primacreator-tough-white.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-primacreator-water-washable-transparent",
+      "sourcePageUrl": "https://primacreator.com/products/primacreator-value-uv-dlp-dlp-resin-water-washable",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/2424/8853/products/WWResin-Clear-1000ml_e022baca-94d6-48ee-8919-57f176a8fa55.jpg?v=1591777277",
+      "src": "/resin-presets/resin-primacreator-water-washable-transparent.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-basic-black",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-basic-black-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/9fd7788b-d8cf-41e9-806e-980dce42a193.jpg",
+      "src": "/resin-presets/resin-prusament-resin-basic-black.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-basic-grey",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-basic-grey-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/e5034a4e-3349-4894-a7de-240ec2144009.jpg",
+      "src": "/resin-presets/resin-prusament-resin-basic-grey.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-basic-orange",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-basic-orange-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/b07caedb-aa2b-497b-81da-e2bc935bec60.jpg",
+      "src": "/resin-presets/resin-prusament-resin-basic-orange.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-biobased60-herbal-green",
+      "sourcePageUrl": "https://web.archive.org/web/2022/https://www.prusa3d.com/product/prusament-resin-biobased60-herbal-green-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/4894.jpg",
+      "src": "/resin-presets/resin-prusament-resin-biobased60-herbal-green.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-biobased60-ivory-white",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-biobased60-ivory-white-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/4b4d1a21-4e05-450d-a233-a50132bc3fa0.jpg",
+      "src": "/resin-presets/resin-prusament-resin-biobased60-ivory-white.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-biobased60-magma-red",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-biobased60-magma-red-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/4895.jpg",
+      "src": "/resin-presets/resin-prusament-resin-biobased60-magma-red.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-biobased60-natural-yellow",
+      "sourcePageUrl": "https://web.archive.org/web/2022/https://www.prusa3d.com/product/prusament-resin-biobased60-natural-yellow-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/4893.jpg",
+      "src": "/resin-presets/resin-prusament-resin-biobased60-natural-yellow.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-biobased60-obsidian-black",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-biobased60-obsidian-black-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/6afb434e-737a-4bed-b923-231ea2e58c28.jpg",
+      "src": "/resin-presets/resin-prusament-resin-biobased60-obsidian-black.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-biobased60-sapphire-blue",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-biobased60-sapphire-blue-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/ca522ce5-aaaf-4cdc-8169-96295d90a7ea.jpg",
+      "src": "/resin-presets/resin-prusament-resin-biobased60-sapphire-blue.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-flex-anatomic-red",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-flex-anatomic-red-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/09eaf841-e057-41f4-95ce-077fb39c7898.jpg",
+      "src": "/resin-presets/resin-prusament-resin-flex-anatomic-red.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-flex-gingiva-mask",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-flex-gingiva-mask-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/a7236162-4aa9-47b0-a91e-88a316f2a78f.jpg",
+      "src": "/resin-presets/resin-prusament-resin-flex-gingiva-mask.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-flex80-black",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-flex80-black-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/5191.jpg",
+      "src": "/resin-presets/resin-prusament-resin-flex80-black.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-flex80-transparent-clear",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-flex80-transparent-clear-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/5192.jpg",
+      "src": "/resin-presets/resin-prusament-resin-flex80-transparent-clear.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-flex80-white",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-flex80-white-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/af97b6d0-d167-4c87-bac8-5eb5cc37e34f.jpg",
+      "src": "/resin-presets/resin-prusament-resin-flex80-white.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-impact65-black",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-impact65-black-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/6acaf03e-d926-435a-ad63-398f4bc55a05.jpg",
+      "src": "/resin-presets/resin-prusament-resin-impact65-black.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-model-alabaster-white",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-model-alabaster-white-1kg-2/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/d7b43e04-0eee-4af4-ac85-e505c050130f.png",
+      "src": "/resin-presets/resin-prusament-resin-model-alabaster-white.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-model-anthracite-grey",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-model-anthracite-grey-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/77d7c51b-1ab1-4e2c-9aac-5cdca864e728.jpg",
+      "src": "/resin-presets/resin-prusament-resin-model-anthracite-grey.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-model-brick-red",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-model-brick-red-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/6770728f-6ae8-46d6-90de-34122f361e29.jpg",
+      "src": "/resin-presets/resin-prusament-resin-model-brick-red.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-model-bright-cyan",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-model-bright-cyan-1kg-3/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/cbdde1e2-a161-4096-8c2f-58a5169ee147.png",
+      "src": "/resin-presets/resin-prusament-resin-model-bright-cyan.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-model-bright-magenta",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-model-bright-magenta-1kg-2/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/f2517b74-7bf6-4cc1-938a-93c10804a5b1.png",
+      "src": "/resin-presets/resin-prusament-resin-model-bright-magenta.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-model-bright-yellow",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-model-bright-yellow-1kg-2/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/f1e700a2-4578-4ae0-851b-ee8365b8917c.png",
+      "src": "/resin-presets/resin-prusament-resin-model-bright-yellow.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-model-classic-red",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-model-classic-red-1kg-discontinued/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/66b5a34f-9402-4ba2-a052-a8135eb5b6e2.png",
+      "src": "/resin-presets/resin-prusament-resin-model-classic-red.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-model-grass-green",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-model-grass-green-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/a72c2421-137b-4544-b443-a95e293fd387.jpg",
+      "src": "/resin-presets/resin-prusament-resin-model-grass-green.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-model-neutral-beige",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-model-plus-neutral-beige-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/ef2f113a-7a5b-4ea5-814c-64dede2078d9.png",
+      "src": "/resin-presets/resin-prusament-resin-model-neutral-beige.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-model-prusa-orange",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-model-plus-prusa-orange-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/15c2e775-46eb-4d58-b0e0-d0c8f8c314d1.png",
+      "src": "/resin-presets/resin-prusament-resin-model-prusa-orange.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-model-prusa-pro-green",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-model-plus-prusa-pro-green-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/1d66d525-2b94-4e2c-bcdf-0ca3208fcbb9.png",
+      "src": "/resin-presets/resin-prusament-resin-model-prusa-pro-green.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-model-rich-black",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-model-plus-rich-black-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/7301d172-92fb-4fd0-9dd8-190bbdcd9bfa.png",
+      "src": "/resin-presets/resin-prusament-resin-model-rich-black.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-model-sandstone",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-model-sandstone-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/0b673ed3-8109-42b9-a044-2641236d8172.jpg",
+      "src": "/resin-presets/resin-prusament-resin-model-sandstone.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-model-solid-grey",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-model-plus-solid-grey-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/d0af1c93-c437-4c09-811c-fed7baf0ff62.png",
+      "src": "/resin-presets/resin-prusament-resin-model-solid-grey.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-model-terra-brown",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-model-terra-brown-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/048b67d5-17fe-495a-9fc7-bf32ad6c3101.jpg",
+      "src": "/resin-presets/resin-prusament-resin-model-terra-brown.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-model-transparent-amber",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-model-transparent-amber-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/f32aaf47-8da9-4c5e-8c5d-115643ac97a2.jpg",
+      "src": "/resin-presets/resin-prusament-resin-model-transparent-amber.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-model-transparent-clear",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-model-plus-transparent-clear-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/c36b9a24-cef0-40ea-b691-5ffc06a39ed3.png",
+      "src": "/resin-presets/resin-prusament-resin-model-transparent-clear.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-model-transparent-green",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-model-transparent-green-1kg-2/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/dea62b69-43d2-4135-8bc6-37e66a1a7751.png",
+      "src": "/resin-presets/resin-prusament-resin-model-transparent-green.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-model-transparent-red",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-model-transparent-red-1kg-2/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/f60e7074-9507-4304-aac1-9246c068f566.png",
+      "src": "/resin-presets/resin-prusament-resin-model-transparent-red.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-model-ultra-violet",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-model-ultra-violet-1kg-2/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/302aee0d-853a-4cbc-88e1-09e642d242f4.png",
+      "src": "/resin-presets/resin-prusament-resin-model-ultra-violet.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-tough-anthracite-grey",
+      "sourcePageUrl": "https://web.archive.org/web/2022/https://www.prusa3d.com/product/prusament-resin-tough-anthracite-grey-1kg-2/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/3199.jpg",
+      "src": "/resin-presets/resin-prusament-resin-tough-anthracite-grey.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-tough-brick-red",
+      "sourcePageUrl": "https://web.archive.org/web/2022/https://www.prusa3d.com/product/prusament-resin-tough-brick-red-1-kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/3239.jpg",
+      "src": "/resin-presets/resin-prusament-resin-tough-brick-red.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-tough-bright-yellow",
+      "sourcePageUrl": "https://web.archive.org/web/2022/https://www.prusa3d.com/product/prusament-resin-tough-bright-yellow-1kg-2/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/3221.jpg",
+      "src": "/resin-presets/resin-prusament-resin-tough-bright-yellow.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-tough-classic-red",
+      "sourcePageUrl": "https://www.prusa3d.com/product/prusament-resin-tough-classic-red-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/6707effc-f5b5-493d-9536-00f0a6e809f6.jpg",
+      "note": "Prusa's live page for this product shows the bottle relabelled 'Model Classic Red'",
+      "src": "/resin-presets/resin-prusament-resin-tough-classic-red.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-tough-grass-green",
+      "sourcePageUrl": "https://web.archive.org/web/2022/https://www.prusa3d.com/product/prusament-resin-tough-grass-green-1kg-2/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/3225.jpg",
+      "src": "/resin-presets/resin-prusament-resin-tough-grass-green.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-tough-prusa-orange",
+      "sourcePageUrl": "https://web.archive.org/web/2022/https://www.prusa3d.com/product/prusament-resin-tough-prusa-orange-1kg-2/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/3191.jpg",
+      "src": "/resin-presets/resin-prusament-resin-tough-prusa-orange.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-tough-rich-black",
+      "sourcePageUrl": "https://web.archive.org/web/2022/https://www.prusa3d.com/product/prusament-resin-tough-rich-black-1kg-2/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/3195.jpg",
+      "src": "/resin-presets/resin-prusament-resin-tough-rich-black.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-tough-sandstone-model",
+      "sourcePageUrl": "https://web.archive.org/web/2022/https://www.prusa3d.com/product/prusament-resin-tough-sandstone-model-1-kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/3230.jpg",
+      "src": "/resin-presets/resin-prusament-resin-tough-sandstone-model.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-tough-terra-brown",
+      "sourcePageUrl": "https://web.archive.org/web/2022/https://www.prusa3d.com/product/prusament-resin-tough-terra-brown-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/3234.jpg",
+      "src": "/resin-presets/resin-prusament-resin-tough-terra-brown.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-tough-transparent-amber",
+      "sourcePageUrl": "https://web.archive.org/web/2022/https://www.prusa3d.com/product/prusament-resin-tough-transparent-amber-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/3255.jpg",
+      "src": "/resin-presets/resin-prusament-resin-tough-transparent-amber.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-tough-transparent-green",
+      "sourcePageUrl": "https://web.archive.org/web/2022/https://www.prusa3d.com/product/prusament-resin-tough-transparent-green-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/3253.jpg",
+      "src": "/resin-presets/resin-prusament-resin-tough-transparent-green.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-prusament-resin-tough-transparent-red",
+      "sourcePageUrl": "https://web.archive.org/web/2022/https://www.prusa3d.com/product/prusament-resin-tough-transparent-red-1kg/",
+      "sourceUrl": "https://www.prusa3d.com/content/images/product/3257.jpg",
+      "src": "/resin-presets/resin-prusament-resin-tough-transparent-red.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-resinworks-3d-violet",
+      "sourcePageUrl": "https://resinworks3d.com/product/ccw-easycast-hd-violet/",
+      "sourceUrl": "https://resinworks3d.com/wp-content/uploads/2019/10/EasyCast-HD-Violet.jpg",
+      "src": "/resin-presets/resin-resinworks-3d-violet.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-siraya-tech-blu-blue",
+      "sourcePageUrl": "https://siraya.tech/products/blu-tough-resin-by-siraya",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0255/7539/1341/products/Blu_2493c77d-7fb9-4a01-a3af-d884c26ee4f2.jpg?v=1705044163",
+      "src": "/resin-presets/resin-siraya-tech-blu-blue.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-siraya-tech-blu-clear-v2",
+      "sourcePageUrl": "https://siraya.tech/products/blu-tough-resin-by-siraya",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0255/7539/1341/files/BluToughresinClearv2_21a8c296-d12e-4316-a5f9-9c162c875b74.jpg?v=1705044163",
+      "src": "/resin-presets/resin-siraya-tech-blu-clear-v2.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-siraya-tech-easy",
+      "sourcePageUrl": "https://siraya.tech/products/blu-tough-resin-by-siraya",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0255/7539/1341/files/Blu_Easy_Grey.jpg?v=1794551758",
+      "note": "Siraya's current Blu Easy Grey; assumed successor of the profile's 'Easy', not confirmed",
+      "src": "/resin-presets/resin-siraya-tech-easy.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-siraya-tech-fast-black",
+      "sourcePageUrl": "https://siraya.tech/products/fast-abs-like",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0255/7539/1341/files/ABS-like_Fast_9_a10c14eb-9e65-4876-9f16-36b9e0f52ed6.jpg?v=1726717618",
+      "src": "/resin-presets/resin-siraya-tech-fast-black.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-siraya-tech-fast-grey",
+      "sourcePageUrl": "https://siraya.tech/products/fast-abs-like",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0255/7539/1341/files/ABS-like_Fast_Grey-05.jpg?v=1726717618",
+      "src": "/resin-presets/resin-siraya-tech-fast-grey.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-siraya-tech-sculpt",
+      "sourcePageUrl": "https://siraya.tech/products/sculpt-resin-high-temperature-resistant-resin",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0255/7539/1341/files/High-tempresin-SculptGrey.jpg?v=1698313314",
+      "src": "/resin-presets/resin-siraya-tech-sculpt.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-siraya-tech-simple-clear",
+      "sourcePageUrl": "https://siraya.tech/products/simple-resin-water-washable",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0255/7539/1341/files/ST0013.jpg?v=1704967309",
+      "src": "/resin-presets/resin-siraya-tech-simple-clear.webp",
+      "checkedAt": "2026-11-22"
+    },
+    {
+      "presetId": "resin-siraya-tech-tenacious",
+      "sourcePageUrl": "https://siraya.tech/products/tenacious-resin-flexible-resin",
+      "sourceUrl": "https://cdn.shopify.com/s/files/1/0255/7539/1341/files/04-_-1.jpg?v=1702967289",
+      "src": "/resin-presets/resin-siraya-tech-tenacious.webp",
+      "checkedAt": "2026-11-22"
+    }
+  ]
+}

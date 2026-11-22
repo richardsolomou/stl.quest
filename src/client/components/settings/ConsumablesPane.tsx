@@ -571,7 +571,11 @@ function ConsumableRow({
       className={cn(rowClassName, nested && 'bg-muted/20 pl-8 @sm:pl-14')}
       onClick={onOpen}
     >
-      <ConsumableIcon consumable={consumable} className={cn(nested && 'size-8')} />
+      <ConsumableIcon
+        consumable={consumable}
+        image={preset && 'image' in preset ? preset.image : undefined}
+        className={cn(nested && 'size-8')}
+      />
       <span className="min-w-0 flex-1">
         <span className="block font-medium @max-sm:line-clamp-2 @sm:truncate">{name}</span>
         {facts && <span className="block truncate text-xs text-muted-foreground">{facts}</span>}
