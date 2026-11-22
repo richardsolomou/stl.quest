@@ -52,6 +52,11 @@ export type ShoppingGroup = {
   shipping?: number
   /** How much more this order needs before it ships free; absent once it does, or when the store sets no threshold. */
   toFreeShipping?: number
+  /**
+   * While the order is short of free shipping, a pack each of what else is tracked from the store, soonest to run out
+   * first, until they would make it ship free; all of them when even that falls short.
+   */
+  topUp?: ShoppingItem[]
 }
 
 /**
@@ -67,40 +72,72 @@ export function shoppingList(input: {
   rates: ReadonlyMap<string, number>
 }): ShoppingGroup[] {
   const levels = new Map(input.levels.map((level) => [level.consumableId, level]))
-  const items = input.consumables.flatMap((consumable) => {
+  const tracked = input.consumables.flatMap((consumable) => {
     const level = levels.get(consumable.id)
     if (consumable.archived || !level?.tracked) return []
     const rate = input.rates.get(consumable.id)
-    const daysLeft = rate ? Math.max(0, level.onHand) / rate : undefined
-    if (!level.missing && !level.low && !(daysLeft !== undefined && daysLeft < BUY_AHEAD_DAYS)) return []
-    const pack = packSize(consumable) ?? enteredUnitScale(consumableUnit(consumable))
-    const target = Math.max(level.minimum ?? 0, (rate ?? 0) * STOCK_UP_DAYS)
-    const packs = Math.max(1, Math.ceil((target - level.onHand) / pack))
-    return [
-      { consumable, level, ...(daysLeft !== undefined && { daysLeft }), packs, pack, cost: packs * pack * consumableUnitPrice(consumable) },
-    ]
+    return [{ consumable, level, rate, ...(rate && { daysLeft: Math.max(0, level.onHand) / rate }) }]
   })
+  const needed = tracked.filter(
+    ({ level, daysLeft }) => level.missing || level.low || (daysLeft !== undefined && daysLeft < BUY_AHEAD_DAYS),
+  )
+  const items = needed.map(({ consumable, level, rate, daysLeft }) => {
+    const pack = packOf(consumable)
+    const target = Math.max(level.minimum ?? 0, (rate ?? 0) * STOCK_UP_DAYS)
+    return shoppingItem(consumable, level, daysLeft, Math.max(1, Math.ceil((target - level.onHand) / pack)))
+  })
+  const spare = tracked
+    .filter((entry) => !needed.includes(entry) && consumableUnitPrice(entry.consumable) > 0)
+    .map(({ consumable, level, daysLeft }) => shoppingItem(consumable, level, daysLeft, 1))
   items.sort(byUrgency)
+  spare.sort(byUrgency)
   const active = input.stores.filter((store) => !store.archived)
   const storeOf = (item: ShoppingItem) => active.find(({ id }) => id === item.consumable.storeId)
-  const groups = [...active, undefined].flatMap((store) => {
+  return [...active, undefined].flatMap((store) => {
     const own = items.filter((item) => storeOf(item) === store)
-    return own.length ? [group(store, own)] : []
+    return own.length ? [group(store, own, store ? spare.filter((item) => storeOf(item) === store) : [])] : []
   })
-  return groups
 }
 
-function group(store: Store | undefined, items: ShoppingItem[]): ShoppingGroup {
+function packOf(consumable: Consumable) {
+  return packSize(consumable) ?? enteredUnitScale(consumableUnit(consumable))
+}
+
+function shoppingItem(consumable: Consumable, level: StockLevel, daysLeft: number | undefined, packs: number): ShoppingItem {
+  const pack = packOf(consumable)
+  return {
+    consumable,
+    level,
+    ...(daysLeft !== undefined && { daysLeft }),
+    packs,
+    pack,
+    cost: packs * pack * consumableUnitPrice(consumable),
+  }
+}
+
+function group(store: Store | undefined, items: ShoppingItem[], spare: ShoppingItem[]): ShoppingGroup {
   const subtotal = items.reduce((total, item) => total + item.cost, 0)
   const threshold = store?.freeShippingOver
   const free = threshold !== undefined && subtotal >= threshold
+  const short = threshold !== undefined && !free ? threshold - subtotal : undefined
   return {
     ...(store && { store }),
     items,
     subtotal,
     ...(store?.shippingCost !== undefined && { shipping: free ? 0 : store.shippingCost }),
-    ...(threshold !== undefined && !free && { toFreeShipping: threshold - subtotal }),
+    ...(short !== undefined && { toFreeShipping: short, topUp: topUp(spare, short) }),
   }
+}
+
+function topUp(spare: ShoppingItem[], short: number) {
+  const picked: ShoppingItem[] = []
+  let added = 0
+  for (const item of spare) {
+    if (added >= short) break
+    picked.push(item)
+    added += item.cost
+  }
+  return picked
 }
 
 /** Gone first, then the fewest days left, then the furthest below its minimum. */

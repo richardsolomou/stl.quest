@@ -1,4 +1,6 @@
 import { consumablesOfKind, type Consumable, type FilamentColour, type FilamentConsumable } from './consumables'
+import type { PriceCalculatorCurrency } from './priceCalculator'
+import { consumableCurrency, type Store } from './stores'
 
 export type FilamentPreset = {
   id: string
@@ -80,10 +82,21 @@ export function filamentProductGroups(filaments: FilamentConsumable[]): Filament
   )
 }
 
-/** The library with a filament's price given to the other active colours of its catalogue product. */
-export function withSharedFilamentPrice(consumables: Consumable[], sourceId: string) {
+/** The other active colours of a filament's catalogue product that are priced in the same currency, so can share its price. */
+export function samePricedColours(
+  consumables: Consumable[],
+  filament: FilamentConsumable,
+  stores: Store[],
+  workspace: PriceCalculatorCurrency,
+) {
+  const currency = consumableCurrency(filament, stores, workspace)
+  return sameFilamentProduct(consumables, filament).filter((other) => consumableCurrency(other, stores, workspace) === currency)
+}
+
+/** The library with a filament's price given to its `samePricedColours`. */
+export function withSharedFilamentPrice(consumables: Consumable[], sourceId: string, stores: Store[], workspace: PriceCalculatorCurrency) {
   const source = consumables.find((item): item is FilamentConsumable => item.id === sourceId && item.kind === 'filament')
   if (!source) return consumables
-  const siblings = new Set(sameFilamentProduct(consumables, source).map(({ id }) => id))
+  const siblings = new Set(samePricedColours(consumables, source, stores, workspace).map(({ id }) => id))
   return consumables.map((item) => (item.kind === 'filament' && siblings.has(item.id) ? { ...item, pricePerKg: source.pricePerKg } : item))
 }

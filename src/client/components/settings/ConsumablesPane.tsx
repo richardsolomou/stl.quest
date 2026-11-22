@@ -21,12 +21,17 @@ import {
 import { filamentConsumableName, filamentFromPreset, filamentProductGroups, type FilamentPreset } from '../../../core/filamentPresets'
 import { partPresetChoices, type PartPresetChoice } from '../../../core/partPresets'
 import { findPreset } from '../../../core/presets'
-import { DEFAULT_PRICE_CALCULATOR_SETTINGS, TYPICAL_RESIN_DENSITY_GRAMS_PER_ML } from '../../../core/priceCalculator'
+import {
+  DEFAULT_PRICE_CALCULATOR_SETTINGS,
+  TYPICAL_RESIN_DENSITY_GRAMS_PER_ML,
+  type PriceCalculatorCurrency,
+} from '../../../core/priceCalculator'
 import { getPrinterPreset } from '../../../core/printerPresets'
 import { printTypeCopy } from '../../../core/printTypes'
 import { resinFromPreset, type ResinPreset } from '../../../core/resinPresets'
 import { supplyFromPreset, supplyPresetsFor, supplyPresetsUsedBy, supplyUserIds } from '../../../core/supplyPresets'
 import { partFromPreset, type PartSuggestion } from '../../../core/stock'
+import { boughtWhereSold, storeCurrency } from '../../../core/stores'
 import { PRINT_TYPES, type PrintType } from '../../../core/types'
 import type { StockLevel } from '../../../core/usage'
 import { useI18n } from '../../i18n'
@@ -46,7 +51,7 @@ import {
 import { signalProductTourProgress } from '../../productTour'
 import { useUsageTracking, useWorkspacePrintTypes, useWorkspaceSlug } from '../../workspace'
 import { UsageTrackingInvite } from '../UsageTracking'
-import { currencySymbol, formatMoney, formatNumber, formatRate } from '../priceCalculator/format'
+import { formatMoney, formatNumber, formatRate } from '../priceCalculator/format'
 import { QueryState } from '../QueryState'
 import { ColourSwatch } from '../ColourSwatch'
 import { AlsoPrints } from './AlsoPrints'
@@ -101,13 +106,10 @@ export function ConsumablesPane() {
 
 /** The library as rows that open one dialog per consumable, each stored straight away from it, as printers are. */
 function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string; saved: Consumable[] }) {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const copy = t.settings.consumables
   const currency =
     useQuery(priceCalculatorSettingsQuery(workspaceSlug)).data?.settings.currency ?? DEFAULT_PRICE_CALCULATOR_SETTINGS.currency
-  const symbol = currencySymbol(currency, locale)
-  const money = (value: number) => formatMoney(value, currency, locale)
-  const rate = (value: number) => formatRate(value, currency, locale)
   const profiles = useQuery(printersQuery(workspaceSlug)).data?.profiles
   const printers = useMemo(() => profiles ?? [], [profiles])
   const printTypes = useWorkspacePrintTypes()
@@ -117,6 +119,12 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
   const levels = useMemo(() => stock ?? [], [stock])
   const storeList = useQuery(storesQuery(workspaceSlug)).data?.stores
   const stores = useMemo(() => storeList ?? [], [storeList])
+  // A consumable is priced in its store's currency.
+  const currencyOf = (item: Consumable) =>
+    storeCurrency(
+      stores.find(({ id }) => id === item.storeId),
+      currency,
+    )
   const { mutation, save, setArchived, remove } = useInventory('consumables')
   const batch = useConsumableBatch()
   // A new item scrolls into view once it is stored, so it is found where it landed when its dialog closes.
@@ -181,7 +189,7 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
       : addCustomPart(group)
   // The catalogue knows no prices, so a part from it opens unpriced, with its list price as a hint.
   const addPresetPart = (suggestion: Pick<PartSuggestion, 'preset' | 'printerPresetId'> & { printerId?: string }) =>
-    setEditing(withConsumablePrice(partFromPreset(createId(), suggestion), Number.NaN))
+    setEditing(boughtWhereSold(withConsumablePrice(partFromPreset(createId(), suggestion), Number.NaN), stores, suggestion.preset))
 
   const [search, setSearch] = useState('')
   const found = (item: Consumable) => matchesListSearch(search, [item.name])
@@ -255,7 +263,7 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
                 entry={entry}
                 preset={findPreset(filaments, entry.presetId)}
                 levels={entry.filaments.flatMap((filament) => level(filament) ?? [])}
-                money={money}
+                currencyOf={currencyOf}
                 onToggle={() => toggleProduct(entry.presetId)}
               />
             ) : (
@@ -271,8 +279,7 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
                 }
                 image={productImage(entry.consumable)}
                 level={level(entry.consumable)}
-                money={money}
-                rate={rate}
+                currency={currencyOf(entry.consumable)}
                 onOpen={() => setEditing(entry.consumable)}
               />
             )
@@ -314,7 +321,7 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
           levels={stock}
           dailyUse={stockData?.dailyUse}
           stores={stores}
-          money={money}
+          currency={currency}
           printers={printers}
           printTypes={printTypes}
           onAddMaterial={addMaterial}
@@ -384,7 +391,7 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
         </div>
       </SettingsSection>
 
-      <StoresSection stores={stores} consumables={saved} symbol={symbol} money={money} />
+      <StoresSection stores={stores} consumables={saved} currency={currency} />
 
       <ArchivedInventory
         kind="consumables"
@@ -402,7 +409,7 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
           kind="resin"
           presets={resins}
           added={presetIds(materials.resin.items.map(({ resinPresetId }) => resinPresetId))}
-          onSelect={(preset) => setEditing(resinFromPreset(createId(), preset))}
+          onSelect={(preset) => setEditing(boughtWhereSold(resinFromPreset(createId(), preset), stores, preset))}
           onCustom={(name = '') =>
             setEditing({
               id: createId(),
@@ -430,7 +437,9 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
           presets={supplyCatalogue && supplyPresetsFor(supplyCatalogue, printTypes)}
           suggested={new Set(supplyPresetsUsedBy(supplyCatalogue ?? [], supplyUserIds(equipment ?? [], printers)).map(({ id }) => id))}
           added={presetIds(supplies.map(({ supplyPresetId }) => supplyPresetId))}
-          onSelect={(preset) => setEditing(withConsumablePrice(supplyFromPreset(createId(), preset), Number.NaN))}
+          onSelect={(preset) =>
+            setEditing(boughtWhereSold(withConsumablePrice(supplyFromPreset(createId(), preset), Number.NaN), stores, preset))
+          }
           onCustom={addCustomSupply}
           onClose={() => setPicking(null)}
         />
@@ -458,8 +467,7 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
           workspaceSlug={workspaceSlug}
           level={levels.find(({ consumableId }) => consumableId === editing.id)}
           printers={printers}
-          symbol={symbol}
-          rate={rate}
+          currency={currency}
           onSave={saveItem}
           onAddColours={addColours}
           onArchive={() => archive(editing)}
@@ -540,8 +548,7 @@ function ConsumableRow({
   preset,
   image,
   level,
-  money,
-  rate,
+  currency,
   onOpen,
 }: {
   consumable: Consumable
@@ -552,11 +559,13 @@ function ConsumableRow({
   /** The catalogue product's photo. */
   image?: { src: string }
   level?: StockLevel
-  money: (value: number) => string
-  rate: (value: number) => string
+  /** What its price is in. */
+  currency: PriceCalculatorCurrency
   onOpen: () => void
 }) {
   const { t, locale } = useI18n()
+  const money = (value: number) => formatMoney(value, currency, locale)
+  const rate = (value: number) => formatRate(value, currency, locale)
   const copy = t.settings.consumables
   const facts = nested ? undefined : rowFacts(consumable)
   const name = (nested && consumable.kind === 'filament' && consumable.colour?.name) || consumable.name
@@ -618,21 +627,25 @@ function FilamentProductRow({
   entry,
   preset,
   levels,
-  money,
+  currencyOf,
   onToggle,
 }: {
   entry: ProductEntry
   preset?: FilamentPreset
   levels: StockLevel[]
-  money: (value: number) => string
+  currencyOf: (consumable: Consumable) => PriceCalculatorCurrency
   onToggle: () => void
 }) {
   const { t, locale } = useI18n()
   const copy = t.settings.consumables
   const name = preset ? filamentConsumableName(preset) : entry.filaments[0].name
-  const prices = entry.filaments.map(({ pricePerKg }) => pricePerKg)
-  const [lowest, highest] = [Math.min(...prices), Math.max(...prices)]
-  const priced = lowest === highest ? `${money(lowest)}/kg` : `${money(lowest)}–${money(highest)}/kg`
+  // Colours bought from stores in different currencies each read in their own.
+  const prices = [...new Set(entry.filaments.map((filament) => formatMoney(filament.pricePerKg, currencyOf(filament), locale)))]
+  const ordered = entry.filaments.toSorted((a, b) => a.pricePerKg - b.pricePerKg)
+  const [lowest, highest] = [ordered[0], ordered[ordered.length - 1]].map((filament) =>
+    formatMoney(filament.pricePerKg, currencyOf(filament), locale),
+  )
+  const priced = prices.length === 1 ? `${prices[0]}/kg` : `${lowest}–${highest}/kg`
   const low = levels.filter((level) => level.low || level.missing).length
   const swatches = entry.filaments.flatMap(({ id, colour }) => (colour ? [{ id, hex: colour.hex }] : []))
   const Chevron = entry.open ? ChevronDown : ChevronRight

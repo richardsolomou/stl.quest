@@ -279,6 +279,8 @@ export const settings: typeof en = {
       fields: { name: 'einen Namen', price: 'einen Preis', density: 'eine Dichte', lifespan: 'eine Lebensdauer', colour: 'eine Farbe' },
       densityHint: 'Die meisten Harze haben etwa 1,1 g/mL.',
       priceHint: 'Was Sie zahlen, inklusive Steuer und Versand.',
+      priceHintSpread: (store: string, share: string) =>
+        `Was Sie ohne Versand zahlen, inklusive Steuer. ${store} schlägt ${share} für den Versand auf.`,
     },
     resins: {
       title: 'Harze',
@@ -453,6 +455,13 @@ export const settings: typeof en = {
       shipsFree: 'Versandkostenfrei',
       toFreeShipping: (amount: string) => `noch ${amount} bis versandkostenfrei`,
       freeShippingProgress: (store: string) => `Fortschritt zum kostenlosen Versand bei ${store}`,
+      converted: (amount: string) => `≈ ${amount}`,
+      needsRate: 'Braucht einen neuen Wechselkurs',
+      topUp: 'Für kostenlosen Versand zusätzlich',
+      stillShort: (amount: string) => `fehlen noch ${amount}`,
+      reachesFree: 'Damit versandkostenfrei',
+      openStore: (store: string) => `${store} öffnen`,
+      openProduct: (name: string) => `${name} im Shop öffnen`,
       missing: 'Fehlt in Ihrer Liste',
       partFits: (model: string, printers: number) => `${model} · ${printers} Drucker`,
       partGeneric: (printType: string, printers: number) => `Jeder ${printType} · ${printers}`,
@@ -481,6 +490,25 @@ export const settings: typeof en = {
       shippingCostHint: 'Was der Versand einer Bestellung zu Ihnen kostet.',
       freeShippingOver: (symbol: string) => `Versandkostenfrei ab (${symbol})`,
       freeShippingOverHint: 'Der Bestellwert, ab dem der Shop kostenlos in Ihr Land liefert, falls es einen gibt.',
+      usualOrder: (symbol: string) => `Übliche Bestellung (${symbol})`,
+      usualOrderHint:
+        'Was eine Bestellung hier üblicherweise kostet. Kosten und Angebote verteilen den Versand dann auf die Preise dieses Shops, geben Sie diese also ohne Versand ein.',
+      currency: 'Währung',
+      workspaceCurrency: (currency: string) => `Währung des Arbeitsbereichs (${currency})`,
+      currencyHint: 'Die Währung seiner Preise, Versandkosten und Versandkostenfrei-Grenze.',
+      exchangeRate: (from: string, to: string) => `1 ${from} in ${to}`,
+      exchangeRateHint: 'Rechnet seine Preise in Kosten und Angeboten um. Passen Sie ihn an, wenn sich der Kurs ändert.',
+      url: 'Website',
+      urlHint: 'Katalogprodukte von dieser Website werden hier gekauft, und „Was Sie brauchen“ verlinkt ihre Seiten.',
+      urlInvalid: 'Geben Sie eine Webadresse ein, die mit http:// oder https:// beginnt.',
+      spread: (share: string) => `schlägt ${share} Versand auf die Preise auf`,
+      needsRate: (currency: string) => `Braucht einen neuen Wechselkurs in ${currency}`,
+      staleRate: (currency: string) =>
+        `Der Arbeitsbereich rechnet jetzt in ${currency}. Bis Sie diesen Kurs in ${currency} eingeben, rechnen Kosten und Angebote seine Preise nicht um.`,
+      takeOutShipping: (share: string, count: number) =>
+        `${share} Versand aus ${count === 1 ? 'dem vorhandenen Preis' : `den ${count} vorhandenen Preisen`} herausrechnen`,
+      takeOutShippingHint:
+        'Sie wurden inklusive Versand eingegeben. Kosten schlagen ihn jetzt anhand der üblichen Bestellung auf, er würde also doppelt gezählt.',
       shipping: (amount: string) => `Versand ${amount}`,
       freeOver: (amount: string) => `frei ab ${amount}`,
       noShipping: 'Keine Versandkosten festgelegt',
