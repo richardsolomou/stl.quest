@@ -3,6 +3,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getSlicer, slicersFor, type SlicerId } from '../../../core/slicers'
 import type { PrintType } from '../../../core/types'
 import { useI18n } from '../../i18n'
+import { AppLogo } from '../AppLogo'
 
 /** Picks the slicer a printer's files go to, or for a material, the one it uses instead of its printer's. */
 export function SlicerField({
@@ -21,7 +22,7 @@ export function SlicerField({
   const { t } = useI18n()
   const copy = t.settings.slicer
   const chosen = getSlicer(value)
-  const items = [
+  const items: { value: SlicerId | ''; label: string }[] = [
     { value: '', label: material ? copy.printers : copy.none },
     ...slicersFor(printType).map((slicer) => ({ value: slicer.id, label: slicer.name })),
   ]
@@ -30,11 +31,15 @@ export function SlicerField({
       <FieldLabel htmlFor={id}>{copy.label}</FieldLabel>
       <Select items={items} value={value ?? ''} onValueChange={(next) => onChange(getSlicer(next ?? undefined)?.id)}>
         <SelectTrigger id={id} className="w-full sm:w-72">
-          <SelectValue />
+          <SelectValue>
+            {chosen && <AppLogo app={chosen.id} />}
+            <span className="truncate">{chosen?.name ?? items[0].label}</span>
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {items.map((item) => (
             <SelectItem key={item.value} value={item.value}>
+              {item.value && <AppLogo app={item.value} />}
               {item.label}
             </SelectItem>
           ))}

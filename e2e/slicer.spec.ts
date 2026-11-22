@@ -49,6 +49,7 @@ test('opens a print in its printer’s slicer through a link that works without 
 
   const open = requestDialog.getByRole('button', { name: 'Open in OrcaSlicer' })
   await expect(open).toBeVisible()
+  await expect.poll(() => open.locator('img').evaluate((logo: HTMLImageElement) => logo.naturalWidth)).toBeGreaterThan(0)
   await screenshot(page, 'request-open-in-slicer')
   await page.setViewportSize({ width: 320, height: 720 })
   await expectWithinViewportWidth(page, open)

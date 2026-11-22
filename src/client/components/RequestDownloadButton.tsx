@@ -12,6 +12,7 @@ import { requestDownloadHref } from '../boardDownload'
 import { signalProductTourProgress } from '../productTour'
 import { slicerFileUrl, usePrinterSlicer } from '../printerSlicer'
 import { useI18n } from '../i18n'
+import { AppLogo } from './AppLogo'
 import { useWorkspaceSlug } from '../workspace'
 
 export function RequestDownloadButton({ request, isAdmin }: { request: PublicPrintRequest; isAdmin: boolean }) {
@@ -30,7 +31,14 @@ export function RequestDownloadButton({ request, isAdmin }: { request: PublicPri
           signalProductTourProgress('download')
         }}
       >
-        {slicer && !slicer.openUrl ? t.requests.slicer.download(slicer.name) : t.requests.downloadModel}
+        {slicer && !slicer.openUrl ? (
+          <>
+            <AppLogo app={slicer.id} />
+            {t.requests.slicer.download(slicer.name)}
+          </>
+        ) : (
+          t.requests.downloadModel
+        )}
       </ButtonLink>
     </>
   )
@@ -61,7 +69,7 @@ function OpenInSlicerButton({
   })
   return (
     <Button type="button" variant="outline" disabled={open.isPending} onClick={() => open.mutate()}>
-      {open.isPending && <Spinner />}
+      {open.isPending ? <Spinner /> : <AppLogo app={slicer.id} />}
       {t.requests.slicer.open(slicer.name)}
     </Button>
   )

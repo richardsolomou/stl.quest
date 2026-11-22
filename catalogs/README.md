@@ -9,5 +9,6 @@ STL Quest keeps versioned product data under this directory so self-hosted insta
 - [Equipment](equipment/README.md) contains accessory and post-processing power specifications.
 - [Parts](parts/README.md) contains wear parts with the printers they fit, sourced lifespans, manufacturer list prices on a checked date, and product images.
 - [Supplies](supplies/README.md) contains wash fluids, gloves, and other supplies, the equipment their makers name them for, manufacturer list prices on a checked date, and product images.
+- [App logos](app-logos/README.md) contains the official icons of the slicers and integrations STL Quest opens or connects to, and their provenance.
 
 Run `pnpm catalog:sync` to regenerate the committed snapshots and `pnpm catalog:check` to validate all catalogs without network access.
