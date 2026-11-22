@@ -2,18 +2,21 @@ import { useRef, useState } from 'react'
 import { ChevronRight, Plus, Store as StoreIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { Consumable } from '../../../core/consumables'
 import { activeItems } from '../../../core/inventory'
-import type { Store } from '../../../core/stores'
+import { PRICE_CALCULATOR_CURRENCIES, type PriceCalculatorCurrency } from '../../../core/priceCalculator'
+import { validSourceUrl } from '../../../core/request'
+import { shippingShare, storeCurrency, type Store } from '../../../core/stores'
 import { useI18n } from '../../i18n'
 import { createId } from '../../id'
 import { useInventory } from '../../inventory'
 import { useAutosave } from '../../useAutosave'
 import { AutosaveStatus } from '../AutosaveStatus'
 import { DialogShell } from '../DialogShell'
+import { currencyLabel, currencySymbol, formatMoney } from '../priceCalculator/format'
 import { ArchivedInventory } from './ArchivedInventory'
 import { SettingsSection } from './SettingsLayout'
 
@@ -21,15 +24,15 @@ import { SettingsSection } from './SettingsLayout'
 export function StoresSection({
   stores,
   consumables,
-  symbol,
-  money,
+  currency,
 }: {
   stores: Store[]
   consumables: Consumable[]
-  symbol: string
-  money: (value: number) => string
+  /** The workspace currency, which a store without its own prices in. */
+  currency: PriceCalculatorCurrency
 }) {
-  const copy = useI18n().t.settings.consumables
+  const { t, locale } = useI18n()
+  const copy = t.settings.consumables
   const { mutation, save, setArchived, remove } = useInventory('stores')
   const [editing, setEditing] = useState<Store | null>(null)
   const active = activeItems(stores)
@@ -45,13 +48,19 @@ export function StoresSection({
     )
   }
   const items = (store: Store) => activeItems(consumables).filter(({ storeId }) => storeId === store.id).length
-  const shipping = (store: Store) =>
-    [
+  const percent = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 })
+  const shipping = (store: Store) => {
+    const money = (value: number) => formatMoney(value, storeCurrency(store, currency), locale)
+    const share = shippingShare(store)
+    return [
+      store.currency && store.currency !== currency && store.currency,
       store.shippingCost === undefined ? copy.stores.noShipping : copy.stores.shipping(money(store.shippingCost)),
       store.freeShippingOver !== undefined && copy.stores.freeOver(money(store.freeShippingOver)),
+      share > 0 && copy.stores.spread(percent.format(share)),
     ]
       .filter(Boolean)
       .join(' · ')
+  }
 
   return (
     <>
@@ -109,7 +118,7 @@ export function StoresSection({
           key={editing.id}
           store={editing}
           isNew={!stores.some(({ id }) => id === editing.id)}
-          symbol={symbol}
+          currency={currency}
           onSave={save}
           onArchive={() => archive(editing)}
           onClose={() => setEditing(null)}
@@ -119,32 +128,44 @@ export function StoresSection({
   )
 }
 
-/** One store's name and shipping, saved as it is edited; a new one is created once it has a name. */
+/**
+ * One store's name, website, currency, and shipping, saved as it is edited; a new one is created once it has a name,
+ * and one in its own currency once it has a rate.
+ */
 function StoreDialog({
   store,
   isNew,
-  symbol,
+  currency,
   onSave,
   onArchive,
   onClose,
 }: {
   store: Store
   isNew: boolean
-  symbol: string
+  currency: PriceCalculatorCurrency
   onSave: (store: Store) => Promise<void>
   onArchive: () => void
   onClose: () => void
 }) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const copy = t.settings.consumables
   const [draft, setDraft] = useState(store)
-  const autosave = useAutosave({ value: draft, valid: draft.name.trim() !== '', save: onSave })
+  const [url, setUrl] = useState(store.url ?? '')
+  const urlValid = url.trim() === '' || validSourceUrl(url.trim())
+  const valid = draft.name.trim() !== '' && urlValid && (!draft.currency || draft.exchangeRate !== undefined)
+  const autosave = useAutosave({ value: draft, valid, save: onSave })
   const nameField = useRef<HTMLInputElement>(null)
   const [initialFocus] = useState(() => (isNew ? nameField : undefined))
   const close = async () => {
-    if (!draft.name.trim() || (await autosave.flush())) onClose()
+    if (!valid || (await autosave.flush())) onClose()
   }
-  const amount = (key: 'shippingCost' | 'freeShippingOver', label: string, hint: string) => {
+  const own = storeCurrency(draft, currency)
+  const symbol = currencySymbol(own, locale)
+  const currencies = [
+    { value: NO_CURRENCY, label: copy.stores.workspaceCurrency(currency) },
+    ...PRICE_CALCULATOR_CURRENCIES.filter((code) => code !== currency).map((code) => ({ value: code, label: currencyLabel(code, locale) })),
+  ]
+  const amount = (key: 'shippingCost' | 'freeShippingOver' | 'usualOrder' | 'exchangeRate', label: string, hint: string) => {
     const id = `store-${key}`
     const value = draft[key]
     return (
@@ -160,8 +181,8 @@ function StoreDialog({
           value={value ?? ''}
           onChange={(event) => {
             const entered = event.target.valueAsNumber
-            const valid = Number.isFinite(entered) && (key === 'shippingCost' ? entered >= 0 : entered > 0)
-            setDraft({ ...draft, [key]: valid ? entered : undefined })
+            const accepted = Number.isFinite(entered) && (key === 'shippingCost' ? entered >= 0 : entered > 0)
+            setDraft({ ...draft, [key]: accepted ? entered : undefined })
           }}
         />
         <FieldDescription>{hint}</FieldDescription>
@@ -204,14 +225,60 @@ function StoreDialog({
           onChange={(event) => setDraft({ ...draft, name: event.target.value })}
         />
       </Field>
+      <Field data-invalid={!urlValid || undefined}>
+        <FieldLabel htmlFor="store-url">{copy.stores.url}</FieldLabel>
+        <Input
+          id="store-url"
+          type="url"
+          inputMode="url"
+          placeholder="https://"
+          value={url}
+          maxLength={2_000}
+          aria-invalid={!urlValid || undefined}
+          onChange={(event) => {
+            const next = event.target.value
+            setUrl(next)
+            setDraft({ ...draft, url: next.trim() && validSourceUrl(next.trim()) ? next.trim() : undefined })
+          }}
+        />
+        {urlValid ? <FieldDescription>{copy.stores.urlHint}</FieldDescription> : <FieldError>{copy.stores.urlInvalid}</FieldError>}
+      </Field>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field>
+          <FieldLabel htmlFor="store-currency">{copy.stores.currency}</FieldLabel>
+          <Select
+            items={currencies}
+            value={draft.currency ?? NO_CURRENCY}
+            onValueChange={(next) => {
+              const code = PRICE_CALCULATOR_CURRENCIES.find((candidate) => candidate === next)
+              setDraft({ ...draft, currency: code, exchangeRate: code ? draft.exchangeRate : undefined })
+            }}
+          >
+            <SelectTrigger className="w-full" id="store-currency">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {currencies.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <FieldDescription>{copy.stores.currencyHint}</FieldDescription>
+        </Field>
+        {draft.currency && amount('exchangeRate', copy.stores.exchangeRate(draft.currency, currency), copy.stores.exchangeRateHint)}
+      </div>
       <div className="grid gap-5 sm:grid-cols-2">
         {amount('shippingCost', copy.stores.shippingCost(symbol), copy.stores.shippingCostHint)}
         {amount('freeShippingOver', copy.stores.freeShippingOver(symbol), copy.stores.freeShippingOverHint)}
+        {amount('usualOrder', copy.stores.usualOrder(symbol), copy.stores.usualOrderHint)}
       </div>
     </DialogShell>
   )
 }
 
+const NO_CURRENCY = ''
 const NO_STORE = ''
 
 /** Which store a consumable is bought from, among those in use and the one it names now. */

@@ -1,20 +1,22 @@
 import { useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Check, ClipboardPaste, Info, Plus } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Check, ClipboardPaste, ExternalLink, Info, Plus } from 'lucide-react'
+import { Button, ButtonLink } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Progress } from '@/components/ui/progress'
 import { consumablesOfKind, type Consumable } from '../../../core/consumables'
 import { wearingParts } from '../../../core/maintenance'
+import type { PriceCalculatorCurrency } from '../../../core/priceCalculator'
+import { findPreset } from '../../../core/presets'
 import { getPrinterPreset } from '../../../core/printerPresets'
-import { shoppingList, type ShoppingGroup } from '../../../core/shopping'
+import { shoppingList, type ShoppingGroup, type ShoppingItem } from '../../../core/shopping'
 import { missingMaterials, missingWearParts, untrackedConsumables, type PartSuggestion } from '../../../core/stock'
-import type { Store } from '../../../core/stores'
+import { inWorkspaceCurrency, presetPage, storeCurrency, storeForProduct, type Store } from '../../../core/stores'
 import type { PrinterProfile, PrintType } from '../../../core/types'
 import type { StockLevel } from '../../../core/usage'
 import { useI18n } from '../../i18n'
 import { catalogueQuery, printerLifetimesQuery } from '../../queries'
-import { formatNumber } from '../priceCalculator/format'
+import { formatMoney, formatNumber } from '../priceCalculator/format'
 import { formatStock, LowMarker, StockMovementForm } from './ConsumableStock'
 import { OrderRestockDialog } from './OrderRestockDialog'
 import { ReplacedButton, WearText } from './PrinterMaintenance'
@@ -33,7 +35,7 @@ export function SupplyNeeds({
   levels: loadedLevels,
   dailyUse,
   stores,
-  money,
+  currency,
   printers,
   printTypes,
   onAddMaterial,
@@ -46,7 +48,8 @@ export function SupplyNeeds({
   /** Per consumable ID, how much goes per day at its recent rate (see core/shopping). */
   dailyUse?: Record<string, number>
   stores: Store[]
-  money: (value: number) => string
+  /** The workspace currency, which a store without its own prices in. */
+  currency: PriceCalculatorCurrency
   printers: PrinterProfile[]
   /** What the workspace prints; nothing is suggested for another type. */
   printTypes: readonly PrintType[]
@@ -61,6 +64,20 @@ export function SupplyNeeds({
   const toBuy = orders.reduce((total, order) => total + order.items.length, 0)
   const materials = missingMaterials(library, printers).filter(({ printType }) => printTypes.includes(printType))
   const catalogue = useQuery(catalogueQuery('parts')).data ?? []
+  // Only a store with a website can be matched to the catalogue's product pages.
+  const linked = stores.some((store) => store.url)
+  const supplyPresets = useQuery({ ...catalogueQuery('supplies'), enabled: linked }).data
+  const resinPresets = useQuery({ ...catalogueQuery('resins'), enabled: linked }).data
+  const productPage = (consumable: Consumable) =>
+    presetPage(
+      consumable.kind === 'part'
+        ? findPreset(catalogue, consumable.partPresetId)
+        : consumable.kind === 'supply'
+          ? findPreset(supplyPresets, consumable.supplyPresetId)
+          : consumable.kind === 'resin'
+            ? findPreset(resinPresets, consumable.resinPresetId)
+            : undefined,
+    )
   const parts = missingWearParts(library, printers, catalogue).filter(({ printType }) => printTypes.includes(printType))
   const lifetimes = useQuery(printerLifetimesQuery(workspaceSlug)).data?.lifetimes ?? []
   const wearing = wearingParts(lifetimes).flatMap(({ printerId, wear }) => {
@@ -117,7 +134,8 @@ export function SupplyNeeds({
               order={order}
               // With no stores set up, what to buy is one list rather than a group named for no store.
               named={orders.length > 1 || Boolean(order.store)}
-              money={money}
+              currency={currency}
+              productPage={productPage}
             />
           ))}
         </div>
@@ -185,34 +203,64 @@ export function SupplyNeeds({
   )
 }
 
-/** One store's order: what to buy there, the order's total and shipping, and how close it is to shipping free. */
+/**
+ * One store's order: what to buy there, the order's total and shipping in the store's currency, how close it is to
+ * shipping free, and what else from the store would get it there.
+ */
 function StoreOrder({
   workspaceSlug,
   order,
   named,
-  money,
+  currency,
+  productPage,
 }: {
   workspaceSlug: string
   order: ShoppingGroup
   named: boolean
-  money: (value: number) => string
+  currency: PriceCalculatorCurrency
+  /** The catalogue page a consumable's product is sold on, if the catalogue knows one. */
+  productPage: (consumable: Consumable) => string | undefined
 }) {
   const { t, locale } = useI18n()
   const copy = t.settings.consumables.needs
-  const stock = t.settings.consumables.stock
-  const { store, subtotal, shipping, toFreeShipping } = order
+  const { store, subtotal, shipping, toFreeShipping, topUp = [] } = order
+  const own = storeCurrency(store, currency)
+  const money = (value: number) => formatMoney(value, own, locale)
   const threshold = store?.freeShippingOver
   const totals = [
     copy.subtotal(money(subtotal)),
+    own !== currency && copy.converted(formatMoney(inWorkspaceCurrency(subtotal, store, currency), currency, locale)),
     shipping === 0 ? copy.shipsFree : shipping !== undefined && copy.shipping(money(shipping)),
     toFreeShipping !== undefined && copy.toFreeShipping(money(toFreeShipping)),
   ].filter(Boolean)
   const name = store?.name ?? copy.noStore
+  const topUpCost = topUp.reduce((total, item) => total + item.cost, 0)
+  const link = (consumable: Consumable) => {
+    const page = store && productPage(consumable)
+    return page && storeForProduct([store], page) ? page : undefined
+  }
+  const row = (item: ShoppingItem) => (
+    <ShoppingRow key={item.consumable.id} workspaceSlug={workspaceSlug} item={item} money={money} page={link(item.consumable)} />
+  )
   return (
     <section aria-label={name} className="grid min-w-0 gap-1.5">
       {named && (
         <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-          <h4 className="text-sm font-medium [overflow-wrap:anywhere]">{name}</h4>
+          <h4 className="text-sm font-medium [overflow-wrap:anywhere]">
+            {store?.url ? (
+              <a
+                href={store.url}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={copy.openStore(name)}
+                className="inline-flex items-center gap-1 underline-offset-2 hover:underline"
+              >
+                {name} <ExternalLink aria-hidden="true" className="size-3 shrink-0 text-muted-foreground" />
+              </a>
+            ) : (
+              name
+            )}
+          </h4>
           <p className="font-mono text-xs text-muted-foreground">{totals.join(' · ')}</p>
         </div>
       )}
@@ -223,52 +271,91 @@ function StoreOrder({
           aria-label={copy.freeShippingProgress(store.name)}
         />
       )}
-      <NeedList>
-        {order.items.map(({ consumable, level, daysLeft, packs, pack, cost }) => (
-          <NeedRow
-            key={consumable.id}
-            name={consumable.name}
-            detail={
-              <>
-                <span className="inline-flex flex-wrap items-center gap-x-1.5">
-                  {level.missing ? (
-                    <span className="font-medium text-destructive">{stock.none}</span>
-                  ) : (
-                    <>
-                      {level.low && <LowMarker />}
-                      <span>{stock.left(formatStock(level.onHand, consumable, locale, stock))}</span>
-                      {/* Under a day says nothing the amount left does not already. */}
-                      {daysLeft !== undefined && Math.round(daysLeft) > 0 && (
-                        <span>· {copy.daysLeft(Math.round(daysLeft), formatNumber(Math.round(daysLeft), locale))}</span>
-                      )}
-                      {level.minimum !== undefined && (
-                        <span>· {stock.warnsBelow(formatStock(level.minimum, consumable, locale, stock))}</span>
-                      )}
-                    </>
-                  )}
-                </span>
-                <span className="block">
-                  {copy.buy(
-                    pack === 1
-                      ? formatStock(packs, consumable, locale, stock)
-                      : `${formatNumber(packs, locale)} × ${formatStock(pack, consumable, locale, stock)}`,
-                    money(cost),
-                  )}
-                </span>
-              </>
-            }
-            // A filament Spoolman manages is restocked by adding its spool in Spoolman.
-            action={
-              level.spoolman ? (
-                <span className="text-xs text-muted-foreground">{stock.spoolman.managed}</span>
-              ) : (
-                <RestockPopover workspaceSlug={workspaceSlug} consumable={consumable} onHand={level.onHand} />
-              )
-            }
-          />
-        ))}
-      </NeedList>
+      <NeedList>{order.items.map(row)}</NeedList>
+      {topUp.length > 0 && toFreeShipping !== undefined && (
+        <div className="grid min-w-0 gap-1 rounded-md bg-muted/40 px-3 py-2">
+          <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+            <h5 className="text-xs font-semibold">{copy.topUp}</h5>
+            <p className="font-mono text-xs text-muted-foreground">
+              {topUpCost >= toFreeShipping ? copy.reachesFree : copy.stillShort(money(toFreeShipping - topUpCost))}
+            </p>
+          </div>
+          <NeedList>{topUp.map(row)}</NeedList>
+        </div>
+      )}
     </section>
+  )
+}
+
+/** One thing to buy: how much is left and for how long, how much to buy at what cost, and a way to restock it. */
+function ShoppingRow({
+  workspaceSlug,
+  item: { consumable, level, daysLeft, packs, pack, cost },
+  money,
+  page,
+}: {
+  workspaceSlug: string
+  item: ShoppingItem
+  money: (value: number) => string
+  /** Its product page on the store's site. */
+  page?: string
+}) {
+  const { t, locale } = useI18n()
+  const copy = t.settings.consumables.needs
+  const stock = t.settings.consumables.stock
+  return (
+    <NeedRow
+      name={consumable.name}
+      detail={
+        <>
+          <span className="inline-flex flex-wrap items-center gap-x-1.5">
+            {level.missing ? (
+              <span className="font-medium text-destructive">{stock.none}</span>
+            ) : (
+              <>
+                {level.low && <LowMarker />}
+                <span>{stock.left(formatStock(level.onHand, consumable, locale, stock))}</span>
+                {/* Under a day says nothing the amount left does not already. */}
+                {daysLeft !== undefined && Math.round(daysLeft) > 0 && (
+                  <span>· {copy.daysLeft(Math.round(daysLeft), formatNumber(Math.round(daysLeft), locale))}</span>
+                )}
+                {level.minimum !== undefined && <span>· {stock.warnsBelow(formatStock(level.minimum, consumable, locale, stock))}</span>}
+              </>
+            )}
+          </span>
+          <span className="block">
+            {copy.buy(
+              pack === 1
+                ? formatStock(packs, consumable, locale, stock)
+                : `${formatNumber(packs, locale)} × ${formatStock(pack, consumable, locale, stock)}`,
+              money(cost),
+            )}
+          </span>
+        </>
+      }
+      action={
+        <span className="flex shrink-0 items-center gap-1">
+          {page && (
+            <ButtonLink
+              variant="ghost"
+              size="icon-sm"
+              aria-label={copy.openProduct(consumable.name)}
+              href={page}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <ExternalLink />
+            </ButtonLink>
+          )}
+          {/* A filament Spoolman manages is restocked by adding its spool in Spoolman. */}
+          {level.spoolman ? (
+            <span className="text-xs text-muted-foreground">{stock.spoolman.managed}</span>
+          ) : (
+            <RestockPopover workspaceSlug={workspaceSlug} consumable={consumable} onHand={level.onHand} />
+          )}
+        </span>
+      }
+    />
   )
 }
 

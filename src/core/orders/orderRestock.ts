@@ -1,6 +1,7 @@
 import { consumablesOfKind, consumableUnit, type Consumable, type FilamentColour, type FilamentConsumable } from '../consumables'
 import { filamentConsumableName, type FilamentPreset } from '../filamentPresets'
 import type { PriceCalculatorCurrency } from '../priceCalculator'
+import { storeCurrency, type Store } from '../stores'
 import { packSize } from '../stock'
 import type { OrderLine, OrderVendor, ParsedOrder } from './orderEmail'
 import { normalizedWords } from './orderText'
@@ -68,12 +69,12 @@ export type OrderRestockChoice =
   | { line: OrderLine; consumableId: string }
   | { line: OrderLine; add: { presetId: string; colour: FilamentColour } }
 
-/** What confirming an order stores, in the consumables' own units and the workspace currency. */
+/** What confirming an order stores, in the consumables' own units and currencies. */
 export type OrderRestockInput = {
   vendor: OrderVendor
   /** Catalogue colours that join the library, priced from the order. */
   added: FilamentConsumable[]
-  /** New prices, when the order is in the workspace currency and someone chose to take them. */
+  /** New prices, when the order is in the currency each is priced in and someone chose to take them. */
   prices: { consumableId: string; price: number }[]
   restocks: { consumableId: string; amount: number }[]
 }
@@ -94,21 +95,28 @@ export function orderLinePrice(line: OrderLine, consumable: Consumable) {
 
 /**
  * The restocks, additions, and prices confirming an order stores. Lines for the same consumable add up, and its new
- * price is what they cost together. Prices come from the order only in the workspace currency; a catalogue colour
- * needs that price to join the library, so without it the line is left out.
+ * price is what they cost together. Prices come from the order only in the currency a consumable is priced in, its
+ * store's or else the workspace's; a catalogue colour needs a workspace-currency price to join the library, so without
+ * it the line is left out.
  */
 export function orderRestock(
   order: Pick<ParsedOrder, 'vendor' | 'currency'>,
   choices: OrderRestockChoice[],
   context: {
     consumables: Consumable[]
+    stores: Store[]
     catalogue: readonly FilamentPreset[]
     currency: PriceCalculatorCurrency
     updatePrices: boolean
     newId: () => string
   },
 ): OrderRestockInput {
-  const priced = order.currency === context.currency
+  const priced = (consumable: Consumable) =>
+    order.currency ===
+    storeCurrency(
+      context.stores.find(({ id }) => id === consumable.storeId),
+      context.currency,
+    )
   const added = new Map<string, FilamentConsumable>()
   const totals = new Map<string, { consumable: Consumable; amount: number; cost: number; costed: number }>()
   for (const choice of choices) {
@@ -117,7 +125,7 @@ export function orderRestock(
     const amount = orderLineAmount(choice.line, consumable)
     if (!amount) continue
     const total = totals.get(consumable.id) ?? { consumable, amount: 0, cost: 0, costed: 0 }
-    const price = priced ? choice.line.linePrice : undefined
+    const price = priced(consumable) ? choice.line.linePrice : undefined
     totals.set(consumable.id, {
       consumable,
       amount: total.amount + amount,

@@ -5,6 +5,7 @@ import { chosenFinishing, servesPrintType, type EquipmentItem } from '../../core
 import {
   costBasis,
   costPrint,
+  DEFAULT_PRICE_CALCULATOR_SETTINGS,
   TYPICAL_JOBS,
   TYPICAL_RESIN_DENSITY_GRAMS_PER_ML,
   type PriceCalculatorJob,
@@ -14,7 +15,8 @@ import type { PrinterProfile, PrintType } from '../../core/types'
 import type { calculatorPrefill } from '../calculatorSearch'
 import { requestPrintTypeChoices } from '../fleet'
 import { useI18n } from '../i18n'
-import { consumablesQuery, equipmentQuery, priceCalculatorSettingsQuery, printersQuery } from '../queries'
+import { usePricedConsumables } from '../inventory'
+import { equipmentQuery, priceCalculatorSettingsQuery, printersQuery } from '../queries'
 import { useWorkspacePrintTypes } from '../workspace'
 import { QueryState } from './QueryState'
 import { BatchEstimate } from './priceCalculator/BatchEstimate'
@@ -47,7 +49,7 @@ export function PriceCalculator({
   const { t } = useI18n()
   const query = useQuery(priceCalculatorSettingsQuery(workspaceSlug))
   const printers = useQuery(printersQuery(workspaceSlug)).data?.profiles.filter((printer) => !printer.archived) ?? []
-  const consumables = useQuery(consumablesQuery(workspaceSlug)).data?.consumables ?? []
+  const consumables = usePricedConsumables(workspaceSlug, query.data?.settings.currency ?? DEFAULT_PRICE_CALCULATOR_SETTINGS.currency)
   const equipment = useQuery(equipmentQuery(workspaceSlug)).data?.equipment.filter((item) => !item.archived) ?? []
   if (!query.data) {
     return (

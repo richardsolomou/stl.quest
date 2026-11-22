@@ -1,7 +1,10 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMemo } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import type { Consumable } from '../core/consumables'
 import type { InventoryItems, InventoryKind } from '../core/inventory'
+import type { PriceCalculatorCurrency } from '../core/priceCalculator'
+import { landedConsumables } from '../core/stores'
 import {
   createConsumables,
   createInventoryItem,
@@ -81,4 +84,11 @@ export function useConsumableBatch() {
     onSuccess: store,
   })
   return { add, sharePrice }
+}
+
+/** The library as quotes price it: in the workspace currency, with each store's shipping spread over its prices. */
+export function usePricedConsumables(workspaceSlug: string, currency: PriceCalculatorCurrency) {
+  const consumables = useQuery(consumablesQuery(workspaceSlug)).data?.consumables
+  const stores = useQuery(storesQuery(workspaceSlug)).data?.stores
+  return useMemo(() => landedConsumables(consumables ?? [], stores ?? [], currency), [consumables, stores, currency])
 }

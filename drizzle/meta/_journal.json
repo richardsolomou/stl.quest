@@ -344,6 +344,13 @@
       "when": 1795341635372,
       "tag": "0048_plate_run_checks",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "6",
+      "when": 1795346333521,
+      "tag": "0049_store_currency",
+      "breakpoints": true
     }
   ]
 }

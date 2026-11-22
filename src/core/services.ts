@@ -81,7 +81,7 @@ import { sameFilamentProduct, withSharedFilamentPrice } from './filamentPresets'
 import type { EquipmentItem } from './equipment'
 import { activeItems, INVENTORY_LIMITS, type InventoryItems, type InventoryKind } from './inventory'
 import { dailyUse, USAGE_RATE_DAYS } from './shopping'
-import type { Store } from './stores'
+import { landedConsumables, type Store } from './stores'
 import { canDeleteInventoryItem, deletedItemKind } from './inventoryDeletion'
 import { printerLifetimes } from './maintenance'
 import {
@@ -1283,7 +1283,7 @@ export class STLQuestService {
     const printers = await this.repository.listInventory('printers')
     const printer = input.printerId ? printers.find(({ id }) => id === input.printerId) : undefined
     if (input.printerId && !printer) throw new Response(this.text.request.unknownPrinter, { status: 400 })
-    const consumables = await this.consumables()
+    const consumables = await this.pricedConsumables()
     const material = input.consumableId ? consumables.find(({ id }) => id === input.consumableId) : undefined
     if (input.consumableId && !material) throw new Response(this.text.usage.unknownConsumable, { status: 400 })
     const assigned = request.printerId ? printers.find(({ id }) => id === request.printerId) : undefined
@@ -1344,7 +1344,7 @@ export class STLQuestService {
           stage: 'stock',
           kind: input.kind,
           ...(input.kind === 'replace' && input.printerId && { printerId: input.printerId }),
-          ...consumed(consumable),
+          ...consumed((await this.landed([consumable]))[0]),
           amount,
         },
       ],
@@ -1378,9 +1378,10 @@ export class STLQuestService {
             ...added.filter((item) => !items.some(({ id }) => id === item.id)).map((item) => ({ ...item, archived: undefined })),
           ])
         : current
+    const priced = await this.landed(library)
     const recorded = await this.appendUsage(
       input.restocks.flatMap(({ consumableId, amount }) => {
-        const consumable = library.find(({ id }) => id === consumableId)
+        const consumable = priced.find(({ id }) => id === consumableId)
         return consumable ? [{ stage: 'stock' as const, kind: 'restock' as const, ...consumed(consumable), amount }] : []
       }),
       identity,
@@ -1807,7 +1808,13 @@ export class STLQuestService {
     )
     return {
       split,
-      drafts: plateUsageDrafts(split, { plateId: plate.id, rates, printer, materials, consumables: await this.consumables() }),
+      drafts: plateUsageDrafts(split, {
+        plateId: plate.id,
+        rates,
+        printer,
+        materials: await this.landed(materials),
+        consumables: await this.pricedConsumables(),
+      }),
     }
   }
 
@@ -2071,7 +2078,7 @@ export class STLQuestService {
       ...items.filter((item) => !current.some(({ id }) => id === item.id)).map((item) => ({ ...item, archived: undefined })),
     ])
     if (onHand !== undefined) {
-      const stored = items.map((item) => library.find(({ id }) => id === item.id) ?? item)
+      const stored = await this.landed(items.map((item) => library.find(({ id }) => id === item.id) ?? item))
       const levels = stockLevels(stored, await this.repository.stockTotals())
       const corrections = stored.flatMap((item, index) => {
         const amount = onHand - levels[index].onHand
@@ -2216,6 +2223,9 @@ export class STLQuestService {
         store_count: active.length,
         with_shipping_count: active.filter((store) => store.shippingCost !== undefined).length,
         with_free_shipping_count: active.filter((store) => store.freeShippingOver !== undefined).length,
+        with_currency_count: active.filter((store) => store.currency !== undefined).length,
+        with_usual_order_count: active.filter((store) => store.usualOrder !== undefined).length,
+        with_url_count: active.filter((store) => store.url !== undefined).length,
       })
     } else {
       const library = items as Consumable[]
@@ -2238,6 +2248,15 @@ export class STLQuestService {
 
   private async consumables() {
     return await this.repository.listInventory('consumables')
+  }
+
+  /** The library as usage prices it: in the workspace currency, with each store's shipping spread over its prices. */
+  private async pricedConsumables() {
+    return await this.landed(await this.consumables())
+  }
+
+  private async landed(consumables: Consumable[]) {
+    return landedConsumables(consumables, await this.repository.listInventory('stores'), (await this.rates()).currency)
   }
 
   private async spoolmanMatches(
@@ -2291,7 +2310,7 @@ export class STLQuestService {
     return usageBackfill(await this.repository.listRequests(), {
       rates: await this.rates(),
       printers: await this.repository.listInventory('printers'),
-      consumables: await this.consumables(),
+      consumables: await this.pricedConsumables(),
       recorded: new Set(await this.repository.usageRequestIds()),
     })
   }

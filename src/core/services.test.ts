@@ -2836,7 +2836,18 @@ describe('STLQuestService crash recovery', () => {
           { resin_count: 1, filament_count: 0, part_count: 0, supply_count: 0, catalogue_supply_count: 0, with_store_count: 0 },
         ],
         [admin.id, 'equipment_saved', { equipment_count: 1, catalogue_count: 1, with_supplies_count: 0 }],
-        [admin.id, 'stores_saved', { store_count: 1, with_shipping_count: 0, with_free_shipping_count: 1 }],
+        [
+          admin.id,
+          'stores_saved',
+          {
+            store_count: 1,
+            with_shipping_count: 0,
+            with_free_shipping_count: 1,
+            with_currency_count: 0,
+            with_usual_order_count: 0,
+            with_url_count: 0,
+          },
+        ],
       ])
     })
 
@@ -3090,6 +3101,34 @@ describe('STLQuestService crash recovery', () => {
         await service.updateInventoryItem('consumables', { ...ipa, storeId: 'bambu' }, admin)
 
         expect((await service.inventoryReferences('stores', 'bambu', admin)).bought).toBe(1)
+      })
+
+      it('keeps a store’s currency, exchange rate, usual order, and website', async () => {
+        const store = {
+          id: 'amazon',
+          name: 'Amazon US',
+          currency: 'USD',
+          exchangeRate: 0.9,
+          usualOrder: 50,
+          url: 'https://www.amazon.com/',
+        } as const
+
+        await service.createInventoryItem('stores', store, admin)
+
+        expect(await repository.listInventory('stores')).toEqual([store])
+      })
+
+      it('records stock bought from a store in the workspace currency, its shipping spread over it', async () => {
+        await service.createInventoryItem(
+          'stores',
+          { id: 'amazon', name: 'Amazon US', currency: 'USD', exchangeRate: 0.9, shippingCost: 10, usualOrder: 50 },
+          admin,
+        )
+        await service.updateInventoryItem('consumables', { ...ipa, storeId: 'amazon' }, admin)
+
+        const { events } = await service.recordStockMovement({ consumableId: ipa.id, kind: 'restock', amount: 1_000 }, admin)
+
+        expect(events[0].unitPrice).toBeCloseTo((10 / 1_000) * 0.9 * 1.2, 9)
       })
 
       it('leaves consumables bought from a deleted store with no store', async () => {

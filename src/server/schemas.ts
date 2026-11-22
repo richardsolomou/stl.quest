@@ -279,12 +279,18 @@ const printerProfileSchema = z.object({
     .optional(),
 })
 
-const storeSchema = z.object({
-  id: z.string().trim().min(1).max(200),
-  name: z.string().trim().min(1).max(100),
-  shippingCost: z.number().nonnegative().max(100_000).optional(),
-  freeShippingOver: z.number().positive().max(1_000_000).optional(),
-})
+const storeSchema = z
+  .object({
+    id: z.string().trim().min(1).max(200),
+    name: z.string().trim().min(1).max(100),
+    shippingCost: z.number().nonnegative().max(100_000).optional(),
+    freeShippingOver: z.number().positive().max(1_000_000).optional(),
+    currency: z.enum(PRICE_CALCULATOR_CURRENCIES).optional(),
+    exchangeRate: z.number().positive().max(1_000_000).optional(),
+    usualOrder: z.number().positive().max(1_000_000).optional(),
+    url: requiredSourceUrl.optional(),
+  })
+  .refine((store) => !store.currency || store.exchangeRate !== undefined, 'a store in its own currency needs an exchange rate')
 
 /** One printer, piece of equipment, consumable, or store; whether it is archived is changed only by `inventoryArchiveSchema`. */
 export const inventoryItemSchema = z.discriminatedUnion('inventory', [
