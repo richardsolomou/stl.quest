@@ -37,6 +37,8 @@ export function VirtualList<Item>({
     getScrollElement: () => scroller,
     getItemKey: (index) => getKey(items[index]),
     estimateSize: () => 57,
+    // The server and the first client render have no scroller to measure, so they render a tall screen's worth of rows.
+    initialRect: { width: 0, height: 1000 },
     overscan: 8,
     scrollMargin,
   })
