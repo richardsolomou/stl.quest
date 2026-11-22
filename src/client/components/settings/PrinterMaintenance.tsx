@@ -105,6 +105,7 @@ export function PrinterMaintenance({ printer }: { printer: PrinterProfile }) {
         <ConsumableDialog
           key={editing.id}
           consumable={editing}
+          library={consumables}
           isNew={!consumables.some(({ id }) => id === editing.id)}
           workspaceSlug={workspaceSlug}
           level={levels.find(({ consumableId }) => consumableId === editing.id)}

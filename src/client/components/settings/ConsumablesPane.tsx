@@ -119,7 +119,6 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
     setAdded(items[0].id)
     signalProductTourProgress('stock')
   }
-  const sharePrice = async (id: string) => void (await batch.sharePrice.mutateAsync(id))
   // Products whose colours are listed under them; the rest show as one line with their swatches.
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const toggleProduct = (presetId: string) =>
@@ -397,7 +396,6 @@ function LoadedConsumablesPane({ workspaceSlug, saved }: { workspaceSlug: string
           rate={rate}
           onSave={saveItem}
           onAddColours={addColours}
-          onSharePrice={sharePrice}
           onArchive={() => archive(editing)}
           onClose={() => setEditing(null)}
         />

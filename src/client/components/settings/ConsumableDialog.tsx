@@ -41,6 +41,7 @@ import type { Messages } from '../../../core/i18n'
 import type { PrinterProfile } from '../../../core/types'
 import type { StockLevel } from '../../../core/usage'
 import { useI18n } from '../../i18n'
+import { useConsumableBatch } from '../../inventory'
 import { createId } from '../../id'
 import { matchesListSearch } from '../../listSearch'
 import { catalogueQuery } from '../../queries'
@@ -76,7 +77,6 @@ export function ConsumableDialog({
   rate,
   onSave,
   onAddColours,
-  onSharePrice,
   onArchive,
   onClose,
 }: {
@@ -91,16 +91,18 @@ export function ConsumableDialog({
   /** Formats a per-plate or per-hour cost. */
   rate: (value: number) => string
   onSave: (consumable: Consumable) => Promise<void>
-  /** Adds the colours of one catalogue filament at once, each counted at `onHand` in grams while stock is tracked. */
-  onAddColours: (filaments: FilamentConsumable[], onHand?: number) => Promise<void>
-  /** Gives a stored filament's price to the other colours of its product. */
-  onSharePrice: (id: string) => Promise<void>
+  /**
+   * Adds the colours of one catalogue filament at once, each counted at `onHand` in grams while stock is tracked. Without
+   * it a new catalogue filament takes one colour, as a dialog that only edits other kinds never needs it.
+   */
+  onAddColours?: (filaments: FilamentConsumable[], onHand?: number) => Promise<void>
   onArchive: () => void
   onClose: () => void
 }) {
   const { t, locale } = useI18n()
   const copy = t.settings.consumables
   const tracking = useUsageTracking()
+  const batch = useConsumableBatch()
   const [draft, setDraft] = useState(consumable)
   const resins = useQuery({ ...catalogueQuery('resins'), enabled: draft.kind === 'resin' }).data
   const filaments = useQuery({ ...catalogueQuery('filaments'), enabled: draft.kind === 'filament' }).data
@@ -115,7 +117,7 @@ export function ConsumableDialog({
           : undefined
   // Until a new catalogue filament is stored, its swatches pick several colours; the picks belong to the product shown.
   const filamentPreset = draft.kind === 'filament' ? findPreset(filaments, draft.filamentPresetId) : undefined
-  const picksSeveral = isNew && Boolean(filamentPreset?.colors?.length)
+  const picksSeveral = isNew && Boolean(onAddColours) && Boolean(filamentPreset?.colors?.length)
   const [picked, setPicked] = useState<{ presetId?: string; colours: FilamentColour[] }>({ colours: [] })
   const colours = picksSeveral && picked.presetId === filamentPreset?.id ? picked.colours : []
   const several = colours.length > 1
@@ -140,7 +142,7 @@ export function ConsumableDialog({
   }
   const [adding, setAdding] = useState(false)
   const addColours = async () => {
-    if (draft.kind !== 'filament' || !filamentPreset || missing.length) return
+    if (draft.kind !== 'filament' || !filamentPreset || !onAddColours || missing.length) return
     setAdding(true)
     try {
       await onAddColours(filamentsInColours(draft, filamentPreset, colours, colourId), tracking ? onHand : undefined)
@@ -172,7 +174,7 @@ export function ConsumableDialog({
   const sharePrice = async () => {
     if (!(await autosave.flush())) return
     setSharing(true)
-    await onSharePrice(draft.id).then(
+    await batch.sharePrice.mutateAsync(draft.id).then(
       () => toast(copy.filaments.sharedPrice(differing)),
       () => toast.error(copy.notSaved),
     )
