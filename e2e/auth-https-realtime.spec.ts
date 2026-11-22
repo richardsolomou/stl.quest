@@ -16,6 +16,7 @@ test('authenticates and receives realtime updates through an HTTPS proxy', async
 
   await page.goto('/')
   await page.getByRole('button', { name: 'Set up STL Quest' }).click()
+  await expect(page.locator('form[data-hydrated="true"]')).toBeVisible()
   await page.getByLabel('Name').fill('HTTPS Owner')
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password').fill(password)
@@ -73,7 +74,9 @@ async function foreignOriginStatus(publicURL: URL) {
   })
 }
 
+// Text typed into the server-rendered form is reset when React hydrates its controlled inputs.
 async function signIn(page: Page) {
+  await expect(page.locator('form[data-hydrated="true"]')).toBeVisible()
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password').fill(password)
   await page.getByRole('button', { name: 'Sign in' }).click()

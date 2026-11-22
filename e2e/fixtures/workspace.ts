@@ -10,6 +10,7 @@ export async function enterAdminWorkspace(page: Page) {
   const signInButton = page.getByRole('button', { name: 'Sign in', exact: true })
   await expect(setupButton.or(signInButton)).toBeVisible()
   if (await signInButton.isVisible()) {
+    await expect(page.locator('form[data-hydrated="true"]')).toBeVisible()
     await page.getByLabel('Email').fill('owner@example.com')
     await page.getByLabel('Password').fill(password)
     await signInButton.click()
