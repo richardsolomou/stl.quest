@@ -14,7 +14,7 @@ Run the complete suite:
 just e2e
 ```
 
-`PLAYWRIGHT_PORT` (default 4173) names a run. Its image tag, container names, ports, and data directories all derive from it, so checkouts that pick ports at least 400 apart run side by side:
+`PLAYWRIGHT_PORT` (default 4173) names a run. Its image tag, container names, ports, and data directories all derive from it, so checkouts that pick ports at least 400 apart run side by side (the fast server, `PLAYWRIGHT_FAST_SERVER=1`, also takes port + 1000 and port + 4000, so keep its ports clear of other runs too):
 
 ```sh
 PLAYWRIGHT_PORT=4573 just e2e
