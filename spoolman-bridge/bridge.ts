@@ -162,7 +162,7 @@ export async function addRestock(
 }
 
 /** Adds every spool STL Quest has waiting to Spoolman and reports each; resolves to how many it handled. */
-export async function syncRestocks(config: Config, fetcher: typeof fetch = fetch) {
+export async function syncRestocks(config: Config, fetcher: typeof fetch = fetch, log: Log = () => {}) {
   const { restocks } = (await (await stlQuest(config, config.restocksUrl, undefined, fetcher)).json()) as { restocks: Restock[] }
   if (!restocks.length) return 0
   const response = await fetcher(`${config.spoolmanUrl}/api/v1/spool?allow_archived=true`, { signal: AbortSignal.timeout(30_000) })
@@ -170,7 +170,10 @@ export async function syncRestocks(config: Config, fetcher: typeof fetch = fetch
   const spools = (await response.json()) as { id: number; comment?: string | null }[]
   for (const restock of restocks) {
     const result = await addRestock(config, restock, spools, fetcher)
-    if ('spool_id' in result) spools.push({ id: result.spool_id, comment: restock.comment })
+    if ('spool_id' in result) {
+      spools.push({ id: result.spool_id, comment: restock.comment })
+      log(`added spool #${result.spool_id} to Spoolman for restock ${restock.id}`)
+    } else log(`Spoolman refused restock ${restock.id}: ${result.error}`)
     // A 404 means the spool was removed in STL Quest meanwhile, which leaves nothing to report.
     await stlQuest(config, config.restocksUrl, result, fetcher)
   }
@@ -259,7 +262,13 @@ async function readBambuddy<Body>(bambuddy: NonNullable<Config['bambuddy']>, pat
  * Sends each recent run's Spoolman spools that STL Quest has not been sent as they are now, skipping runs that ended
  * too long ago to wait for. `sent` remembers what went, by run, between polls.
  */
-export async function syncPrints(config: Config, sent: Map<string, string>, fetcher: typeof fetch = fetch, now = Date.now()) {
+export async function syncPrints(
+  config: Config,
+  sent: Map<string, string>,
+  fetcher: typeof fetch = fetch,
+  now = Date.now(),
+  log: Log = () => {},
+) {
   const { bambuddy } = config
   if (!bambuddy) return
   const { items: runs } = await readBambuddy<{ items: BambuddyRun[] }>(bambuddy, '/api/v1/print-log/?limit=100', fetcher)
@@ -269,11 +278,17 @@ export async function syncPrints(config: Config, sent: Map<string, string>, fetc
     const sending = JSON.stringify(spools)
     if (sent.get(runId) === sending || now - utc(runs.find(({ id }) => String(id) === runId)!.completed_at!) > GIVE_UP_MS) continue
     if (posts++ === MAX_RUNS_PER_POLL) break
-    if (await sendPrintUsage(config, runId, spools, fetcher)) sent.set(runId, sending)
+    if (await sendPrintUsage(config, runId, spools, fetcher)) {
+      sent.set(runId, sending)
+      const grams = Math.round(spools.reduce((total, spool) => total + spool.grams, 0) * 10) / 10
+      log(`sent run ${runId} to STL Quest: ${grams} g from ${spools.length} spool${spools.length === 1 ? '' : 's'}`)
+    } else log(`STL Quest has not received run ${runId} yet; sending it again next poll`)
   }
   const recent = new Set(runs.map(({ id }) => String(id)))
   for (const runId of sent.keys()) if (!recent.has(runId)) sent.delete(runId)
 }
+
+type Log = (message: string) => void
 
 export class RetryLater extends Error {
   readonly delayMs: number
@@ -284,7 +299,7 @@ export class RetryLater extends Error {
 }
 
 /** Runs until the process stops: syncs on start, after changes settle, and on a timer, reconnecting with backoff. */
-export function run(config: Config, log: (message: string) => void = console.log) {
+export function run(config: Config, log: Log = console.log) {
   let timer: ReturnType<typeof setTimeout> | undefined
   let syncing = false
   let again = false
@@ -351,15 +366,15 @@ export function run(config: Config, log: (message: string) => void = console.log
   }
 
   connect()
-  repeat('restocks', config.restockMs, () => syncRestocks(config), log)
+  repeat('restocks', config.restockMs, () => syncRestocks(config, fetch, log), log)
   if (config.bambuddy) {
     const sent = new Map<string, string>()
-    repeat('Bambuddy', config.bambuddy.pollMs, () => syncPrints(config, sent), log)
+    repeat('Bambuddy', config.bambuddy.pollMs, () => syncPrints(config, sent, fetch, Date.now(), log), log)
   }
 }
 
 /** Runs `task` now and every `everyMs`, backing off after failures and waiting as long as STL Quest asks. */
-function repeat(name: string, everyMs: number, task: () => Promise<unknown>, log: (message: string) => void) {
+function repeat(name: string, everyMs: number, task: () => Promise<unknown>, log: Log) {
   let failures = 0
   const tick = async () => {
     let delayMs = everyMs

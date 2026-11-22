@@ -147,6 +147,36 @@ describe('syncRestocks', () => {
     ])
   })
 
+  it('says which spool it added for a restock', async () => {
+    const log = vi.fn()
+    const fetcher = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const target = href(url)
+      if (target.endsWith('/api/spoolman/restocks') && !init?.method) return json({ restocks: [restock] })
+      if (target.includes('/api/v1/spool?')) return json([])
+      if (target.endsWith('/api/v1/spool')) return json({ id: 42 }, 200)
+      return new Response(null, { status: 204 })
+    })
+
+    await syncRestocks(config, fetcher, log)
+
+    expect(log).toHaveBeenCalledWith('added spool #42 to Spoolman for restock r1')
+  })
+
+  it('says why Spoolman refused a restock', async () => {
+    const log = vi.fn()
+    const fetcher = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const target = href(url)
+      if (target.endsWith('/api/spoolman/restocks') && !init?.method) return json({ restocks: [restock] })
+      if (target.includes('/api/v1/spool?')) return json([])
+      if (target.endsWith('/api/v1/spool')) return json({ message: 'Filament not found' }, 404)
+      return new Response(null, { status: 204 })
+    })
+
+    await syncRestocks(config, fetcher, log)
+
+    expect(log).toHaveBeenCalledWith('Spoolman refused restock r1: Filament not found')
+  })
+
   it('asks Spoolman for nothing when no spool is waiting', async () => {
     const fetcher = vi.fn(async () => json({ restocks: [] }))
 
@@ -271,6 +301,22 @@ describe('syncPrints', () => {
     await syncPrints(bambuddy, sent, reader, Date.parse('2026-11-20T10:02:00Z'))
 
     expect(calls(reader).filter((call) => call.startsWith('POST'))).toEqual(['POST https://stl.quest/api/bambuddy/usage'])
+  })
+
+  it('says what it sent for each run', async () => {
+    const log = vi.fn()
+
+    await syncPrints(bambuddy, new Map(), fetcher(204), Date.parse('2026-11-20T10:01:00Z'), log)
+
+    expect(log).toHaveBeenCalledWith('sent run 5 to STL Quest: 12.5 g from 1 spool')
+  })
+
+  it('says when STL Quest has not received a run yet', async () => {
+    const log = vi.fn()
+
+    await syncPrints(bambuddy, new Map(), fetcher(404), Date.parse('2026-11-20T10:01:00Z'), log)
+
+    expect(log).toHaveBeenCalledWith('STL Quest has not received run 5 yet; sending it again next poll')
   })
 
   it('sends a run again while STL Quest has not received its print', async () => {
