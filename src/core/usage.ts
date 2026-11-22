@@ -243,19 +243,28 @@ export type StockLevel = {
   tracked: boolean
   low: boolean
   missing: boolean
+  /** Set when Spoolman manages it: on hand is what its spools have left, and STL Quest moves none of it. */
+  spoolman?: { spools: number }
 }
 
 /**
  * Stock on hand per consumable, counting only events in the unit it is stocked in now, so a wear part's use by the plate
- * never counts as items and changing a supply's unit never mixes millilitres with items. It is missing at or below zero and low below its minimum.
+ * never counts as items and changing a supply's unit never mixes millilitres with items, or what Spoolman says its
+ * spools hold for a filament it manages. It is missing at or below zero and low below its minimum.
  */
-export function stockLevels(consumables: Consumable[], totals: StockTotal[]): StockLevel[] {
+export function stockLevels(
+  consumables: Consumable[],
+  totals: StockTotal[],
+  spoolman: Map<string, { onHand: number; spools: number }> = new Map(),
+): StockLevel[] {
   return consumables.map((consumable) => {
     const unit = consumableUnit(consumable)
     const own = totals.filter((total) => total.consumableId === consumable.id && total.unit === unit)
-    const onHand = own.reduce((sum, total) => sum + stockEffect(total.kind) * total.amount, 0)
+    const managed = spoolman.get(consumable.id)
+    const onHand = managed?.onHand ?? own.reduce((sum, total) => sum + stockEffect(total.kind) * total.amount, 0)
     const minimum = consumable.minimumStock
-    const tracked = own.some((total) => total.kind === 'restock' || total.kind === 'correction') || minimum !== undefined
+    const tracked =
+      Boolean(managed) || own.some((total) => total.kind === 'restock' || total.kind === 'correction') || minimum !== undefined
     const missing = tracked && onHand <= 0
     return {
       consumableId: consumable.id,
@@ -265,6 +274,7 @@ export function stockLevels(consumables: Consumable[], totals: StockTotal[]): St
       tracked,
       missing,
       low: tracked && !missing && minimum !== undefined && onHand < minimum,
+      ...(managed && { spoolman: { spools: managed.spools } }),
     }
   })
 }

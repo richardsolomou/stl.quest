@@ -151,6 +151,13 @@ describe('preloadSettingsSection', () => {
     expect(await preloadedKeys('consumables', { ...admin, usageTracking: false })).not.toContainEqual(['stock', 'workshop'])
   })
 
+  it('loads the Spoolman section with the library filaments it links to', async () => {
+    expect(await preloadedKeys('spoolman')).toEqual([
+      ['spoolman', 'workshop'],
+      ['consumables', 'workshop'],
+    ])
+  })
+
   it('waits for the section’s data while rendering on the server', async () => {
     let settle = () => {}
     const prefetchQuery = vi.fn(() => new Promise<void>((resolve) => (settle = resolve)))

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { check, index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { check, foreignKey, index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 import { organization } from './auth'
 
 /**
@@ -112,5 +112,60 @@ export const consumables = sqliteTable(
     check('consumables_lifespan_unit_check', sql`${table.lifespanUnit} IN ('plates', 'hours') OR ${table.lifespanUnit} IS NULL`),
     check('consumables_unit_check', sql`${table.unit} IN ('ml', 'g', 'item') OR ${table.unit} IS NULL`),
     index('consumables_position').on(table.workspaceId, table.position),
+  ],
+)
+
+/** A workspace's Spoolman connection: the hash of the write-only token its bridge or other tools send spools with. */
+export const spoolmanConnections = sqliteTable('spoolman_connections', {
+  workspaceId: text('workspace_id')
+    .primaryKey()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  tokenHash: text('token_hash').notNull().unique(),
+  createdAt: integer('created_at').notNull(),
+  receivedAt: integer('received_at'),
+})
+
+/** The spools Spoolman last sent, each with its filament as Spoolman describes it; they go when the connection does. */
+export const spoolmanSpools = sqliteTable(
+  'spoolman_spools',
+  {
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => spoolmanConnections.workspaceId, { onDelete: 'cascade' }),
+    id: integer().notNull(),
+    filamentId: integer('filament_id').notNull(),
+    filamentName: text('filament_name'),
+    vendor: text(),
+    material: text(),
+    colourHex: text('colour_hex'),
+    externalId: text('external_id'),
+    remainingGrams: real('remaining_grams'),
+    archived: integer({ mode: 'boolean' }).notNull().default(false),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.workspaceId, table.id] })],
+)
+
+/**
+ * Which library filament a Spoolman filament is, when someone chose it rather than leaving it to matching; no
+ * consumable means it is deliberately linked to none. Links outlive the connection, so reconnecting keeps them.
+ */
+export const spoolmanLinks = sqliteTable(
+  'spoolman_links',
+  {
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    filamentId: integer('filament_id').notNull(),
+    consumableId: text('consumable_id'),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.filamentId] }),
+    foreignKey({
+      columns: [table.workspaceId, table.consumableId],
+      foreignColumns: [consumables.workspaceId, consumables.id],
+      name: 'spoolman_links_workspace_consumable_fk',
+    }).onDelete('cascade'),
   ],
 )

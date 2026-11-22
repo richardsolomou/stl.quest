@@ -35,6 +35,7 @@ Along the way:
 - Interactive STL, 3MF, and OBJ previews, thumbnails, filtering, and drag-and-drop board controls. OBJ geometry is supported without companion MTL or texture files.
 - Mixed resin and filament fleets with dimension-aware auto-assignment.
 - Local, S3-compatible, Dropbox, Google Drive, OneDrive, or Box storage, with guided migration.
+- Filament stock read from [Spoolman](docs/spoolman.md) through a small bridge that only connects out, on hosted and self-hosted installs alike.
 - Fair ordering, manual requester priorities, and withdrawal controls.
 - Automatic migrations, backups, health checks, and optional print-ready email notifications that carry your workspace logo and can go out through your own mail server.
 - Built-in realtime updates and board presence with no additional service to install.

@@ -42,6 +42,7 @@ import { ACTIVE_SUBSCRIPTION_STATUSES, BILLABLE_SUBSCRIPTION_STATUSES } from '..
 import { automaticallyAssignedPrinter } from '../core/printers'
 import type { InventoryItems, InventoryKind } from '../core/inventory'
 import { deletedItemKind, keepsDeletedName, NO_REFERENCES, withoutSupply, type InventoryReferences } from '../core/inventoryDeletion'
+import type { SpoolmanChange, SpoolmanLink, SpoolmanSpool } from '../core/spoolman'
 import { supportsDatabaseBackup, type DatabaseBackend } from './backend'
 import type { MigrationLog } from './dataMigrations/types'
 import { SQLiteBackend } from './backends/sqlite'
@@ -63,6 +64,9 @@ import {
   requestStatuses,
   session as authSession,
   settings,
+  spoolmanConnections,
+  spoolmanLinks,
+  spoolmanSpools,
   uploadSessions,
   usageEvents,
   plateItems,
@@ -3328,6 +3332,16 @@ export class DrizzleRepository implements Repository {
       .get()
   }
 
+  /** The workspace a Spoolman token sends to; global, since the token is all the request carries. */
+  async workspaceForSpoolmanToken(tokenHash: string) {
+    return await this.database
+      .select({ id: organization.id, name: organization.name, slug: organization.slug })
+      .from(spoolmanConnections)
+      .innerJoin(organization, eq(organization.id, spoolmanConnections.workspaceId))
+      .where(eq(spoolmanConnections.tokenHash, tokenHash))
+      .get()
+  }
+
   async workspaceBySlug(slug: string) {
     return await this.database
       .select({ id: organization.id, name: organization.name, slug: organization.slug })
@@ -3643,6 +3657,138 @@ export class DrizzleRepository implements Repository {
       await this.addWorkspaceMemberWith(tx, workspaceId, identity.id, invite.role === 'admin' ? 'admin' : 'member')
       return { ...mapInvite(invite), usedAt: now }
     })
+  }
+
+  async spoolmanConnection() {
+    const row = await this.database
+      .select({ createdAt: spoolmanConnections.createdAt, receivedAt: spoolmanConnections.receivedAt })
+      .from(spoolmanConnections)
+      .where(eq(spoolmanConnections.workspaceId, await this.workspace()))
+      .get()
+    return row && { createdAt: row.createdAt, ...(row.receivedAt !== null && { receivedAt: row.receivedAt }) }
+  }
+
+  async connectSpoolman(tokenHash: string, now: number) {
+    const workspaceId = await this.workspace()
+    await this.database
+      .insert(spoolmanConnections)
+      .values({ workspaceId, tokenHash, createdAt: now })
+      // A replaced token has received nothing yet, so the page waits for its first send rather than showing the old one's.
+      .onConflictDoUpdate({ target: spoolmanConnections.workspaceId, set: { tokenHash, createdAt: now, receivedAt: null } })
+      .run()
+  }
+
+  async disconnectSpoolman() {
+    await this.database
+      .delete(spoolmanConnections)
+      .where(eq(spoolmanConnections.workspaceId, await this.workspace()))
+      .run()
+  }
+
+  async listSpoolmanSpools(): Promise<SpoolmanSpool[]> {
+    const rows = await this.database
+      .select()
+      .from(spoolmanSpools)
+      .where(eq(spoolmanSpools.workspaceId, await this.workspace()))
+      .orderBy(spoolmanSpools.id)
+      .all()
+    return rows.map(
+      ({ workspaceId: _workspace, filamentName, vendor, material, colourHex, externalId, remainingGrams, archived, ...spool }) => ({
+        ...spool,
+        archived,
+        ...(filamentName !== null && { filamentName }),
+        ...(vendor !== null && { vendor }),
+        ...(material !== null && { material }),
+        ...(colourHex !== null && { colourHex }),
+        ...(externalId !== null && { externalId }),
+        ...(remainingGrams !== null && { remainingGrams }),
+      }),
+    )
+  }
+
+  async receiveSpoolman(change: SpoolmanChange, now: number, maxSpools: number) {
+    const workspaceId = await this.workspace()
+    return await this.database.transaction(async (tx) => {
+      const connection = await tx
+        .select({ receivedAt: spoolmanConnections.receivedAt })
+        .from(spoolmanConnections)
+        .where(eq(spoolmanConnections.workspaceId, workspaceId))
+        .get()
+      if (!connection) return { received: false as const }
+      const row = (spool: Omit<SpoolmanSpool, 'updatedAt'>) => ({
+        workspaceId,
+        id: spool.id,
+        filamentId: spool.filamentId,
+        filamentName: spool.filamentName ?? null,
+        vendor: spool.vendor ?? null,
+        material: spool.material ?? null,
+        colourHex: spool.colourHex ?? null,
+        externalId: spool.externalId ?? null,
+        remainingGrams: spool.remainingGrams ?? null,
+        archived: spool.archived,
+        updatedAt: now,
+      })
+      if ('replace' in change) {
+        await tx.delete(spoolmanSpools).where(eq(spoolmanSpools.workspaceId, workspaceId)).run()
+        // Batches stay well below SQLite's limit on bound parameters.
+        for (let start = 0; start < change.replace.length; start += 500)
+          await tx
+            .insert(spoolmanSpools)
+            .values(change.replace.slice(start, start + 500).map(row))
+            .run()
+      } else if ('upsert' in change) {
+        const exists = await tx
+          .select({ id: spoolmanSpools.id })
+          .from(spoolmanSpools)
+          .where(and(eq(spoolmanSpools.workspaceId, workspaceId), eq(spoolmanSpools.id, change.upsert.id)))
+          .get()
+        if (!exists) {
+          const stored = (await tx.select({ total: count() }).from(spoolmanSpools).where(eq(spoolmanSpools.workspaceId, workspaceId)).get())
+            ?.total
+          if ((stored ?? 0) >= maxSpools) return { received: false as const, full: true }
+        }
+        const { workspaceId: _workspace, id: _id, ...values } = row(change.upsert)
+        await tx
+          .insert(spoolmanSpools)
+          .values(row(change.upsert))
+          .onConflictDoUpdate({ target: [spoolmanSpools.workspaceId, spoolmanSpools.id], set: values })
+          .run()
+      } else {
+        await tx
+          .delete(spoolmanSpools)
+          .where(and(eq(spoolmanSpools.workspaceId, workspaceId), eq(spoolmanSpools.id, change.remove)))
+          .run()
+      }
+      await tx.update(spoolmanConnections).set({ receivedAt: now }).where(eq(spoolmanConnections.workspaceId, workspaceId)).run()
+      return { received: true as const, first: connection.receivedAt === null }
+    })
+  }
+
+  async listSpoolmanLinks(): Promise<SpoolmanLink[]> {
+    return await this.database
+      .select({ filamentId: spoolmanLinks.filamentId, consumableId: spoolmanLinks.consumableId })
+      .from(spoolmanLinks)
+      .where(eq(spoolmanLinks.workspaceId, await this.workspace()))
+      .all()
+  }
+
+  async setSpoolmanLink(filamentId: number, link: { consumableId: string | null } | undefined, now: number) {
+    const workspaceId = await this.workspace()
+    if (!link) {
+      await this.database
+        .delete(spoolmanLinks)
+        .where(and(eq(spoolmanLinks.workspaceId, workspaceId), eq(spoolmanLinks.filamentId, filamentId)))
+        .run()
+      return
+    }
+    await this.database
+      .insert(spoolmanLinks)
+      .values({ workspaceId, filamentId, consumableId: link.consumableId, updatedAt: now })
+      .onConflictDoUpdate({
+        target: [spoolmanLinks.workspaceId, spoolmanLinks.filamentId],
+        set: { consumableId: link.consumableId, updatedAt: now },
+      })
+      .run()
   }
 
   async deleteInvite(id: string) {

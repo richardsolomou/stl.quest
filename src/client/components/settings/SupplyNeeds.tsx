@@ -106,7 +106,14 @@ export function SupplyNeeds({
                   </span>
                 )
               }
-              action={<RestockPopover workspaceSlug={workspaceSlug} consumable={consumable} onHand={level.onHand} />}
+              // A filament Spoolman manages is restocked by adding its spool in Spoolman.
+              action={
+                level.spoolman ? (
+                  <span className="text-xs text-muted-foreground">{stock.spoolman.managed}</span>
+                ) : (
+                  <RestockPopover workspaceSlug={workspaceSlug} consumable={consumable} onHand={level.onHand} />
+                )
+              }
             />
           ))}
         </NeedList>

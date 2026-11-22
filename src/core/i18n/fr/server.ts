@@ -120,6 +120,14 @@ export const server: typeof en = {
     materialMismatch: 'ce matériau ne convient pas à ce type d’impression',
     nothingToUndo: 'rien à annuler',
     trackingOff: 'le suivi de la consommation et du stock est désactivé pour cet espace de travail',
+    managedBySpoolman: 'Spoolman gère le stock de ce filament',
+  },
+  spoolman: {
+    notConnected: 'ce jeton Spoolman n’est relié à aucun espace de travail',
+    tooManySpools: (max: number) => `envoyez au plus ${max} bobines`,
+    tooLarge: (megabytes: number) => `envoyez au plus ${megabytes} Mo à la fois`,
+    invalid: 'envoyez les bobines Spoolman en JSON : {"spools": [...]} ou un événement de bobine Spoolman',
+    rateLimited: 'trop de mises à jour ; attendez une minute avant de renvoyer',
   },
   plates: {
     notFound: 'plateau introuvable',

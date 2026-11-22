@@ -2053,6 +2053,51 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
       .click()
     await expect(requestCard(page, name)).toHaveCount(0)
   }
+  // Spoolman sends its spools with a write-only token, and a filament they match takes its stock from them.
+  await page.goto('/settings/spoolman')
+  await page.getByRole('button', { name: 'Create token' }).click()
+  const spoolmanToken = (await page.getByText(/^stlq_spoolman_/).textContent())!
+  await screenshot(page, 'spoolman-token')
+  const spool = (id: number, filament: Record<string, unknown>, remaining_weight: number) => ({ id, remaining_weight, filament })
+  const sentSpools = await page.request.post('/api/spoolman/spools', {
+    headers: { authorization: `Bearer ${spoolmanToken}` },
+    data: {
+      spools: [
+        spool(1, { id: 7, name: 'Galaxy Silver', material: 'PLA', external_id: 'prusament_pla_galaxysilver_1000_175_n' }, 640),
+        spool(2, { id: 8, name: 'Red', material: 'PLA', color_hex: 'cc0000', vendor: { name: 'Generic' } }, 300),
+      ],
+    },
+  })
+  expect(sentSpools.status()).toBe(204)
+  expect(
+    (await page.request.post('/api/spoolman/spools', { headers: { authorization: 'Bearer stlq_spoolman_wrong' }, data: {} })).status(),
+  ).toBe(401)
+  await page.reload()
+  await expect(page.getByRole('region', { name: 'Spoolman' })).toContainText('Receiving')
+  await expect(page.getByRole('combobox', { name: 'What Galaxy Silver counts towards' })).toContainText(
+    'Automatic · Prusament PLA · Galaxy Silver',
+  )
+  await choose(page.getByRole('combobox', { name: 'What Generic Red counts towards' }), 'Prusament PLA · Galaxy Silver')
+  await expect(page.getByText('PLA · 1 spool · Chosen by hand')).toBeVisible()
+  await screenshot(page, 'spoolman-filaments')
+  await page.getByLabel('Settings sections').getByRole('link', { name: 'Consumables' }).click()
+  await page.getByRole('button', { expanded: false }).filter({ hasText: '3 colours' }).click()
+  await page.getByRole('button', { name: 'Edit Prusament PLA · Galaxy Silver' }).click()
+  const spoolmanStock = page.getByRole('dialog', { name: 'Prusament PLA · Galaxy Silver' })
+  await expect(spoolmanStock).toContainText('940 g on hand')
+  await expect(spoolmanStock).toContainText('Managed by Spoolman · 2 spools')
+  await expect(spoolmanStock.getByRole('button', { name: 'Add stock' })).toHaveCount(0)
+  await screenshot(page, 'spoolman-managed-stock')
+  await spoolmanStock.getByRole('button', { name: 'Done' }).click()
+  await page.goto('/settings/spoolman')
+  await page.getByRole('button', { name: 'Disconnect' }).click()
+  await page.getByRole('alertdialog', { name: 'Disconnect Spoolman?' }).getByRole('button', { name: 'Disconnect' }).click()
+  await expect(page.getByRole('region', { name: 'Spoolman' })).toContainText('Not connected')
+  expect(
+    (
+      await page.request.post('/api/spoolman/spools', { headers: { authorization: `Bearer ${spoolmanToken}` }, data: { spools: [] } })
+    ).status(),
+  ).toBe(401)
   await page.goto('/settings/printers')
   await page.getByRole('button', { name: 'Edit Elegoo Mars 3' }).click()
   // A wear part is added from the printer itself, without leaving for Consumables.

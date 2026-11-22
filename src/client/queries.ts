@@ -31,6 +31,7 @@ import {
   sessionInfo,
   listUsage,
   getStockLevels,
+  getSpoolman,
   getPrinterLifetimes,
   getUsagePrefills,
   getUsageBackfillPreview,
@@ -166,6 +167,9 @@ export const stockQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['stock', workspaceSlug], queryFn: () => getStockLevels({ data: { workspaceSlug } }) })
 export const printerLifetimesQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['printer-lifetimes', workspaceSlug], queryFn: () => getPrinterLifetimes({ data: { workspaceSlug } }) })
+export const spoolmanQuery = (workspaceSlug: string) =>
+  queryOptions({ queryKey: ['spoolman', workspaceSlug], queryFn: () => getSpoolman({ data: { workspaceSlug } }) })
+export type SpoolmanView = Awaited<ReturnType<typeof getSpoolman>>
 export const usagePrefillsQuery = (workspaceSlug: string) =>
   queryOptions({ queryKey: ['usage-prefills', workspaceSlug], queryFn: () => getUsagePrefills({ data: { workspaceSlug } }) })
 export const platesQuery = (workspaceSlug: string) =>
@@ -253,6 +257,8 @@ function prefetchSettingsSection(queryClient: QueryClient, section: SettingsSect
         prefetch(storageMigrationQuery(workspaceSlug)),
         prefetch(cloudConnectionsQuery(workspaceSlug)),
       ]
+    case 'spoolman':
+      return [prefetch(spoolmanQuery(workspaceSlug)), prefetch(consumablesQuery(workspaceSlug))]
   }
 }
 

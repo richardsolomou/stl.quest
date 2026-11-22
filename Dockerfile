@@ -13,7 +13,7 @@ COPY src ./src
 COPY public ./public
 COPY catalogs/printers/catalog.generated.json catalogs/printers/index.generated.json ./catalogs/printers/
 COPY catalogs/resins/catalog.generated.json catalogs/resins/images.json ./catalogs/resins/
-COPY catalogs/filaments/catalog.generated.json ./catalogs/filaments/catalog.generated.json
+COPY catalogs/filaments/catalog.generated.json catalogs/filaments/spoolman.generated.json ./catalogs/filaments/
 COPY catalogs/electricity/catalog.generated.json ./catalogs/electricity/catalog.generated.json
 COPY catalogs/equipment/catalog.json catalogs/equipment/images.json ./catalogs/equipment/
 COPY catalogs/parts/catalog.json ./catalogs/parts/catalog.json

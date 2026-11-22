@@ -14,7 +14,7 @@ import {
   workspaceOnboarding,
 } from './auth'
 import { assetGenerationJobs } from './analysis'
-import { consumables, equipment, printers } from './inventory'
+import { consumables, equipment, printers, spoolmanConnections, spoolmanLinks, spoolmanSpools } from './inventory'
 import {
   managedStorageAccounts,
   managedStorageEntitlements,
@@ -64,6 +64,9 @@ export const schema = {
   requestStatuses,
   session,
   settings,
+  spoolmanConnections,
+  spoolmanLinks,
+  spoolmanSpools,
   subscription,
   twoFactor,
   uploadSessions,
