@@ -218,7 +218,7 @@ describe('quote totals', () => {
 
 describe('measured failure rate', () => {
   const materialOnly = { ...job, printHours: 0, plates: 0 }
-  const runs = (count: number) => [{ printerId: reflex.id, runs: count, failed: 3, cancelled: 1 }]
+  const runs = (count: number) => [{ printerId: reflex.id, runs: count, failed: 4 }]
 
   it('prices from the flat allowance while the printer has too few reported runs', () => {
     expect(
@@ -226,7 +226,7 @@ describe('measured failure rate', () => {
     ).toBeCloseTo(1.2)
   })
 
-  it('prices from the printer’s failed and cancelled share once it has enough runs', () => {
+  it('prices from the printer’s failed share once it has enough runs', () => {
     expect(
       cost({ material: grey, job: materialOnly, printer: reflex, printerRuns: runs(MIN_MEASURED_FAILURE_RUNS) }).failureAllowance,
     ).toBeCloseTo(2.4)
@@ -241,6 +241,12 @@ describe('measured failure rate', () => {
 
   it('says the quote used the flat allowance', () => {
     expect(cost({ printer: reflex, printerRuns: runs(MIN_MEASURED_FAILURE_RUNS - 1) }).failureRate).toEqual({ percent: 10 })
+  })
+
+  it('keeps a zero allowance', () => {
+    expect(
+      cost({ printer: reflex, printerRuns: runs(MIN_MEASURED_FAILURE_RUNS), rates: { ...rates, failureAllowancePercent: 0 } }).failureRate,
+    ).toEqual({ percent: 0 })
   })
 
   it('ignores the runs of another printer', () => {

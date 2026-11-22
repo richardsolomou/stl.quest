@@ -119,10 +119,23 @@ describe('printFilaments', () => {
     ])
   })
 
-  it('puts grams the trays do not account for on the first filament', () => {
-    expect(printFilaments({ grams: 10, filamentDetails: 'AMS-A T1 PETG: 4.0g' }, [pla, petg], materialOf)).toEqual([
+  it('takes measured trays as the whole print', () => {
+    expect(printFilaments({ grams: 12, filamentDetails: 'AMS-A T1 PETG: 4.0g' }, [pla, petg], materialOf)).toEqual([
+      { filament: petg, grams: 4 },
+    ])
+  })
+
+  it('puts grams the slicer slots do not account for on the first filament', () => {
+    expect(printFilaments({ grams: 10, filamentDetails: 'PETG: 4.0g' }, [pla, petg], materialOf)).toEqual([
       { filament: petg, grams: 4 },
       { filament: pla, grams: 6 },
+    ])
+  })
+
+  it('ignores slicer slots missing the total only by rounding', () => {
+    expect(printFilaments({ grams: 10, filamentDetails: 'PLA: 3.3g | PETG: 6.6g' }, [pla, petg], materialOf)).toEqual([
+      { filament: pla, grams: 3.3 },
+      { filament: petg, grams: 6.6 },
     ])
   })
 
@@ -242,7 +255,7 @@ describe('printJobLink', () => {
 describe('printerRunCounts', () => {
   const linked = { printerId: 'x2d', plateId: 'plate' }
 
-  it('counts ended plate runs and failures per printer', () => {
+  it('counts finished and failed plate runs per printer', () => {
     expect(
       printerRunCounts([
         job(linked),
@@ -250,7 +263,7 @@ describe('printerRunCounts', () => {
         job({ ...linked, outcome: 'cancelled' }),
         job({ ...linked, outcome: 'printing' }),
       ]),
-    ).toEqual([{ printerId: 'x2d', runs: 3, failed: 1, cancelled: 1 }])
+    ).toEqual([{ printerId: 'x2d', runs: 2, failed: 1 }])
   })
 
   it('leaves out prints on no plate', () => {

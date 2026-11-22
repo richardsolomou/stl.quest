@@ -133,7 +133,7 @@ export const calculator = {
     labour: (symbol: string) => `Labour (${symbol}/h)`,
     failureAllowance: 'Failure allowance (%)',
     failureAllowanceHint: (runs: number) =>
-      `A printer with ${runs} or more plate runs reported by Bambuddy prices failures from its own rate instead.`,
+      `A printer with ${runs} or more finished or failed plate runs reported by Bambuddy prices failures from its own rate instead. Stopped prints don’t count, and 0% stays 0%.`,
     markup: 'Markup on cost (%)',
     markupHint: (markup: string, share: string) => `A ${markup}% markup keeps ${share}% of each sale as profit.`,
   },

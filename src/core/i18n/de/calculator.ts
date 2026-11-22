@@ -144,7 +144,7 @@ export const calculator: typeof en = {
     labour: (symbol: string) => `Arbeitszeit (${symbol}/h)`,
     failureAllowance: 'Ausfallreserve (%)',
     failureAllowanceHint: (runs) =>
-      `Ein Drucker mit ${runs} oder mehr von Bambuddy gemeldeten Plattenläufen berechnet Ausfälle stattdessen mit seiner eigenen Quote.`,
+      `Ein Drucker mit ${runs} oder mehr von Bambuddy gemeldeten fertigen oder fehlgeschlagenen Plattenläufen berechnet Ausfälle stattdessen mit seiner eigenen Quote. Abgebrochene Drucke zählen nicht, und 0 % bleibt 0 %.`,
     markup: 'Aufschlag auf die Kosten (%)',
     markupHint: (markup: string, share: string) => `Bei ${markup} % Aufschlag bleiben ${share} % jedes Verkaufs als Gewinn.`,
   },

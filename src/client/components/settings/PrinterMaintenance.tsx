@@ -151,7 +151,7 @@ export function PrinterLifetimeLine({ printerId, lifespanHours }: { printerId: s
         <p className="font-mono text-xs text-muted-foreground tabular-nums">
           {copy.runs(
             lifetime.runs.runs,
-            lifetime.runs.failed + lifetime.runs.cancelled,
+            lifetime.runs.failed,
             new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 }).format(
               measuredFailurePercent(lifetime.runs) / 100,
             ),

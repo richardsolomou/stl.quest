@@ -4448,7 +4448,6 @@ describe('STLQuestService crash recovery', () => {
           printerId: x2d.id,
           runs: 1,
           failed: 1,
-          cancelled: 0,
         })
       })
 

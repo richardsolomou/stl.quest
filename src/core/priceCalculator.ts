@@ -156,23 +156,25 @@ export type PrintCostInput = {
  */
 export const MIN_MEASURED_FAILURE_RUNS = 20
 
-/** The share of a printer's reported plate runs that failed or were cancelled, as a percentage. */
-export function measuredFailurePercent({ runs, failed, cancelled }: Pick<PrinterRunCount, 'runs' | 'failed' | 'cancelled'>) {
-  return runs > 0 ? ((failed + cancelled) * 100) / runs : 0
+/** The share of a printer's reported plate runs that failed, as a percentage. */
+export function measuredFailurePercent({ runs, failed }: Pick<PrinterRunCount, 'runs' | 'failed'>) {
+  return runs > 0 ? (failed * 100) / runs : 0
 }
 
 /**
  * The failure allowance a quote uses: the printer's measured failure rate once it has reported enough runs, with how
- * many, else the workspace's flat allowance.
+ * many, else the workspace's flat allowance. A workspace that allows nothing for failures keeps pricing none.
  */
 export function failureRateFor(
   rates: Pick<PriceCalculatorSettings, 'failureAllowancePercent'>,
   printer?: Pick<CostedPrinter, 'id'>,
   printerRuns: PrinterRunCount[] = [],
 ): { percent: number; runs?: number } {
+  const flat = nonNegative(rates.failureAllowancePercent)
   const counted = printer && printerRuns.find(({ printerId }) => printerId === printer.id)
-  if (counted && counted.runs >= MIN_MEASURED_FAILURE_RUNS) return { percent: measuredFailurePercent(counted), runs: counted.runs }
-  return { percent: nonNegative(rates.failureAllowancePercent) }
+  if (flat > 0 && counted && counted.runs >= MIN_MEASURED_FAILURE_RUNS)
+    return { percent: measuredFailurePercent(counted), runs: counted.runs }
+  return { percent: flat }
 }
 
 export type EquipmentCost = {
