@@ -8,6 +8,10 @@ STL Quest includes a hand-curated catalog of printer wear parts: resin tanks, re
 
 `listPrice` is the manufacturer's own store price for one pack on the `checked` date, in that store's currency, with `packSize` when the pack holds several parts. Its note records whether tax is included and any sale. It is a starting point, not what a user pays: prices vary by region, retailer, and date, and users save their own price.
 
+## Categories and sets
+
+Each part has a `category`. The "What you need" list treats parts of one category for the same printers as alternatives, so owning a smooth or a satin sheet stands in for the other. A model that needs two parts of one category at once gives each its own `set`, such as the A2L's separate X and Y belts, so owning one still suggests the other.
+
 ## Lifespans
 
 Each `lifespanSource` records its `basis`:

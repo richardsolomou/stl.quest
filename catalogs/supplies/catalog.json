@@ -92,12 +92,13 @@
       "category": "desiccant",
       "unit": "item",
       "printType": "filament",
+      "packSize": 6,
       "listPrice": {
         "amount": 3.99,
         "currency": "EUR",
         "url": "https://eu.store.bambulab.com/products/molecular-sieve-desiccant",
         "checked": "2026-11-22",
-        "note": "Including VAT. For every AMS model."
+        "note": "Including VAT. For every AMS model. A pack of six sachets."
       },
       "usedBy": [],
       "source": {
@@ -112,12 +113,13 @@
       "category": "desiccant",
       "unit": "item",
       "printType": "filament",
+      "packSize": 6,
       "listPrice": {
         "amount": 4.99,
         "currency": "EUR",
         "url": "https://eu.store.bambulab.com/products/silicone-desiccant",
         "checked": "2026-11-22",
-        "note": "Including VAT. For every AMS model."
+        "note": "Including VAT. For every AMS model. A pack of six sachets."
       },
       "usedBy": [],
       "source": {
@@ -193,12 +195,13 @@
       "category": "lubricant",
       "unit": "item",
       "printType": "filament",
+      "packSize": 6,
       "listPrice": {
         "amount": 6.99,
         "currency": "EUR",
         "url": "https://eu.store.bambulab.com/products/lubricant-oil",
         "checked": "2026-11-22",
-        "note": "Including VAT."
+        "note": "Including VAT. A pack of six 3 g tubes."
       },
       "usedBy": [],
       "source": {
@@ -211,14 +214,15 @@
       "brand": "Bambu Lab",
       "name": "Lubricant Grease",
       "category": "lubricant",
-      "unit": "item",
+      "unit": "g",
       "printType": "filament",
+      "packSize": 6,
       "listPrice": {
         "amount": 4.99,
         "currency": "EUR",
         "url": "https://eu.store.bambulab.com/products/lubricant-grease",
         "checked": "2026-11-22",
-        "note": "Including VAT."
+        "note": "Including VAT. 6 g a pack, as six 1 g or two 3 g sachets."
       },
       "usedBy": [],
       "source": {

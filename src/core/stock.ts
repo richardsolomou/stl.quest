@@ -101,8 +101,8 @@ const CATEGORY_WORDS: [PartCategory, RegExp][] = [
   ['purge-wiper', /\b(purge|wiper|abstreifer)/i],
   ['cutter', /\b(cutter|blade|klinge|messer|lame|coupe)/i],
   ['nozzle', /\b(nozzle|hotend|buse)|düse/i],
-  ['flex-platform', /\bflex|build platform|plateforme|druckplattform/i],
   ['build-sheet', /\b(sheet|pei|plaque|plateau)|platte/i],
+  ['flex-platform', /\bflex|build platform|plateforme|druckplattform/i],
   ['air-filter', /filt(er|re)/i],
   ['belt', /\b(belt|riemen|courroie)/i],
   ['ptfe-tube', /\b(ptfe|bowden|tube|schlauch)/i],
@@ -115,9 +115,10 @@ export function partCategory(part: PartConsumable, catalogue: readonly PartPrese
   return CATEGORY_WORDS.find(([, words]) => words.test(part.name))?.[0]
 }
 
+/** Parts of one kind are alternatives, such as a smooth or a satin sheet, unless the catalogue names each its own set. */
 function lacking(presets: PartPreset[], owned: PartConsumable[], catalogue: readonly PartPreset[]) {
-  const had = new Set(owned.map((part) => partCategory(part, catalogue)))
-  return presets.filter((preset) => !had.has(preset.category))
+  const had = new Set(owned.map((part) => findPreset(catalogue, part.partPresetId)?.set ?? partCategory(part, catalogue)))
+  return presets.filter((preset) => !had.has(preset.set ?? preset.category))
 }
 
 /** Stock is entered in litres, kilograms, or items, and kept in the consumable's own unit. */

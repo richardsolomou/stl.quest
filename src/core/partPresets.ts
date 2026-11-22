@@ -27,6 +27,8 @@ export type PartPreset = {
   brand: string
   name: string
   category: PartCategory
+  /** Set when a model needs this part alongside others of its category, such as separate X and Y belts, so owning one does not stand in for the others. */
+  set?: string
   printType: PrintType
   /** Printer preset IDs the part is made for; empty for a generic part that suits every printer of its print type. */
   fits: string[]

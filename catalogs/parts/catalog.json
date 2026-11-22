@@ -1472,6 +1472,7 @@
       "brand": "Bambu Lab",
       "name": "Y Belt - A2L",
       "category": "belt",
+      "set": "y-belt",
       "printType": "filament",
       "fits": ["filament-bambu-lab-a2l"],
       "lifespan": 5000,
@@ -1497,6 +1498,7 @@
       "brand": "Bambu Lab",
       "name": "X Belt - A2L",
       "category": "belt",
+      "set": "x-belt",
       "printType": "filament",
       "fits": ["filament-bambu-lab-a2l"],
       "lifespan": 5000,
@@ -1735,7 +1737,8 @@
         "currency": "EUR",
         "url": "https://eu.store.bambulab.com/products/nozzle-wiper-a2l",
         "checked": "2026-11-22",
-        "note": "Including VAT."
+        "note": "Including VAT. A pack of three silicone pads with a steel blade.",
+        "packSize": 3
       },
       "source": {
         "id": "bambu-lab-store",
@@ -1761,7 +1764,8 @@
         "currency": "EUR",
         "url": "https://eu.store.bambulab.com/products/replacement-filament-cutter",
         "checked": "2026-11-22",
-        "note": "Including VAT. The left and right cutters are sold separately at the same price."
+        "note": "Including VAT. The left and right cutters are sold separately at the same price. A pack of three cutters.",
+        "packSize": 3
       },
       "source": {
         "id": "bambu-lab-store",
@@ -1787,7 +1791,8 @@
         "currency": "EUR",
         "url": "https://eu.store.bambulab.com/products/replacement-filament-cutter",
         "checked": "2026-11-22",
-        "note": "Including VAT."
+        "note": "Including VAT. A pack of three cutters.",
+        "packSize": 3
       },
       "source": {
         "id": "bambu-lab-store",
@@ -1813,7 +1818,8 @@
         "currency": "EUR",
         "url": "https://eu.store.bambulab.com/products/replacement-filament-cutter",
         "checked": "2026-11-22",
-        "note": "Including VAT."
+        "note": "Including VAT. A pack of three cutters.",
+        "packSize": 3
       },
       "source": {
         "id": "bambu-lab-store",
@@ -1845,7 +1851,8 @@
         "currency": "EUR",
         "url": "https://eu.store.bambulab.com/products/replacement-filament-cutter",
         "checked": "2026-11-22",
-        "note": "Including VAT."
+        "note": "Including VAT. A pack of three cutters.",
+        "packSize": 3
       },
       "source": {
         "id": "bambu-lab-store",
