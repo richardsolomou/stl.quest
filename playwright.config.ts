@@ -1,13 +1,12 @@
 import { defineConfig, devices } from '@playwright/test'
+import { e2eContainer, e2eDataRoot, e2eImage, e2ePort as port } from './e2e/fixtures/environment'
 
-const port = Number(process.env.PLAYWRIGHT_PORT ?? 4173)
 const coreOnly = process.env.PLAYWRIGHT_CORE_ONLY === '1'
-const containerSuffix = port === 4173 ? '' : `-${port}`
 const baseURL = `http://127.0.0.1:${port}`
 const selfHostedPort = port + 1
 const selfHostedServerURL = `http://127.0.0.1:${selfHostedPort}`
 const selfHostedURL = `http://stlquest.test:${selfHostedPort}`
-const root = process.env.PLAYWRIGHT_DATA_ROOT ?? `/tmp/stlquest-playwright-${port}`
+const root = e2eDataRoot
 const selfHostedRoot = `${root}-self-hosted`
 const hostedPort = port + 2
 const hostedServerURL = `http://127.0.0.1:${hostedPort}`
@@ -37,11 +36,11 @@ function appServer(name: string, appPort: number, dataRoot: string, environment:
   const variables = Object.entries(environment)
     .map(([key, value]) => `-e ${key}=${value}`)
     .join(' ')
-  return `docker rm -f ${name} >/dev/null 2>&1 || true; rm -rf ${dataRoot} && mkdir -p ${dataRoot}/data ${dataRoot}/prints ${dataRoot}/prints-migrated ${dataRoot}/prints-stranded && chmod 777 ${dataRoot}/data ${dataRoot}/prints ${dataRoot}/prints-migrated ${dataRoot}/prints-stranded && docker run -d --name ${name} --read-only --tmpfs /tmp -v ${dataRoot}:${dataRoot} --add-host host.docker.internal:host-gateway -p ${publishedHost}:${appPort}:3000 -e DATA_DIR=${dataRoot}/data -e PRINTS_DIR=${dataRoot}/prints -e STLQUEST_REALTIME_SECRET_FILE=${dataRoot}/data/realtime-secret $(sh scripts/e2eContainerArgs.sh) ${variables} stlquest-e2e >/dev/null && trap 'docker rm -f ${name} >/dev/null 2>&1' EXIT INT TERM; docker logs -f ${name} & docker wait ${name}`
+  return `docker rm -f ${name} >/dev/null 2>&1 || true; rm -rf ${dataRoot} && mkdir -p ${dataRoot}/data ${dataRoot}/prints ${dataRoot}/prints-migrated ${dataRoot}/prints-stranded && chmod 777 ${dataRoot}/data ${dataRoot}/prints ${dataRoot}/prints-migrated ${dataRoot}/prints-stranded && docker run -d --name ${name} --read-only --tmpfs /tmp -v ${dataRoot}:${dataRoot} --add-host host.docker.internal:host-gateway -p ${publishedHost}:${appPort}:3000 -e DATA_DIR=${dataRoot}/data -e PRINTS_DIR=${dataRoot}/prints -e STLQUEST_REALTIME_SECRET_FILE=${dataRoot}/data/realtime-secret $(sh scripts/e2eContainerArgs.sh ${e2eImage}) ${variables} ${e2eImage} >/dev/null && trap 'docker rm -f ${name} >/dev/null 2>&1' EXIT INT TERM; docker logs -f ${name} & docker wait ${name}`
 }
 
 function httpsProxyServer() {
-  const name = `stlquest-e2e-https-proxy${containerSuffix}`
+  const name = e2eContainer('https-proxy')
   return `docker rm -f ${name} >/dev/null 2>&1 || true; docker run -d --name ${name} --read-only --tmpfs /tmp --add-host host.docker.internal:host-gateway -p 127.0.0.1:${httpsProxyPort}:443 -p 127.0.0.1:${httpsProxyHealthPort}:80 -e UPSTREAM=host.docker.internal:${httpsInnerPort} -e XDG_CONFIG_HOME=/tmp/caddy-config -e XDG_DATA_HOME=/tmp/caddy-data -v ${process.cwd()}/e2e/outer-proxy.Caddyfile:/etc/caddy/Caddyfile:ro caddy:2.11.4-alpine >/dev/null && trap 'docker rm -f ${name} >/dev/null 2>&1' EXIT INT TERM; docker logs -f ${name}`
 }
 
@@ -111,7 +110,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: appServer(`stlquest-e2e-main${containerSuffix}`, port, root, { BETTER_AUTH_URL: baseURL }),
+      command: appServer(e2eContainer('main'), port, root, { BETTER_AUTH_URL: baseURL }),
       url: `${baseURL}/api/health`,
       reuseExistingServer: false,
       timeout: 120_000,
@@ -130,13 +129,7 @@ export default defineConfig({
       ? []
       : [
           {
-            command: appServer(
-              `stlquest-e2e-https${containerSuffix}`,
-              httpsInnerPort,
-              httpsRoot,
-              { DATABASE_URL: '', NODE_ENV: 'production' },
-              '0.0.0.0',
-            ),
+            command: appServer(e2eContainer('https'), httpsInnerPort, httpsRoot, { DATABASE_URL: '', NODE_ENV: 'production' }, '0.0.0.0'),
             url: `http://127.0.0.1:${httpsInnerPort}/api/health`,
             reuseExistingServer: false,
             timeout: 120_000,
@@ -148,7 +141,7 @@ export default defineConfig({
             timeout: 120_000,
           },
           {
-            command: appServer(`stlquest-e2e-base-path${containerSuffix}`, basePathPort, basePathRoot, {
+            command: appServer(e2eContainer('base-path'), basePathPort, basePathRoot, {
               BASE_PATH: '/stlquest',
               BETTER_AUTH_URL: `${basePathServerURL}/stlquest`,
             }),
@@ -157,7 +150,7 @@ export default defineConfig({
             timeout: 120_000,
           },
           {
-            command: appServer(`stlquest-e2e-preview${containerSuffix}`, previewPort, previewRoot, {
+            command: appServer(e2eContainer('preview'), previewPort, previewRoot, {
               BETTER_AUTH_URL: previewServerURL,
               STLQUEST_HOSTED: 'true',
               STLQUEST_SEED_PREVIEW: 'true',
@@ -178,7 +171,7 @@ export default defineConfig({
       ? []
       : [
           {
-            command: appServer(`stlquest-e2e-self-hosted${containerSuffix}`, selfHostedPort, selfHostedRoot, {
+            command: appServer(e2eContainer('self-hosted'), selfHostedPort, selfHostedRoot, {
               DATABASE_URL: '',
               NODE_ENV: 'production',
             }),
@@ -187,7 +180,7 @@ export default defineConfig({
             timeout: 120_000,
           },
           {
-            command: appServer(`stlquest-e2e-hosted${containerSuffix}`, hostedPort, hostedRoot, {
+            command: appServer(e2eContainer('hosted'), hostedPort, hostedRoot, {
               NODE_ENV: 'production',
               BETTER_AUTH_URL: hostedServerURL,
               STLQUEST_HOSTED: 'true',
