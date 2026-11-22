@@ -86,7 +86,7 @@ export const plates: typeof en = {
     unlabelled: 'Diese Datei sagt nicht, was jedes Objekt verbraucht hat, deshalb wird ihre Summe nach Modellvolumen aufgeteilt.',
     plateInFile: 'Druckplatte in der Datei',
     objects: 'Objekte',
-    objectsHint: 'Nach Dateiname des Modells zugeordnet. Ändere falsche Zuordnungen.',
+    objectsHint: 'Nach Anfragenummer wie SQ-142, sonst nach Dateiname des Modells zugeordnet. Ändere falsche Zuordnungen.',
     unnamed: (id) => `Objekt ${id}`,
     filament: (index) => `Filament ${index + 1}`,
     check: (measured, slicer) => `${measured} in Objekten und Spülmenge; der Slicer sagt ${slicer}.`,

@@ -556,7 +556,11 @@ export const recordPlateSchema = z.union([
     objects: z.array(z.object({ requestId: id.optional(), amounts: z.array(plateAmount).max(MAX_PLATE_FILAMENTS) })).max(MAX_PLATE_OBJECTS),
     overhead: z.array(plateAmount).max(MAX_PLATE_FILAMENTS),
   }),
-  z.object({ ...plateRecordBase, total: z.number().positive().max(1_000_000), otherShare: z.number().min(0).lt(1) }),
+  z.object({
+    ...plateRecordBase,
+    totals: z.array(z.number().nonnegative().max(1_000_000)).min(1).max(MAX_PLATE_FILAMENTS),
+    otherShare: z.number().min(0).lt(1),
+  }),
 ]) satisfies z.ZodType<PlateRecordInput>
 export const plateIdSchema = z.object({ plateId: id })
 export const requestChargeSchema = z.object({ id, amount: z.number().min(0).max(1_000_000_000).nullable() })

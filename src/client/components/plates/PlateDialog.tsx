@@ -272,7 +272,7 @@ function PlateRecorder({
     mode === 'file' && sliced && parsed ? measuredRecord(plate.id, sliced, parsed.assignments, [], time) : undefined
   const totalsInput: PlateTotals | undefined =
     mode === 'totals' && Number(total) > 0
-      ? { total: Number(total), otherShare: plate.otherStuff ? Math.min(0.99, Math.max(0, Number(otherShare) || 0) / 100) : 0 }
+      ? { totals: [Number(total)], otherShare: plate.otherStuff ? Math.min(0.99, Math.max(0, Number(otherShare) || 0) / 100) : 0 }
       : undefined
   const input = measuredInput ?? totalsInput
   const split = input

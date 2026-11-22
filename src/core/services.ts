@@ -60,7 +60,15 @@ import {
   type PlateRecording,
   type PlateTotals,
 } from './plates'
-import { continuedPrintJob, printerNamed, printerRunCounts, printJobLink, type PrintJob, type PrintReport } from './printJobs'
+import {
+  continuedPrintJob,
+  printerNamed,
+  printerRunCounts,
+  printFilaments,
+  printJobLink,
+  type PrintJob,
+  type PrintReport,
+} from './printJobs'
 import {
   MAX_REQUEST_NAME_LENGTH,
   MAX_BULK_CARDS,
@@ -1583,7 +1591,7 @@ export class STLQuestService {
           return {
             ...item,
             name: request?.name ?? '',
-            ...(request && { number: request.number }),
+            ...(request?.number && { number: request.number }),
             ...(request?.fileName && { fileName: request.fileName }),
             ...(request?.modelVolumeMm3 && { volumeMm3: request.modelVolumeMm3 }),
             ...(estimate && { estimatedMaterial: estimate }),
@@ -1805,11 +1813,14 @@ export class STLQuestService {
     input: PlateMeasured | PlateTotals,
     minutes: number,
     materials: Consumable[],
+    /** Weighs the prints by what the plate's slicer file measured for them, when it was recorded from one. */
+    byRecording = false,
   ) {
     const printers = await this.repository.listInventory('printers')
     const printer = printers.find(({ id }) => id === plate.printerId)
     const requests = await Promise.all(plate.items.map(({ requestId }) => this.repository.getRequest(requestId)))
     const rates = await this.rates()
+    const measured = byRecording && plate.recording?.method === 'measured'
     const split = splitPlate(
       input,
       minutes,
@@ -1819,6 +1830,7 @@ export class STLQuestService {
         return {
           requestId: item.requestId,
           copies: item.copies,
+          ...(measured && item.amount && { measuredAmount: item.amount }),
           ...(request?.modelVolumeMm3 && { volumeMm3: request.modelVolumeMm3 }),
           ...(estimate && { estimatedMaterial: estimate }),
         }
@@ -1912,17 +1924,19 @@ export class STLQuestService {
     if (!plate || !(await storedUsageTracking(this.repository))) return
     const printType = await this.platePrintType(plate).catch(() => undefined)
     if (!printType) return
-    const material = job.grams ? consumablesOfKind(await this.consumables(), printType)[0] : undefined
-    const totals: PlateTotals = { total: job.grams ?? 0, otherShare: 0 }
+    const used = this.printMaterials(job, printType, await this.consumables())
+    const materials = used.map(({ material }) => material)
+    const totals: PlateTotals = { totals: used.map(({ amount }) => amount), otherShare: 0 }
     const minutes = job.minutes ?? 0
     let transactionId: string | undefined
     if (job.outcome === 'finished') {
       if (plate.recording || plate.otherStuff || job.minutes === undefined) return
-      transactionId = (await this.recordPlateUsage(plate, printType, totals, minutes, material ? [material] : [], 'printer')).recorded
-        .recording!.transactionId
+      transactionId = (await this.recordPlateUsage(plate, printType, totals, minutes, materials, 'printer')).recorded.recording!
+        .transactionId
       this.changed('usage.recorded')
     } else {
-      const { drafts } = await this.plateRunUsage(plate, printType, totals, minutes, material ? [material] : [])
+      // Bambuddy already scales a stopped print's grams to its progress, so they are what each print had used by then.
+      const { drafts } = await this.plateRunUsage(plate, printType, totals, minutes, materials, true)
       transactionId = (await this.appendUsage(drafts.map((draft) => ({ ...draft, outcome: 'failed' as const })))).transactionId
       if (plate.stage) {
         const requests = new Map((await this.repository.listRequests()).map((request) => [request.id, request]))
@@ -1939,6 +1953,19 @@ export class STLQuestService {
       }
     }
     if (transactionId) await this.repository.updatePrintJob({ ...job, transactionId })
+  }
+
+  /**
+   * What a reported print used of each library material: a filament print's trays by their material, a resin one's
+   * grams in the first resin.
+   */
+  private printMaterials(job: PrintJob, printType: PrintType, consumables: Consumable[]) {
+    if (printType === 'filament')
+      return printFilaments(job, consumablesOfKind(consumables, 'filament'), ({ filamentPresetId }) =>
+        filamentPresetId ? SPOOLMAN_CATALOGUE.presets[filamentPresetId]?.[1] : undefined,
+      ).map(({ filament, grams }): { material: Consumable; amount: number } => ({ material: filament, amount: grams }))
+    const resin = consumablesOfKind(consumables, 'resin')[0]
+    return resin && job.grams ? [{ material: resin, amount: job.grams }] : []
   }
 
   /** Bambuddy's prints, newest first, each unlinked one with the request its name is tagged with, if any. */
@@ -2028,7 +2055,11 @@ export class STLQuestService {
           input.overhead.length === slots &&
           input.overhead.every(amount) &&
           input.objects.every((object) => object.amounts.length === slots && object.amounts.every(amount))
-        : slots === 1 && amount(input.total) && input.total > 0 && input.otherShare >= 0 && input.otherShare < 1)
+        : input.totals.length === slots &&
+          input.totals.every((total) => amount(total) && total >= 0) &&
+          input.totals.some((total) => total > 0) &&
+          input.otherShare >= 0 &&
+          input.otherShare < 1)
     if (!valid) throw new Response(this.text.plates.invalid, { status: 400 })
     if (isMeasured(input) && input.objects.some(({ requestId }) => requestId !== undefined && !onPlate.has(requestId)))
       throw new Response(this.text.plates.notOnPlate, { status: 400 })

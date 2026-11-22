@@ -1,5 +1,7 @@
+import type { FilamentConsumable } from './consumables'
 import { heldByPlates, printingPlate, type Plate } from './plates'
 import { taggedRequestNumber } from './request'
+import { sameText } from './spoolman'
 
 /**
  * Prints a printer actually ran, as Bambuddy (github.com/maziggy/bambuddy) reports them through its generic webhook.
@@ -88,6 +90,51 @@ export function displayedGrams(text?: string) {
   return match ? Number(match[1]) : undefined
 }
 
+export type DisplayedTray = { material?: string; grams: number }
+
+/** The tray label (`AMS-A T1`, `Ext`) Bambuddy puts before the material of a spool it measured. */
+const TRAY_LABEL = /^(?:Ext|.+?\sT\d+)\s+/
+
+/**
+ * Bambuddy's per-tray breakdown read into each tray's material and grams: `AMS-A T1 PLA: 12.3g | Ext PETG: 4.0g` from
+ * the spools it tracked, or `PLA: 12.3g` from the sliced file's filament slots.
+ */
+export function displayedTrays(text?: string): DisplayedTray[] {
+  return (known(text) ?? '').split('|').flatMap((part) => {
+    const match = /^(.*?):\s*(\d+(?:\.\d+)?)\s*g$/i.exec(part.trim())
+    if (!match) return []
+    const material = known(match[1].replace(TRAY_LABEL, ''))
+    return [{ ...(material && { material }), grams: Number(match[2]) }]
+  })
+}
+
+/**
+ * What a print used of each library filament: each tray goes to the first filament of its material, else the first
+ * filament. Labelled trays are what Bambuddy measured, so they are the whole print; the print's grams are the slicer's
+ * estimate, so only grams the slicer's own slots leave out go to the first filament.
+ */
+export function printFilaments(
+  job: Pick<PrintJob, 'grams' | 'filamentDetails'>,
+  filaments: FilamentConsumable[],
+  materialOf: (filament: FilamentConsumable) => string | undefined,
+): { filament: FilamentConsumable; grams: number }[] {
+  const first = filaments[0]
+  if (!first) return []
+  const used = new Map<FilamentConsumable, number>()
+  const add = (filament: FilamentConsumable, grams: number) => {
+    if (grams > 0) used.set(filament, (used.get(filament) ?? 0) + grams)
+  }
+  const trays = displayedTrays(job.filamentDetails)
+  for (const { material, grams } of trays) add(filaments.find((filament) => sameText(materialOf(filament), material)) ?? first, grams)
+  const measured = job.filamentDetails?.split('|').some((part) => TRAY_LABEL.test(part.trim()))
+  if (!measured) {
+    // Bambuddy rounds every figure to a tenth of a gram, so n slots can miss the rounded total by up to n × 0.05 g.
+    const untracked = Math.round(((job.grams ?? 0) - trays.reduce((total, { grams }) => total + grams, 0)) * 10) / 10
+    if (untracked > trays.length * 0.05) add(first, untracked)
+  }
+  return [...used].map(([filament, grams]) => ({ filament, grams }))
+}
+
 /** The print event a Bambuddy notification is, or none for notifications that are not about a print's start or end. */
 export function bambuddyReport(event: BambuddyEvent): PrintReport | undefined {
   const outcome = OUTCOMES[event.event]
@@ -151,17 +198,19 @@ export function printJobLink(
   return plate ? { plateId: plate.id, by: 'tag' } : { requestId: request.id, by: 'tag' }
 }
 
-export type PrinterRunCount = { printerId: string; runs: number; failed: number; cancelled: number }
+export type PrinterRunCount = { printerId: string; runs: number; failed: number }
 
-/** Each printer's ended plate runs as Bambuddy reported them, and how many failed or were cancelled. */
+/**
+ * Each printer's plate runs that Bambuddy reported finished or failed, and how many failed. A stopped print is someone's
+ * choice, not the printer failing, so it is not a run here.
+ */
 export function printerRunCounts(jobs: PrintJob[]): PrinterRunCount[] {
   const counts = new Map<string, PrinterRunCount>()
   for (const { printerId, plateId, outcome } of jobs) {
-    if (!printerId || !plateId || outcome === 'printing') continue
-    const count = counts.get(printerId) ?? { printerId, runs: 0, failed: 0, cancelled: 0 }
+    if (!printerId || !plateId || (outcome !== 'finished' && outcome !== 'failed')) continue
+    const count = counts.get(printerId) ?? { printerId, runs: 0, failed: 0 }
     count.runs += 1
     if (outcome === 'failed') count.failed += 1
-    if (outcome === 'cancelled') count.cancelled += 1
     counts.set(printerId, count)
   }
   return [...counts.values()]

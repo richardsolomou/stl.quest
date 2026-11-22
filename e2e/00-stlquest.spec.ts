@@ -122,6 +122,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(roughQuote.getByText('€6.00', { exact: true }).first()).toBeVisible()
   await roughQuote.getByText('How it adds up').click()
   await expect(roughQuote.getByRole('term').filter({ hasText: '100 g filament' })).toBeVisible()
+  await expect(roughQuote.getByRole('term').filter({ hasText: 'Failure allowance (10%)' })).toBeVisible()
   await screenshot(page, 'print-calculator')
   await page.setViewportSize({ width: 390, height: 844 })
   expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(
@@ -2044,6 +2045,13 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   const x1cStation = page.locator('[data-status="in_progress"] [data-station]').filter({ hasText: 'Bambu Lab X1 Carbon' })
   await expect(x1cStation.locator('[data-plate-badge="1"]')).toHaveCount(2)
   await screenshot(page, 'plate-running')
+  // Downloads carry the request's tag, which the slicer keeps on every copy it makes, however the object is renamed.
+  await requestCard(page, 'plate-turret').click()
+  const turretDownload = page.waitForEvent('download')
+  await page.getByRole('dialog', { name: 'plate-turret' }).getByRole('link', { name: 'Download model' }).click()
+  const turretTag = /^SQ-\d+/.exec((await turretDownload).suggestedFilename())![0]
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: 'plate-turret' })).toHaveCount(0)
   await requestCard(page, 'plate-hull').click()
   await page.getByRole('button', { name: 'On plate #1' }).click()
   const plateDialog = page.getByRole('dialog', { name: 'Plate #1' })
@@ -2056,7 +2064,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
         objects: [
           { id: '1', name: 'plate-hull.stl_A', extrusionMm: 1000 },
           { id: '2', name: 'plate-hull.stl_B', extrusionMm: 400 },
-          { id: '3', name: 'plate-turret.stl', extrusionMm: 600 },
+          { id: '3', name: `${turretTag} Gun mount.stl_2`, extrusionMm: 600 },
         ],
         overheadMm: 100,
         predictionSeconds: 3_600,
@@ -2064,6 +2072,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     ),
   })
   await expect(plateDialog.locator('[data-plate-objects] li')).toHaveCount(3)
+  await expect(plateDialog.getByRole('combobox', { name: `${turretTag} Gun mount.stl_2` })).toContainText('plate-turret')
   await expect(plateDialog.getByRole('combobox', { name: 'Material' })).toContainText('Prusament PLA · Galaxy Silver')
   await screenshot(page, 'plate-slicer-file')
   await plateDialog.getByRole('button', { name: 'Record usage' }).click()
