@@ -42,6 +42,7 @@ import { backfillSummary, usageBackfill, type UsageBackfillSummary } from './usa
 import {
   coveringPlateTransaction,
   isMeasured,
+  matchSlicedObjects,
   MAX_PLATE_FILAMENTS,
   plateMaterialTotals,
   plateTotalsProblem,
@@ -53,6 +54,7 @@ import {
   plateStart,
   plateUsageDrafts,
   splitPlate,
+  suggestedFilament,
   supersededByPlate,
   type Plate,
   type PlateCopies,
@@ -66,15 +68,20 @@ import {
   continuedPrintJob,
   printerNamed,
   printerRunCounts,
+  MAX_SLICED_FILES_WANTED,
   printFilaments,
   printJobLink,
+  printSlicedPlate,
   printSpoolMaterials,
   sameSpoolUsage,
+  slicedFileNote,
+  slicedPrintInput,
+  wantsSlicedFile,
   type PrintJob,
   type PrintReport,
-  type PrintSpoolUsage,
   type PrintUsageReport,
 } from './printJobs'
+import { SlicedFileError, type SlicedPlate } from './slicedPlate'
 import {
   MAX_REQUEST_NAME_LENGTH,
   MAX_BULK_CARDS,
@@ -1665,6 +1672,7 @@ export class STLQuestService {
     const consumables = await this.repository.listInventory('consumables')
     return plates.map((plate) => {
       const print = jobs.find(({ plateId }) => plateId === plate.id)
+      const sliced = print && slicedFileNote(print)
       const printTypes = unique(
         plate.items.map(({ requestId }) => {
           const request = requests.get(requestId)
@@ -1684,7 +1692,9 @@ export class STLQuestService {
         ...plate,
         recording,
         ...(printType && { printType }),
-        ...(print && { print: { outcome: print.outcome, receivedAt: print.receivedAt } }),
+        ...(print && {
+          print: { outcome: print.outcome, receivedAt: print.receivedAt, ...(sliced && { sliced }) },
+        }),
         items: plate.items.map((item) => {
           const request = requests.get(item.requestId)
           const estimate = request && this.platePrintEstimate(request, printType, printers, estimateSettings)
@@ -2071,10 +2081,13 @@ export class STLQuestService {
     }
     if (!transactionId) return
     await this.repository.updatePrintJob(job.id, { transactionId })
-    // Spools the bridge stored while this was recording were not part of it, and the bridge will not send them again.
+    // Spools or a sliced file the bridge stored while this was recording were not part of it, and the bridge will not
+    // send them again.
     const stored = (await this.repository.listPrintJobs()).find(({ id }) => id === job.id)
-    if (stored?.filamentUsage && !sameSpoolUsage(job.filamentUsage, stored.filamentUsage))
-      await this.recordPrintSpools({ ...job, transactionId }, stored.filamentUsage)
+    const newSpools = stored?.filamentUsage && !sameSpoolUsage(job.filamentUsage, stored.filamentUsage)
+    const newFile = !job.slicedPlate && typeof stored?.slicedPlate === 'object'
+    if (stored && (newSpools || newFile))
+      await this.recordPrintAgain({ ...job, transactionId, filamentUsage: stored.filamentUsage, slicedPlate: stored.slicedPlate })
   }
 
   /**
@@ -2094,13 +2107,21 @@ export class STLQuestService {
             fallback: consumablesOfKind(consumables, 'filament')[0],
           })
         : undefined
-    const used = this.printMaterials(job, printType, consumables)
-    const input: PlateTotals = {
-      totals: bySpool?.materials.length ? bySpool.totals : used.map(({ amount }) => amount),
-      otherShare: 0,
-    }
-    const materials = bySpool?.materials.length ? bySpool.materials : used.map(({ material }) => material)
-    const minutes = job.minutes ?? 0
+    const measured = bySpool?.materials.length
+      ? bySpool.materials.map((material, index) => ({ material, amount: bySpool.totals[index] }))
+      : this.printMaterials(job, printType, consumables)
+    const sliced = printType === 'filament' && typeof job.slicedPlate === 'object' ? job.slicedPlate : undefined
+    const { input, materials } = sliced
+      ? slicedPrintInput(
+          sliced,
+          sliced.filaments.map((filament) => this.slicedFilamentMaterial(filament, consumables, measured)),
+          measured,
+        )
+      : {
+          input: { totals: measured.map(({ amount }) => amount), otherShare: 0 } satisfies PlateTotals,
+          materials: measured.map(({ material }) => material),
+        }
+    const minutes = job.minutes ?? sliced?.minutes ?? 0
     if (job.outcome === 'finished') {
       const { recorded } = await this.recordPlateUsage(plate, printType, input, minutes, materials, 'printer', undefined, (current) =>
         replacing ? current.recording?.transactionId === replacing : !current.recording,
@@ -2109,7 +2130,7 @@ export class STLQuestService {
       this.changed('usage.recorded')
       return recorded.recording!.transactionId
     }
-    // Bambuddy already scales a stopped print's grams to its progress, so they are what each print had used by then.
+    // Bambuddy already scales a stopped print's grams to its progress, so they are what the plate had used by then.
     const { drafts } = await this.plateRunUsage(plate, printType, input, minutes, materials, true)
     const failed = drafts.map((draft) => ({ ...draft, outcome: 'failed' as const }))
     if (!replacing) return (await this.appendUsage(failed)).transactionId
@@ -2120,12 +2141,16 @@ export class STLQuestService {
     return transactionId
   }
 
-  /** Records an ended print again by the spools it reported, in place of what it recorded before, and stores the new recording. */
-  private async recordPrintSpools(job: PrintJob & { transactionId: string }, spools: PrintSpoolUsage[]) {
+  /**
+   * Records an ended print again by what it reported since, its spools or sliced file, in place of what it recorded
+   * before, and stores the new recording. A finished print that recorded nothing records only on a plate with no recording.
+   */
+  private async recordPrintAgain(job: PrintJob) {
     const plate = (await this.repository.listPlates()).find(({ id }) => id === job.plateId)
     const printType = plate && (await this.platePrintType(plate).catch(() => undefined))
     if (!plate || !printType || !(await storedUsageTracking(this.repository))) return false
-    const transactionId = await this.recordPrintUsage({ ...job, filamentUsage: spools }, plate, printType, job.transactionId)
+    if (!job.transactionId && job.outcome !== 'finished') return false
+    const transactionId = await this.recordPrintUsage(job, plate, printType, job.transactionId)
     if (transactionId) await this.repository.updatePrintJob(job.id, { transactionId })
     return Boolean(transactionId)
   }
@@ -2140,11 +2165,12 @@ export class STLQuestService {
     if (!job) throw new Response(this.text.prints.notFound, { status: 404 })
     if (sameSpoolUsage(job.filamentUsage, report.spools)) return
     // Stored once recorded, so a send that fails to record is taken in again when the bridge retries.
-    let recorded = job.transactionId ? await this.recordPrintSpools({ ...job, transactionId: job.transactionId }, report.spools) : false
+    let recorded = job.transactionId ? await this.recordPrintAgain({ ...job, filamentUsage: report.spools }) : false
     await this.repository.updatePrintJob(job.id, { filamentUsage: report.spools })
     // An end event that recorded after the read above could not see these spools, so they replace its recording too.
     const recordedMeanwhile = !job.transactionId && (await this.repository.listPrintJobs()).find(({ id }) => id === job.id)?.transactionId
-    if (recordedMeanwhile) recorded = await this.recordPrintSpools({ ...job, transactionId: recordedMeanwhile }, report.spools)
+    if (recordedMeanwhile)
+      recorded = await this.recordPrintAgain({ ...job, transactionId: recordedMeanwhile, filamentUsage: report.spools })
     this.changed('print.received')
     const { matches } = await this.spoolmanMatches(await this.consumables())
     const spools = await this.repository.listSpoolmanSpools()
@@ -2156,6 +2182,102 @@ export class STLQuestService {
       }).length,
       recorded,
     })
+  }
+
+  /** The ended prints of plate runs whose sliced file the bridge should fetch from Bambuddy's archive and send. */
+  async slicedFilesWanted() {
+    const plates = await this.repository.listPlates()
+    const now = Date.now()
+    return (await this.repository.listPrintJobs())
+      .filter((job) => wantsSlicedFile(job, plates, now))
+      .slice(0, MAX_SLICED_FILES_WANTED)
+      .map(({ runId, archiveId }) => ({ runId: runId!, ...(archiveId && { archiveId }) }))
+  }
+
+  /**
+   * Takes in a print's sliced file, which the bridge fetched from Bambuddy's archive, and records the print again from
+   * it: each object's figures go to the print its name matches, scaled to what the printer measured. A print that did
+   * not finish is charged what the file printed up to its progress. A file for a print STL Quest does not want one for
+   * is ignored; one it cannot read is refused and not asked for again. `read` reads the file's plates, with a stopped
+   * print's progress what each had printed by then.
+   */
+  async receivePrintSlicedFile(report: { runId: string; plate?: number }, read: (stoppedAt?: number) => Promise<SlicedPlate[]>) {
+    const job = (await this.repository.listPrintJobs()).find(({ runId }) => runId === report.runId)
+    if (!job) throw new Response(this.text.prints.notFound, { status: 404 })
+    const plate = (await this.repository.listPlates()).find(({ id }) => id === job.plateId)
+    if (!plate || !wantsSlicedFile(job, [plate], Date.now())) return
+    const stopped = job.outcome !== 'finished'
+    const sliced = await this.slicedPlateOf(read, report.plate, stopped ? job.progress : undefined)
+    if (typeof sliced === 'string') {
+      await this.repository.updatePrintJob(job.id, { slicedPlate: 'unreadable' })
+      throw new Response(sliced, { status: 422 })
+    }
+    const requests = new Map((await this.repository.listRequests()).map((request) => [request.id, request]))
+    const assignments = matchSlicedObjects(
+      sliced.objects,
+      plate.items.map(({ requestId }) => {
+        const request = requests.get(requestId)
+        return { requestId, number: request?.number, name: request?.name ?? '', fileName: request?.fileName }
+      }),
+    )
+    const slicedPlate = printSlicedPlate(sliced, assignments, stopped)
+    await this.repository.updatePrintJob(job.id, { slicedPlate })
+    let recorded = await this.recordPrintAgain({ ...job, slicedPlate })
+    // An end event that recorded after the read above could not see this file, so it replaces that recording too.
+    const meanwhile = !recorded && !job.transactionId && (await this.repository.listPrintJobs()).find(({ id }) => id === job.id)
+    if (meanwhile && meanwhile.transactionId) recorded = await this.recordPrintAgain({ ...meanwhile, slicedPlate })
+    this.changed('print.received')
+    this.capture('server', 'print_sliced_file_received', {
+      outcome: job.outcome,
+      object_count: slicedPlate.objects.length,
+      matched_count: slicedPlate.objects.filter(({ requestId }) => requestId).length,
+      cut: slicedPlate.cut ?? false,
+      recorded,
+    })
+  }
+
+  /** Takes in that the bridge cannot get a print's sliced file, so it is not asked for again. */
+  async slicedFileUnavailable(runId: string) {
+    const job = (await this.repository.listPrintJobs()).find((candidate) => candidate.runId === runId)
+    if (!job) throw new Response(this.text.prints.notFound, { status: 404 })
+    if (wantsSlicedFile(job, await this.repository.listPlates(), Date.now()))
+      await this.repository.updatePrintJob(job.id, { slicedPlate: 'unavailable' })
+  }
+
+  /** The plate of a sliced file that printed, or why there is none to read. */
+  private async slicedPlateOf(
+    read: (stoppedAt?: number) => Promise<SlicedPlate[]>,
+    index: number | undefined,
+    stoppedAt: number | undefined,
+  ): Promise<SlicedPlate | string> {
+    let plates: SlicedPlate[]
+    try {
+      plates = await read(stoppedAt)
+    } catch (error) {
+      if (error instanceof SlicedFileError) return this.text.prints.slicedUnreadable
+      throw error
+    }
+    const plate =
+      index === undefined ? (plates.length === 1 ? plates[0] : undefined) : plates.find((candidate) => candidate.index === index)
+    if (!plate) return this.text.prints.slicedPlateUnknown
+    return plate.objects.length && plate.objects.length <= MAX_PLATE_OBJECTS && plate.filaments.length <= MAX_PLATE_FILAMENTS
+      ? plate
+      : this.text.prints.slicedUnreadable
+  }
+
+  /**
+   * The library filament a sliced file's filament is: of what the print measured, the one of its colour and type, else
+   * of the library, else the first measured, else the first filament.
+   */
+  private slicedFilamentMaterial(
+    filament: { type?: string; color?: string },
+    consumables: Consumable[],
+    measured: { material: Consumable }[],
+  ) {
+    const presetTypes = new Map(Object.entries(SPOOLMAN_CATALOGUE.presets).map(([id, preset]) => [id, preset[1]]))
+    const of = (library: Consumable[]) => library.find(({ id }) => id === suggestedFilament(library, filament, presetTypes))
+    const filaments = consumablesOfKind(consumables, 'filament')
+    return of(measured.map(({ material }) => material)) ?? of(filaments) ?? measured[0]?.material ?? filaments[0]
   }
 
   /**

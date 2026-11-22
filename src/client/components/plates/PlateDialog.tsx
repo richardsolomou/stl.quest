@@ -15,6 +15,7 @@ import {
   matchSlicedObjects,
   plateTotalsProblem,
   splitPlate,
+  suggestedFilament,
   type PlateMaterialChoice,
   type PlateMeasured,
   type PlateTotals,
@@ -24,7 +25,7 @@ import type { PrintType } from '../../../core/types'
 import type { UsageUnit } from '../../../core/usage'
 import { deletePlate, recordPlate, undoUsage } from '../../../server/fns'
 import { useI18n } from '../../i18n'
-import { measuredRecord, slicedObjectLabel, suggestedFilament } from '../../plateRecord'
+import { measuredRecord, slicedObjectLabel } from '../../plateRecord'
 import { catalogueQuery, consumablesQuery, platesQuery, printersQuery, type PlateView } from '../../queries'
 import { invalidateQueries } from '../../queryState'
 import { useWorkspaceSlug } from '../../workspace'
@@ -197,6 +198,7 @@ function PlateSummary({ plate, onRecord, onClose }: { plate: PlateView; onRecord
           )}
         >
           {copy.dialog.reported(copy.outcome[plate.print.outcome], when.format(plate.print.receivedAt))}
+          {plate.print.sliced && <span className="block text-muted-foreground">{copy.dialog.sliced[plate.print.sliced]}</span>}
         </p>
       )}
       {recording && (

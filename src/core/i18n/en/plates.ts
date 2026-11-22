@@ -65,6 +65,11 @@ export const plates = {
     },
     recordedAt: (when: string) => `Recorded ${when}`,
     reported: (outcome: string, when: string) => `${outcome} · reported ${when}`,
+    sliced: {
+      cut: 'Its waste stops where it did, by the sliced file from Bambuddy: objects already done count in full.',
+      whole: 'The sliced file from Bambuddy doesn’t mark progress, so its waste is split by each object’s whole share.',
+      unreadable: 'The sliced file from Bambuddy couldn’t be read, so it’s split without it.',
+    },
     replaceFile: 'Upload again',
     replaceTotals: 'Enter totals again',
     delete: 'Delete plate',

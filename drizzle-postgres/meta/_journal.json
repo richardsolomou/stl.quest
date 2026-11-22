@@ -260,6 +260,13 @@
       "when": 1795352040601,
       "tag": "0036_spoolman_restocks",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1795359481598,
+      "tag": "0037_print_sliced_plate",
+      "breakpoints": true
     }
   ]
 }

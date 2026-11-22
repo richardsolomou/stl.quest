@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { FilamentConsumable } from './consumables'
-import type { Plate } from './plates'
+import type { Plate, PlateRecording } from './plates'
+import type { SlicedPlate } from './slicedPlate'
 import {
   bambuddyReport,
   continuedPrintJob,
@@ -11,8 +12,13 @@ import {
   printJobLink,
   printerNamed,
   printerRunCounts,
+  printSlicedPlate,
   printSpoolMaterials,
   sameSpoolUsage,
+  slicedPrintInput,
+  SLICED_FILE_WAIT_MS,
+  wantsSlicedFile,
+  type PrintSlicedPlate,
   type PrintJob,
 } from './printJobs'
 
@@ -380,5 +386,198 @@ describe('sameSpoolUsage', () => {
 
   it('treats a print without a report as different', () => {
     expect(sameSpoolUsage(undefined, [])).toBe(false)
+  })
+})
+
+describe('printSlicedPlate', () => {
+  const sliced: SlicedPlate = {
+    index: 1,
+    objects: [
+      { id: '1', name: 'SQ-1 Hull.stl', grams: [0, 20] },
+      { id: '2', name: 'Other.stl', grams: [0, 10] },
+    ],
+    overhead: [0, 4],
+    filaments: [{ slot: 1, type: 'PLA', color: '#000000', density: 1.24, diameter: 1.75 }],
+    printed: {
+      objects: [
+        [0, 20],
+        [0, 3],
+      ],
+      overhead: [0, 2],
+    },
+  }
+
+  it('keeps each object’s amounts for the filaments the plate uses, on the print it matched', () => {
+    expect(printSlicedPlate(sliced, ['hull', undefined], false).objects).toEqual([{ requestId: 'hull', amounts: [20] }, { amounts: [10] }])
+  })
+
+  it('takes what was printed for a print that stopped', () => {
+    expect(printSlicedPlate(sliced, ['hull', undefined], true)).toMatchObject({
+      objects: [{ amounts: [20] }, { amounts: [3] }],
+      overhead: [2],
+      cut: true,
+    })
+  })
+
+  it('says a stopped print’s file could not show where it stopped', () => {
+    expect(printSlicedPlate({ ...sliced, printed: undefined }, ['hull'], true)).toMatchObject({ overhead: [4], cut: false })
+  })
+
+  it('keeps the filaments’ type and colour', () => {
+    expect(printSlicedPlate(sliced, [], false).filaments).toEqual([{ type: 'PLA', color: '#000000' }])
+  })
+})
+
+describe('slicedPrintInput', () => {
+  const sliced: PrintSlicedPlate = {
+    filaments: [{ type: 'PLA' }, { type: 'PETG' }],
+    objects: [
+      { requestId: 'hull', amounts: [10, 0] },
+      { requestId: 'turret', amounts: [0, 5] },
+    ],
+    overhead: [2, 1],
+  }
+  const total = ({ input }: ReturnType<typeof slicedPrintInput<string>>) =>
+    input.objects.reduce((sum, object) => sum + object.amounts.reduce((a, b) => a + b, 0), 0) + input.overhead.reduce((a, b) => a + b, 0)
+
+  it('scales each filament to what was measured of its material', () => {
+    const { input } = slicedPrintInput(
+      sliced,
+      ['pla', 'petg'],
+      [
+        { material: 'pla', amount: 24 },
+        { material: 'petg', amount: 3 },
+      ],
+    )
+    expect(input.objects.map(({ amounts }) => amounts)).toEqual([
+      [20, 0],
+      [0, 2.5],
+    ])
+  })
+
+  it('scales the overhead with its filament', () => {
+    const { input } = slicedPrintInput(
+      sliced,
+      ['pla', 'petg'],
+      [
+        { material: 'pla', amount: 24 },
+        { material: 'petg', amount: 3 },
+      ],
+    )
+    expect(input.overhead).toEqual([4, 0.5])
+  })
+
+  it('scales every filament alike when a measured material is not on the plate', () => {
+    const result = slicedPrintInput(sliced, ['pla', 'petg'], [{ material: 'abs', amount: 36 }])
+    expect(result.input.objects.map(({ amounts }) => amounts)).toEqual([
+      [20, 0],
+      [0, 10],
+    ])
+  })
+
+  it('scales every filament alike when a filament the file used was not measured', () => {
+    expect(total(slicedPrintInput(sliced, ['pla', 'petg'], [{ material: 'pla', amount: 27 }]))).toBeCloseTo(27, 9)
+  })
+
+  it('merges slots of one material', () => {
+    expect(slicedPrintInput(sliced, ['pla', 'pla'], [{ material: 'pla', amount: 36 }]).materials).toEqual(['pla'])
+  })
+
+  it('adds a merged material’s slots together', () => {
+    const { input } = slicedPrintInput(sliced, ['pla', 'pla'], [{ material: 'pla', amount: 36 }])
+    expect(input.objects.map(({ amounts }) => amounts)).toEqual([[20], [10]])
+  })
+
+  it('keeps what was measured of a material the file barely used as its overhead', () => {
+    const { input } = slicedPrintInput(
+      { ...sliced, objects: [{ requestId: 'hull', amounts: [10, 0] }], overhead: [2, 0] },
+      ['pla', 'petg'],
+      [
+        { material: 'pla', amount: 12 },
+        { material: 'petg', amount: 4 },
+      ],
+    )
+    expect(input.overhead).toEqual([2, 4])
+  })
+
+  it('charges nothing from a stopped print’s file when nothing was measured', () => {
+    expect(total(slicedPrintInput({ ...sliced, cut: true }, ['pla', 'petg'], []))).toBe(0)
+  })
+
+  it('keeps the file’s figures when nothing was measured', () => {
+    expect(slicedPrintInput(sliced, ['pla', 'petg'], []).input.objects.map(({ amounts }) => amounts)).toEqual([
+      [10, 0],
+      [0, 5],
+    ])
+  })
+
+  it('keeps each object on its print', () => {
+    expect(slicedPrintInput(sliced, ['pla', 'petg'], []).input.objects.map(({ requestId }) => requestId)).toEqual(['hull', 'turret'])
+  })
+})
+
+describe('wantsSlicedFile', () => {
+  const now = 10 * 60 * 60_000
+  const ended = job({ runId: '7', plateId: 'plate', endedAt: now - 60_000 })
+  const recording = (fields: Partial<PlateRecording>): PlateRecording => ({
+    transactionId: 'tx',
+    source: 'printer',
+    method: 'volume',
+    unit: 'g',
+    minutes: 60,
+    otherAmount: 0,
+    overheadAmount: 0,
+    recordedAt: 1,
+    ...fields,
+  })
+
+  it('wants a finished print’s file for a plate not recorded yet', () => {
+    expect(wantsSlicedFile(ended, [plate()], now)).toBe(true)
+  })
+
+  it('wants a finished print’s file for the plate it recorded itself', () => {
+    expect(wantsSlicedFile({ ...ended, transactionId: 'tx' }, [plate({ recording: recording({}) })], now)).toBe(true)
+  })
+
+  it('leaves a plate recorded from a slicer file alone', () => {
+    expect(wantsSlicedFile(ended, [plate({ recording: recording({ source: 'file', transactionId: 'mine' }) })], now)).toBe(false)
+  })
+
+  it('leaves a plate recorded from typed totals alone', () => {
+    expect(
+      wantsSlicedFile(
+        { ...ended, transactionId: 'tx' },
+        [plate({ recording: recording({ source: 'totals', transactionId: 'typed' }) })],
+        now,
+      ),
+    ).toBe(false)
+  })
+
+  it('wants a failed print’s file once its waste is recorded', () => {
+    expect(wantsSlicedFile({ ...ended, outcome: 'failed', transactionId: 'waste' }, [plate()], now)).toBe(true)
+  })
+
+  it('leaves a failed print with no recorded waste alone', () => {
+    expect(wantsSlicedFile({ ...ended, outcome: 'failed' }, [plate()], now)).toBe(false)
+  })
+
+  it('leaves a print still printing alone', () => {
+    expect(wantsSlicedFile({ ...ended, outcome: 'printing' }, [plate()], now)).toBe(false)
+  })
+
+  it('leaves a print linked to no plate alone', () => {
+    expect(wantsSlicedFile({ ...ended, plateId: undefined }, [plate()], now)).toBe(false)
+  })
+
+  it('leaves a print without a run alone', () => {
+    expect(wantsSlicedFile({ ...ended, runId: undefined }, [plate()], now)).toBe(false)
+  })
+
+  it('asks for a file once', () => {
+    expect(wantsSlicedFile({ ...ended, slicedPlate: 'unreadable' }, [plate()], now)).toBe(false)
+  })
+
+  it('stops asking after a while', () => {
+    expect(wantsSlicedFile({ ...ended, endedAt: now - SLICED_FILE_WAIT_MS - 1 }, [plate()], now)).toBe(false)
   })
 })

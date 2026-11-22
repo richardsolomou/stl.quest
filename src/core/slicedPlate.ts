@@ -40,6 +40,13 @@ export type SlicedPlate = {
   slicerGrams?: number
   /** The slicer's print time prediction. */
   minutes?: number
+  /**
+   * For a print that stopped at a progress, what each object (in `objects` order) and the overhead had used by then,
+   * per slot: everything extruded before the G-code's `M73 P` progress markers passed it. The slicer prints layer by
+   * layer, so an object shorter than where the print stopped is whole and a taller one is cut at that height. Absent
+   * when the G-code has no progress markers.
+   */
+  printed?: { objects: number[][]; overhead: number[] }
 }
 
 export class SlicedFileError extends Error {}
@@ -48,17 +55,32 @@ const MAX_ENTRIES = 4096
 const PLATE_GCODE = /^Metadata\/plate_(\d+)\.gcode$/
 const SLICE_INFO = 'Metadata/slice_info.config'
 const CHUNK = 1 << 20
+/** Compressed bytes inflated at a time; deflate expands at most ~1032×, so this bounds each inflated chunk too. */
+const INFLATE_CHUNK = 16 << 10
+const MAX_INFLATED_CHUNK = 32 << 20
+/** All the G-code and slice info read, a few times the G-code a full plate at `MAX_SLICED_FILE_BYTES` compresses from. */
+const MAX_SLICED_INFLATED_BYTES = 512 << 20
+const MAX_SLICE_INFO_BYTES = 8 << 20
+const MAX_LINE_LENGTH = 1 << 20
 /** Nominal PLA, for G-code that never states its filament. */
 const DEFAULT_DENSITY = 1.24
 const DEFAULT_DIAMETER = 1.75
-/** Bambu firmware takes T255, T65279, and T65535 as commands rather than tools, so only a loaded slot switches. */
-const MAX_SLOTS_UNSTATED = 64
+/**
+ * More filament slots than any Bambu Studio or OrcaSlicer printer loads (an H2D's four AMS units and eight AMS HTs
+ * plus two external spools come to 26), so a file declaring more is not one they sliced.
+ */
+const MAX_SLOTS = 64
+/** Well past the objects a plate holds, so labels can't grow the per-object sums without end. */
+const MAX_LABELLED_OBJECTS = 4096
 
-/** Reads a Bambu Studio or OrcaSlicer `.gcode.3mf` (every plate G-code it holds) or a plain `.gcode`. */
-export function readSlicedFile(bytes: Uint8Array, fileName: string): SlicedPlate[] {
-  if (isZip(bytes)) return readArchive(bytes)
+/**
+ * Reads a Bambu Studio or OrcaSlicer `.gcode.3mf` (every plate G-code it holds) or a plain `.gcode`, and with
+ * `stoppedAt`, a print's progress in percent, also what it had printed by then.
+ */
+export function readSlicedFile(bytes: Uint8Array, fileName: string, stoppedAt?: number): SlicedPlate[] {
+  if (isZip(bytes)) return readArchive(bytes, stoppedAt)
   if (!/\.g(code)?$/i.test(fileName)) throw new SlicedFileError('not a sliced file')
-  const reader = new GcodeReader()
+  const reader = new GcodeReader(stoppedAt)
   const decoder = new TextDecoder()
   for (let offset = 0; offset < bytes.length; offset += CHUNK)
     reader.push(decoder.decode(bytes.subarray(offset, offset + CHUNK), { stream: true }))
@@ -70,16 +92,24 @@ function isZip(bytes: Uint8Array) {
   return bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 3 && bytes[3] === 4
 }
 
-function readArchive(bytes: Uint8Array) {
+function readArchive(bytes: Uint8Array, stoppedAt?: number) {
   let directoryEntries = 0
+  /** What the central directory says is left to inflate of each entry read. */
+  const unclaimed = new Map<string, number>()
   let entries = 0
   const readers = new Map<number, GcodeReader>()
   let sliceInfo: string | undefined
   try {
-    // Streaming inflation reads local members only, so the central directory is checked separately for a whole archive.
+    // Streaming inflation reads local members only, so the central directory is checked separately for a whole
+    // archive, and its sizes refuse an honest bomb before anything inflates.
     unzipSync(bytes, {
-      filter: () => {
+      filter: ({ name, originalSize }) => {
         if (++directoryEntries > MAX_ENTRIES) throw new SlicedFileError('too many archive entries')
+        if (!PLATE_GCODE.test(name) && name !== SLICE_INFO) return false
+        unclaimed.set(name, (unclaimed.get(name) ?? 0) + originalSize)
+        if ((unclaimed.get(SLICE_INFO) ?? 0) > MAX_SLICE_INFO_BYTES) throw new SlicedFileError('slice info too large')
+        if ([...unclaimed.values()].reduce((total, size) => total + size) > MAX_SLICED_INFLATED_BYTES)
+          throw new SlicedFileError('sliced file inflates too large')
         return false
       },
     })
@@ -88,11 +118,15 @@ function readArchive(bytes: Uint8Array) {
       const plate = PLATE_GCODE.exec(entry.name)
       if (!plate && entry.name !== SLICE_INFO) return
       const decoder = new TextDecoder()
-      const reader = plate ? new GcodeReader() : undefined
+      const reader = plate ? new GcodeReader(stoppedAt) : undefined
       if (plate) readers.set(Number(plate[1]), reader!)
       let text = ''
       entry.ondata = (error, chunk, final) => {
         if (error) throw error
+        // Headers can lie about sizes, so what actually inflates is held to what the directory claimed.
+        const left = (unclaimed.get(entry.name) ?? 0) - chunk.length
+        if (chunk.length > MAX_INFLATED_CHUNK || left < 0) throw new SlicedFileError('sliced file inflates past its headers')
+        unclaimed.set(entry.name, left)
         const decoded = decoder.decode(chunk, { stream: !final })
         if (reader) reader.push(decoded)
         else text += decoded
@@ -101,8 +135,8 @@ function readArchive(bytes: Uint8Array) {
       entry.start()
     })
     archive.register(UnzipInflate)
-    for (let offset = 0; offset < bytes.length; offset += CHUNK)
-      archive.push(bytes.subarray(offset, offset + CHUNK), offset + CHUNK >= bytes.length)
+    for (let offset = 0; offset < bytes.length; offset += INFLATE_CHUNK)
+      archive.push(bytes.subarray(offset, offset + INFLATE_CHUNK), offset + INFLATE_CHUNK >= bytes.length)
   } catch (error) {
     if (error instanceof SlicedFileError) throw error
     throw new SlicedFileError('unreadable archive', { cause: error })
@@ -184,11 +218,19 @@ class GcodeReader {
   private colors: string[] = []
   private totalGrams?: number
   private estimatedMinutes?: number
+  private progressMarked = false
+  private printed?: { objects: Map<string, number[]>; overhead: number[] }
+
+  constructor(private readonly stoppedAt?: number) {}
 
   push(text: string) {
     const lines = (this.rest + text).split('\n')
     this.rest = lines.pop() ?? ''
-    for (const line of lines) this.line(line)
+    if (this.rest.length > MAX_LINE_LENGTH) throw new SlicedFileError('G-code line too long')
+    for (const line of lines) {
+      if (line.length > MAX_LINE_LENGTH) throw new SlicedFileError('G-code line too long')
+      this.line(line)
+    }
   }
 
   plate(index: number, info?: PlateInfo): SlicedPlate {
@@ -197,7 +239,8 @@ class GcodeReader {
     const used = new Set(
       [...this.objects.values(), this.overhead].flatMap((lengths) => lengths.flatMap((length, slot) => (length ? [slot] : []))),
     )
-    const slots = Math.max(this.densities.length, ...[...used].map((slot) => slot + 1), 1)
+    let slots = 1
+    for (const slot of used) slots = Math.max(slots, slot + 1)
     const grams = (lengths: number[]) => Array.from({ length: slots }, (_, slot) => (lengths[slot] ?? 0) * this.gramsPerMm(slot))
     const named = info?.objects.filter(({ skipped }) => !skipped)
     const skipped = new Set(info?.objects.filter((object) => object.skipped).map(({ id }) => id))
@@ -219,6 +262,13 @@ class GcodeReader {
       filaments,
       ...optional('slicerGrams', info?.weight ?? this.totalGrams),
       ...optional('minutes', info?.predictionSeconds !== undefined ? info.predictionSeconds / 60 : this.estimatedMinutes),
+      ...(this.stoppedAt !== undefined &&
+        this.progressMarked && {
+          printed: {
+            objects: ids.map((id) => grams((this.printed?.objects ?? this.objects).get(id) ?? [])),
+            overhead: grams(this.printed?.overhead ?? this.overhead),
+          },
+        }),
     }
   }
 
@@ -245,12 +295,16 @@ class GcodeReader {
     const command = code.split(/\s/, 1)[0].toUpperCase()
     if (command === 'M82') this.relative = false
     else if (command === 'M83') this.relative = true
-    else if (command === 'G92') {
+    else if (command === 'M73') {
+      const progress = /\sP(\d+(?:\.\d+)?)/i.exec(code)
+      if (progress) this.progress(Number(progress[1]))
+    } else if (command === 'G92') {
       const e = extrusion(code)
       if (e !== undefined) this.lastE = e
     } else if (/^T\d+$/.test(command)) {
       const tool = Number(command.slice(1))
-      if (tool < (this.densities.length || MAX_SLOTS_UNSTATED)) this.slot = tool
+      // Bambu firmware takes T255, T65279, and T65535 as commands rather than tools, so only a loaded slot switches.
+      if (tool < (this.densities.length || MAX_SLOTS)) this.slot = tool
     } else if (/^G0*[0-3]$/.test(command)) {
       const e = extrusion(code)
       if (e === undefined) return
@@ -261,9 +315,22 @@ class GcodeReader {
     }
   }
 
+  /** The printer shows a marker's percent until the next one, so a print stopped at a percent got as far as the first marker past it. */
+  private progress(percent: number) {
+    this.progressMarked = true
+    if (this.stoppedAt === undefined || this.printed || percent <= this.stoppedAt) return
+    this.printed = {
+      objects: new Map([...this.objects].map(([id, lengths]) => [id, [...lengths]])),
+      overhead: [...this.overhead],
+    }
+  }
+
   private objectLengths(label: string) {
     let lengths = this.objects.get(label)
-    if (!lengths) this.objects.set(label, (lengths = []))
+    if (!lengths) {
+      if (this.objects.size === MAX_LABELLED_OBJECTS) throw new SlicedFileError('too many objects')
+      this.objects.set(label, (lengths = []))
+    }
     return lengths
   }
 
@@ -274,7 +341,8 @@ class GcodeReader {
     const setting = /^;\s*(filament_density|filament_diameter|filament_type|filament_colour)\s*[:=]\s*(.*)$/.exec(line)
     if (setting) {
       const [, key, value] = setting
-      const list = value.split(/[,;]/).map((item) => item.trim())
+      const list = value.split(/[,;]/, MAX_SLOTS + 1).map((item) => item.trim())
+      if (list.length > MAX_SLOTS) throw new SlicedFileError('too many filament slots')
       if (key === 'filament_density') this.densities = list.map(Number)
       else if (key === 'filament_diameter') this.diameters = list.map(Number)
       else if (key === 'filament_type') this.types = list

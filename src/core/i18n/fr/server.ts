@@ -153,5 +153,8 @@ export const server: typeof en = {
     alreadyLinked: 'cette impression est déjà reliée à un plateau',
     invalid: 'envoyez le JSON du webhook générique de Bambuddy avec un événement et une imprimante',
     invalidUsage: 'envoyez {"run_id": "…", "spools": [{"spool_id": 1, "grams": 1.5}]}',
+    invalidSlicedFile: 'envoyez les octets du fichier tranché avec ?run_id=…, et &plate=… pour un fichier de plusieurs plateaux',
+    slicedUnreadable: 'ce n’est pas un fichier tranché de Bambu Studio ou d’OrcaSlicer aux objets étiquetés',
+    slicedPlateUnknown: 'ce fichier contient plusieurs plateaux tranchés ; envoyez celui qui a été imprimé avec &plate=…',
   },
 }

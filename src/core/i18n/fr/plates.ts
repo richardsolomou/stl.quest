@@ -67,6 +67,12 @@ export const plates: typeof en = {
     },
     recordedAt: (when) => `Enregistré ${when}`,
     reported: (outcome, when) => `${outcome} · signalé ${when}`,
+    sliced: {
+      cut: 'Le rebut s’arrête là où l’impression s’est arrêtée, d’après le fichier tranché de Bambuddy : les objets terminés comptent en entier.',
+      whole:
+        'Le fichier tranché de Bambuddy ne marque pas la progression, le rebut est donc réparti selon la part entière de chaque objet.',
+      unreadable: 'Le fichier tranché de Bambuddy n’a pas pu être lu, la répartition se fait donc sans lui.',
+    },
     replaceFile: 'Importer à nouveau',
     replaceTotals: 'Saisir à nouveau les totaux',
     delete: 'Supprimer le plateau',

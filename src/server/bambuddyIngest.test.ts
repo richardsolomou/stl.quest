@@ -8,15 +8,43 @@ const finished = { event: 'print_complete', printer: 'X2D', filename: 'SQ-1 Hull
 let temporary: string
 
 async function ingest() {
-  const { receiveBambuddyRequest, receivePrintUsageRequest } = await import('./bambuddyIngest')
+  const {
+    receiveBambuddyRequest,
+    receivePrintUsageRequest,
+    receiveSlicedFileRequest,
+    sendSlicedFilesWanted,
+    slicedFileUnavailableRequest,
+  } = await import('./bambuddyIngest')
+  const handlers: Record<string, (request: Request) => Promise<Response>> = {
+    '/api/bambuddy/usage': receivePrintUsageRequest,
+    '/api/bambuddy/sliced': (request) =>
+      (request.method === 'GET'
+        ? sendSlicedFilesWanted
+        : request.method === 'DELETE'
+          ? slicedFileUnavailableRequest
+          : receiveSlicedFileRequest)(request),
+  }
   return (request: Request) =>
-    (new URL(request.url).pathname === '/api/bambuddy/usage' ? receivePrintUsageRequest : receiveBambuddyRequest)(request).catch(
-      (error: unknown) => {
-        if (error instanceof Response) return error
-        throw error
-      },
-    )
+    (handlers[new URL(request.url).pathname] ?? receiveBambuddyRequest)(request).catch((error: unknown) => {
+      if (error instanceof Response) return error
+      throw error
+    })
 }
+
+const sliced = (query: string, body: BodyInit = new Uint8Array([1, 2, 3]), headers: Record<string, string> = {}) =>
+  new Request(`http://localhost/api/bambuddy/sliced${query}`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/octet-stream', ...headers },
+    body,
+    duplex: 'half',
+  } as RequestInit)
+const unavailable = (query: string, headers: Record<string, string> = {}) =>
+  new Request(`http://localhost/api/bambuddy/sliced${query}`, {
+    method: 'DELETE',
+    headers: { authorization: `Bearer ${token}`, ...headers },
+  })
+const wanted = (headers: Record<string, string> = {}) =>
+  new Request('http://localhost/api/bambuddy/sliced', { headers: { authorization: `Bearer ${token}`, ...headers } })
 
 const usage = (body: object) => post(JSON.stringify(body), {}, 'http://localhost/api/bambuddy/usage')
 
@@ -121,5 +149,113 @@ describe('Bambuddy ingest', () => {
     const response = await (await ingest())(usage({ spools: [{ spool_id: 4, grams: 1 }] }))
 
     expect(response.status).toBe(400)
+  })
+
+  describe('sliced files', () => {
+    it('names no print while none wants a file', async () => {
+      const response = await (await ingest())(wanted())
+
+      expect({ status: response.status, body: await response.json() }).toEqual({ status: 200, body: { runs: [] } })
+    })
+
+    it('refuses to name prints without a token', async () => {
+      const response = await (await ingest())(wanted({ authorization: '' }))
+
+      expect(response.status).toBe(401)
+    })
+
+    it('refuses a file without a token', async () => {
+      const response = await (await ingest())(sliced('?run_id=3', undefined, { authorization: '' }))
+
+      expect(response.status).toBe(401)
+    })
+
+    it('refuses a file sent as anything but bytes', async () => {
+      const response = await (await ingest())(sliced('?run_id=3', undefined, { 'content-type': 'application/json' }))
+
+      expect(response.status).toBe(415)
+    })
+
+    it('refuses a file sent without a run', async () => {
+      const response = await (await ingest())(sliced(''))
+
+      expect(response.status).toBe(400)
+    })
+
+    it('refuses a file larger than the limit before reading it', async () => {
+      const { MAX_SLICED_FILE_BYTES } = await import('../core/printJobs')
+
+      const response = await (await ingest())(sliced('?run_id=3', undefined, { 'content-length': String(MAX_SLICED_FILE_BYTES + 1) }))
+
+      expect(response.status).toBe(413)
+    })
+
+    it('refuses a streamed file once it passes the limit', async () => {
+      const { MAX_SLICED_FILE_BYTES } = await import('../core/printJobs')
+      const chunk = new Uint8Array(1024 * 1024)
+      let sent = 0
+      const body = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (sent > MAX_SLICED_FILE_BYTES) return controller.close()
+          sent += chunk.byteLength
+          controller.enqueue(chunk)
+        },
+      })
+
+      const response = await (await ingest())(sliced('?run_id=3', body))
+
+      expect(response.status).toBe(413)
+    })
+
+    it('asks the bridge to send a file again for a print not received yet', async () => {
+      const response = await (await ingest())(sliced('?run_id=9'))
+
+      expect(response.status).toBe(404)
+    })
+
+    it('accepts and drops a file for a print that wants none', async () => {
+      const receive = await ingest()
+      await receive(post(JSON.stringify(finished)))
+
+      const response = await receive(sliced('?run_id=3'))
+
+      expect({ status: response.status, sliced: (await storedPrints())[0].slicedPlate }).toEqual({ status: 204, sliced: undefined })
+    })
+
+    it('takes in that the bridge cannot get a print’s file', async () => {
+      const receive = await ingest()
+      await receive(post(JSON.stringify(finished)))
+
+      const response = await receive(unavailable('?run_id=3'))
+
+      expect(response.status).toBe(204)
+    })
+
+    it('asks the bridge to say again that a file is unavailable for a print not received yet', async () => {
+      const response = await (await ingest())(unavailable('?run_id=9'))
+
+      expect(response.status).toBe(404)
+    })
+
+    it('refuses to hear a file is unavailable without a token', async () => {
+      const response = await (await ingest())(unavailable('?run_id=3', { authorization: '' }))
+
+      expect(response.status).toBe(401)
+    })
+
+    it('refuses to hear a file is unavailable without a run', async () => {
+      const response = await (await ingest())(unavailable(''))
+
+      expect(response.status).toBe(400)
+    })
+
+    it('slows the bridge down past its allowance without refusing Bambuddy’s notifications', async () => {
+      const receive = await ingest()
+      for (let sent = 0; sent < 20; sent++) await receive(wanted())
+
+      const [bridge, notification] = [await receive(wanted()), await receive(post(JSON.stringify(finished)))]
+
+      expect([bridge.status, notification.status]).toEqual([429, 204])
+    })
   })
 })

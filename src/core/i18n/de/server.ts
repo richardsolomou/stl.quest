@@ -154,5 +154,8 @@ export const server: typeof en = {
     alreadyLinked: 'dieser Druck ist bereits mit einer Druckplatte verknüpft',
     invalid: 'sende das generische Webhook-JSON von Bambuddy mit einem Ereignis und einem Drucker',
     invalidUsage: 'sende {"run_id": "…", "spools": [{"spool_id": 1, "grams": 1.5}]}',
+    invalidSlicedFile: 'sende die Bytes der geslicten Datei mit ?run_id=… und bei mehreren Druckplatten &plate=…',
+    slicedUnreadable: 'das ist keine geslicte Bambu-Studio- oder OrcaSlicer-Datei mit benannten Objekten',
+    slicedPlateUnknown: 'diese Datei enthält mehrere geslicte Druckplatten; sende die gedruckte mit &plate=…',
   },
 }

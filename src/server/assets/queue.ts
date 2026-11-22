@@ -1,11 +1,12 @@
 import fs from 'node:fs'
 import { setImmediate } from 'node:timers/promises'
-import { Worker } from 'node:worker_threads'
+import { type ResourceLimits, Worker } from 'node:worker_threads'
 import { fileURLToPath } from 'node:url'
 import PQueue from 'p-queue'
 import { errorMessage } from '../../core/error'
 import type { AssetGenerationFailureKind, AssetGenerationStage, AssetStore, EventBus, Repository, Telemetry } from '../../core/types'
 import { InvalidMeshError } from '../../core/mesh/stl'
+import { readSlicedFile, SlicedFileError, type SlicedPlate } from '../../core/slicedPlate'
 import { thumbnailKey } from '../../core/assetKeys'
 import { ASSET_GENERATION_MEMORY_BUDGET, ASSET_GENERATION_MEMORY_MULTIPLIER } from '../../core/uploadLimits'
 import { generateVisualAssets, type GeneratedAssets } from './pipeline'
@@ -39,6 +40,12 @@ function positiveInteger(value: string | undefined, fallback: number, name: stri
   if (!Number.isSafeInteger(parsed) || parsed < 1) throw new Error(`${name} must be a positive integer`)
   return parsed
 }
+
+/**
+ * The heap a sliced file's worker may grow to, and what it reserves of the memory budget: the parser streams its
+ * G-code, so this holds the largest inflated chunk and its lines whatever the file's size.
+ */
+export const SLICED_WORKER_HEAP_MB = 256
 
 class ByteBudget {
   private used = 0
@@ -425,6 +432,40 @@ export class AssetGenerationQueue {
     }
   }
 
+  /**
+   * Reads a sliced file off the request thread, within the same deadline as visual assets and a capped heap reserved
+   * from their memory budget, so a file that inflates or amplifies without end can't stall or exhaust the server. Any
+   * way its worker fails, it is logged and thrown as a `SlicedFileError`, so the file is refused rather than retried.
+   */
+  async readSlicedFile(file: Uint8Array, stoppedAt?: number): Promise<SlicedPlate[]> {
+    // The worker takes the file's buffer, so its size is read first.
+    const bytes = file.byteLength
+    const heapMb = Math.max(SLICED_WORKER_HEAP_MB, Math.ceil((bytes * ASSET_GENERATION_MEMORY_MULTIPLIER) / (1 << 20)))
+    const release = await this.sourceBytes.acquire(heapMb << 20)
+    try {
+      await setImmediate()
+      if (!this.workerConfig) return readSlicedFile(file, 'print.gcode.3mf', stoppedAt)
+      let plates: SlicedPlate[] | undefined
+      await this.inWorker(
+        { mode: 'sliced', file, stoppedAt },
+        file,
+        (reply: { stage: 'complete'; plates: SlicedPlate[] }) => {
+          plates = reply.plates
+        },
+        { maxOldGenerationSizeMb: heapMb },
+      )
+      if (!plates) throw new Error('asset worker exited without plates')
+      return plates
+    } catch (error) {
+      const unreadable =
+        error instanceof SlicedFileError ? error : new SlicedFileError(errorMessage(error, String(error)), { cause: error })
+      logger.warn({ event: 'sliced_file_unreadable', reason: unreadable.message, bytes }, 'sliced file unreadable')
+      throw unreadable
+    } finally {
+      release()
+    }
+  }
+
   private async runPipeline(
     file: Uint8Array,
     wants: { thumbnail: boolean; preview: boolean },
@@ -449,12 +490,14 @@ export class AssetGenerationQueue {
     workerData: Record<string, unknown>,
     file: Uint8Array,
     onReply: (reply: Reply) => void | Promise<void>,
+    resourceLimits?: ResourceLimits,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const worker = new Worker(this.workerConfig!.path, {
         workerData,
         transferList: [file.buffer as ArrayBuffer],
         execArgv: this.workerConfig!.execArgv,
+        resourceLimits,
       })
       let failure: unknown
       let handled = Promise.resolve()
@@ -462,17 +505,24 @@ export class AssetGenerationQueue {
         failure ??= new InvalidMeshError('model processing exceeded the time limit')
         void worker.terminate()
       }, this.workerConfig!.timeoutMs ?? 120_000)
-      worker.on('message', (reply: ({ ok: true } & Reply) | { ok: false; message: string; invalidMesh?: boolean }) => {
-        if (!reply.ok) {
-          failure ??= reply.invalidMesh ? new InvalidMeshError(reply.message) : new Error(reply.message)
-          return
-        }
-        handled = handled
-          .then(() => onReply(reply))
-          .catch((error: unknown) => {
-            failure ??= error
-          })
-      })
+      worker.on(
+        'message',
+        (reply: ({ ok: true } & Reply) | { ok: false; message: string; invalidMesh?: boolean; slicedFile?: boolean }) => {
+          if (!reply.ok) {
+            failure ??= reply.invalidMesh
+              ? new InvalidMeshError(reply.message)
+              : reply.slicedFile
+                ? new SlicedFileError(reply.message)
+                : new Error(reply.message)
+            return
+          }
+          handled = handled
+            .then(() => onReply(reply))
+            .catch((error: unknown) => {
+              failure ??= error
+            })
+        },
+      )
       worker.once('error', (error) => {
         failure ??= error
       })

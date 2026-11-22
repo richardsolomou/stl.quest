@@ -6,9 +6,11 @@ import {
   RetryLater,
   runSpools,
   sendPrintUsage,
+  sendSlicedFiles,
   sendSpools,
   slimSpool,
   syncPrints,
+  MAX_SLICED_FILE_BYTES,
   syncRestocks,
   websocketUrl,
   type BambuddyRun,
@@ -384,5 +386,272 @@ describe('sendPrintUsage', () => {
     await sendPrintUsage(config, '5', [{ spool_id: 3, grams: 12.5 }], fetcher)
 
     expect(fetcher.mock.calls[0][1]?.body).toBe(JSON.stringify({ run_id: '5', spools: [{ spool_id: 3, grams: 12.5 }] }))
+  })
+})
+
+describe('sendSlicedFiles', () => {
+  const bambuddy = readConfig({ ...environment, BAMBUDDY_URL: 'http://bambuddy:8000', BAMBUDDY_API_KEY: 'bb_key' })
+  const runs: BambuddyRun[] = [{ id: 5, archive_id: 12, plate_id: 2, status: 'completed', completed_at: '2026-11-20T10:00:00' }]
+  const file = new Uint8Array([0x50, 0x4b, 3, 4, 9])
+  /** Bambuddy's `GET /api/v1/archives/{id}/download` and STL Quest's `/api/bambuddy/sliced`, answering as given. */
+  const fetcher = ({
+    wanted = [{ run_id: '5', archive_id: '12' }] as { run_id: string; archive_id?: string }[],
+    download = () => new Response(file, { headers: { 'content-length': String(file.length) } }),
+    upload = 204,
+  }: { wanted?: { run_id: string; archive_id?: string }[]; download?: () => Response; upload?: number } = {}) =>
+    vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const target = href(url)
+      if (target.startsWith('http://bambuddy:8000/api/v1/archives/')) return download()
+      if (init?.method === 'DELETE') return new Response(null, { status: 204 })
+      if (target === 'https://stl.quest/api/bambuddy/sliced') return json({ runs: wanted })
+      if (init?.body instanceof ReadableStream) await new Response(init.body).arrayBuffer()
+      return new Response(null, { status: upload })
+    })
+
+  it('downloads each wanted run’s file from Bambuddy’s archive with its API key', async () => {
+    const reader = fetcher()
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), reader)
+
+    expect(reader.mock.calls[1]).toEqual([
+      'http://bambuddy:8000/api/v1/archives/12/download',
+      expect.objectContaining({ headers: { 'X-API-Key': 'bb_key' } }),
+    ])
+  })
+
+  it('sends the file to STL Quest with its run and the plate that printed', async () => {
+    const reader = fetcher()
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), reader)
+
+    expect(calls(reader)[2]).toBe('POST https://stl.quest/api/bambuddy/sliced?run_id=5&plate=2')
+  })
+
+  it('streams the file’s bytes as they are', async () => {
+    let received: Uint8Array | undefined
+    const reader = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const target = href(url)
+      if (target.startsWith('http://bambuddy:8000/')) return new Response(file)
+      if (init?.method !== 'POST') return json({ runs: [{ run_id: '5', archive_id: '12' }] })
+      received = new Uint8Array(await new Response(init.body).arrayBuffer())
+      return new Response(null, { status: 204 })
+    })
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), reader)
+
+    expect(received).toEqual(file)
+  })
+
+  it('sends the file as bytes with the token', async () => {
+    const reader = fetcher()
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), reader)
+
+    expect(reader.mock.calls[2][1]).toMatchObject({
+      headers: { authorization: 'Bearer stlq_spoolman_token', 'content-type': 'application/octet-stream' },
+    })
+  })
+
+  it('uses the archive STL Quest names for a run older than the print log it read', async () => {
+    const reader = fetcher()
+
+    await sendSlicedFiles(bambuddy, [], new Set(), reader)
+
+    expect(calls(reader).slice(1)).toEqual([
+      'GET http://bambuddy:8000/api/v1/archives/12/download',
+      'POST https://stl.quest/api/bambuddy/sliced?run_id=5',
+    ])
+  })
+
+  it('fetches nothing while STL Quest wants no file', async () => {
+    const reader = fetcher({ wanted: [] })
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), reader)
+
+    expect(calls(reader)).toEqual(['GET https://stl.quest/api/bambuddy/sliced'])
+  })
+
+  it('fetches nothing from an STL Quest that does not take sliced files yet', async () => {
+    const reader = vi.fn(async () => new Response('<html>', { status: 404 }))
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), reader)
+
+    expect(reader).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops asking Bambuddy for a file its archive does not have', async () => {
+    const skipped = new Set<string>()
+    const reader = fetcher({ download: () => json({ detail: 'File not found' }, 404) })
+
+    await sendSlicedFiles(bambuddy, runs, skipped, reader)
+    await sendSlicedFiles(bambuddy, runs, skipped, reader)
+
+    expect(calls(reader).filter((call) => call.includes('bambuddy:8000'))).toHaveLength(1)
+  })
+
+  it('skips a file larger than STL Quest takes without sending it', async () => {
+    const reader = fetcher({
+      download: () => new Response(file, { headers: { 'content-length': String(MAX_SLICED_FILE_BYTES + 1) } }),
+    })
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), reader)
+
+    expect(calls(reader).filter((call) => call.startsWith('POST'))).toEqual([])
+  })
+
+  it('stops sending a file STL Quest could not read', async () => {
+    const skipped = new Set<string>()
+    const reader = fetcher({ upload: 422 })
+
+    await sendSlicedFiles(bambuddy, runs, skipped, reader)
+    await sendSlicedFiles(bambuddy, runs, skipped, reader)
+
+    expect(calls(reader).filter((call) => call.startsWith('POST'))).toHaveLength(1)
+  })
+
+  it('tells STL Quest a file Bambuddy’s archive does not have is unavailable, so it stops asking', async () => {
+    const reader = fetcher({ download: () => json({ detail: 'File not found' }, 404) })
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), reader)
+
+    expect(calls(reader)).toContain('DELETE https://stl.quest/api/bambuddy/sliced?run_id=5')
+  })
+
+  it('tells STL Quest a run Bambuddy archived no file for is unavailable', async () => {
+    const reader = fetcher({ wanted: [{ run_id: '6' }] })
+
+    await sendSlicedFiles(bambuddy, [], new Set(), reader)
+
+    expect(calls(reader)).toEqual(['GET https://stl.quest/api/bambuddy/sliced', 'DELETE https://stl.quest/api/bambuddy/sliced?run_id=6'])
+  })
+
+  it('tells STL Quest a file too large for it is unavailable', async () => {
+    const reader = fetcher({
+      download: () => new Response(file, { headers: { 'content-length': String(MAX_SLICED_FILE_BYTES + 1) } }),
+    })
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), reader)
+
+    expect(calls(reader)).toContain('DELETE https://stl.quest/api/bambuddy/sliced?run_id=5')
+  })
+
+  it('tells STL Quest a file it refused as too large is unavailable', async () => {
+    const reader = fetcher({ upload: 413 })
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), reader)
+
+    expect(calls(reader)).toContain('DELETE https://stl.quest/api/bambuddy/sliced?run_id=5')
+  })
+
+  it('leaves a file STL Quest could not read to STL Quest, which already stopped asking', async () => {
+    const reader = fetcher({ upload: 422 })
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), reader)
+
+    expect(calls(reader).filter((call) => call.startsWith('DELETE'))).toEqual([])
+  })
+
+  it('skips a run all the same on an STL Quest that cannot be told a file is unavailable', async () => {
+    const skipped = new Set<string>()
+    const reader = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (href(url).startsWith('http://bambuddy:8000/')) return json({ detail: 'File not found' }, 404)
+      if (init?.method === 'DELETE') return new Response(null, { status: 405 })
+      return json({ runs: [{ run_id: '5', archive_id: '12' }] })
+    })
+
+    await sendSlicedFiles(bambuddy, runs, skipped, reader)
+
+    expect(skipped).toEqual(new Set(['5']))
+  })
+
+  it('moves on to the next run when STL Quest fails on one', async () => {
+    const reader = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const target = href(url)
+      if (target.startsWith('http://bambuddy:8000/')) return new Response(file)
+      if (init?.method !== 'POST')
+        return json({
+          runs: [
+            { run_id: '5', archive_id: '12' },
+            { run_id: '6', archive_id: '13' },
+          ],
+        })
+      await new Response(init.body).arrayBuffer()
+      return new Response(null, { status: target.includes('run_id=5') ? 500 : 204 })
+    })
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), reader)
+
+    expect(calls(reader).filter((call) => call.startsWith('POST'))).toHaveLength(2)
+  })
+
+  it('sends a file STL Quest failed on again next poll', async () => {
+    const skipped = new Set<string>()
+    const reader = fetcher({ upload: 500 })
+
+    await sendSlicedFiles(bambuddy, runs, skipped, reader)
+    await sendSlicedFiles(bambuddy, runs, skipped, reader)
+
+    expect(calls(reader).filter((call) => call.startsWith('POST'))).toHaveLength(2)
+  })
+
+  it('does not tell STL Quest a file it failed on is unavailable', async () => {
+    const reader = fetcher({ upload: 503 })
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), reader)
+
+    expect(calls(reader).filter((call) => call.startsWith('DELETE'))).toEqual([])
+  })
+
+  it('says STL Quest failed on a file', async () => {
+    const log = vi.fn()
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), fetcher({ upload: 500 }), log)
+
+    expect(log).toHaveBeenCalledWith('STL Quest answered 500 for the sliced file of run 5; sending it again next poll')
+  })
+
+  it('says a key without archive access was refused', async () => {
+    const reader = fetcher({ download: () => json({ detail: 'Forbidden' }, 403) })
+
+    await expect(sendSlicedFiles(bambuddy, runs, new Set(), reader)).rejects.toThrow(/Read Status/)
+  })
+
+  it('waits as long as STL Quest asks', async () => {
+    const reader = vi.fn(async (url: string | URL | Request) =>
+      new URL(href(url)).origin === 'https://stl.quest'
+        ? new Response(null, { status: 429, headers: { 'retry-after': '30' } })
+        : new Response(file),
+    )
+
+    await expect(sendSlicedFiles(bambuddy, runs, new Set(), reader)).rejects.toMatchObject({ delayMs: 30_000 })
+  })
+
+  it('sends at most a few files a poll', async () => {
+    const reader = fetcher({ wanted: Array.from({ length: 10 }, (_, index) => ({ run_id: String(index), archive_id: String(index) })) })
+
+    await sendSlicedFiles(bambuddy, [], new Set(), reader)
+
+    expect(calls(reader).filter((call) => call.startsWith('POST'))).toHaveLength(3)
+  })
+
+  it('says what it sent', async () => {
+    const log = vi.fn()
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), fetcher(), log)
+
+    expect(log).toHaveBeenCalledWith('sent the sliced file of run 5 to STL Quest')
+  })
+
+  it('says why STL Quest refused a file', async () => {
+    const log = vi.fn()
+    const reader = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (href(url).startsWith('http://bambuddy:8000/')) return new Response(file)
+      if (init?.method !== 'POST') return json({ runs: [{ run_id: '5' }] })
+      return new Response('this file holds several sliced plates', { status: 422 })
+    })
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), reader, log)
+
+    expect(log).toHaveBeenCalledWith('not sending the sliced file of run 5: this file holds several sliced plates')
   })
 })

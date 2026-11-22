@@ -68,6 +68,12 @@ export const plates: typeof en = {
     },
     recordedAt: (when) => `Erfasst ${when}`,
     reported: (outcome, when) => `${outcome} · gemeldet ${when}`,
+    sliced: {
+      cut: 'Der Ausschuss endet laut der geslicten Datei aus Bambuddy dort, wo der Druck stoppte: fertige Objekte zählen ganz.',
+      whole:
+        'Die geslicte Datei aus Bambuddy markiert keinen Fortschritt, daher wird der Ausschuss nach dem ganzen Anteil jedes Objekts aufgeteilt.',
+      unreadable: 'Die geslicte Datei aus Bambuddy ließ sich nicht lesen, daher wird ohne sie aufgeteilt.',
+    },
     replaceFile: 'Erneut hochladen',
     replaceTotals: 'Summen erneut eingeben',
     delete: 'Druckplatte löschen',
