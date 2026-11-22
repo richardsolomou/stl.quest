@@ -846,14 +846,19 @@ export const settings = {
     filaments: {
       title: 'Filaments',
       description:
-        'Each Spoolman filament counts towards one filament in Consumables, whose stock then becomes what its spools have left. Filaments added from SpoolmanDB find their catalogue colour, others match by brand, material, and colour, and you choose where neither is sure.',
+        'Each Spoolman filament counts towards one filament in Consumables, whose stock then becomes what its spools have left. Filaments added from SpoolmanDB find their catalogue colour, others match by brand, material, and colour, then by their name, and you choose where none is sure.',
       empty: 'No spools yet.',
       unnamed: (id: number) => `Filament #${id}`,
       spools: (count: number) => `${count} ${count === 1 ? 'spool' : 'spools'}`,
       countsTowards: (name: string) => `What ${name} counts towards`,
       automatic: (name?: string) => (name ? `Automatic · ${name}` : 'Automatic · no match'),
       none: 'Not counted',
-      by: { catalogue: 'Matched by its SpoolmanDB entry', colour: 'Matched by brand, material, and colour', manual: 'Chosen by hand' },
+      by: {
+        catalogue: 'Matched by its SpoolmanDB entry',
+        colour: 'Matched by brand, material, and colour',
+        name: 'Matched by brand, material, and name',
+        manual: 'Chosen by hand',
+      },
       noLibrary: 'Add the filaments you buy in Consumables to count Spoolman stock towards them.',
       error: 'The link could not be saved.',
     },

@@ -61,10 +61,15 @@ function synchronizeCatalog() {
       applyFilamentPatches(parsed, overrides.patches),
     )
     const sources = manifest.sources.map(({ id, webRepository: repository, revision, license }) => ({ id, repository, revision, license }))
+    // Overrides rename products, so matching reads each product by the name the library shows.
+    for (const { id, name } of presets) {
+      const entry = spoolman.presets[id]
+      if (entry) spoolman.presets[id] = [entry[0], entry[1], name]
+    }
     validateCatalog(presets, sources)
     validateSpoolman(spoolman, presets)
     writeFileSync(outputPath, `${JSON.stringify({ sources, presets }, null, 2)}\n`)
-    writeFileSync(spoolmanPath, `${formatPairs(JSON.stringify(spoolman, null, 2))}\n`)
+    writeFileSync(spoolmanPath, `${formatTuples(JSON.stringify(spoolman, null, 2))}\n`)
     if (update) writeFileSync(sourcesPath, `${JSON.stringify({ sources: manifest.sources }, null, 2)}\n`)
     console.log(`Synchronized ${presets.length} filament presets.`)
   } finally {
@@ -107,15 +112,19 @@ function validateCatalog(presets: GeneratedFilamentPreset[], sources: CatalogSou
   if (codes.size < 200) throw new Error(`Filament catalog unexpectedly has only ${codes.size} colour codes`)
 }
 
-/** Keeps each pair on one line, as the formatter does. */
-function formatPairs(json: string) {
-  return json.replace(/\[\n\s+("[^"\n]*"),\n\s+("[^"\n]*")\n\s+\]/g, '[$1, $2]')
+/** Keeps each tuple of strings on one line, as the formatter does. */
+function formatTuples(json: string) {
+  return json.replace(/\[\n\s+("[^"\n]*"(?:,\n\s+"[^"\n]*")*)\n\s+\]/g, (_, items: string) => `[${items.replace(/,\n\s+/g, ', ')}]`)
 }
 
 function validateSpoolman(spoolman: SpoolmanCatalogue, presets: GeneratedFilamentPreset[]) {
   const colours = new Map(presets.map((preset) => [preset.id, new Set(preset.colors?.map((color) => color.names.en))]))
   for (const [stem, [presetId, colour]] of Object.entries(spoolman.colours)) {
     if (!colours.get(presetId)?.has(colour)) throw new Error(`SpoolmanDB ID ${stem} names unknown colour ${presetId} ${colour}`)
+  }
+  const names = new Map(presets.map((preset) => [preset.id, preset.name]))
+  for (const [presetId, [, , product]] of Object.entries(spoolman.presets)) {
+    if (names.get(presetId) !== product) throw new Error(`Spoolman matching names ${presetId} ${product}, not ${names.get(presetId)}`)
   }
   if (Object.keys(spoolman.colours).length < 1_000) throw new Error('Spoolman matching catalog unexpectedly small')
 }

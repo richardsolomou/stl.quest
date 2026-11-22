@@ -4142,6 +4142,94 @@ describe('STLQuestService crash recovery', () => {
         )
       })
 
+      describe('typed totals for several filaments', () => {
+        const white: Consumable = { id: 'white', kind: 'filament', name: 'White PLA', pricePerKg: 20 }
+
+        beforeEach(async () => {
+          await stock('consumables', [white])
+        })
+
+        function typed(plateId: string, rows: [string, number][]) {
+          return {
+            plateId,
+            minutes: 60,
+            materials: rows.map(([consumableId]) => ({ consumableId })),
+            totals: rows.map(([, total]) => total),
+            otherShare: 0,
+          }
+        }
+
+        it('refuses the same filament twice', async () => {
+          const { id } = await plate(await filamentPrint())
+
+          await expect(
+            service.recordPlate(
+              typed(id, [
+                [filament.id, 30],
+                [filament.id, 8],
+              ]),
+              admin,
+            ),
+          ).rejects.toMatchObject({ status: 400 })
+        })
+
+        it('refuses a filament named on the spot that the library filament beside it has', async () => {
+          const { id } = await plate(await filamentPrint())
+
+          await expect(
+            service.recordPlate(
+              { plateId: id, minutes: 60, materials: [{ consumableId: white.id }, { name: 'white pla' }], totals: [30, 8], otherShare: 0 },
+              admin,
+            ),
+          ).rejects.toMatchObject({ status: 400 })
+        })
+
+        it('refuses a filament without grams', async () => {
+          const { id } = await plate(await filamentPrint())
+
+          await expect(
+            service.recordPlate(
+              typed(id, [
+                [filament.id, 30],
+                [white.id, 0],
+              ]),
+              admin,
+            ),
+          ).rejects.toMatchObject({ status: 400 })
+        })
+
+        it('lists what each filament gave each print', async () => {
+          const large = await filamentPrint()
+          const small = await filamentPrint()
+          await repository.setModelDimensions(large, { widthMm: 10, depthMm: 10, heightMm: 30 }, 3_000)
+          await repository.setModelDimensions(small, { widthMm: 10, depthMm: 10, heightMm: 10 }, 1_000)
+          const { id } = await plate(large, small)
+          await service.recordPlate(
+            typed(id, [
+              [filament.id, 40],
+              [white.id, 8],
+            ]),
+            admin,
+          )
+
+          expect((await service.listPlates(admin)).find((listed) => listed.id === id)?.recording?.materials).toEqual([
+            { key: filament.id, name: 'PLA', amount: 40, prints: { [large]: 30, [small]: 10 } },
+            { key: white.id, name: 'White PLA', amount: 8, prints: { [large]: 6, [small]: 2 } },
+          ])
+        })
+
+        it('lists only what the latest recording used', async () => {
+          const requestId = await filamentPrint()
+          const { id } = await plate(requestId)
+          await service.recordPlate(typed(id, [[white.id, 8]]), admin)
+          await service.recordPlate(typed(id, [[filament.id, 30]]), admin)
+
+          expect((await service.listPlates(admin)).find((listed) => listed.id === id)?.recording?.materials).toEqual([
+            { key: filament.id, name: 'PLA', amount: 30, prints: { [requestId]: 30 } },
+          ])
+        })
+      })
+
       it('records the slicer’s amount for a print estimated from its model, without the allowance', async () => {
         const requestId = await request()
         await repository.updateRequest(requestId, { printerId: fdm.id, estimatedPrintMinutesOverride: 90 })

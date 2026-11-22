@@ -54,7 +54,7 @@ A repeated end event records nothing twice. The workspace keeps the newest 2,000
 
 ### Filaments
 
-Bambuddy lists the grams each AMS tray or external spool used, such as `AMS-A T1 PLA: 30.0g | AMS-A T2 PETG: 10.0g`. Each tray's grams go to the first filament in **Consumables** whose catalogue product is that material, else to the first filament, and each filament's grams are split across the plate's prints by volume. The trays are what Bambuddy measured, so they are the whole print: `filament_grams` is the slicer's estimate and adds nothing on top. Without trays, Bambuddy lists the slicer file's slots instead (`PLA: 30.0g`), and grams those slots leave out go to the first filament. The breakdown names only a material, so two colours of the same material count against the first filament of that material.
+Bambuddy lists the grams each AMS tray or external spool used, such as `AMS-A T1 PLA: 30.0g | AMS-A T2 PETG: 10.0g`. Each tray's grams go to the first filament in **Consumables** whose catalogue product is that material, else its "+" kind (PLA+ spools from eSUN and SUNLU report plain PLA), else to the first filament, and each filament's grams are split across the plate's prints by volume. The trays are what Bambuddy measured, so they are the whole print: `filament_grams` is the slicer's estimate and adds nothing on top. Without trays, Bambuddy lists the slicer file's slots instead (`PLA: 30.0g`), and grams those slots leave out go to the first filament. The breakdown names only a material, so two colours of the same material count against the first filament of that material.
 
 ## Grams per spool
 

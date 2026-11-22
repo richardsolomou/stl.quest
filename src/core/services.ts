@@ -44,6 +44,8 @@ import {
   isMeasured,
   matchSlicedObjects,
   MAX_PLATE_FILAMENTS,
+  plateMaterialTotals,
+  plateTotalsProblem,
   MAX_PLATE_OBJECTS,
   MAX_PLATE_PRINTS,
   PLATE_RETRY_STAGE,
@@ -1665,7 +1667,10 @@ export class STLQuestService {
     const printers = await this.repository.listInventory('printers')
     const estimateSettings = await this.rates()
     const jobs = await this.repository.listPrintJobs()
-    return (await this.repository.listPlates()).map((plate) => {
+    const plates = await this.repository.listPlates()
+    const uses = await this.repository.plateMaterialUse(plates.flatMap(({ recording }) => (recording ? [recording.transactionId] : [])))
+    const consumables = await this.repository.listInventory('consumables')
+    return plates.map((plate) => {
       const print = jobs.find(({ plateId }) => plateId === plate.id)
       const sliced = print && slicedFileNote(print)
       const printTypes = unique(
@@ -1676,8 +1681,16 @@ export class STLQuestService {
       )
       const printType =
         printers.find(({ id }) => id === plate.printerId)?.printType ?? (printTypes.length === 1 ? printTypes[0] : undefined)
+      const recording = plate.recording && {
+        ...plate.recording,
+        materials: plateMaterialTotals(
+          uses.filter(({ transactionId }) => transactionId === plate.recording!.transactionId),
+          consumables,
+        ),
+      }
       return {
         ...plate,
+        recording,
         ...(printType && { printType }),
         ...(print && {
           print: { outcome: print.outcome, receivedAt: print.receivedAt, ...(sliced && { sliced }) },
@@ -1871,6 +1884,15 @@ export class STLQuestService {
     const printType = await this.platePrintType(plate)
     // Slicer files weigh filament per object; a resin slicer's summary is typed in as totals.
     if (isMeasured(input) && printType === 'resin') throw new Response(this.text.plates.invalid, { status: 400 })
+    if (
+      !isMeasured(input) &&
+      plateTotalsProblem(
+        input.materials.map((material, slot) => ({ material, amount: input.totals[slot] })),
+        await this.consumables(),
+        printType,
+      )
+    )
+      throw new Response(this.text.plates.invalid, { status: 400 })
     const materials = await this.plateMaterials(input.materials, printType, identity)
     const { split, recorded } = await this.recordPlateUsage(
       plate,
@@ -2358,11 +2380,7 @@ export class STLQuestService {
           input.overhead.length === slots &&
           input.overhead.every(amount) &&
           input.objects.every((object) => object.amounts.length === slots && object.amounts.every(amount))
-        : input.totals.length === slots &&
-          input.totals.every((total) => amount(total) && total >= 0) &&
-          input.totals.some((total) => total > 0) &&
-          input.otherShare >= 0 &&
-          input.otherShare < 1)
+        : input.totals.length === slots && input.totals.every(amount) && input.otherShare >= 0 && input.otherShare < 1)
     if (!valid) throw new Response(this.text.plates.invalid, { status: 400 })
     if (isMeasured(input) && input.objects.some(({ requestId }) => requestId !== undefined && !onPlate.has(requestId)))
       throw new Response(this.text.plates.notOnPlate, { status: 400 })

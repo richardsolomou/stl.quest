@@ -77,6 +77,7 @@ export const plates = {
     deleted: 'Plate deleted.',
     deleteFailed: 'The plate could not be deleted.',
     missing: 'This plate no longer exists.',
+    materials: 'Materials',
     loadError: 'Could not load the plate',
   },
   file: {
@@ -95,6 +96,10 @@ export const plates = {
   },
   totals: {
     material: 'Material used',
+    amount: (material: string) => `${material} used`,
+    addFilament: 'Add filament',
+    remove: (material: string) => `Remove ${material}`,
+    duplicate: 'Each filament goes in once. Add up its grams on one row.',
     hours: 'Hours',
     minutes: 'Minutes',
     time: 'Print time',

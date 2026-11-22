@@ -865,7 +865,7 @@ export const settings: typeof en = {
     filaments: {
       title: 'Filamente',
       description:
-        'Jedes Spoolman-Filament zählt zu einem Filament in Verbrauchsmaterial, dessen Bestand dann ist, was seine Spulen noch haben. Filamente aus SpoolmanDB finden ihre Katalogfarbe, andere passen über Marke, Material und Farbe, und wo beides unsicher ist, wählst du.',
+        'Jedes Spoolman-Filament zählt zu einem Filament in Verbrauchsmaterial, dessen Bestand dann ist, was seine Spulen noch haben. Filamente aus SpoolmanDB finden ihre Katalogfarbe, andere passen über Marke, Material und Farbe, dann über ihren Namen, und wo nichts sicher ist, wählst du.',
       empty: 'Noch keine Spulen.',
       unnamed: (id: number) => `Filament #${id}`,
       spools: (count: number) => `${count} ${count === 1 ? 'Spule' : 'Spulen'}`,
@@ -875,6 +875,7 @@ export const settings: typeof en = {
       by: {
         catalogue: 'Über seinen SpoolmanDB-Eintrag zugeordnet',
         colour: 'Über Marke, Material und Farbe zugeordnet',
+        name: 'Über Marke, Material und Namen zugeordnet',
         manual: 'Von Hand gewählt',
       },
       noLibrary: 'Füge die Filamente, die du kaufst, in Verbrauchsmaterial hinzu, um Spoolman-Bestand dazu zu zählen.',

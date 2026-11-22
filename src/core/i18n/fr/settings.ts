@@ -870,7 +870,7 @@ export const settings: typeof en = {
     filaments: {
       title: 'Filaments',
       description:
-        'Chaque filament Spoolman compte pour un filament des consommables, dont le stock devient ce qui reste sur ses bobines. Les filaments ajoutés depuis SpoolmanDB trouvent leur couleur du catalogue, les autres se rapprochent par marque, matière et couleur, et vous choisissez quand aucun n’est sûr.',
+        'Chaque filament Spoolman compte pour un filament des consommables, dont le stock devient ce qui reste sur ses bobines. Les filaments ajoutés depuis SpoolmanDB trouvent leur couleur du catalogue, les autres se rapprochent par marque, matière et couleur, puis par leur nom, et vous choisissez quand rien n’est sûr.',
       empty: 'Aucune bobine pour l’instant.',
       unnamed: (id: number) => `Filament n° ${id}`,
       spools: (count: number) => `${count} ${count === 1 ? 'bobine' : 'bobines'}`,
@@ -880,6 +880,7 @@ export const settings: typeof en = {
       by: {
         catalogue: 'Rapproché par son entrée SpoolmanDB',
         colour: 'Rapproché par marque, matière et couleur',
+        name: 'Rapproché par marque, matière et nom',
         manual: 'Choisi à la main',
       },
       noLibrary: 'Ajoutez les filaments que vous achetez dans les consommables pour y compter le stock Spoolman.',

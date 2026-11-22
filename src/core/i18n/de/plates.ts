@@ -81,6 +81,7 @@ export const plates: typeof en = {
     deleted: 'Druckplatte gelöscht.',
     deleteFailed: 'Die Druckplatte konnte nicht gelöscht werden.',
     missing: 'Diese Druckplatte gibt es nicht mehr.',
+    materials: 'Materialien',
     loadError: 'Die Druckplatte konnte nicht geladen werden',
   },
   file: {
@@ -99,6 +100,10 @@ export const plates: typeof en = {
   },
   totals: {
     material: 'Verbrauchtes Material',
+    amount: (material) => `${material}: Menge`,
+    addFilament: 'Filament hinzufügen',
+    remove: (material) => `${material} entfernen`,
+    duplicate: 'Jedes Filament kommt nur einmal vor. Rechne seine Gramm in einer Zeile zusammen.',
     hours: 'Stunden',
     minutes: 'Minuten',
     time: 'Druckzeit',

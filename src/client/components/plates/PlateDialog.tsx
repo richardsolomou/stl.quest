@@ -1,7 +1,7 @@
-import { useId, useRef, useState, type ComponentProps, type ReactNode } from 'react'
+import { useId, useLayoutEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
-import { FileUp } from 'lucide-react'
+import { FileUp, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
@@ -11,7 +11,9 @@ import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { errorMessage } from '../../../core/error'
 import {
+  MAX_PLATE_FILAMENTS,
   matchSlicedObjects,
+  plateTotalsProblem,
   splitPlate,
   suggestedFilament,
   type PlateMaterialChoice,
@@ -27,6 +29,7 @@ import { measuredRecord, slicedObjectLabel } from '../../plateRecord'
 import { catalogueQuery, consumablesQuery, platesQuery, printersQuery, type PlateView } from '../../queries'
 import { invalidateQueries } from '../../queryState'
 import { useWorkspaceSlug } from '../../workspace'
+import { ColourSwatch } from '../ColourSwatch'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { DialogProblem } from '../DialogProblem'
 import { DialogShell } from '../DialogShell'
@@ -86,6 +89,7 @@ function PlateSummary({ plate, onRecord, onClose }: { plate: PlateView; onRecord
   })
   const recording = plate.recording
   const amount = (value: number, unit: UsageUnit) => formatUsageAmount(value, unit, t.spend, locale)
+  const materials = recording?.materials ?? []
   const otherMinutes = recording ? recording.minutes - plate.items.reduce((total, item) => total + (item.minutes ?? 0), 0) : 0
   const when = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' })
   return (
@@ -133,7 +137,20 @@ function PlateSummary({ plate, onRecord, onClose }: { plate: PlateView; onRecord
             <tr key={item.requestId} className="border-b border-border/60 last:border-0">
               <td className="max-w-0 py-1.5">
                 <span className="block truncate font-medium">{item.name}</span>
-                <span className="font-mono text-xs text-muted-foreground">×{item.copies}</span>
+                <span className="block text-xs text-muted-foreground">
+                  <span className="font-mono">×{item.copies}</span>
+                  {recording &&
+                    materials.length > 1 &&
+                    materials.map((material) => (
+                      <span key={material.key}>
+                        {' · '}
+                        <span className="whitespace-nowrap">
+                          {material.name}{' '}
+                          <span className="tabular-nums">{amount(material.prints[item.requestId] ?? 0, recording.unit)}</span>
+                        </span>
+                      </span>
+                    ))}
+                </span>
               </td>
               {recording && (
                 <td className="py-1.5 pl-3 text-right font-mono whitespace-nowrap tabular-nums">
@@ -160,6 +177,19 @@ function PlateSummary({ plate, onRecord, onClose }: { plate: PlateView; onRecord
           )}
         </tbody>
       </table>
+      {recording && materials.length > 0 && (
+        <Section title={copy.dialog.materials}>
+          <ul className="flex flex-col text-sm" data-plate-materials>
+            {materials.map((material) => (
+              <li key={material.key} className="flex items-center gap-2 border-b border-border/60 py-1 last:border-0">
+                {material.hex && <ColourSwatch hex={material.hex} />}
+                <span className="min-w-0 flex-1 truncate">{material.name}</span>
+                <span className="font-mono whitespace-nowrap tabular-nums">{amount(material.amount, recording.unit)}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
       {plate.print && (
         <p
           className={cn(
@@ -232,7 +262,21 @@ function PlateRecorder({
   const [materials, setMaterials] = useState<MaterialDraft[]>([{}])
   const [hours, setHours] = useState('')
   const [minutes, setMinutes] = useState('')
-  const [total, setTotal] = useState('')
+  const [amounts, setAmounts] = useState<string[]>([''])
+  // Typed rows keep an identity of their own so that removing one moves neither focus nor fields onto another.
+  const rowCount = useRef(1)
+  const [rowKeys, setRowKeys] = useState([0])
+  const totalsSection = useRef<HTMLElement>(null)
+  const pendingFocus = useRef<string[]>([])
+  useLayoutEffect(() => {
+    const selectors = pendingFocus.current
+    if (selectors.length === 0) return
+    pendingFocus.current = []
+    for (const selector of selectors) {
+      const target = totalsSection.current?.querySelector<HTMLElement>(selector)
+      if (target) return target.focus()
+    }
+  })
   const [otherShare, setOtherShare] = useState('')
   const sliced = parsed?.plates[parsed.index]
 
@@ -255,8 +299,9 @@ function PlateRecorder({
     const labelled = chosen.objects.length > 0
     setUnlabelled(!labelled)
     if (!labelled) {
-      if (chosen.slicerGrams !== undefined) setTotal(String(chosen.slicerGrams))
+      setAmounts([chosen.slicerGrams === undefined ? '' : String(chosen.slicerGrams)])
       setMaterials([{}])
+      setRowKeys([rowCount.current++])
       onModeChange('totals')
     }
   }
@@ -278,9 +323,17 @@ function PlateRecorder({
   const choices = materials.map((draft) => plateMaterialChoice(draft))
   const measuredInput: PlateMeasured | undefined =
     mode === 'file' && sliced && parsed ? measuredRecord(plate.id, sliced, parsed.assignments, [], time) : undefined
+  const totalsProblem = plateTotalsProblem(
+    choices.map((material, slot) => ({ material, amount: Number(amounts[slot]) })),
+    library,
+    printType,
+  )
   const totalsInput: PlateTotals | undefined =
-    mode === 'totals' && Number(total) > 0
-      ? { totals: [Number(total)], otherShare: plate.otherStuff ? Math.min(0.99, Math.max(0, Number(otherShare) || 0) / 100) : 0 }
+    mode === 'totals' && !totalsProblem
+      ? {
+          totals: amounts.map(Number),
+          otherShare: plate.otherStuff ? Math.min(0.99, Math.max(0, Number(otherShare) || 0) / 100) : 0,
+        }
       : undefined
   const input = measuredInput ?? totalsInput
   const split = input
@@ -288,7 +341,7 @@ function PlateRecorder({
         input,
         time,
         plate.items.map(({ requestId, copies, volumeMm3, estimatedMaterial }) => ({ requestId, copies, volumeMm3, estimatedMaterial })),
-        mode === 'file' ? materials.length : 1,
+        materials.length,
       )
     : undefined
   const ready = Boolean(input) && choices.every((choice) => choice !== undefined)
@@ -325,6 +378,34 @@ function PlateRecorder({
   })
 
   const amount = (value: number) => formatUsageAmount(value, unit, t.spend, locale)
+  const slotLabel = (index: number) =>
+    materials.length > 1
+      ? mode === 'file'
+        ? `${copy.material.label} · ${copy.file.filament(index)}`
+        : copy.file.filament(index)
+      : copy.material.label
+  const materialName = (index: number) => {
+    const draft = materials[index]
+    return library.find((consumable) => consumable.id === draft?.consumableId)?.name ?? draft?.name?.trim() ?? copy.file.filament(index)
+  }
+  const inRow = (key: number | undefined, selector: string) => `[data-total-row="${key}"] ${selector}`
+  const addSlot = () => {
+    const key = rowCount.current++
+    setMaterials([...materials, {}])
+    setAmounts([...amounts, ''])
+    setRowKeys([...rowKeys, key])
+    pendingFocus.current = [inRow(key, '[data-slot="select-trigger"]')]
+  }
+  const removeSlot = (index: number) => {
+    setMaterials(materials.filter((_, position) => position !== index))
+    setAmounts(amounts.filter((_, position) => position !== index))
+    setRowKeys(rowKeys.filter((_, position) => position !== index))
+    pendingFocus.current = [
+      inRow(rowKeys[index + 1], '[data-total-remove]'),
+      inRow(rowKeys[index - 1], '[data-total-remove]'),
+      '[data-total-add]',
+    ]
+  }
   const assignmentOptions = [
     ...plate.items.map((item) => ({ value: item.requestId, label: item.name })),
     { value: NOT_IN_STL_QUEST, label: copy.dialog.other },
@@ -453,23 +534,63 @@ function PlateRecorder({
         </section>
       )}
 
+      {mode === 'totals' && (
+        <section ref={totalsSection} className="flex flex-col gap-3" data-plate-totals>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="font-heading text-xs font-bold tracking-[0.015em] text-muted-foreground uppercase">{copy.totals.material}</h3>
+            {printType === 'filament' && materials.length < MAX_PLATE_FILAMENTS && (
+              <Button type="button" variant="ghost" size="sm" data-total-add onClick={addSlot}>
+                <Plus />
+                {copy.totals.addFilament}
+              </Button>
+            )}
+          </div>
+          {materials.map((draft, index) => (
+            <div key={rowKeys[index]} data-total-row={rowKeys[index]}>
+              <PlateMaterialField
+                label={slotLabel(index)}
+                printType={printType}
+                library={library}
+                value={draft}
+                onChange={(next) => setMaterials(materials.map((current, position) => (position === index ? next : current)))}
+                trailing={
+                  <>
+                    <UnitInput
+                      unit={unit === 'ml' ? 'mL' : 'g'}
+                      className="w-28"
+                      aria-label={copy.totals.amount(slotLabel(index))}
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step="any"
+                      value={amounts[index] ?? ''}
+                      onChange={(event) =>
+                        setAmounts(amounts.map((current, position) => (position === index ? event.target.value : current)))
+                      }
+                    />
+                    {materials.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={copy.totals.remove(slotLabel(index))}
+                        data-total-remove
+                        onClick={() => removeSlot(index)}
+                      >
+                        <X />
+                      </Button>
+                    )}
+                  </>
+                }
+              />
+            </div>
+          ))}
+          {totalsProblem === 'duplicate' && <p className="text-sm text-destructive">{copy.totals.duplicate}</p>}
+        </section>
+      )}
+
       {(mode === 'totals' || sliced) && (
         <div className="grid gap-3 sm:grid-cols-2">
-          {mode === 'totals' && (
-            <Field>
-              <FieldLabel htmlFor={`${id}-total`}>{copy.totals.material}</FieldLabel>
-              <UnitInput
-                unit={unit === 'ml' ? 'mL' : 'g'}
-                id={`${id}-total`}
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="any"
-                value={total}
-                onChange={(event) => setTotal(event.target.value)}
-              />
-            </Field>
-          )}
           <Field>
             <FieldLabel htmlFor={`${id}-hours`}>{copy.totals.time}</FieldLabel>
             <div className="flex gap-2">
@@ -514,12 +635,13 @@ function PlateRecorder({
         </div>
       )}
 
-      {(mode === 'totals' || sliced) &&
+      {mode === 'file' &&
+        sliced &&
         materials.map((draft, index) => (
           <PlateMaterialField
             // eslint-disable-next-line react/no-array-index-key -- one field per filament slot, which never reorder
             key={index}
-            label={materials.length > 1 ? `${copy.material.label} · ${copy.file.filament(index)}` : copy.material.label}
+            label={slotLabel(index)}
             printType={printType}
             library={library}
             fromFile={sliced?.filaments[index]}
@@ -533,7 +655,19 @@ function PlateRecorder({
           <ul className="flex flex-col text-sm" data-plate-split>
             {split.prints.map((print) => (
               <li key={print.requestId} className="flex items-baseline gap-2 border-b border-border/60 py-1 last:border-0">
-                <span className="min-w-0 flex-1 truncate">{plate.items.find(({ requestId }) => requestId === print.requestId)?.name}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">{plate.items.find(({ requestId }) => requestId === print.requestId)?.name}</span>
+                  {mode === 'totals' && print.amounts.length > 1 && (
+                    <span className="block text-xs text-muted-foreground">
+                      {print.amounts.map((value, slot) => (
+                        <span key={rowKeys[slot]}>
+                          {slot > 0 && ' · '}
+                          <span className="whitespace-nowrap">{`${materialName(slot)} ${amount(value)}`}</span>
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                </span>
                 <span className="font-mono tabular-nums">{amount(print.amounts.reduce((sum, value) => sum + value, 0))}</span>
               </li>
             ))}
@@ -569,9 +703,9 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
-function UnitInput({ unit, ...props }: ComponentProps<'input'> & { unit: string }) {
+function UnitInput({ unit, className, ...props }: ComponentProps<'input'> & { unit: string }) {
   return (
-    <InputGroup>
+    <InputGroup className={className}>
       <InputGroupInput {...props} />
       <InputGroupAddon align="inline-end">{unit}</InputGroupAddon>
     </InputGroup>

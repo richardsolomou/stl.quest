@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.16.0
+
+### Minor Changes
+
+- dca8e23: Enter a plate's typed totals one row per filament, so that a multi-colour plate charges each filament's grams to its prints, and see what each filament gave each print once it's recorded.
+
+### Patch Changes
+
+- 2372d75: Match a filament typed into Spoolman by its name when several library filaments share its brand, material, and colour, so that "PLA Basic Black" counts towards Bambu Lab PLA Basic rather than needing a link by hand.
+- 2372d75: Keep PLA+ apart from PLA when matching Spoolman filaments to library filaments, and send a printed tray that reports plain PLA to a PLA+ filament only when the library has no PLA, so that PLA+ spools never count towards a PLA filament.
+
 ## 2.15.2
 
 ### Patch Changes

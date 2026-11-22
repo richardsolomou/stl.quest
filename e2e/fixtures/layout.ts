@@ -9,10 +9,11 @@ export async function expectTablesFitWidth(page: Page) {
     .toBe(0)
 }
 
-// Measured without scrolling, because clicking or scrollIntoView would also scroll a sideways-overflowing table.
+// Measured without scrolling, because clicking or scrollIntoView would also scroll a sideways-overflowing table. A centred
+// dialog can land a fraction of a pixel off the edge, which is rounding rather than overflow.
 export async function expectWithinViewportWidth(page: Page, locator: Locator) {
   const box = await locator.boundingBox()
   expect(box).not.toBeNull()
-  expect(box!.x).toBeGreaterThanOrEqual(0)
-  expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width)
+  expect(box!.x).toBeGreaterThanOrEqual(-0.5)
+  expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width + 0.5)
 }

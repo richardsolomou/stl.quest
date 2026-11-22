@@ -127,7 +127,7 @@ import {
 import type { MaintenanceTotals } from '../core/maintenance'
 import { MAX_USAGE_LIST, type UsageEvent, type UsageFilters } from '../core/usage'
 import type { PriceCalculatorCurrency } from '../core/priceCalculator'
-import type { Plate, PlateItem, PlateRecording, PlateRunStage } from '../core/plates'
+import type { Plate, PlateItem, PlateMaterialUse, PlateRecording, PlateRunStage } from '../core/plates'
 import { MAX_PRINT_JOBS, type PrintJob, type PrintJobChanges } from '../core/printJobs'
 import { inventoryColumns, inventoryItem, inventoryTables } from './repository/inventory'
 import { requestConditions, requestOrderBy, requestSelection, type RequestFilterOptions } from './repository/requestQuery'
@@ -2853,6 +2853,41 @@ export class DrizzleRepository implements Repository {
       )
       .all()
     return rows.map(mapUsageEvent)
+  }
+
+  async plateMaterialUse(transactionIds: string[]): Promise<PlateMaterialUse[]> {
+    const workspaceId = await this.workspace()
+    const uses: PlateMaterialUse[] = []
+    for (let start = 0; start < transactionIds.length; start += USAGE_INSERT_BATCH) {
+      const rows = await this.database
+        .select({
+          transactionId: usageEvents.transactionId,
+          requestId: usageEvents.requestId,
+          consumableId: usageEvents.consumableId,
+          deletedItemName: usageEvents.deletedItemName,
+          amount: sql<number>`coalesce(sum(${usageEvents.amount}), 0)`.mapWith(Number),
+        })
+        .from(usageEvents)
+        .where(
+          and(
+            eq(usageEvents.workspaceId, workspaceId),
+            inArray(usageEvents.transactionId, transactionIds.slice(start, start + USAGE_INSERT_BATCH)),
+            isNotNull(usageEvents.plateId),
+            inArray(usageEvents.unit, ['g', 'ml']),
+            isNull(usageEvents.undoneAt),
+          ),
+        )
+        .groupBy(usageEvents.transactionId, usageEvents.requestId, usageEvents.consumableId, usageEvents.deletedItemName)
+        .all()
+      for (const { requestId, consumableId, deletedItemName, ...use } of rows)
+        uses.push({
+          ...use,
+          ...(requestId && { requestId }),
+          ...(consumableId && { consumableId }),
+          ...(deletedItemName && { deletedItemName }),
+        })
+    }
+    return uses
   }
 
   async listPlates() {

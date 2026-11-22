@@ -8,7 +8,7 @@ import type { StockTotal, UsageEvent, UsageFilters } from './usage'
 import type { InventoryItems, InventoryKind } from './inventory'
 import type { RecentStockUse } from './shopping'
 import type { InventoryReferences } from './inventoryDeletion'
-import type { Plate, PlateItem, PlateRecording, PlateRunStage } from './plates'
+import type { Plate, PlateItem, PlateMaterialUse, PlateRecording, PlateRunStage } from './plates'
 import type { PrintJob, PrintJobChanges } from './printJobs'
 import type { PriceCalculatorCurrency } from './priceCalculator'
 import type { ChargedPrint } from './spend'
@@ -592,6 +592,8 @@ interface RepositoryShape {
   /** Every printing use of the prints, undone events included, so a plate can tell which of them it replaced. */
   printingUsage(requestIds: string[]): UsageEvent[]
   listPlates(): Plate[]
+  /** The live material each of these plate transactions used, summed per print and material. */
+  plateMaterialUse(transactionIds: string[]): PlateMaterialUse[]
   /**
    * Numbers the plate after the workspace's last one. A running plate moves its copies with `moves` and puts its prints
    * on its printer in the same transaction.
