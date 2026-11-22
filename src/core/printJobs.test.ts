@@ -142,11 +142,11 @@ describe('printJobLink', () => {
   ]
 
   it('links to the plate printing on the printer', () => {
-    expect(printJobLink(job({ printerId: 'x2d' }), [plate()], requests)).toEqual({ plateId: 'plate', by: 'printer' })
+    expect(printJobLink(job({ printerId: 'x2d' }), [plate()], requests, [])).toEqual({ plateId: 'plate', by: 'printer' })
   })
 
   it('links by the request tag when nothing is printing there', () => {
-    expect(printJobLink(job({ fileName: 'SQ-7 Hull' }), [plate({ printerId: 'other' })], requests)).toEqual({
+    expect(printJobLink(job({ fileName: 'SQ-7 Hull' }), [plate({ printerId: 'other' })], requests, [])).toEqual({
       plateId: 'plate',
       by: 'tag',
     })
@@ -158,16 +158,29 @@ describe('printJobLink', () => {
         job({ fileName: 'SQ-7 Hull' }),
         [plate({ id: 'old', stage: undefined }), plate({ id: 'new', number: 5, stage: undefined })],
         requests,
+        [],
       ),
     ).toEqual({ plateId: 'new', by: 'tag' })
   })
 
   it('suggests the tagged request when it is on no plate', () => {
-    expect(printJobLink(job({ fileName: 'SQ-8 Turret' }), [plate()], requests)).toEqual({ requestId: 'turret', by: 'tag' })
+    expect(printJobLink(job({ fileName: 'SQ-8 Turret' }), [plate()], requests, [])).toEqual({ requestId: 'turret', by: 'tag' })
+  })
+
+  it('links nothing on the printer once another print is linked to its plate', () => {
+    expect(printJobLink(job({ id: 'next', printerId: 'x2d' }), [plate()], requests, [job({ plateId: 'plate' })])).toBeUndefined()
+  })
+
+  it('links by tag to no plate whose run already ended', () => {
+    expect(
+      printJobLink(job({ id: 'reprint', fileName: 'SQ-7 Hull' }), [plate({ stage: undefined })], requests, [
+        job({ plateId: 'plate', outcome: 'failed' }),
+      ]),
+    ).toEqual({ requestId: 'hull', by: 'tag' })
   })
 
   it('links nothing without a printing plate or a tag', () => {
-    expect(printJobLink(job({ fileName: 'Benchy' }), [plate()], requests)).toBeUndefined()
+    expect(printJobLink(job({ fileName: 'Benchy' }), [plate()], requests, [])).toBeUndefined()
   })
 })
 

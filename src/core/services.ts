@@ -37,7 +37,7 @@ import {
   printerValidationError,
 } from './printers'
 import { storedWorkspacePrintTypes } from './printTypes'
-import { storedUsageTracking } from './usageTracking'
+import { storedUsageTracking, USAGE_TRACKING_SETTING } from './usageTracking'
 import { backfillSummary, usageBackfill, type UsageBackfillSummary } from './usageBackfill'
 import {
   coveringPlateTransaction,
@@ -922,6 +922,7 @@ export class STLQuestService {
       const started = requestStarted(request.counts)
       if (request.ownerUserId !== identity.id || started) throw new Response(this.text.access.forbidden, { status: 403 })
     }
+    await this.assertPlatesKept(Object.entries(request.counts).map(([from, count]) => ({ id, from, count })))
     await this.removeRequest(request)
     this.changed('request.deleted')
     this.capture(identity.id, 'request_deleted', {
@@ -1673,6 +1674,13 @@ export class STLQuestService {
     })
   }
 
+  /** Switches usage tracking; switching it off ends every plate run, since copies then move without their plates. */
+  async setUsageTracking(enabled: boolean, identity: Identity) {
+    this.requireAdmin(identity)
+    await this.repository.setSetting(USAGE_TRACKING_SETTING, enabled)
+    if (!enabled && (await this.repository.endPlateRuns(Date.now()))) this.changed('plate.changed')
+  }
+
   /** Copies a running plate holds move only with it, so a single move, group move, or delete may not take them. */
   private async assertPlatesKept(moves: { id: string; from: string; count: number }[]) {
     if (!(await storedUsageTracking(this.repository))) return
@@ -1833,7 +1841,7 @@ export class STLQuestService {
     if (continued?.transactionId) return
     let linkedBy = continued?.plateId ? 'earlier' : 'none'
     if (!job.plateId && !job.personal) {
-      const link = printJobLink(job, await this.repository.listPlates(), await this.repository.listRequests())
+      const link = printJobLink(job, await this.repository.listPlates(), await this.repository.listRequests(), jobs)
       if (link && 'plateId' in link) {
         job = { ...job, plateId: link.plateId }
         linkedBy = link.by
@@ -1891,8 +1899,9 @@ export class STLQuestService {
     await this.requireUsageTracking(identity)
     const plates = await this.repository.listPlates()
     const requests = await this.repository.listRequests()
-    return (await this.repository.listPrintJobs()).map((job) => {
-      const link = job.plateId || job.personal ? undefined : printJobLink(job, plates, requests)
+    const jobs = await this.repository.listPrintJobs()
+    return jobs.map((job) => {
+      const link = job.plateId || job.personal ? undefined : printJobLink(job, plates, requests, jobs)
       const suggested = link && 'requestId' in link ? requests.find(({ id }) => id === link.requestId) : undefined
       return {
         ...job,

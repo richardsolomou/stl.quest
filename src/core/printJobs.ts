@@ -131,21 +131,25 @@ export function printerNamed<Printer extends { id: string; name: string; archive
 export type PrintJobLink = { plateId: string; by: 'printer' | 'tag' } | { requestId: string; by: 'tag' }
 
 /**
- * Which plate run a print was: the plate printing on its printer, else the plate holding the request its name is
- * tagged with (the one printing, else the newest not recorded yet). A tagged request on no such plate is only
- * suggested, for someone to attach.
+ * Which plate run a print was: the plate printing on its printer that no other print is linked to, else the plate
+ * holding the request its name is tagged with (the one printing, else the newest not recorded yet) whose run has not
+ * ended. A tagged request on no such plate is only suggested, for someone to attach.
  */
 export function printJobLink(
-  job: Pick<PrintJob, 'printerId' | 'fileName'>,
+  job: Pick<PrintJob, 'id' | 'printerId' | 'fileName'>,
   plates: Plate[],
   requests: { id: string; number: number }[],
+  jobs: PrintJob[],
 ): PrintJobLink | undefined {
-  const printing = job.printerId ? printingPlate(plates, job.printerId) : undefined
+  const others = jobs.filter(({ id, plateId }) => id !== job.id && plateId)
+  const linked = new Set(others.map(({ plateId }) => plateId!))
+  const printing = job.printerId ? printingPlate(plates, job.printerId, linked) : undefined
   if (printing) return { plateId: printing.id, by: 'printer' }
   const number = taggedRequestNumber(job.fileName)
   const request = number === undefined ? undefined : requests.find((candidate) => candidate.number === number)
   if (!request) return undefined
-  const holding = plates.filter((plate) => plate.items.some((item) => item.requestId === request.id))
+  const ended = new Set(others.filter(({ outcome }) => outcome !== 'printing').map(({ plateId }) => plateId!))
+  const holding = plates.filter((plate) => !ended.has(plate.id) && plate.items.some((item) => item.requestId === request.id))
   const plate =
     holding.find((candidate) => heldByPlates([candidate], request.id, 'in_progress') > 0) ??
     holding.filter((candidate) => !candidate.recording).sort((left, right) => right.number - left.number)[0]

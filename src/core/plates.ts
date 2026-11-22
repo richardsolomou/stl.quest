@@ -357,10 +357,13 @@ export function plateMoves(
   }
 }
 
-/** The plate printing on a printer now: the one started last of those in Printing. */
-export function printingPlate(plates: Plate[], printerId: string) {
+/**
+ * The plate printing on a printer now: the one started last of those in Printing that no print is linked to yet, since
+ * a plate's run is one print and a later one on the printer is a different run.
+ */
+export function printingPlate(plates: Plate[], printerId: string, linked: ReadonlySet<string>) {
   return plates
-    .filter((plate) => plate.stage === printing && plate.printerId === printerId)
+    .filter((plate) => plate.stage === printing && plate.printerId === printerId && !linked.has(plate.id))
     .sort((left, right) => (right.startedAt ?? 0) - (left.startedAt ?? 0))[0]
 }
 

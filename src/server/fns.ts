@@ -63,7 +63,7 @@ import {
 import type { BoardConfig, Repository, Role, StorageMigration, Telemetry } from '../core/types'
 import { PRINTERS_SKIPPED_SETTING } from '../core/printers'
 import { PRINT_TYPE_SETTING, storedPrintTypeChoice, workspacePrintTypes } from '../core/printTypes'
-import { storedUsageTracking, USAGE_TRACKING_SETTING } from '../core/usageTracking'
+import { storedUsageTracking } from '../core/usageTracking'
 import { applyOnboardingProgressOperation, recordOnboardingTask } from '../core/onboarding'
 import { memberRequestVisibility, visiblePeople, withMemberRequestVisibility } from '../core/visibility'
 import {
@@ -1508,7 +1508,7 @@ export const updateUsageTracking = createServerFn({ method: 'POST' })
     mutationRpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      await context.repository.setSetting(USAGE_TRACKING_SETTING, data.enabled)
+      await context.service.setUsageTracking(data.enabled, context.identity)
       // Every admin's board starts or stops asking what each step used on their next session refetch.
       context.events.publish('settings.changed')
       instance.telemetry.capture(context.identity.id, 'usage_tracking_changed', { enabled: data.enabled, source: data.source })

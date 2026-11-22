@@ -10,7 +10,7 @@ A plate run is the prints that go on one plate of one printer. Select their card
 
 - **Move plate to Finishing** on the printer's station, or moving any of its cards, moves every print on the plate.
 - A move, group move, or delete that would take some of a plate's copies on their own is refused.
-- The run ends once its prints leave Printing and Finishing, usually when they are ready.
+- The run ends once its prints leave Printing and Finishing, usually when they are ready, or when usage tracking is switched off.
 
 Choosing only prints already past Printing records a run that already happened, as before.
 
@@ -35,8 +35,8 @@ Bambuddy's **Test** button sends a test notification, which STL Quest accepts an
 
 When a print starts or ends, STL Quest links it to:
 
-1. **The plate printing on that printer**: the plate run most recently started in Printing on the STL Quest printer with Bambuddy's printer name.
-2. **The plate of the request its name is tagged with.** Models downloaded from STL Quest are named after their request, such as `SQ-142 Plasma.3mf`, and the tag usually survives into the Bambu Studio job name Bambuddy reports. The tag links to the plate printing that request, else its newest plate not recorded yet.
+1. **The plate printing on that printer**: the plate run most recently started in Printing on the STL Quest printer with Bambuddy's printer name, unless another print is already linked to it, since one plate run is one print.
+2. **The plate of the request its name is tagged with.** Models downloaded from STL Quest are named after their request, such as `SQ-142 Plasma.3mf`, and the tag usually survives into the Bambu Studio job name Bambuddy reports. The tag links to the plate printing that request, else its newest plate not recorded yet, skipping plates whose print already ended, so a reprint after a failure never lands on the failed run.
 3. **Nothing.** The print waits under **Settings → Bambuddy → Unlinked prints**, where you attach it to a plate, to the request its tag names (which puts all its copies on a new plate), or mark it personal.
 
 A print's start and end are one print: Bambuddy's end event continues the start on the same printer under the same name.

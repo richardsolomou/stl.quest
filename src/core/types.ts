@@ -377,11 +377,6 @@ export type RepeatOperation = {
 export type OperationPayload = MoveOperation | DeleteOperation | UploadOperation | AttachOperation | RepeatOperation
 export type PendingOperation = { id: string; state: 'prepared' | 'assets_moved' | 'committed'; payload: OperationPayload }
 
-/**
- * Moves `count` copies of a print between stages with the tags they carry. Naming `tagIds` moves copies of the board
- * card carrying exactly those tags (an empty list is the untagged card); omitting it moves copies of any cards, those
- * with the fewest tags first.
- */
 export type NewPlate = {
   id: string
   printerId?: string
@@ -391,6 +386,11 @@ export type NewPlate = {
   createdAt: number
 }
 
+/**
+ * Moves `count` copies of a print between stages with the tags they carry. Naming `tagIds` moves copies of the board
+ * card carrying exactly those tags (an empty list is the untagged card); omitting it moves copies of any cards, those
+ * with the fewest tags first.
+ */
 export type CopyMove = {
   id: string
   from: string
@@ -577,6 +577,8 @@ interface RepositoryShape {
   createPlate(plate: NewPlate, moves?: CopyMove[]): Plate
   /** Moves a running plate's copies and sets the stage it runs in, none once the run is over. */
   movePlate(id: string, moves: CopyMove[], stage: PlateRunStage | undefined, at: number): void
+  /** Ends every running plate, returning how many there were. */
+  endPlateRuns(at: number): number
   /** The newest prints first, at most `MAX_PRINT_JOBS`. */
   listPrintJobs(): PrintJob[]
   /** Adds a print, dropping the oldest beyond `MAX_PRINT_JOBS`. */

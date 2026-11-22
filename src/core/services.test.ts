@@ -4244,6 +4244,51 @@ describe('STLQuestService crash recovery', () => {
         expect((await plateOf(id)).print?.outcome).toBe('failed')
       })
 
+      it('links a later print on the printer to no plate whose own print already ended', async () => {
+        await start(await queued())
+        await service.receivePrint({ ...finished, fileName: 'First' })
+
+        await service.receivePrint({ ...finished, outcome: 'failed', fileName: 'Second' })
+
+        expect((await repository.listPrintJobs()).find(({ fileName }) => fileName === 'Second')?.plateId).toBeUndefined()
+      })
+
+      it('keeps a plate’s copies when a later print on its printer fails', async () => {
+        const requestId = await queued()
+        await start(requestId)
+        await service.receivePrint({ ...finished, fileName: 'First' })
+
+        await service.receivePrint({ ...finished, outcome: 'failed', fileName: 'Second' })
+
+        expect((await counts(requestId)).in_progress).toBe(1)
+      })
+
+      it('links a reprint by its tag to no plate whose run already failed', async () => {
+        const requestId = await queued()
+        await start(requestId)
+        await service.receivePrint({ ...finished, outcome: 'failed' })
+        const { number } = (await repository.getRequest(requestId))!
+
+        await service.receivePrint({ ...finished, printerName: 'Somewhere else', fileName: `SQ-${number} Hull` })
+
+        expect((await repository.listPrintJobs()).find(({ printerName }) => printerName === 'Somewhere else')?.plateId).toBeUndefined()
+      })
+
+      it('refuses to delete a request a running plate holds', async () => {
+        const requestId = await queued()
+        await start(requestId)
+
+        await expect(service.remove(requestId, admin)).rejects.toMatchObject({ status: 409 })
+      })
+
+      it('ends running plates when usage tracking is switched off', async () => {
+        const { id } = await start(await queued())
+
+        await service.setUsageTracking(false, admin)
+
+        expect((await repository.listPlates()).find((plate) => plate.id === id)?.stage).toBeUndefined()
+      })
+
       it('links a print by the request tag in its name', async () => {
         const requestId = await queued()
         const { id } = await start(requestId)

@@ -1564,9 +1564,27 @@ export class DrizzleRepository implements Repository {
   }
 
   async deleteRequest(id: string, database: DatabaseExecutor = this.database) {
+    const workspaceId = await this.workspace()
     await database
       .delete(requests)
-      .where(and(eq(requests.workspaceId, await this.workspace()), eq(requests.id, id)))
+      .where(and(eq(requests.workspaceId, workspaceId), eq(requests.id, id)))
+      .run()
+    // Deleting a request drops its plate items, and a running plate left with none would claim the printer's next print.
+    await database
+      .update(plates)
+      .set({ statusId: null, updatedAt: Date.now() })
+      .where(
+        and(
+          eq(plates.workspaceId, workspaceId),
+          isNotNull(plates.statusId),
+          notExists(
+            database
+              .select({ id: plateItems.plateId })
+              .from(plateItems)
+              .where(and(eq(plateItems.workspaceId, workspaceId), eq(plateItems.plateId, plates.id))),
+          ),
+        ),
+      )
       .run()
   }
 
@@ -2913,6 +2931,15 @@ export class DrizzleRepository implements Repository {
         .where(and(eq(plates.workspaceId, workspaceId), eq(plates.id, id)))
         .run()
     })
+  }
+
+  async endPlateRuns(at: number) {
+    const ended = await this.database
+      .update(plates)
+      .set({ statusId: null, updatedAt: at })
+      .where(and(eq(plates.workspaceId, await this.workspace()), isNotNull(plates.statusId)))
+      .run()
+    return ended.changes
   }
 
   async listPrintJobs() {

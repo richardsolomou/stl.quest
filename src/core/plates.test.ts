@@ -464,10 +464,14 @@ describe('plateMoves', () => {
 
 describe('printingPlate', () => {
   it('finds the plate printing on the printer', () => {
-    expect(printingPlate([run({ stage: 'post_processing' }), run({ id: 'now' })], 'x2d')?.id).toBe('now')
+    expect(printingPlate([run({ stage: 'post_processing' }), run({ id: 'now' })], 'x2d', new Set())?.id).toBe('now')
   })
 
   it('takes the plate started last', () => {
-    expect(printingPlate([run({ id: 'old', startedAt: 1 }), run({ id: 'new', startedAt: 2 })], 'x2d')?.id).toBe('new')
+    expect(printingPlate([run({ id: 'old', startedAt: 1 }), run({ id: 'new', startedAt: 2 })], 'x2d', new Set())?.id).toBe('new')
+  })
+
+  it('skips a plate a print is already linked to', () => {
+    expect(printingPlate([run({ id: 'done' })], 'x2d', new Set(['done']))).toBeUndefined()
   })
 })
