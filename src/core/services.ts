@@ -2214,6 +2214,14 @@ export class STLQuestService {
     })
   }
 
+  /** Takes in that the bridge cannot get a print's sliced file, so it is not asked for again. */
+  async slicedFileUnavailable(runId: string) {
+    const job = (await this.repository.listPrintJobs()).find((candidate) => candidate.runId === runId)
+    if (!job) throw new Response(this.text.prints.notFound, { status: 404 })
+    if (wantsSlicedFile(job, await this.repository.listPlates(), Date.now()))
+      await this.repository.updatePrintJob(job.id, { slicedPlate: 'unavailable' })
+  }
+
   /** The plate of a sliced file that printed, or why there is none to read. */
   private async slicedPlateOf(
     read: (stoppedAt?: number) => Promise<SlicedPlate[]>,

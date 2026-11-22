@@ -402,6 +402,7 @@ describe('sendSlicedFiles', () => {
     vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
       const target = href(url)
       if (target.startsWith('http://bambuddy:8000/api/v1/archives/')) return download()
+      if (init?.method === 'DELETE') return new Response(null, { status: 204 })
       if (target === 'https://stl.quest/api/bambuddy/sliced') return json({ runs: wanted })
       if (init?.body instanceof ReadableStream) await new Response(init.body).arrayBuffer()
       return new Response(null, { status: upload })
@@ -506,6 +507,61 @@ describe('sendSlicedFiles', () => {
     await sendSlicedFiles(bambuddy, runs, skipped, reader)
 
     expect(calls(reader).filter((call) => call.startsWith('POST'))).toHaveLength(1)
+  })
+
+  it('tells STL Quest a file Bambuddy’s archive does not have is unavailable, so it stops asking', async () => {
+    const reader = fetcher({ download: () => json({ detail: 'File not found' }, 404) })
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), reader)
+
+    expect(calls(reader)).toContain('DELETE https://stl.quest/api/bambuddy/sliced?run_id=5')
+  })
+
+  it('tells STL Quest a run Bambuddy archived no file for is unavailable', async () => {
+    const reader = fetcher({ wanted: [{ run_id: '6' }] })
+
+    await sendSlicedFiles(bambuddy, [], new Set(), reader)
+
+    expect(calls(reader)).toEqual(['GET https://stl.quest/api/bambuddy/sliced', 'DELETE https://stl.quest/api/bambuddy/sliced?run_id=6'])
+  })
+
+  it('tells STL Quest a file too large for it is unavailable', async () => {
+    const reader = fetcher({
+      download: () => new Response(file, { headers: { 'content-length': String(MAX_SLICED_FILE_BYTES + 1) } }),
+    })
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), reader)
+
+    expect(calls(reader)).toContain('DELETE https://stl.quest/api/bambuddy/sliced?run_id=5')
+  })
+
+  it('tells STL Quest a file it refused as too large is unavailable', async () => {
+    const reader = fetcher({ upload: 413 })
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), reader)
+
+    expect(calls(reader)).toContain('DELETE https://stl.quest/api/bambuddy/sliced?run_id=5')
+  })
+
+  it('leaves a file STL Quest could not read to STL Quest, which already stopped asking', async () => {
+    const reader = fetcher({ upload: 422 })
+
+    await sendSlicedFiles(bambuddy, runs, new Set(), reader)
+
+    expect(calls(reader).filter((call) => call.startsWith('DELETE'))).toEqual([])
+  })
+
+  it('skips a run all the same on an STL Quest that cannot be told a file is unavailable', async () => {
+    const skipped = new Set<string>()
+    const reader = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (href(url).startsWith('http://bambuddy:8000/')) return json({ detail: 'File not found' }, 404)
+      if (init?.method === 'DELETE') return new Response(null, { status: 405 })
+      return json({ runs: [{ run_id: '5', archive_id: '12' }] })
+    })
+
+    await sendSlicedFiles(bambuddy, runs, skipped, reader)
+
+    expect(skipped).toEqual(new Set(['5']))
   })
 
   it('says a key without archive access was refused', async () => {

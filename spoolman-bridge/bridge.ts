@@ -119,11 +119,15 @@ async function stlQuest(
   url: string,
   body: unknown,
   fetcher: typeof fetch,
-  { passed = [404], timeoutMs = 30_000 }: { passed?: number[]; timeoutMs?: number } = {},
+  {
+    method = body === undefined ? undefined : 'POST',
+    passed = [404],
+    timeoutMs = 30_000,
+  }: { method?: string; passed?: number[]; timeoutMs?: number } = {},
 ) {
   const stream = body instanceof ReadableStream
   const response = await fetcher(url, {
-    ...(body !== undefined && { method: 'POST' }),
+    ...(method && { method }),
     headers: {
       authorization: `Bearer ${config.token}`,
       ...(body !== undefined && { 'content-type': stream ? 'application/octet-stream' : 'application/json' }),
@@ -318,7 +322,8 @@ const SLICED_TIMEOUT_MS = 5 * 60_000
 /**
  * Sends STL Quest the sliced file of each print it asks for, downloaded from Bambuddy's archive and streamed on as it
  * arrives. `runs` is Bambuddy's print log, which says which plate of the file each run printed. A file Bambuddy does
- * not have, or that is too large or that STL Quest cannot read, goes in `skipped` and is not tried again.
+ * not have, or that is too large or that STL Quest cannot read, goes in `skipped` and is not tried again; STL Quest is
+ * told it is unavailable, so it stops asking for it, unless it already refused the file itself.
  */
 export async function sendSlicedFiles(
   config: Config,
@@ -339,12 +344,18 @@ export async function sendSlicedFiles(
     if (sent++ === MAX_SLICED_PER_POLL) break
     const printed = runs.find(({ id }) => String(id) === runId)
     const archiveId = printed?.archive_id ?? wantedArchive
-    const skip = (reason: string) => {
+    const skip = async (reason: string, tell = true) => {
       skipped.add(runId)
       log(`not sending the sliced file of run ${runId}: ${reason}`)
+      // An STL Quest from before this has no such method, and asks again until the run is a day old.
+      if (tell)
+        await stlQuest(config, `${config.slicedUrl}?${new URLSearchParams({ run_id: runId })}`, undefined, fetcher, {
+          method: 'DELETE',
+          passed: [404, 405],
+        })
     }
     if (archiveId === undefined || archiveId === null) {
-      skip('Bambuddy archived no file for it')
+      await skip('Bambuddy archived no file for it')
       continue
     }
     const file = await fetcher(`${bambuddy.url}/api/v1/archives/${encodeURIComponent(String(archiveId))}/download`, {
@@ -354,13 +365,13 @@ export async function sendSlicedFiles(
     if (file.status === 401 || file.status === 403)
       throw new Error('Bambuddy refused the API key; it needs Read Status, and its owner needs to see every archive')
     if (file.status === 404) {
-      skip('Bambuddy’s archive does not have it')
+      await skip('Bambuddy’s archive does not have it')
       continue
     }
     if (!file.ok || !file.body) throw new Error(`Bambuddy answered ${file.status}`)
     if (Number(file.headers.get('content-length')) > MAX_SLICED_FILE_BYTES) {
       await file.body.cancel()
-      skip(`it is larger than ${MAX_SLICED_FILE_BYTES / 1024 / 1024} MB`)
+      await skip(`it is larger than ${MAX_SLICED_FILE_BYTES / 1024 / 1024} MB`)
       continue
     }
     const query = new URLSearchParams({ run_id: runId, ...(printed?.plate_id && { plate: String(printed.plate_id) }) })
@@ -370,7 +381,7 @@ export async function sendSlicedFiles(
     })
     if (response.ok) log(`sent the sliced file of run ${runId} to STL Quest`)
     else if (response.status === 404) log(`STL Quest has not received run ${runId} yet; sending its sliced file again next poll`)
-    else skip(await refusalOf(response))
+    else await skip(await refusalOf(response), response.status !== 422)
   }
 }
 

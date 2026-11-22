@@ -4839,6 +4839,29 @@ describe('STLQuestService crash recovery', () => {
           expect(await service.slicedFilesWanted()).toEqual([])
         })
 
+        it('stops asking for a file the bridge cannot get', async () => {
+          await twoPrints()
+          await service.receivePrint({ ...finished, runId: '7' })
+
+          await service.slicedFileUnavailable('7')
+
+          expect(await service.slicedFilesWanted()).toEqual([])
+        })
+
+        it('keeps a file it read once the bridge says it cannot get one', async () => {
+          const { hull, turret } = await twoPrints()
+          await service.receivePrint({ ...finished, runId: '7' })
+          await receiveSliced(service, { runId: '7' }, await hullAndTurretFile(hull, turret))
+
+          await service.slicedFileUnavailable('7')
+
+          expect(typeof (await repository.listPrintJobs())[0].slicedPlate).toBe('object')
+        })
+
+        it('asks to hear again about a file for a print it has not heard of yet', async () => {
+          await expect(service.slicedFileUnavailable('8')).rejects.toMatchObject({ status: 404 })
+        })
+
         it('refuses a file it cannot read', async () => {
           await twoPrints()
           await service.receivePrint({ ...finished, runId: '7' })

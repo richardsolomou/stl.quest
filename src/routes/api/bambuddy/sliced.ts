@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { receiveSlicedFileRequest, sendSlicedFilesWanted } from '../../../server/bambuddyIngest'
+import { receiveSlicedFileRequest, sendSlicedFilesWanted, slicedFileUnavailableRequest } from '../../../server/bambuddyIngest'
 import { withRequestContext } from '../../../server/requestContext'
 
 export const Route = createFileRoute('/api/bambuddy/sliced')({
@@ -7,6 +7,7 @@ export const Route = createFileRoute('/api/bambuddy/sliced')({
     handlers: {
       GET: ({ request }) => withRequestContext(request, () => sendSlicedFilesWanted(request)),
       POST: ({ request }) => withRequestContext(request, () => receiveSlicedFileRequest(request)),
+      DELETE: ({ request }) => withRequestContext(request, () => slicedFileUnavailableRequest(request)),
     },
   },
 })

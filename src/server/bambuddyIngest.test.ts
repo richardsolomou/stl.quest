@@ -8,11 +8,18 @@ const finished = { event: 'print_complete', printer: 'X2D', filename: 'SQ-1 Hull
 let temporary: string
 
 async function ingest() {
-  const { receiveBambuddyRequest, receivePrintUsageRequest, receiveSlicedFileRequest, sendSlicedFilesWanted } =
-    await import('./bambuddyIngest')
+  const {
+    receiveBambuddyRequest,
+    receivePrintUsageRequest,
+    receiveSlicedFileRequest,
+    sendSlicedFilesWanted,
+    slicedFileUnavailableRequest,
+  } = await import('./bambuddyIngest')
   const handlers: Record<string, (request: Request) => Promise<Response>> = {
     '/api/bambuddy/usage': receivePrintUsageRequest,
-    '/api/bambuddy/sliced': (request) => (request.method === 'GET' ? sendSlicedFilesWanted : receiveSlicedFileRequest)(request),
+    '/api/bambuddy/sliced': (request) =>
+      ({ GET: sendSlicedFilesWanted, DELETE: slicedFileUnavailableRequest })[request.method]?.(request) ??
+      receiveSlicedFileRequest(request),
   }
   return (request: Request) =>
     (handlers[new URL(request.url).pathname] ?? receiveBambuddyRequest)(request).catch((error: unknown) => {
@@ -28,6 +35,11 @@ const sliced = (query: string, body: BodyInit = new Uint8Array([1, 2, 3]), heade
     body,
     duplex: 'half',
   } as RequestInit)
+const unavailable = (query: string, headers: Record<string, string> = {}) =>
+  new Request(`http://localhost/api/bambuddy/sliced${query}`, {
+    method: 'DELETE',
+    headers: { authorization: `Bearer ${token}`, ...headers },
+  })
 const wanted = (headers: Record<string, string> = {}) =>
   new Request('http://localhost/api/bambuddy/sliced', { headers: { authorization: `Bearer ${token}`, ...headers } })
 
@@ -205,6 +217,33 @@ describe('Bambuddy ingest', () => {
       const response = await receive(sliced('?run_id=3'))
 
       expect({ status: response.status, sliced: (await storedPrints())[0].slicedPlate }).toEqual({ status: 204, sliced: undefined })
+    })
+
+    it('takes in that the bridge cannot get a print’s file', async () => {
+      const receive = await ingest()
+      await receive(post(JSON.stringify(finished)))
+
+      const response = await receive(unavailable('?run_id=3'))
+
+      expect(response.status).toBe(204)
+    })
+
+    it('asks the bridge to say again that a file is unavailable for a print not received yet', async () => {
+      const response = await (await ingest())(unavailable('?run_id=9'))
+
+      expect(response.status).toBe(404)
+    })
+
+    it('refuses to hear a file is unavailable without a token', async () => {
+      const response = await (await ingest())(unavailable('?run_id=3', { authorization: '' }))
+
+      expect(response.status).toBe(401)
+    })
+
+    it('refuses to hear a file is unavailable without a run', async () => {
+      const response = await (await ingest())(unavailable(''))
+
+      expect(response.status).toBe(400)
     })
 
     it('slows the bridge down past its allowance without refusing Bambuddy’s notifications', async () => {

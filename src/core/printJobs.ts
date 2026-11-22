@@ -82,8 +82,8 @@ export type PrintJob = Omit<PrintReport, 'outcome'> & {
   personal: boolean
   /** What it used per Spoolman spool, once the bridge reported it. */
   filamentUsage?: PrintSpoolUsage[]
-  /** Its sliced file, once the bridge sent it, or that the file it sent could not be read. */
-  slicedPlate?: PrintSlicedPlate | 'unreadable'
+  /** Its sliced file, once the bridge sent it, or that the file it sent could not be read or it could not get one. */
+  slicedPlate?: PrintSlicedPlate | 'unreadable' | 'unavailable'
   /** The usage its end recorded, so a repeated event never records it twice. */
   transactionId?: string
   startedAt?: number
@@ -388,6 +388,6 @@ export function slicedPrintInput<Material>(
  */
 export function slicedFileNote(job: Pick<PrintJob, 'slicedPlate'>): 'cut' | 'whole' | 'unreadable' | undefined {
   if (job.slicedPlate === 'unreadable') return 'unreadable'
-  if (job.slicedPlate?.cut === undefined) return undefined
+  if (typeof job.slicedPlate !== 'object' || job.slicedPlate.cut === undefined) return undefined
   return job.slicedPlate.cut ? 'cut' : 'whole'
 }

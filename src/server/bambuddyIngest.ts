@@ -68,3 +68,13 @@ export async function receiveSlicedFileRequest(request: Request) {
   await service.receivePrintSlicedFile(query.data, (stoppedAt) => assetQueue.readSlicedFile(read.body, stoppedAt))
   return new Response(null, { status: 204 })
 }
+
+/** Takes in that the bridge cannot get a print's sliced file from Bambuddy, or not one STL Quest takes; 404 until its print arrives. */
+export async function slicedFileUnavailableRequest(request: Request) {
+  const context = await ingestWorkspace(request, takeSliced)
+  if (context instanceof Response) return context
+  const query = bambuddySlicedFileSchema.safeParse(Object.fromEntries(new URL(request.url).searchParams))
+  if (!query.success) return ingestProblem(400, serverMessages().server.prints.invalidSlicedFile)
+  await context.service.slicedFileUnavailable(query.data.runId)
+  return new Response(null, { status: 204 })
+}
