@@ -67,6 +67,13 @@ describe('parseOrderEmail', () => {
 })
 
 describe('orderEmailLines', () => {
+  it('leaves no markup when tags are nested to survive one pass of stripping', () => {
+    const lines = orderEmailLines(
+      '<html><body><scr<script>x</script>ipt>alert(1)</script><!<!--x-->-- y -->Gray 10103</body></html><script',
+    )
+    expect(lines.join('\n')).not.toMatch(/[<>]/)
+  })
+
   it('turns HTML into its text, a line per block', () => {
     expect(orderEmailLines('<p>One&nbsp;&amp; two</p><div>Three<br>Four</div>')).toEqual(['One & two', 'Three', 'Four'])
   })

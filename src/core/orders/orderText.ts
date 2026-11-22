@@ -40,15 +40,18 @@ export function orderEmailLines(pasted: string) {
     .filter(Boolean)
 }
 
+/** The text an HTML email shows. Its output is only ever plain text, and each strip repeats so nested markup cannot survive. */
 function htmlText(html: string) {
-  return decodeEntities(
-    html
-      .replace(/<!--[\s\S]*?-->/g, '')
-      .replace(/<(head|style|script|title)\b[\s\S]*?<\/\1\s*>/gi, '')
-      .replace(/\r?\n/g, ' ')
-      .replace(BLOCK_TAGS, '\n')
-      .replace(/<[^>]*>/g, ''),
+  const stripped = untilStable(html, (text) =>
+    text.replace(/<!--[\s\S]*?-->/g, '').replace(/<(head|style|script|title)\b[\s\S]*?<\/\1\s*>/gi, ''),
   )
+  const lines = stripped.replace(/\r?\n/g, ' ').replace(BLOCK_TAGS, '\n')
+  return decodeEntities(untilStable(lines, (text) => text.replace(/<[^>]*>/g, '')).replace(/[<>]/g, ''))
+}
+
+function untilStable(text: string, strip: (text: string) => string) {
+  for (let previous = ''; previous !== text;) [previous, text] = [text, strip(text)]
+  return text
 }
 
 function decodeEntities(text: string) {
