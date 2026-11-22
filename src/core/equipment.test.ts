@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Consumable } from './consumables'
 import {
+  chosenFinishing,
   defaultFinishing,
   equipmentForStage,
   equipmentPrintType,
@@ -131,5 +132,21 @@ describe('default finishing', () => {
 
   it('assumes no finishing for filament', () => {
     expect(defaultFinishing([wash, dryer], 'filament')).toEqual([])
+  })
+})
+
+describe('chosen finishing', () => {
+  const cure: EquipmentItem = { ...wash, id: 'cure', kind: 'cure', supplies: [] }
+
+  it('uses the default until anything is picked', () => {
+    expect(chosenFinishing([wash, cure], 'resin', undefined).map(({ id }) => id)).toEqual(['wash', 'cure'])
+  })
+
+  it('keeps an emptied pick empty, so the typical station prices it', () => {
+    expect(chosenFinishing([wash, cure], 'resin', [])).toEqual([])
+  })
+
+  it('uses exactly what was picked', () => {
+    expect(chosenFinishing([wash, cure], 'resin', ['cure']).map(({ id }) => id)).toEqual(['cure'])
   })
 })

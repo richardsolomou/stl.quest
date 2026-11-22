@@ -120,7 +120,7 @@ export const requests: typeof en = {
   cost: {
     label: 'Geschätzte Kosten',
     suggested: (price, quantity) => (quantity > 1 ? `${price} empfohlen für alle ${quantity} Kopien` : `${price} empfohlen`),
-    hint: 'Aus Ihren Preissätzen und dem zugewiesenen Drucker, mit Ihrem ersten Material und Ihrer eigenen Wasch- und Härtestation, sonst typischen Werten, einer Druckplatte pro Kopie und ohne manuelle Arbeitszeit.',
+    hint: 'Aus Ihren Preissätzen und dem zugewiesenen Drucker, mit Ihrem ersten Material und den eingerichteten Wasch- und Härtestationen, oder einer typischen Wasch- und Härtestation, wenn Sie keine haben, einer Druckplatte pro Kopie und ohne manuelle Arbeitszeit.',
     openCalculator: 'Im Rechner öffnen',
     onPrinter: (printer: string) => `auf ${printer}`,
     compare: (count: number, range: string) => `${range} auf ${count} Druckern`,

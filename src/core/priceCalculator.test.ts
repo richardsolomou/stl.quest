@@ -386,6 +386,11 @@ describe('request quotes', () => {
     expect(priceRequest({ rates, consumables: [] }, { ...request, minutes: undefined })).toBeUndefined()
   })
 
+  it('washes and cures on the workspace’s own station on every printer compared', () => {
+    const quotes = priceRequestOnPrinters(rates, [reflex], request, [], [wash])
+    expect(quotes[0].quote?.result.equipment.map(({ item }) => item.id)).toEqual([wash.id])
+  })
+
   it('compares the active printers of the request print type', () => {
     const printers = [reflex, { ...reflex, id: 'old', archived: true }, { id: 'p1s', printType: 'filament' as const }]
     expect(priceRequestOnPrinters(rates, printers, request, []).map(({ printer }) => printer.id)).toEqual(['reflex'])

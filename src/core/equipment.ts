@@ -75,6 +75,11 @@ export function defaultFinishing(items: EquipmentItem[], printType: PrintType) {
   return (['wash', 'cure'] as const).flatMap((kind) => finishing.find((item) => item.kind === kind) ?? [])
 }
 
+/** What a quote washes and cures with: the picked equipment once anything was picked, else the workspace's own default. */
+export function chosenFinishing(items: EquipmentItem[], printType: PrintType, pickedIds: string[] | undefined) {
+  return pickedIds ? items.filter((item) => pickedIds.includes(item.id)) : defaultFinishing(items, printType)
+}
+
 /** A typical run when nothing else is known: a wash cycle, a cure, a combined cycle, or a filament drying session. */
 export const DEFAULT_MINUTES_PER_USE: Record<EquipmentKind, number> = {
   wash: 10,

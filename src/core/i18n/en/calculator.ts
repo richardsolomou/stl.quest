@@ -78,7 +78,7 @@ export const calculator = {
     basis: 'Without hands-on time: add labour in the single-job calculator if the work needs it.',
     defaults: 'No printer',
     description:
-      'Each print is priced from its own estimate on the printer it is assigned to, with your first material and your own wash and cure, or typical ones where you have none.',
+      'Each print is priced from its own estimate on the printer it is assigned to, with your first material and the wash and cure stations you set up, or a typical wash and cure if you have none.',
   },
   basis: {
     title: 'Cost basis',

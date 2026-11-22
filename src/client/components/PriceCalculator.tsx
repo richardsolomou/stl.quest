@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { consumablesOfKind, type Consumable } from '../../core/consumables'
-import { defaultFinishing, servesPrintType, type EquipmentItem } from '../../core/equipment'
+import { chosenFinishing, servesPrintType, type EquipmentItem } from '../../core/equipment'
 import {
   costBasis,
   costPrint,
@@ -123,7 +123,7 @@ function LoadedPriceCalculator({
   const materials: JobMaterial[] = consumablesOfKind(consumables, printType)
   const material = picked(materials, materialId)
   const usable = equipment.filter((item) => servesPrintType(item, printType))
-  const chosenEquipment = equipmentIds ? usable.filter((item) => equipmentIds.includes(item.id)) : defaultFinishing(usable, printType)
+  const chosenEquipment = chosenFinishing(usable, printType, equipmentIds)
   const picks = { rates, printType, consumables, material, equipment: chosenEquipment }
   const cost = (on?: PrinterProfile) => costPrint({ ...picks, job, printer: on })
   const result = cost(printer)
