@@ -2118,7 +2118,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(spoolmanStock).toContainText('Managed by Spoolman · 2 spools')
   await expect(spoolmanStock.getByRole('button', { name: 'Add stock' })).toHaveCount(0)
   await screenshot(page, 'spoolman-managed-stock')
-  await spoolmanStock.getByLabel('Warn below (g)').fill('1000')
+  await spoolmanStock.getByLabel('Warn below (kg)').fill('1')
   await spoolmanStock.getByRole('button', { name: 'Done' }).click()
   // A filament Spoolman manages is restocked in Spoolman, so what to buy offers no restock of its own.
   const unstocked = page.getByRole('region', { name: 'No store set' })
