@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
@@ -14,6 +13,7 @@ import { useUsageTracking, useWorkspaceSlug } from '../../workspace'
 import { CopyableValue } from '../CopyableValue'
 import { QueryState } from '../QueryState'
 import { SettingNotice, errorNotice } from '../SettingNotice'
+import { AppLogo } from '../AppLogo'
 import { SettingRow } from '../SettingRow'
 import { UsageTrackingInvite } from '../UsageTracking'
 import { PageHeader, SettingsPage, SettingsSection } from './SettingsLayout'
@@ -72,7 +72,7 @@ function Connect({ connected, printsUrl, lastReceivedAt }: { connected: boolean;
     <SettingsSection title={copy.title} description={copy.description}>
       <div className="grid gap-4">
         <SettingRow
-          icon={<Printer />}
+          icon={<AppLogo app="bambuddy" className="size-6" />}
           name={t.settings.bambuddy.title}
           status={
             !connected

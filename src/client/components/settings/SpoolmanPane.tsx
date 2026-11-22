@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { Disc3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
@@ -24,6 +23,7 @@ import { UsageTrackingInvite } from '../UsageTracking'
 import { CopyButtonLabel, useCopied } from '../useCopied'
 import { formatQuantity } from './ConsumableStock'
 import { PageHeader, SettingsPage, SettingsSection } from './SettingsLayout'
+import { AppLogo } from '../AppLogo'
 
 const DOCS_URL = `${REPOSITORY_URL}/blob/main/docs/spoolman.md`
 
@@ -96,7 +96,7 @@ function SpoolmanSettings({ workspaceSlug, spoolman }: { workspaceSlug: string; 
       <SettingsSection title={copy.connection.title} description={copy.connection.description}>
         <div className="grid gap-4">
           <SettingRow
-            icon={<Disc3 />}
+            icon={<AppLogo app="spoolman" className="size-6" />}
             name={copy.connection.name}
             status={status}
             detail={detail}

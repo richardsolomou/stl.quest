@@ -1,0 +1,102 @@
+{
+  "logos": [
+    {
+      "appId": "anycubic-photon-workshop",
+      "sourcePageUrl": "https://wiki.anycubic.com/en/software-and-app",
+      "sourceUrl": "https://cdn.anycubic-cloud.anycubicloud.com/file/2026/02/09/dmg/177064002612089700/AnycubicPhotonWorkshop_v4.1.4_cn.dmg",
+      "checkedAt": "2026-11-22",
+      "license": "Proprietary. Anycubic Photon Workshop and its logo are trademarks of Anycubic; shown only to name the app a file goes to.",
+      "note": "The app icon from the Anycubic Photon Workshop bundle in the official macOS installer (纵维立方工坊.app/Contents/Resources/PhotonSlicer.icns), at its 256-pixel size, trimmed to its edges and resized to 128 pixels."
+    },
+    {
+      "appId": "bambu-studio",
+      "sourcePageUrl": "https://github.com/bambulab/BambuStudio/blob/8e524a39d4c4cd0541801c1c46d2f77debb0bf1d/resources/images/BambuStudio.svg",
+      "sourceUrl": "https://raw.githubusercontent.com/bambulab/BambuStudio/8e524a39d4c4cd0541801c1c46d2f77debb0bf1d/resources/images/BambuStudio.svg",
+      "checkedAt": "2026-11-22",
+      "license": "AGPL-3.0-only, LICENSES/BambuStudio-AGPL-3.0.txt. Bambu Studio and its logo are trademarks of Bambu Lab."
+    },
+    {
+      "appId": "bambuddy",
+      "sourcePageUrl": "https://github.com/maziggy/bambuddy/blob/b7d894b57c0a373f66dc0de49680865b02b3aae5/frontend/public/img/apple-touch-icon.png",
+      "sourceUrl": "https://raw.githubusercontent.com/maziggy/bambuddy/b7d894b57c0a373f66dc0de49680865b02b3aae5/frontend/public/img/apple-touch-icon.png",
+      "checkedAt": "2026-11-22",
+      "license": "AGPL-3.0-only, LICENSES/Bambuddy-AGPL-3.0.txt. The Bambuddy name and logo belong to the Bambuddy project.",
+      "note": "The 180-pixel app icon, resized to 128 pixels; it carries its own dark tile, unlike the transparent favicon, so it reads on both themes."
+    },
+    {
+      "appId": "chitubox",
+      "sourcePageUrl": "https://www.chitubox.com/en/download/chitubox-free",
+      "sourceUrl": "https://www.chitubox.com/favicon.ico",
+      "checkedAt": "2026-11-22",
+      "license": "Proprietary. CHITUBOX and its logo are trademarks of CBD-Tech; shown only to name the app a file goes to.",
+      "note": "The 256-pixel frame of the official site icon, which is the CHITUBOX app icon, trimmed to its edges and resized to 128 pixels."
+    },
+    {
+      "appId": "cura",
+      "sourcePageUrl": "https://github.com/Ultimaker/Cura/blob/1a221ec29a86960d16a412940becc1f63534c41f/packaging/icons/cura-icon.svg",
+      "sourceUrl": "https://raw.githubusercontent.com/Ultimaker/Cura/1a221ec29a86960d16a412940becc1f63534c41f/packaging/icons/cura-icon.svg",
+      "checkedAt": "2026-11-22",
+      "license": "LGPL-3.0-only, LICENSES/Cura-LGPL-3.0.txt. UltiMaker Cura and its logo are trademarks of UltiMaker."
+    },
+    {
+      "appId": "dragonfruit",
+      "sourcePageUrl": "https://github.com/Open-Resin-Alliance/DragonFruit/blob/a7a334df337320effb38ecd91a929b0adb097709/public/dragonfruit_assets/branding/simple_icon.svg",
+      "sourceUrl": "https://raw.githubusercontent.com/Open-Resin-Alliance/DragonFruit/a7a334df337320effb38ecd91a929b0adb097709/public/dragonfruit_assets/branding/simple_icon.svg",
+      "checkedAt": "2026-11-22",
+      "license": "AGPL-3.0-only, LICENSES/DragonFruit-AGPL-3.0.txt. The DragonFruit name and logo belong to the Open Resin Alliance."
+    },
+    {
+      "appId": "elegoo-satellite",
+      "sourcePageUrl": "https://www.elegoo.com/pages/download?c1=3d-printers-slicing-softwares",
+      "sourceUrl": "https://elegoo-downloads.oss-us-west-1.aliyuncs.com/software/ELEGOO%20SatelLite/ELEGOO%20SatelLite_Mac_1.0.2.43.dmg",
+      "checkedAt": "2026-11-22",
+      "license": "Proprietary. ELEGOO SatelLite and its logo are trademarks of ELEGOO; shown only to name the app a file goes to.",
+      "note": "The app icon from the ELEGOO SatelLite bundle in the official macOS installer (ELEGOO SatelLite.app/Contents/Resources/elegoo.icns), at its 256-pixel size, trimmed to its edges and resized to 128 pixels."
+    },
+    {
+      "appId": "heygears-blueprint",
+      "sourcePageUrl": "https://www.heygears.com/SAP/Blueprint",
+      "sourceUrl": "https://bp-download.heygears.com/3.5.0/arm64/blueprint-studio_3.5.0_arm64.dmg",
+      "checkedAt": "2026-11-22",
+      "license": "Proprietary. HeyGears Blueprint and its logo are trademarks of HeyGears; shown only to name the app a file goes to.",
+      "note": "The app icon from the Blueprint Studio bundle in the official macOS installer (Blueprint Studio.app/Contents/Resources/icon.icns), at its 256-pixel size, trimmed to its edges and resized to 128 pixels. The same icon is on the source page at 108 pixels."
+    },
+    {
+      "appId": "lychee",
+      "sourcePageUrl": "https://lychee.co/",
+      "sourceUrl": "https://lychee.co/static/metas/apple-touch-icon.png",
+      "checkedAt": "2026-11-22",
+      "license": "Proprietary. Lychee Slicer and its logo are trademarks of Mango 3D; shown only to name the app a file goes to.",
+      "note": "The official site's 180-pixel app icon, resized to 128 pixels."
+    },
+    {
+      "appId": "orcaslicer",
+      "sourcePageUrl": "https://github.com/OrcaSlicer/OrcaSlicer/blob/1478735b584c19a93363e369d51351813a7b4b7a/resources/images/OrcaSlicer.svg",
+      "sourceUrl": "https://raw.githubusercontent.com/OrcaSlicer/OrcaSlicer/1478735b584c19a93363e369d51351813a7b4b7a/resources/images/OrcaSlicer.svg",
+      "checkedAt": "2026-11-22",
+      "license": "AGPL-3.0-only, LICENSES/OrcaSlicer-AGPL-3.0.txt. The OrcaSlicer name and logo belong to the OrcaSlicer project."
+    },
+    {
+      "appId": "preform",
+      "sourcePageUrl": "https://formlabs.com/download-preform-mac/",
+      "sourceUrl": "https://downloads.formlabs.com/PreForm/Release/3.48.0/PreForm_mac_3.48.0_release_releaser_523_98058.dmg",
+      "checkedAt": "2026-11-22",
+      "license": "Proprietary. PreForm and its logo are trademarks of Formlabs; shown only to name the app a file goes to.",
+      "note": "The app icon from the PreForm bundle in the official macOS installer (PreForm.app/Contents/Resources/PreFormBlue.icns), at its 256-pixel size, trimmed to its edges and resized to 128 pixels."
+    },
+    {
+      "appId": "prusaslicer",
+      "sourcePageUrl": "https://github.com/prusa3d/PrusaSlicer/blob/e6c85c50dcc56f9968a61dfdd7a3b695e1004037/resources/icons/PrusaSlicer.svg",
+      "sourceUrl": "https://raw.githubusercontent.com/prusa3d/PrusaSlicer/e6c85c50dcc56f9968a61dfdd7a3b695e1004037/resources/icons/PrusaSlicer.svg",
+      "checkedAt": "2026-11-22",
+      "license": "AGPL-3.0-only, LICENSES/PrusaSlicer-AGPL-3.0.txt. PrusaSlicer and its logo are trademarks of Prusa Research."
+    },
+    {
+      "appId": "spoolman",
+      "sourcePageUrl": "https://github.com/Donkie/Spoolman/blob/13c972d831373d095e703e91e02f9cce7ee2a32f/client/icons/spoolman.svg",
+      "sourceUrl": "https://raw.githubusercontent.com/Donkie/Spoolman/13c972d831373d095e703e91e02f9cce7ee2a32f/client/icons/spoolman.svg",
+      "checkedAt": "2026-11-22",
+      "license": "MIT, LICENSES/Spoolman-MIT.txt. The Spoolman name and logo belong to the Spoolman project."
+    }
+  ]
+}

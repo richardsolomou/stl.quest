@@ -24,6 +24,10 @@ The Open Resin Alliance printer plugin images are licensed under MIT. Their lice
 
 OrcaSlicer, UVtools, and PrusaSlicer content is licensed under AGPL-3.0-only. Their license texts are included in `LICENSES/OrcaSlicer-AGPL-3.0.txt`, `LICENSES/UVtools-AGPL-3.0.txt`, and `LICENSES/PrusaSlicer-AGPL-3.0.txt`.
 
+## App logos
+
+The slicer and integration icons under `public/app-logos/` identify the apps STL Quest opens or connects to. Each records its source, checked date, and license in `catalogs/app-logos/sources.json`. The Bambu Studio, OrcaSlicer, PrusaSlicer, DragonFruit, and Bambuddy icons come from their projects' repositories under AGPL-3.0-only; their license texts are included in `LICENSES/BambuStudio-AGPL-3.0.txt`, `LICENSES/OrcaSlicer-AGPL-3.0.txt`, `LICENSES/PrusaSlicer-AGPL-3.0.txt`, `LICENSES/DragonFruit-AGPL-3.0.txt`, and `LICENSES/Bambuddy-AGPL-3.0.txt`. The [UltiMaker Cura](https://github.com/Ultimaker/Cura) icon is licensed under LGPL-3.0-only, with its license text in `LICENSES/Cura-LGPL-3.0.txt`. The [Spoolman](https://github.com/Donkie/Spoolman) icon is licensed under MIT, with its license text in `LICENSES/Spoolman-MIT.txt`. The CHITUBOX, Lychee Slicer, PreForm, HeyGears Blueprint, ELEGOO SatelLite, and Anycubic Photon Workshop icons come from their vendors' official websites or installers. App names and logos remain the trademarks of their respective owners and are shown only to identify each app.
+
 ## Resin catalog
 
 Resin names, categories, and available density values under `catalogs/resins/catalog.generated.json` are derived from pinned [PrusaSlicer](https://github.com/prusa3d/PrusaSlicer) SLA material profiles, selected official HeyGears material pages, and Formlabs' official materials listing and safety data sheets. Their revisions or checked dates and exact source URLs are recorded alongside the generated presets. PrusaSlicer content is licensed under AGPL-3.0-only; manufacturer names and product data remain the property of their respective owners.

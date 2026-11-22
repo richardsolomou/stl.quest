@@ -8,6 +8,7 @@ import { createPlateSlicerLink } from '../../../server/fns'
 import { useI18n } from '../../i18n'
 import { slicerFileUrl, usePrinterSlicer } from '../../printerSlicer'
 import { useWorkspaceSlug } from '../../workspace'
+import { AppLogo } from '../AppLogo'
 
 /**
  * Opens the plate in its printer's slicer as one file holding every copy, or downloads that file for a slicer that
@@ -38,7 +39,7 @@ export function PlateSlicerButton({ plate, size }: { plate: { id: string; printe
   })
   return (
     <Button type="button" size={size} variant="outline" disabled={open.isPending} onClick={() => open.mutate()}>
-      {open.isPending && <Spinner />}
+      {open.isPending ? <Spinner /> : slicer && <AppLogo app={slicer.id} className={size === 'xs' ? 'size-3.5' : undefined} />}
       {slicer?.openUrl ? t.requests.slicer.open(slicer.name) : slicer ? t.requests.slicer.download(slicer.name) : t.plates.slicer.download}
     </Button>
   )
