@@ -22,6 +22,8 @@ import { PRINT_TYPES, printGroupColors, REQUEST_SORTS } from '../core/types'
 import { MAX_WORKSPACE_NAME_LENGTH } from '../core/workspaces'
 import { MAX_SPOOLMAN_SPOOLS, type SpoolmanChange } from '../core/spoolman'
 import { MAX_CONSUMABLES, SUPPLY_UNITS } from '../core/consumables'
+import { ORDER_VENDORS } from '../core/orders/orderEmail'
+import type { OrderRestockInput } from '../core/orders/orderRestock'
 import { isPrinterAddOn } from '../core/equipmentPresets'
 import { EQUIPMENT_KINDS, EQUIPMENT_STAGES, MAX_EQUIPMENT } from '../core/equipment'
 import { INVENTORY_KINDS } from '../core/inventory'
@@ -124,6 +126,22 @@ const consumableBaseSchema = {
   packSize: z.number().positive().max(10_000_000).optional(),
   storeId: z.string().trim().min(1).max(200).optional(),
 }
+const filamentConsumableSchema = z.object({
+  ...consumableBaseSchema,
+  kind: z.literal('filament'),
+  filamentPresetId: z.string().trim().min(1).max(200).optional(),
+  colour: z
+    .object({
+      name: z.string().trim().min(1).max(60),
+      hex: z.string().regex(/^#[0-9a-f]{6}$/i),
+    })
+    .optional(),
+  pricePerKg: z.number().positive().max(100_000),
+  slicer: z
+    .enum(SLICER_IDS)
+    .refine((slicer) => isSlicerFor(slicer, 'filament'), 'not a filament slicer')
+    .optional(),
+})
 const consumableSchema = z.discriminatedUnion('kind', [
   z.object({
     ...consumableBaseSchema,
@@ -136,22 +154,7 @@ const consumableSchema = z.discriminatedUnion('kind', [
       .refine((slicer) => isSlicerFor(slicer, 'resin'), 'not a resin slicer')
       .optional(),
   }),
-  z.object({
-    ...consumableBaseSchema,
-    kind: z.literal('filament'),
-    filamentPresetId: z.string().trim().min(1).max(200).optional(),
-    colour: z
-      .object({
-        name: z.string().trim().min(1).max(60),
-        hex: z.string().regex(/^#[0-9a-f]{6}$/i),
-      })
-      .optional(),
-    pricePerKg: z.number().positive().max(100_000),
-    slicer: z
-      .enum(SLICER_IDS)
-      .refine((slicer) => isSlicerFor(slicer, 'filament'), 'not a filament slicer')
-      .optional(),
-  }),
+  filamentConsumableSchema,
   z.object({
     ...consumableBaseSchema,
     kind: z.literal('part'),
@@ -493,6 +496,20 @@ export const recordStockMovementSchema = z.discriminatedUnion('kind', [
   z.object({ consumableId: settingsItemId, kind: z.literal('replace'), amount: usageAmount, printerId: settingsItemId.optional() }),
   z.object({ consumableId: settingsItemId, kind: z.literal('correction'), counted: z.number().min(0).max(1_000_000) }),
 ]) satisfies z.ZodType<StockMovementInput>
+/** What confirming a pasted order stores; the email itself never reaches the server. */
+export const restockFromOrderSchema = z.object({
+  vendor: z.enum(ORDER_VENDORS),
+  added: z
+    .array(filamentConsumableSchema)
+    .max(MAX_CONSUMABLES)
+    .refine((items) => new Set(items.map((item) => item.id)).size === items.length, 'IDs must be unique'),
+  prices: z.array(z.object({ consumableId: settingsItemId, price: z.number().positive().max(100_000) })).max(MAX_CONSUMABLES),
+  restocks: z
+    .array(z.object({ consumableId: settingsItemId, amount: usageAmount }))
+    .min(1)
+    .max(MAX_CONSUMABLES)
+    .refine((items) => new Set(items.map(({ consumableId }) => consumableId)).size === items.length, 'one restock per consumable'),
+}) satisfies z.ZodType<OrderRestockInput>
 export const undoUsageSchema = z.object({ transactionId: id })
 export const usageFiltersSchema = z.object({
   requestId: id.optional(),

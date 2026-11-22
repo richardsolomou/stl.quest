@@ -4301,6 +4301,138 @@ describe('STLQuestService crash recovery', () => {
     })
   })
 
+  describe('restocking from an order', () => {
+    const grey: Consumable = {
+      id: 'basic-grey',
+      kind: 'filament',
+      name: 'Bambu Lab PLA Basic · Gray',
+      filamentPresetId: 'filament-bambu-lab-pla',
+      colour: { name: 'Gray', hex: '#8E9089' },
+      pricePerKg: 20,
+    }
+    const jade: Consumable = {
+      id: 'basic-jade',
+      kind: 'filament',
+      name: 'Bambu Lab PLA Basic · Jade White',
+      filamentPresetId: 'filament-bambu-lab-pla',
+      colour: { name: 'Jade White', hex: '#FFFFFF' },
+      pricePerKg: 16.99,
+    }
+    const order = { vendor: 'bambu-lab' as const, added: [], prices: [], restocks: [{ consumableId: grey.id, amount: 2_000 }] }
+    const onHand = async (id: string) => (await service.stockLevels(admin)).find((level) => level.consumableId === id)?.onHand
+
+    beforeEach(async () => {
+      await stock('consumables', [grey])
+      await repository.setSetting(USAGE_TRACKING_SETTING, true)
+    })
+
+    it('restocks each line', async () => {
+      await service.restockFromOrder(order, admin)
+
+      expect(await onHand(grey.id)).toBe(2_000)
+    })
+
+    it('records the lines as one undoable step', async () => {
+      const { transactionId } = await service.restockFromOrder(
+        { ...order, added: [jade], restocks: [...order.restocks, { consumableId: jade.id, amount: 1_000 }] },
+        admin,
+      )
+      await service.undoUsage(transactionId!, admin)
+
+      expect([await onHand(grey.id), await onHand(jade.id)]).toEqual([0, 0])
+    })
+
+    it('adds a new filament to the library', async () => {
+      await service.restockFromOrder({ ...order, added: [jade], restocks: [{ consumableId: jade.id, amount: 1_000 }] }, admin)
+
+      expect((await repository.listInventory('consumables')).map(({ id }) => id)).toEqual([grey.id, jade.id])
+    })
+
+    it('updates the prices it was given before restocking at them', async () => {
+      const { events } = await service.restockFromOrder({ ...order, prices: [{ consumableId: grey.id, price: 16.99 }] }, admin)
+
+      expect(events[0].unitPrice).toBeCloseTo(0.01699)
+    })
+
+    it('leaves prices it was not given', async () => {
+      await service.restockFromOrder(order, admin)
+
+      expect((await repository.listInventory('consumables')).find(({ id }) => id === grey.id)).toMatchObject({ pricePerKg: 20 })
+    })
+
+    it('refuses a consumable the library lacks', async () => {
+      await expect(service.restockFromOrder({ ...order, restocks: [{ consumableId: 'missing', amount: 1 }] }, admin)).rejects.toMatchObject(
+        {
+          status: 400,
+        },
+      )
+    })
+
+    it('refuses a filament Spoolman manages', async () => {
+      await service.connectSpoolman('hash', admin)
+      await service.receiveSpoolman({
+        replace: [
+          {
+            id: 1,
+            filamentId: 10,
+            vendor: 'Bambu Lab',
+            material: 'PLA',
+            externalId: 'bambulab_pla_gray_1000_175_n',
+            remainingGrams: 600,
+            archived: false,
+          },
+        ],
+      })
+
+      await expect(service.restockFromOrder(order, admin)).rejects.toMatchObject({ status: 409 })
+    })
+
+    it('refuses a new filament Spoolman would manage, adding nothing', async () => {
+      await service.connectSpoolman('hash', admin)
+      await service.receiveSpoolman({
+        replace: [
+          {
+            id: 1,
+            filamentId: 10,
+            vendor: 'Bambu Lab',
+            material: 'PLA',
+            externalId: 'bambulab_pla_jadewhite_1000_175_n',
+            remainingGrams: 600,
+            archived: false,
+          },
+        ],
+      })
+      await service
+        .restockFromOrder({ ...order, added: [jade], restocks: [{ consumableId: jade.id, amount: 1_000 }] }, admin)
+        .catch(() => undefined)
+
+      expect((await repository.listInventory('consumables')).map(({ id }) => id)).toEqual([grey.id])
+    })
+
+    it('lets only admins restock', async () => {
+      await expect(service.restockFromOrder(order, requester)).rejects.toMatchObject({ status: 403 })
+    })
+
+    it('counts what it recorded for telemetry', async () => {
+      await service.restockFromOrder(
+        {
+          ...order,
+          added: [jade],
+          prices: [{ consumableId: grey.id, price: 16.99 }],
+          restocks: [...order.restocks, { consumableId: jade.id, amount: 1_000 }],
+        },
+        admin,
+      )
+
+      expect(capture).toHaveBeenCalledWith(admin.id, 'order_restock_recorded', {
+        vendor: 'bambu-lab',
+        restock_count: 2,
+        added_count: 1,
+        price_count: 1,
+      })
+    })
+  })
+
   describe('print-ready notifications', () => {
     let printsReady: Mock<Notifier['printsReady']>
     let canSend: boolean
