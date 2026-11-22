@@ -39,6 +39,7 @@ import type {
   AttachOperation,
   AssetGenerationOutcome,
   AssetGenerationStage,
+  BoardConfig,
   ModelDimensions,
   PrintCharge,
   PrintType,
@@ -60,6 +61,7 @@ import {
 import { highestStoragePlan, storagePlans, type StoragePlan } from '../core/plans'
 import { ACTIVE_SUBSCRIPTION_STATUSES, BILLABLE_SUBSCRIPTION_STATUSES } from '../core/subscription'
 import { automaticallyAssignedPrinter, outstandingCopies } from '../core/printers'
+import { normalizeBoardConfig } from '../core/visibility'
 import type { InventoryItems, InventoryKind } from '../core/inventory'
 import { deletedItemKind, keepsDeletedName, NO_REFERENCES, withoutSupply, type InventoryReferences } from '../core/inventoryDeletion'
 import type { SpoolmanChange, SpoolmanLink, SpoolmanSpool } from '../core/spoolman'
@@ -3323,6 +3325,7 @@ export class DrizzleRepository implements Repository {
       const repository = this.workspaceId === workspaceId ? this : await this.scoped(workspaceId)
       const profiles = await repository.listInventory('printers')
       if (!profiles.length) continue
+      if (normalizeBoardConfig(await repository.getSetting<Partial<BoardConfig>>('board')).manualPrinterAssignment) continue
       const existingRequests = await repository.listRequests()
       const automatic = existingRequests
         .filter(

@@ -49,6 +49,12 @@ export const settings = {
         failed: 'Couldn’t turn on tracking. Try again.',
       },
     },
+    assignment: {
+      title: 'Printer assignment',
+      label: 'Assign printers automatically',
+      description:
+        'Give each new print the least busy printer of its type, and spread queued prints across a printer you add. Turned off, prints wait on their print type until you pick a printer. Prints already on a printer stay there.',
+    },
     archive: {
       title: 'Archive',
       label: 'Archive Ready prints automatically',

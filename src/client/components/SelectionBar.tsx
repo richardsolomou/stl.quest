@@ -1,9 +1,14 @@
-import { Archive, Calculator, Download, Layers, Layers3, Move, RotateCcw, Trash2, X } from 'lucide-react'
+import { Archive, Calculator, Download, Layers, Layers3, MoreHorizontal, Move, Printer, RotateCcw, Trash2, X } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
+import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@/components/ui/menu'
+import type { PrinterProfile } from '../../core/types'
 import { MAX_BULK_CARDS } from '../../core/request'
 import { useI18n } from '../i18n'
 
 type Action = { onClick: () => void } | undefined
+/** The printers every print acted on can go on, offered as one menu. */
+export type AssignAction = { printers: Pick<PrinterProfile, 'id' | 'name'>[]; onAssign: (printerId: string) => void }
 
 /**
  * What is selected and what can be done with it, floating above the board for as long as a selection lasts, so bulk work
@@ -13,6 +18,7 @@ export function SelectionBar({
   prints,
   copies,
   move,
+  assign,
   tags,
   download,
   repeat,
@@ -26,6 +32,7 @@ export function SelectionBar({
   prints: number
   copies: number
   move: Action
+  assign: AssignAction | undefined
   tags: Action
   download: Action
   repeat: Action
@@ -41,15 +48,22 @@ export function SelectionBar({
   const { t, locale } = useI18n()
   const actions = t.requests.actions
   const pass = t.board.pass
-  const items = [
-    { action: move, icon: <Move />, label: actions.move },
+  // The everyday actions stay one click away; the rest wait in More so the bar keeps its size as actions are added.
+  const barButton = 'shrink-0 max-lg:px-1.5'
+  const barAction = (action: Action, icon: ReactNode, label: string) =>
+    action && (
+      <Button type="button" variant="ghost" size="sm" className={barButton} onClick={action.onClick}>
+        {icon}
+        <span className="max-lg:sr-only">{label}</span>
+      </Button>
+    )
+  const more = [
     { action: tags, icon: <Layers3 />, label: actions.manageTags },
-    { action: download, icon: <Download />, label: actions.downloadModels(prints) },
-    { action: repeat, icon: <RotateCcw />, label: actions.printAgain },
-    { action: estimate, icon: <Calculator />, label: actions.estimate },
     { action: plate, icon: <Layers />, label: t.plates.startPlate },
-    { action: archive, icon: <Archive />, label: actions.archive },
-  ]
+    { action: estimate, icon: <Calculator />, label: actions.estimate },
+    { action: repeat, icon: <RotateCcw />, label: actions.printAgain },
+    { action: download, icon: <Download />, label: actions.downloadModels(prints) },
+  ].filter((item) => item.action)
   return (
     <div
       role="toolbar"
@@ -66,27 +80,46 @@ export function SelectionBar({
       {overLimit ? (
         <p className="min-w-0 px-1 text-sm text-shell-foreground/75">{pass.tooManySelected(MAX_BULK_CARDS.toLocaleString(locale))}</p>
       ) : (
-        <div className="no-scrollbar flex min-w-0 items-center gap-1 overflow-x-auto">
-          {items.map(
-            ({ action, icon, label }) =>
-              action && (
-                <Button key={label} type="button" variant="ghost" size="sm" className="shrink-0 max-lg:px-1.5" onClick={action.onClick}>
-                  {icon}
-                  <span className="max-lg:sr-only">{label}</span>
-                </Button>
-              ),
+        <div className="flex min-w-0 items-center gap-1">
+          {barAction(move, <Move />, actions.move)}
+          {assign && (
+            <Menu>
+              <MenuTrigger render={<Button type="button" variant="ghost" size="sm" className={barButton} />}>
+                <Printer />
+                <span className="max-lg:sr-only">{actions.assignPrinter}</span>
+              </MenuTrigger>
+              <MenuContent side="top">
+                {assign.printers.map((printer) => (
+                  <MenuItem key={printer.id} onClick={() => assign.onAssign(printer.id)}>
+                    {printer.name}
+                  </MenuItem>
+                ))}
+              </MenuContent>
+            </Menu>
           )}
-          {remove && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="shrink-0 text-destructive hover:text-destructive max-lg:px-1.5"
-              onClick={remove.onClick}
-            >
-              <Trash2 />
-              <span className="max-lg:sr-only">{t.common.delete}</span>
-            </Button>
+          {barAction(archive, <Archive />, actions.archive)}
+          {(more.length > 0 || remove) && (
+            <Menu>
+              <MenuTrigger render={<Button type="button" variant="ghost" size="sm" className={barButton} />}>
+                <MoreHorizontal />
+                <span className="max-lg:sr-only">{pass.moreActions}</span>
+              </MenuTrigger>
+              <MenuContent side="top" align="end">
+                {more.map(({ action, icon, label }) => (
+                  <MenuItem key={label} onClick={action!.onClick}>
+                    {icon}
+                    {label}
+                  </MenuItem>
+                ))}
+                {remove && more.length > 0 && <MenuSeparator />}
+                {remove && (
+                  <MenuItem className="text-destructive data-highlighted:text-destructive" onClick={remove.onClick}>
+                    <Trash2 />
+                    {t.common.delete}
+                  </MenuItem>
+                )}
+              </MenuContent>
+            </Menu>
           )}
         </div>
       )}

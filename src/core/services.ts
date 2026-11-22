@@ -860,6 +860,21 @@ export class STLQuestService {
     await this.assets.remove(request.sourceImagePath).catch(() => {})
   }
 
+  /** Puts several prints on one printer, each checked as editing its printer would be. */
+  async assignRequests(ids: string[], printerId: string, identity: Identity) {
+    this.requireAdmin(identity)
+    const uniqueIds = unique(ids)
+    if (
+      typeof printerId !== 'string' ||
+      uniqueIds.length === 0 ||
+      uniqueIds.length > MAX_BULK_CARDS ||
+      uniqueIds.some((id) => typeof id !== 'string' || id.length > 100)
+    ) {
+      throw new Response(this.text.request.invalidUpdate, { status: 400 })
+    }
+    for (const id of uniqueIds) await this.update(id, { printerId }, identity)
+  }
+
   async archiveRequests(ids: string[], identity: Identity) {
     await this.setArchived(ids, true, identity)
   }
@@ -2295,6 +2310,9 @@ export class STLQuestService {
     await this.validateTarget(requestedPrintType, printerId, currentPrintType)
     if (printerId || !requestedPrintType) {
       return { requestedPrintType: undefined, printerId: printerId ?? undefined, automaticPrinterAssignment: false }
+    }
+    if (normalizeBoardConfig(await this.repository.getSetting<Partial<BoardConfig>>('board')).manualPrinterAssignment) {
+      return { requestedPrintType, printerId: undefined, automaticPrinterAssignment: true }
     }
     const profiles = await this.repository.listInventory('printers')
     const automatic = automaticallyAssignedPrinter(

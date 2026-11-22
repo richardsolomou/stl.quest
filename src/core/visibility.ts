@@ -9,6 +9,7 @@ export function normalizeBoardConfig(stored?: Partial<BoardConfig> | null): Boar
     privateRequests: stored?.privateRequests === true,
     memberVisibility: normalizeMemberVisibility(stored?.memberVisibility),
     ...(validAutoArchiveDays(stored?.autoArchiveDays) ? { autoArchiveDays: stored.autoArchiveDays } : {}),
+    ...(stored?.manualPrinterAssignment === true ? { manualPrinterAssignment: true } : {}),
   }
 }
 

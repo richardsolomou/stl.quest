@@ -29,6 +29,14 @@ describe('board configuration', () => {
   it('turns automatic archiving off for an invalid stored delay', () => {
     expect(normalizeBoardConfig({ autoArchiveDays: 0 })).not.toHaveProperty('autoArchiveDays')
   })
+
+  it('keeps manual printer assignment once a workspace turns it on', () => {
+    expect(normalizeBoardConfig({ manualPrinterAssignment: true }).manualPrinterAssignment).toBe(true)
+  })
+
+  it('assigns printers automatically for any other stored value', () => {
+    expect(normalizeBoardConfig({ manualPrinterAssignment: 'yes' } as never)).not.toHaveProperty('manualPrinterAssignment')
+  })
 })
 
 describe('member request visibility', () => {

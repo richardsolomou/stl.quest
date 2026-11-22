@@ -41,6 +41,10 @@ describe('board settings schema', () => {
   it('rejects an update that changes nothing', () => {
     expect(boardSettingsSchema.safeParse({}).success).toBe(false)
   })
+
+  it('accepts turning automatic printer assignment off on its own', () => {
+    expect(boardSettingsSchema.parse({ manualPrinterAssignment: true })).toEqual({ manualPrinterAssignment: true })
+  })
 })
 
 describe('create consumables schema', () => {

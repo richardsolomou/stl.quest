@@ -244,8 +244,11 @@ export const boardSettingsSchema = z
   .object({
     privateRequests: z.boolean().optional(),
     autoArchiveDays: z.number().int().min(1).max(MAX_AUTO_ARCHIVE_DAYS).nullable().optional(),
+    manualPrinterAssignment: z.boolean().optional(),
   })
-  .refine((value) => value.privateRequests !== undefined || value.autoArchiveDays !== undefined)
+  .refine(
+    (value) => value.privateRequests !== undefined || value.autoArchiveDays !== undefined || value.manualPrinterAssignment !== undefined,
+  )
 
 export const printTypeChoiceSchema = z.object({ choice: z.enum(PRINT_TYPE_CHOICES) })
 
@@ -597,6 +600,8 @@ export const deleteRequestsSchema = z.object({
 })
 
 export const archiveRequestsSchema = z.object({ ids: z.array(id).min(1).max(MAX_BULK_CARDS) })
+
+export const assignRequestsSchema = z.object({ ids: z.array(id).min(1).max(MAX_BULK_CARDS), printerId: id })
 
 export const reorderRequestSchema = z.object({
   id,

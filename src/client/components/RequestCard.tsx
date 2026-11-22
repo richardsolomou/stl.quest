@@ -5,10 +5,32 @@ import { attachClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/clos
 import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge/extract-closest-edge'
 import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/types'
 import { Button } from '@/components/ui/button'
-import { Archive, ArrowRight, Check, ChevronDown, Copy, Download, Layers, Layers3, Move, RotateCcw, Trash2 } from 'lucide-react'
+import {
+  Archive,
+  ArrowRight,
+  Calculator,
+  Check,
+  ChevronDown,
+  Copy,
+  Download,
+  Layers,
+  Layers3,
+  Move,
+  Printer,
+  RotateCcw,
+  Trash2,
+} from 'lucide-react'
 import { Menu, MenuContent, MenuGroup, MenuGroupLabel, MenuItem, MenuTrigger } from '@/components/ui/menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
 import { cn } from '@/lib/utils'
 import { boardDropEffect, canDropOnRequest, canShowRequestDropEdge, isTouchOriginatedDragStart } from '../boardDrag'
 import { requesterLabel } from '../requester'
@@ -18,6 +40,7 @@ import type { PublicPrintRequest } from '../../core/types'
 import { FitAlertIcon } from './PrintType'
 import { printTypeLabel } from './PrintType'
 import { TagDotCluster } from './TagBadge'
+import type { AssignAction } from './SelectionBar'
 import { UserAvatar } from './UserAvatar'
 import { PrintEstimateBadges } from './PrintEstimate'
 import { RequestThumb } from './RequestThumb'
@@ -75,6 +98,9 @@ export function RequestCard({
   onDelete,
   onArchive,
   onManageTags,
+  assign,
+  onEstimate,
+  onPlate,
 }: {
   request: PublicPrintRequest
   variant?: RequestCardVariant
@@ -116,6 +142,11 @@ export function RequestCard({
   onDelete?: () => void
   onArchive?: () => void
   onManageTags?: () => void
+  /** The printers this card, or the selection it belongs to, can go on. */
+  assign?: AssignAction
+  onEstimate?: () => void
+  /** Opens the plate planner for the selection; an unselected card is selected on its own first. */
+  onPlate?: () => void
 }) {
   const { t } = useI18n()
   const ref = useRef<HTMLButtonElement>(null)
@@ -453,9 +484,10 @@ export function RequestCard({
 
   return (
     <div className="group/card relative">
-      {onSelect || onMove || onDownload || onRepeat || onDelete || onArchive || onManageTags ? (
+      {onSelect || onMove || assign || onArchive || onManageTags || onPlate || onEstimate || onRepeat || onDownload || onDelete ? (
         <ContextMenu>
           <ContextMenuTrigger className="block">{card}</ContextMenuTrigger>
+          {/* The same actions, in the same order, as the selection bar, plus selecting and per-copy downloads. */}
           <ContextMenuContent>
             {onSelect && (
               <ContextMenuItem onClick={() => onSelect({ range: false, toggle: true })}>
@@ -467,10 +499,64 @@ export function RequestCard({
                   : t.requests.actions.select}
               </ContextMenuItem>
             )}
+            {onSelect && (onMove || assign || onArchive) && <ContextMenuSeparator />}
+            {onMove && (
+              <ContextMenuItem onClick={onMove}>
+                <Move />
+                {t.requests.actions.move}
+              </ContextMenuItem>
+            )}
+            {assign && (
+              <ContextMenuSub>
+                <ContextMenuSubTrigger>
+                  <Printer />
+                  {t.requests.actions.assignPrinter}
+                </ContextMenuSubTrigger>
+                <ContextMenuContent>
+                  {assign.printers.map((printer) => (
+                    <ContextMenuItem key={printer.id} onClick={() => assign.onAssign(printer.id)}>
+                      {printer.name}
+                    </ContextMenuItem>
+                  ))}
+                </ContextMenuContent>
+              </ContextMenuSub>
+            )}
+            {onArchive && (
+              <ContextMenuItem onClick={onArchive}>
+                <Archive />
+                {t.requests.actions.archive}
+              </ContextMenuItem>
+            )}
+            {(onSelect || onMove || assign || onArchive) && (onManageTags || onPlate || onEstimate || onRepeat || onDownload) && (
+              <ContextMenuSeparator />
+            )}
             {onManageTags && (
               <ContextMenuItem onClick={onManageTags}>
                 <Layers3 />
                 {t.requests.actions.manageTags}
+              </ContextMenuItem>
+            )}
+            {onPlate && (
+              <ContextMenuItem
+                onClick={() => {
+                  if (!selected) onSelect?.({ range: false, toggle: false })
+                  onPlate()
+                }}
+              >
+                <Layers />
+                {t.plates.putOnPlate}
+              </ContextMenuItem>
+            )}
+            {onEstimate && (
+              <ContextMenuItem onClick={onEstimate}>
+                <Calculator />
+                {t.requests.actions.estimate}
+              </ContextMenuItem>
+            )}
+            {onRepeat && (
+              <ContextMenuItem onClick={onRepeat}>
+                <RotateCcw />
+                {t.requests.actions.printAgain}
               </ContextMenuItem>
             )}
             {onDownload && (
@@ -486,27 +572,6 @@ export function RequestCard({
                   ? t.requests.actions.downloadAllCopies
                   : t.requests.actions.downloadCopies(copyDownloadCount)}
               </ContextMenuItem>
-            )}
-            {onRepeat && (
-              <ContextMenuItem onClick={onRepeat}>
-                <RotateCcw />
-                {t.requests.actions.printAgain}
-              </ContextMenuItem>
-            )}
-            {onMove && (
-              <ContextMenuItem onClick={onMove}>
-                <Move />
-                {t.requests.actions.move}
-              </ContextMenuItem>
-            )}
-            {onArchive && (
-              <>
-                <ContextMenuSeparator />
-                <ContextMenuItem onClick={onArchive}>
-                  <Archive />
-                  {t.requests.actions.archive}
-                </ContextMenuItem>
-              </>
             )}
             {onDelete && (
               <>

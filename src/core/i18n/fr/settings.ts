@@ -51,6 +51,12 @@ export const settings: typeof en = {
         failed: 'Impossible d’activer le suivi. Réessayez.',
       },
     },
+    assignment: {
+      title: 'Attribution des imprimantes',
+      label: 'Attribuer les imprimantes automatiquement',
+      description:
+        'Donner à chaque nouvelle impression l’imprimante la moins occupée de son type, et répartir les impressions en file sur une imprimante ajoutée. Désactivée, les impressions restent sur leur type jusqu’à ce que vous choisissiez une imprimante. Les impressions déjà attribuées restent où elles sont.',
+    },
     archive: {
       title: 'Archives',
       label: 'Archiver automatiquement les impressions prêtes',

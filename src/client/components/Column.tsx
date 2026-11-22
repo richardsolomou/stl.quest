@@ -16,6 +16,7 @@ import { startPrinters, type BoardStation } from '../boardStations'
 import { shelfByRequester } from '../boardShelf'
 import { requesterLabel } from '../requester'
 import { RequestCard, type CardAdvance, type RequestCardVariant } from './RequestCard'
+import type { AssignAction } from './SelectionBar'
 import { VirtualRow } from './VirtualRow'
 import { AgeStamp } from './AgeStamp'
 import { UserAvatar } from './UserAvatar'
@@ -91,6 +92,9 @@ export function Column({
   onRepeatRequest,
   onDeleteRequest,
   onArchiveRequest,
+  onAssignRequest,
+  onEstimateRequest,
+  onPlateRequest,
 }: {
   status: StatusId
   layout: ZoneLayout
@@ -178,6 +182,10 @@ export function Column({
     cohortId: string,
   ) => void
   onArchiveRequest?: (requestId: string, status: StatusId, groupId?: string, cohortId?: string) => void
+  /** The printers a card, or the selection it belongs to, can be assigned to. */
+  onAssignRequest?: (requestId: string, status: StatusId, groupId?: string, cohortId?: string) => AssignAction | undefined
+  onEstimateRequest?: (requestId: string, status: StatusId, groupId?: string, cohortId?: string) => void
+  onPlateRequest?: () => void
 }) {
   const { t } = useI18n()
   const pass = t.board.pass
@@ -328,6 +336,9 @@ export function Column({
         onManageTags={
           isAdmin && onManageTags ? () => onManageTags(request.id, cardStatus, count, tagIds, actionGroupId, actionKey) : undefined
         }
+        assign={onAssignRequest?.(request.id, cardStatus, actionGroupId, actionKey)}
+        onEstimate={onEstimateRequest ? () => onEstimateRequest(request.id, cardStatus, actionGroupId, actionKey) : undefined}
+        onPlate={onPlateRequest}
         onSelect={(selectOptions) => onSelectRequest(cardStatus, request.id, orderedIds, selectOptions, groupId, key)}
       />
     )
