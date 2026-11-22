@@ -25,6 +25,7 @@ import { AuthMethodIcon } from './AuthMethodIcon'
 import { PasswordAuthDivider } from './PasswordAuthDivider'
 import { TwoFactorSignInForm } from './TwoFactorSignInForm'
 import { appPath } from '../../basePath'
+import { useTypedBeforeHydration } from '../useTypedBeforeHydration'
 
 export function AuthenticationMethods({
   auth,
@@ -48,6 +49,9 @@ export function AuthenticationMethods({
   const router = useRouter()
   const posthog = usePostHog()
   const [values, setValues] = useState({ email: '', name: '', password: '' })
+  const formRef = useTypedBeforeHydration(['email', 'name', 'password'], (name, value) =>
+    setValues((current) => ({ ...current, [name]: value })),
+  )
   const search = useLocation({ select: (location) => location.searchStr })
   const [error, setError] = useState(() => (hasSocialSignInError(search) ? t.auth.socialSignInFailed : ''))
   const [busy, setBusy] = useState(false)
@@ -100,6 +104,7 @@ export function AuthenticationMethods({
       )}
       {auth.password && !twoFactorPending && (
         <form
+          ref={formRef}
           data-hydrated={hydrated}
           className="flex flex-col gap-4"
           onSubmit={async (event) => {
@@ -141,6 +146,7 @@ export function AuthenticationMethods({
               <FieldLabel htmlFor="auth-name">{t.auth.name}</FieldLabel>
               <Input
                 id="auth-name"
+                name="name"
                 value={values.name}
                 onChange={(event) => setValues((current) => ({ ...current, name: event.target.value }))}
                 required
@@ -151,6 +157,7 @@ export function AuthenticationMethods({
             <FieldLabel htmlFor="auth-email">{t.auth.email}</FieldLabel>
             <Input
               id="auth-email"
+              name="email"
               type="email"
               value={values.email}
               onChange={(event) => setValues((current) => ({ ...current, email: event.target.value }))}
@@ -162,6 +169,7 @@ export function AuthenticationMethods({
             <FieldLabel htmlFor="auth-password">{t.auth.password}</FieldLabel>
             <Input
               id="auth-password"
+              name="password"
               type="password"
               value={values.password}
               onChange={(event) => setValues((current) => ({ ...current, password: event.target.value }))}

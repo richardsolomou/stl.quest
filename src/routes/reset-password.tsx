@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useAuthAction } from '../client/useAuthAction'
+import { useTypedBeforeHydration } from '../client/useTypedBeforeHydration'
 import { CircleAlert } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -26,6 +27,7 @@ function ResetPasswordPage() {
   const { token, error: tokenError } = Route.useSearch()
   const navigate = useNavigate()
   const [password, setPassword] = useState('')
+  const formRef = useTypedBeforeHydration(['password'], (_, value) => setPassword(value))
   const { t } = useI18n()
   const copy = t.auth.resetPassword
   const action = useAuthAction({ failureMessage: () => copy.failed })
@@ -38,6 +40,7 @@ function ResetPasswordPage() {
         <AuthTicket title={copy.title} description={copy.description}>
           <CardContent>
             <form
+              ref={formRef}
               className="flex flex-col gap-4"
               onSubmit={async (event) => {
                 event.preventDefault()
@@ -52,6 +55,7 @@ function ResetPasswordPage() {
                 <FieldLabel htmlFor="reset-password">{copy.newPassword}</FieldLabel>
                 <Input
                   id="reset-password"
+                  name="password"
                   type="password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}

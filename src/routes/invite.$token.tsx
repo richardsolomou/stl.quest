@@ -23,6 +23,7 @@ import { socialProviderName, type SocialAuthProvider } from '../core/auth'
 import { authCapabilitiesQuery } from '../client/queries'
 import { MAX_USER_NAME_LENGTH } from '../core/identity'
 import { appPath } from '../basePath'
+import { useTypedBeforeHydration } from '../client/useTypedBeforeHydration'
 
 export const Route = createFileRoute('/invite/$token')({
   loader: async ({ params }) => {
@@ -95,6 +96,8 @@ function InvitePage() {
     },
   })
 
+  const formRef = useTypedBeforeHydration(['name', 'email', 'password'], (name, value) => form.setFieldValue(name, value))
+
   return (
     <main className="grid min-h-dvh place-items-center p-6">
       <div className="flex w-full max-w-[440px] flex-col gap-8">
@@ -140,6 +143,7 @@ function InvitePage() {
               )}
               {!signedIn && auth.password && (
                 <form
+                  ref={formRef}
                   data-hydrated={hydrated}
                   className="flex flex-col gap-4"
                   onSubmit={(event) => {
@@ -154,6 +158,7 @@ function InvitePage() {
                           <FieldLabel htmlFor="invite-name">{t.auth.name}</FieldLabel>
                           <Input
                             id="invite-name"
+                            name="name"
                             value={field.state.value}
                             onChange={(event) => field.handleChange(event.target.value)}
                             maxLength={MAX_USER_NAME_LENGTH}
@@ -172,6 +177,7 @@ function InvitePage() {
                         <FieldLabel htmlFor="invite-email">{t.auth.email}</FieldLabel>
                         <Input
                           id="invite-email"
+                          name="email"
                           type="email"
                           value={field.state.value}
                           onChange={(event) => field.handleChange(event.target.value)}
@@ -187,6 +193,7 @@ function InvitePage() {
                         <FieldLabel htmlFor="invite-password">{t.auth.password}</FieldLabel>
                         <Input
                           id="invite-password"
+                          name="password"
                           type="password"
                           value={field.state.value}
                           onChange={(event) => field.handleChange(event.target.value)}
@@ -200,7 +207,7 @@ function InvitePage() {
                   </form.Field>
                   <form.Subscribe selector={(state) => state.isSubmitting}>
                     {(busy) => (
-                      <Button type="submit" disabled={busy}>
+                      <Button type="submit" disabled={busy || !hydrated}>
                         {busy && <Spinner />}
                         {busy ? t.auth.working : signingIn ? copy.signInAndJoin : copy.createAndJoin}
                       </Button>
