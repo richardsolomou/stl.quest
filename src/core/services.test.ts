@@ -4431,8 +4431,8 @@ describe('STLQuestService crash recovery', () => {
         const used = async (requestId: string) =>
           (await service.listUsage({ requestId }, admin))
             .filter((event) => event.unit === 'g' && !event.undoneAt)
-            .map(({ consumableId, amount }) => [consumableId, amount])
-            .toSorted()
+            .map(({ consumableId, amount }) => [consumableId, amount] as const)
+            .toSorted((left, right) => (left[0] ?? '').localeCompare(right[0] ?? ''))
 
         beforeEach(async () => {
           await stock('consumables', [petg])

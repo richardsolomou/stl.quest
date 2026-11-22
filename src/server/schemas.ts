@@ -711,7 +711,7 @@ export const spoolmanIngestSchema = z.union([
 ]) satisfies z.ZodType<SpoolmanChange>
 /** What the bridge sends after trying to add a queued spool, in Spoolman's snake case. */
 export const spoolmanRestockResultSchema = z.union([
-  z.object({ id, spool_id: spoolmanKey }).transform(({ id, spool_id }) => ({ id, spoolId: spool_id })),
+  z.object({ id, spool_id: spoolmanKey }).transform((result) => ({ id: result.id, spoolId: result.spool_id })),
   z.object({ id, error: z.string().trim().min(1).max(512) }),
 ]) satisfies z.ZodType<SpoolmanRestockResult>
 export const spoolmanRestockIdSchema = z.object({ id })

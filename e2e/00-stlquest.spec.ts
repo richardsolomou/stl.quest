@@ -2242,7 +2242,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     { filament_id: 9, initial_weight: 1_000 },
   ])
   await page.goto('/settings/spoolman')
-  const spoolsToAdd = page.getByRole('region', { name: 'Spools to add' })
+  const spoolsToAdd = page.getByRole('group', { name: 'Spools to add' })
   await expect(spoolsToAdd).toContainText('Waiting for the bridge')
   expect(
     (
@@ -2250,7 +2250,12 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
     ).status(),
   ).toBe(204)
   await expect(spoolsToAdd).toContainText('Spoolman refused it: Spoolman is busy')
+  await spoolsToAdd.scrollIntoViewIfNeeded()
   await screenshot(page, 'spoolman-restock-failed')
+  await page.setViewportSize({ width: 320, height: 800 })
+  await spoolsToAdd.scrollIntoViewIfNeeded()
+  await screenshot(page, 'spoolman-restock-failed-320')
+  await page.setViewportSize({ width: 1280, height: 720 })
   await spoolsToAdd.getByRole('button', { name: 'Try again' }).click()
   await expect(spoolsToAdd).toContainText('Waiting for the bridge')
   expect((await page.request.post('/api/spoolman/restocks', { headers: bridge, data: { id: restocks[0].id, spool_id: 4 } })).status()).toBe(

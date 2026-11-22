@@ -123,15 +123,16 @@ describe('sendSpools', () => {
 })
 
 const json = (body: unknown, status = 200) => Response.json(body, { status })
+const href = (url: string | URL | Request) => (url instanceof Request ? url.url : url.toString())
 const calls = (fetcher: ReturnType<typeof vi.fn>) =>
-  fetcher.mock.calls.map(([url, init]) => `${(init as RequestInit | undefined)?.method ?? 'GET'} ${String(url)}`)
+  fetcher.mock.calls.map(([url, init]) => `${(init as RequestInit | undefined)?.method ?? 'GET'} ${href(url as string)}`)
 
 describe('syncRestocks', () => {
   const restock = { id: 'r1', filament_id: 2, initial_weight: 1000, comment: 'stlquest-restock:r1' }
 
   it('adds each waiting spool to Spoolman and reports the spool it made', async () => {
     const fetcher = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-      const target = String(url)
+      const target = href(url)
       if (target.endsWith('/api/spoolman/restocks') && !init?.method) return json({ restocks: [restock] })
       if (target.includes('/api/v1/spool?')) return json([])
       if (target.endsWith('/api/v1/spool')) return json({ id: 42 }, 200)
@@ -140,7 +141,7 @@ describe('syncRestocks', () => {
 
     await syncRestocks(config, fetcher)
 
-    expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'POST').map(([url, init]) => [String(url), init?.body])).toEqual([
+    expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'POST').map(([url, init]) => [href(url), init?.body])).toEqual([
       ['http://spoolman:7912/api/v1/spool', JSON.stringify({ filament_id: 2, initial_weight: 1000, comment: 'stlquest-restock:r1' })],
       ['https://stl.quest/api/spoolman/restocks', JSON.stringify({ id: 'r1', spool_id: 42 })],
     ])
@@ -242,8 +243,8 @@ describe('runSpools', () => {
 describe('syncPrints', () => {
   const bambuddy = readConfig({ ...environment, BAMBUDDY_URL: 'http://bambuddy:8000', BAMBUDDY_API_KEY: 'bb_key' })
   const fetcher = (answer: number) =>
-    vi.fn(async (url: string | URL | Request) => {
-      const target = String(url)
+    vi.fn(async (url: string | URL | Request, _init?: RequestInit) => {
+      const target = href(url)
       if (target.includes('/api/v1/print-log/'))
         return json({
           items: [{ id: 5, printer_id: 1, print_name: 'Hull', status: 'completed', completed_at: '2026-11-20T10:00:00' }],

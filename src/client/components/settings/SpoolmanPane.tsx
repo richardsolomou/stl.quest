@@ -195,7 +195,7 @@ function SpoolRestocks({ workspaceSlug, restocks }: { workspaceSlug: string; res
                 : copy.queued
           return (
             <li key={restock.id} className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 py-3 first:pt-0 last:pb-0">
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 basis-56">
                 <p className="font-semibold [overflow-wrap:anywhere]">
                   {name}
                   {restock.grams !== undefined && (

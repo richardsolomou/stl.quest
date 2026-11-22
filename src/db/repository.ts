@@ -4009,7 +4009,7 @@ export class DrizzleRepository implements Repository {
     }))
   }
 
-  async queueSpoolmanRestocks(restocks: SpoolmanRestock[], max: number) {
+  async queueSpoolmanRestocks(restocks: SpoolmanRestock[], limit: number) {
     const workspaceId = await this.workspace()
     return await this.database.transaction(async (tx) => {
       const connected = await tx
@@ -4026,7 +4026,7 @@ export class DrizzleRepository implements Repository {
             .where(and(eq(spoolmanRestocks.workspaceId, workspaceId), ne(spoolmanRestocks.status, 'created')))
             .get()
         )?.total ?? 0
-      if (waiting + restocks.length > max) return false
+      if (waiting + restocks.length > limit) return false
       await tx
         .insert(spoolmanRestocks)
         .values(
@@ -4046,7 +4046,7 @@ export class DrizzleRepository implements Repository {
         .from(spoolmanRestocks)
         .where(and(eq(spoolmanRestocks.workspaceId, workspaceId), eq(spoolmanRestocks.status, 'created')))
         .orderBy(desc(spoolmanRestocks.updatedAt), desc(spoolmanRestocks.id))
-        .limit(max)
+        .limit(limit)
       await tx
         .delete(spoolmanRestocks)
         .where(

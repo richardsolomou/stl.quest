@@ -268,7 +268,7 @@ function OrderLineRow({
   const filaments = consumablesOfKind(consumables, 'filament')
   const addable = match.kind === 'catalogue' && priced && line.linePrice !== undefined
   const addName = match.kind === 'catalogue' ? catalogueName(catalogue, match.presetId, match.colour) : undefined
-  const managed = match.kind === 'spoolman' ? filaments.find(({ id }) => id === match.consumableId) : undefined
+  const managed = match.kind === 'spoolman' ? filaments.find((filament) => filament.id === match.consumableId) : undefined
   const options = [
     ...(addable && addName ? [{ value: ADD, label: copy.add(addName), hex: match.colour.hex }] : []),
     ...(match.kind === 'spoolman'

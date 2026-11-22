@@ -546,10 +546,10 @@ interface RepositoryShape {
   /** Spools to add to Spoolman, newest first. */
   listSpoolmanRestocks(): SpoolmanRestock[]
   /**
-   * Queues spools for the bridge to add to Spoolman, keeping at most `max` of those already added; false when the
-   * workspace is not connected or more than `max` would wait.
+   * Queues spools for the bridge to add to Spoolman, keeping at most `limit` of those already added; false when the
+   * workspace is not connected or more than `limit` would wait.
    */
-  queueSpoolmanRestocks(restocks: SpoolmanRestock[], max: number): boolean
+  queueSpoolmanRestocks(restocks: SpoolmanRestock[], limit: number): boolean
   /** Records what the bridge did with a spool not yet added; false when there is none such. */
   settleSpoolmanRestock(result: SpoolmanRestockResult, now: number): boolean
   /** Queues a spool Spoolman refused again; false when it did not fail. */

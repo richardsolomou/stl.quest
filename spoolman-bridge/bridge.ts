@@ -213,7 +213,7 @@ export function runSpools(runs: BambuddyRun[], usage: BambuddyUsage[]) {
     const spoolId = charge.spoolman_spool_id
     if (spoolId === null || spoolId === undefined || !(charge.weight_used > 0)) continue
     const at = utc(charge.created_at)
-    const run = runs
+    const ended = runs
       .filter(
         (candidate) =>
           candidate.completed_at &&
@@ -223,10 +223,10 @@ export function runSpools(runs: BambuddyRun[], usage: BambuddyUsage[]) {
       .map((candidate) => ({ candidate, gap: Math.abs(utc(candidate.completed_at!) - at) }))
       .filter(({ gap }) => gap <= CHARGE_WINDOW_MS)
       .sort((left, right) => left.gap - right.gap)[0]?.candidate
-    if (!run) continue
-    const spools = charged.get(String(run.id)) ?? new Map<number, number>()
+    if (!ended) continue
+    const spools = charged.get(String(ended.id)) ?? new Map<number, number>()
     spools.set(spoolId, (spools.get(spoolId) ?? 0) + charge.weight_used)
-    charged.set(String(run.id), spools)
+    charged.set(String(ended.id), spools)
   }
   return new Map(
     [...charged].map(([runId, spools]) => [
