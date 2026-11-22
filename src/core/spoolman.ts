@@ -165,20 +165,26 @@ export function matchSpoolmanFilaments(
         (!filament.colourHex || colour?.hex.toUpperCase() === filament.colourHex.toUpperCase())
       )
     })
-    const byColour = filament.colourHex && only(candidates)
-    if (byColour) {
-      matches.set(filament.id, { consumableId: byColour, by: 'colour' })
-      continue
-    }
     const products = Object.entries(catalogue.presets).filter(
       ([, [brand, material]]) => sameText(brand, filament.vendor) && sameText(material, filament.material),
     )
     const presetIds = new Set(products.map(([id]) => id))
-    const colourNames = new Set(
-      Object.values(catalogue.colours)
-        .filter(([presetId]) => presetIds.has(presetId))
-        .map(([, colour]) => words(colour).join(' ')),
-    )
+    const brandColours = Object.values(catalogue.colours).filter(([presetId]) => presetIds.has(presetId))
+    const colourNames = new Set(brandColours.map(([, colour]) => words(colour).join(' ')))
+    const byColour = filament.colourHex && only(candidates)
+    // A name that reads as another of the brand's catalogue filaments ("Matte Charcoal" beside a lone Basic Black) overrules a shared hex.
+    const contradicted =
+      byColour &&
+      filament.name &&
+      brandColours.some(
+        ([presetId, colour]) =>
+          namesFilament(filament.name!, catalogue.presets[presetId], colour, { bareColour: false, colourNames }) &&
+          !candidates.some((candidate) => candidate.filamentPresetId === presetId && sameText(candidate.colour?.name, colour)),
+      )
+    if (byColour && !contradicted) {
+      matches.set(filament.id, { consumableId: byColour, by: 'colour' })
+      continue
+    }
     const byName =
       filament.name &&
       only(

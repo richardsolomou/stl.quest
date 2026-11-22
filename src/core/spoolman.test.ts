@@ -193,6 +193,25 @@ describe('matchSpoolmanFilaments', () => {
       ).toBeUndefined()
     })
 
+    it('leaves a colour match alone when the name names another catalogue filament', () => {
+      const found = matchSpoolmanFilaments(
+        spoolmanFilaments([
+          spool({ externalId: undefined, colourHex: '#000000', vendor: 'Bambu Lab', material: 'PLA', filamentName: 'Matte Charcoal' }),
+        ]),
+        [
+          filament({
+            id: 'basic-black',
+            name: 'basic-black',
+            filamentPresetId: 'filament-bambu-lab-pla',
+            colour: { name: 'Black', hex: '#000000' },
+          }),
+        ],
+        [],
+        SPOOLMAN_CATALOGUE,
+      )
+      expect(found.get(10)).toBeUndefined()
+    })
+
     it('never reads PLA+ as PLA', () => {
       expect(typed(library(['filament-esun-basic-pla', 'Black']), 'eSUN', 'PLA+', 'PLA+ Black')).toBeUndefined()
     })
