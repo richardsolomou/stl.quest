@@ -212,7 +212,9 @@ function namesFilament(
   const colourName = words(colour ?? '').join(' ')
   if (!colourName) return false
   const materialWords = new Set(words(material))
-  const productNames = [words(product), words(product).filter((word) => !materialWords.has(word))].filter((name) => name.length > 0)
+  const productNames = [words(product), words(product).filter((word) => !materialWords.has(word))].filter(
+    (productName) => productName.length > 0,
+  )
   const given = words(name).join(' ')
   return ['', brand, material, `${brand} ${material}`]
     .map((prefix) => words(prefix).join(' '))
