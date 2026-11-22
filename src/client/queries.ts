@@ -235,10 +235,15 @@ function prefetchSettingsSection(queryClient: QueryClient, section: SettingsSect
   }
 }
 
-// Only admins see workspace settings, so loading them for anyone else would only collect authorization errors.
+/**
+ * Only admins see workspace settings, so loading them for anyone else would only collect authorization errors. The server
+ * waits so the section renders with its data; the browser does not, so switching sections is immediate and the pane's
+ * own query joins the fetch already in flight instead of repeating it.
+ */
 export async function preloadSettingsSection(queryClient: QueryClient, section: SettingsSection) {
   const session = await queryClient.ensureQueryData(sessionQuery())
   const workspaceSlug = session.identity?.workspaceSlug
   if (session.identity?.role !== 'admin' || !workspaceSlug) return
-  await Promise.all(prefetchSettingsSection(queryClient, section, workspaceSlug, session.usageTracking))
+  const prefetches = Promise.all(prefetchSettingsSection(queryClient, section, workspaceSlug, session.usageTracking))
+  if (typeof document === 'undefined') await prefetches
 }

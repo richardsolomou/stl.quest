@@ -150,6 +150,28 @@ describe('preloadSettingsSection', () => {
     expect(await preloadedKeys('consumables', { ...admin, usageTracking: false })).not.toContainEqual(['stock', 'workshop'])
   })
 
+  it('waits for the section’s data while rendering on the server', async () => {
+    let settle = () => {}
+    const prefetchQuery = vi.fn(() => new Promise<void>((resolve) => (settle = resolve)))
+    const queryClient = { ensureQueryData: vi.fn().mockResolvedValue(admin), prefetchQuery } as unknown as QueryClient
+    const preload = preloadSettingsSection(queryClient, 'email').then(() => 'loaded')
+    await Promise.resolve()
+    expect(await Promise.race([preload, new Promise((resolve) => setTimeout(() => resolve('waiting'), 10))])).toBe('waiting')
+    settle()
+  })
+
+  it('switches sections in the browser without waiting, so the pane shows its own loading state', async () => {
+    vi.stubGlobal('document', {})
+    try {
+      const prefetchQuery = vi.fn(() => new Promise<void>(() => {}))
+      const queryClient = { ensureQueryData: vi.fn().mockResolvedValue(admin), prefetchQuery } as unknown as QueryClient
+      await expect(preloadSettingsSection(queryClient, 'email')).resolves.toBeUndefined()
+      expect(prefetchQuery).toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('loads nothing for a member, whom the page sends away', async () => {
     expect(await preloadedKeys('equipment', { identity: { role: 'member', workspaceSlug: 'workshop' } })).toEqual([])
   })
