@@ -79,6 +79,7 @@ import {
   validRequestUpdate,
   validSourceUrl,
   type RequestUpdateFields,
+  taggedFileName,
 } from './request'
 import { modelFormat, sourceImageKey } from './assetKeys'
 import { imageContentType, MAX_COVER_BYTES } from './coverImage'
@@ -1602,6 +1603,30 @@ export class STLQuestService {
   }
 
   /**
+   * The models on a plate, each named by its request's tag, for building the one file a slicer opens the plate from;
+   * prints without a model are left out and counted.
+   */
+  async plateModels(plateId: string, identity: Pick<Identity, 'role'>) {
+    await this.requireUsageTracking(identity)
+    const plate = (await this.repository.listPlates()).find(({ id }) => id === plateId)
+    if (!plate) throw new Response(this.text.plates.notFound, { status: 404 })
+    const models: { requestId: string; name: string; path: string; copies: number; updatedAt: number }[] = []
+    for (const { requestId, copies } of plate.items) {
+      const request = await this.repository.getRequest(requestId)
+      if (request?.filePath && request.fileName)
+        models.push({
+          requestId,
+          name: taggedFileName(request.number, request.fileName),
+          path: request.filePath,
+          copies,
+          updatedAt: request.updatedAt,
+        })
+    }
+    if (!models.length) throw new Response(this.text.plates.noModels, { status: 409 })
+    return { plate: { number: plate.number }, models, skipped: plate.items.length - models.length }
+  }
+
+  /**
    * Puts selected copies on a plate. Copies not past Printing start a run on the printer, which moves them there
    * together; copies all past it record a run that already happened.
    */
@@ -2305,7 +2330,7 @@ export class STLQuestService {
   }
 
   /** Only admins record, read, or undo usage, and only while the workspace tracks it; turning tracking off keeps the log. */
-  private async requireUsageTracking(identity: Identity) {
+  private async requireUsageTracking(identity: Pick<Identity, 'role'>) {
     this.requireAdmin(identity)
     if (!(await storedUsageTracking(this.repository))) throw new Response(this.text.usage.trackingOff, { status: 409 })
   }
@@ -2387,7 +2412,7 @@ export class STLQuestService {
     }
   }
 
-  private requireAdmin(identity: Identity) {
+  private requireAdmin(identity: Pick<Identity, 'role'>) {
     if (identity.role !== 'admin') throw new Response(this.text.access.forbidden, { status: 403 })
   }
 

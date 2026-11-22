@@ -26,7 +26,7 @@ STL Quest replaces scattered spreadsheets and chat threads with one shared queue
 1. **Requesters upload models or save source links** with quantity, notes, and a preferred print type. Links to MakerWorld and Printables get their cover automatically, and any linked print can take a pasted or uploaded cover image.
 2. **You choose the queue order** — balance work between requesters, print the oldest request first, or pick whatever fits.
 3. **STL Quest auto-assigns a compatible printer**, or an operator picks one manually.
-4. **Your slicer handles the build** — orientation, arrangement, and supports. A print opens straight in OrcaSlicer, or downloads for any other slicer, named with its request tag such as `SQ-142 Plasma.3mf`.
+4. **Your slicer handles the build** — orientation, arrangement, and supports. A print opens straight in OrcaSlicer, or downloads for any other slicer, named with its request tag such as `SQ-142 Plasma.3mf`. A plate opens the same way as one 3MF holding every copy, each named with its request tag.
 5. **Each copy is tracked** through printing, finishing, and collection.
 
 Along the way:

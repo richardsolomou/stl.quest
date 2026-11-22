@@ -1,24 +1,23 @@
 import { usePostHog } from '@posthog/react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { useServerFn } from '@tanstack/react-start'
 import { toast } from 'sonner'
 import { Button, ButtonLink } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { errorMessage } from '../../core/error'
-import { resolvedSlicer, type Slicer } from '../../core/slicers'
+import type { Slicer } from '../../core/slicers'
 import type { PublicPrintRequest } from '../../core/types'
 import { createSlicerLink } from '../../server/fns'
-import { appPath } from '../../basePath'
 import { requestDownloadHref } from '../boardDownload'
 import { signalProductTourProgress } from '../productTour'
-import { consumablesQuery, printersQuery, usagePrefillsQuery } from '../queries'
+import { slicerFileUrl, usePrinterSlicer } from '../printerSlicer'
 import { useI18n } from '../i18n'
-import { useUsageTracking, useWorkspaceSlug } from '../workspace'
+import { useWorkspaceSlug } from '../workspace'
 
 export function RequestDownloadButton({ request, isAdmin }: { request: PublicPrintRequest; isAdmin: boolean }) {
   const { t } = useI18n()
   const posthog = usePostHog()
-  const slicer = useRequestSlicer(request, isAdmin)
+  const slicer = usePrinterSlicer(request.printer?.id, isAdmin)
   return (
     <>
       {slicer?.openUrl && <OpenInSlicerButton request={request} slicer={slicer} openUrl={slicer.openUrl} />}
@@ -37,23 +36,6 @@ export function RequestDownloadButton({ request, isAdmin }: { request: PublicPri
   )
 }
 
-/**
- * The slicer the request's printer sends its files to, or the material last recorded on that printer when it names its
- * own, which only usage tracking knows; only admins set printers up, so only they see it.
- */
-function useRequestSlicer(request: PublicPrintRequest, isAdmin: boolean) {
-  const workspaceSlug = useWorkspaceSlug()
-  const tracking = useUsageTracking()
-  const printer = useQuery({ ...printersQuery(workspaceSlug), enabled: isAdmin }).data?.profiles.find(
-    ({ id }) => id === request.printer?.id,
-  )
-  const materials = Boolean(printer) && tracking
-  const consumables = useQuery({ ...consumablesQuery(workspaceSlug), enabled: materials }).data?.consumables
-  const loaded = useQuery({ ...usagePrefillsQuery(workspaceSlug), enabled: materials }).data?.materials[printer?.id ?? '']
-  const material = consumables?.find((consumable) => consumable.id === loaded && !consumable.archived)
-  return resolvedSlicer(printer, material && (material.kind === 'resin' || material.kind === 'filament') ? material : undefined)
-}
-
 /** Hands the slicer a signed link to fetch the model itself, since it has no browser session. */
 function OpenInSlicerButton({
   request,
@@ -70,7 +52,7 @@ function OpenInSlicerButton({
   const open = useMutation({
     mutationFn: () => callCreateLink({ data: { workspaceSlug, requestId: request.id, slicer: slicer.id } }),
     onSuccess: ({ path }) => {
-      window.location.href = openUrl(new URL(appPath(path), window.location.origin).href)
+      window.location.href = openUrl(slicerFileUrl(path))
       toast(t.requests.slicer.opening(slicer.name), {
         description: request.modelFormat === '3mf' ? t.requests.slicer.opensProject : t.requests.slicer.opensModel,
       })

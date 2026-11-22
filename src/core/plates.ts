@@ -1,3 +1,4 @@
+import { stripModelExtension } from './assetKeys'
 import { wearPartsFor, type Consumable } from './consumables'
 import { printerCostPerMinute, type CostedPrinter, type PriceCalculatorSettings } from './priceCalculator'
 import { taggedRequestNumber } from './request'
@@ -18,6 +19,21 @@ import { workflow, type StatusId } from './workflow'
 export const MAX_PLATE_PRINTS = 100
 export const MAX_PLATE_OBJECTS = 1_000
 export const MAX_PLATE_FILAMENTS = 32
+/**
+ * The most stored model data one plate file is built from, each model counted once however many copies it has, which
+ * bounds how much a build reads and how long a slicer waits; each model's conversion memory has its own budget.
+ */
+export const MAX_PLATE_FILE_BYTES = 256 * 1024 * 1024
+
+/**
+ * What a plate's combined file is saved as, which slicers take as the project's name. OrcaSlicer also names the only
+ * object of a 3MF it did not write after the file, and its copies keep that name, so a one-model plate is named after
+ * the model to keep its tag.
+ */
+export function plateFileName(number: number, objectNames: string[]) {
+  if (objectNames.length === 1) return `${stripModelExtension(objectNames[0])}.3mf`
+  return `stlquest-plate-${number}.3mf`
+}
 
 export const PLATE_SPLIT_METHODS = ['measured', 'volume', 'estimate', 'even'] as const
 export type PlateSplitMethod = (typeof PLATE_SPLIT_METHODS)[number]
@@ -116,12 +132,13 @@ export function slicedObjectStem(label: string) {
 
 /**
  * The print each object belongs to: by the request tag its name carries, which every copy, cut, and split of a model
- * downloaded from STL Quest keeps, else by its model's file name, else the print's name. When several names fit, the
- * longest wins, so `Hull_Bolter` is not taken for `Hull`. A tag of a request not on the plate falls back to the names.
+ * downloaded or opened from STL Quest keeps, else by its model's file name, else the print's name. When several names
+ * fit, the longest wins, so `Hull_Bolter` is not taken for `Hull`. A tag of a request not on the plate falls back to
+ * the names.
  */
 export function matchSlicedObjects(
   objects: { name?: string }[],
-  prints: { requestId: string; name: string; fileName?: string; number?: number }[],
+  prints: { requestId: string; number?: number; name: string; fileName?: string }[],
 ): (string | undefined)[] {
   const stems = prints
     .flatMap(({ requestId, name, fileName }) => [

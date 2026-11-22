@@ -113,6 +113,29 @@ describe('asset generation queue', () => {
     expect((await repository.assetGenerationJobs(id)).map((job) => job.error)).toContain('model processing exceeded the time limit')
   })
 
+  it('converts a stored model into a plate object', async () => {
+    const xmlPath = path.join(root, 'plate.model')
+    await assets.write('todo/plate.stl', triangleStl(10, 4))
+    expect(await queue.writePlateObject('todo/plate.stl', { id: 1, name: 'SQ-1 plate.stl' }, xmlPath)).toEqual({ width: 10, depth: 4 })
+  })
+
+  it('writes the plate object it converts', async () => {
+    const xmlPath = path.join(root, 'plate.model')
+    await assets.write('todo/plate.stl', triangleStl(10, 4))
+    await queue.writePlateObject('todo/plate.stl', { id: 1, name: 'SQ-1 plate.stl' }, xmlPath)
+    expect(await fs.promises.readFile(xmlPath, 'utf8')).toMatch(/^<object id="1" name="SQ-1 plate.stl".*<\/object>$/)
+  })
+
+  it('fails a plate object whose worker exceeds its deadline', async () => {
+    const worker = path.join(root, 'waiting-worker.mjs')
+    await fs.promises.writeFile(worker, 'setInterval(() => {}, 1000)')
+    queue = new AssetGenerationQueue(repository, assets, events, telemetry, { workerConfig: { path: worker, timeoutMs: 50 } })
+    await assets.write('todo/plate.stl', triangleStl())
+    await expect(
+      queue.writePlateObject('todo/plate.stl', { id: 1, name: 'SQ-1 plate.stl' }, path.join(root, 'plate.model')),
+    ).rejects.toThrow('model processing exceeded the time limit')
+  })
+
   it('regenerates every asset after the model is replaced', async () => {
     const staging = new UploadStaging(await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-assets-staging-')))
     await staging.initialize()

@@ -5,10 +5,11 @@ import { useI18n } from '../../i18n'
 import type { PlateView } from '../../queries'
 import { formatUsageAmount } from '../spend/format'
 import type { PlateMode } from './PlateDialog'
+import { PlateSlicerButton } from './PlateSlicerButton'
 
 /**
- * A printer's plates on its station, one line each: a running plate offers to move on to Finishing as one, and until
- * a plate is recorded it offers to record it, then shows what it used.
+ * A printer's plates on its station, one line each: a running plate opens in its slicer and moves on to Finishing as
+ * one, and until a plate is recorded it offers to record it, then shows what it used.
  */
 export function StationPlates({
   plates,
@@ -35,7 +36,7 @@ export function StationPlates({
             <span className="truncate">{copy.name(plate.number)}</span>
             <span className="shrink-0 font-normal text-muted-foreground">· {copy.station(plate.items.length)}</span>
           </button>
-          <span className="ml-auto flex items-center gap-1">
+          <span className="ml-auto flex flex-wrap items-center justify-end gap-1">
             {plate.recording ? (
               <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground tabular-nums">
                 <Check className="size-3.5" aria-hidden="true" />
@@ -59,6 +60,7 @@ export function StationPlates({
                 )}
               </>
             )}
+            {plate.stage === 'in_progress' && <PlateSlicerButton plate={plate} size="xs" />}
             {plate.stage === 'in_progress' && onMove && (
               <Button type="button" size="xs" onClick={() => onMove(plate, 'post_processing')}>
                 {copy.moveTo(finishing)}
