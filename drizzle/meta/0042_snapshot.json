@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "057d48c9-d462-4904-a442-c05f0062d171",
+  "id": "9b5e6c2c-f89d-4bb2-a67d-fb7635ddc8b4",
   "prevId": "a90caf92-2e06-4c61-aa87-128a43571427",
   "tables": {
     "asset_generation_jobs": {
@@ -590,6 +590,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "last_request_number": {
+          "name": "last_request_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {

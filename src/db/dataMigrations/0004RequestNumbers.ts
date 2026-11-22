@@ -11,7 +11,15 @@ const requests = sqliteTable('requests', {
   createdAt: integer('created_at').notNull(),
 })
 
-/** Numbers each workspace's existing requests from 1 in the order they were made, so every request has its `SQ-<number>` tag. */
+const organization = sqliteTable('organization', {
+  id: text('id').notNull(),
+  lastRequestNumber: integer('last_request_number').notNull(),
+})
+
+/**
+ * Numbers each workspace's existing requests from 1 in the order they were made, so every request has its `SQ-<number>`
+ * tag, and starts the workspace's counter after the last of them.
+ */
 export const requestNumbersMigration: DataMigration = {
   id: '0004_request_numbers',
   after: 'request_numbers',
@@ -30,6 +38,9 @@ export const requestNumbersMigration: DataMigration = {
         .set({ number })
         .where(and(eq(requests.workspaceId, row.workspaceId), eq(requests.id, row.id)))
         .run()
+    }
+    for (const [workspaceId, lastRequestNumber] of next) {
+      await database.update(organization).set({ lastRequestNumber }).where(eq(organization.id, workspaceId)).run()
     }
   },
 }

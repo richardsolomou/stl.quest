@@ -23,7 +23,7 @@ export const requests = pgTable(
     workspaceId: text('workspace_id')
       .notNull()
       .references(() => organization.id, { onDelete: 'cascade' }),
-    /** One more than the workspace's highest when the request is made, so it makes the request's `SQ-<number>` tag; set on every row. */
+    /** Taken from the workspace's `last_request_number` when the request is made, so it makes the request's `SQ-<number>` tag. */
     number: integer('number'),
     name: text().notNull(),
     fileName: text('file_name'),

@@ -1,5 +1,5 @@
 {
-  "id": "58fa1181-2ade-42c1-bf97-3688f8488bac",
+  "id": "f278f9bb-224a-4b43-88b6-e3bd419ec4ce",
   "prevId": "13217eae-faf3-42dc-940a-bfbd8b5a21cf",
   "version": "7",
   "dialect": "postgresql",
@@ -629,6 +629,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "last_request_number": {
+          "name": "last_request_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         }
       },
       "indexes": {

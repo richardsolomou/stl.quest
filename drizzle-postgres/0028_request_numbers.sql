@@ -1,3 +1,4 @@
+ALTER TABLE "organization" ADD COLUMN "last_request_number" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
 ALTER TABLE "consumables" ADD COLUMN "slicer" text;--> statement-breakpoint
 ALTER TABLE "printers" ADD COLUMN "slicer" text;--> statement-breakpoint
 ALTER TABLE "requests" ADD COLUMN "number" integer;--> statement-breakpoint

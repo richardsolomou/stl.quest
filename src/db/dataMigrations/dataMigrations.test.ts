@@ -167,7 +167,10 @@ describe.each(backends)('upgrading stored inventory (%s)', (dialect) => {
     await backend.migrateSchema('usage_events')
     repository = await DrizzleRepository.create(backend, { initialize: false })
     const now = new Date()
-    await backend.database.insert(organization).values({ id: 'farm', name: 'Farm', slug: 'farm', createdAt: now }).run()
+    // Raw SQL: the live `organization` schema has columns this release's table does not.
+    await backend.database.run(
+      sql`INSERT INTO organization (id, name, slug, "createdAt") VALUES ('farm', 'Farm', 'farm', ${now.toISOString()})`,
+    )
     await backend.database
       .insert(user)
       .values({
@@ -344,6 +347,25 @@ describe.each(backends)('upgrading stored inventory (%s)', (dialect) => {
       { id: 'second', number: 2 },
       { id: 'third', number: 3 },
     ])
+  })
+
+  it('continues numbering after the requests that existed, even once the newest is deleted', async () => {
+    await released()
+    for (const [id, createdAt] of [
+      ['first', 10],
+      ['second', 20],
+    ] as const) {
+      await backend.database.run(sql`
+        INSERT INTO requests (id, workspace_id, name, file_name, file_path, quantity, owner_user_id, created_at, updated_at)
+        VALUES (${id}, 'farm', ${id}, ${`${id}.stl`}, ${`${id}.stl`}, 1, 'maker', ${createdAt}, ${createdAt})
+      `)
+    }
+
+    const upgraded = await upgrade()
+    await upgraded.deleteRequest('second')
+    const model = { name: 'Model', fileName: 'model.stl', filePath: 'todo/model.stl', quantity: 1, ownerUserId: 'maker' }
+
+    expect((await upgraded.getRequest(await upgraded.createRequest(model)))?.number).toBe(3)
   })
 
   it('creates no printers for a workspace whose v1.52 costing never saved any', async () => {
