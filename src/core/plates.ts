@@ -68,7 +68,10 @@ export type PlateMaterialChoice = { consumableId: string } | { name: string; pri
 
 /** A slicer file's amounts: each object's material per filament slot, assigned to a print or to none. */
 export type PlateMeasured = { objects: { requestId?: string; amounts: number[] }[]; overhead: number[] }
-/** A plate's total per filament slot, typed from the slicer summary or reported by the printer, with the share of it that went to things not in STL Quest. */
+/**
+ * A plate's total per filament slot, typed from the slicer summary or reported by the printer, with the share of it that
+ * went to things not in STL Quest.
+ */
 export type PlateTotals = { totals: number[]; otherShare: number }
 
 export type PlateRecordInput = { plateId: string; minutes: number; materials: PlateMaterialChoice[] } & (PlateMeasured | PlateTotals)
