@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.8.1
+
+### Patch Changes
+
+- 05254f9: Stop automatic assignment from moving prints that are already made onto another printer, and detach past prints it had moved, so a newly added printer no longer shows hours it never ran.
+
 ## 2.8.0
 
 ### Minor Changes
