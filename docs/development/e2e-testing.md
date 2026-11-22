@@ -14,9 +14,15 @@ Run the complete suite:
 just e2e
 ```
 
-Every checkout on a machine shares the e2e image tag, container names, ports, and data directories, so each `just e2e*` command holds a machine-wide lock for its whole build and run. A second checkout's command waits for the first to finish instead of rebuilding its image or removing its containers mid-run. A lock left by a killed run is removed automatically once its process is gone.
+`PLAYWRIGHT_PORT` (default 4173) names a run. Its image tag, container names, ports, and data directories all derive from it, so checkouts that pick ports at least 400 apart run side by side:
 
-Use `CI=1 just e2e` to match CI reporting and trace behavior. For faster reruns against the current `stlquest-e2e` image, use `just e2e-run`. Set `PLAYWRIGHT_DEV_SERVER=1` only when debugging against an existing `just dev` process.
+```sh
+PLAYWRIGHT_PORT=4573 just e2e
+```
+
+Runs on the same port hold that port's lock for their whole build and run, so a second command on it waits instead of rebuilding its image or removing its containers mid-run. `just e2e-distributed` uses fixed ports and names, so it also holds one machine-wide lock. A lock left by a killed run is removed automatically once its process is gone.
+
+Use `CI=1 just e2e` to match CI reporting and trace behavior. For faster reruns against the current build, use `just e2e-run`. Set `PLAYWRIGHT_DEV_SERVER=1` only when debugging against an existing `just dev` process.
 
 Run the distributed realtime topology separately:
 

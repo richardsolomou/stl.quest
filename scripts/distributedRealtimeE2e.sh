@@ -6,6 +6,7 @@ redis_name=stlquest-e2e-distributed-redis
 first_name=stlquest-e2e-distributed-a
 second_name=stlquest-e2e-distributed-b
 network=stlquest-e2e-distributed
+image=${STLQUEST_E2E_IMAGE:-$(sh scripts/e2eImage.sh)}
 s3_port=49000
 first_port=4273
 second_port=4274
@@ -73,7 +74,7 @@ start_replica() {
     -e STRIPE_SUPPORTER_PRICE_ID=price_supporter \
     -e STRIPE_PRO_PRICE_ID=price_pro \
     -e BETTER_AUTH_URL=http://127.0.0.1:$first_port \
-    stlquest-e2e >/dev/null
+    "$image" >/dev/null
 }
 
 wait_for_replica() {
