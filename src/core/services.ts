@@ -1609,11 +1609,17 @@ export class STLQuestService {
     await this.requireUsageTracking(identity)
     const plate = (await this.repository.listPlates()).find(({ id }) => id === plateId)
     if (!plate) throw new Response(this.text.plates.notFound, { status: 404 })
-    const models: { requestId: string; name: string; path: string; copies: number }[] = []
+    const models: { requestId: string; name: string; path: string; copies: number; updatedAt: number }[] = []
     for (const { requestId, copies } of plate.items) {
       const request = await this.repository.getRequest(requestId)
       if (request?.filePath && request.fileName)
-        models.push({ requestId, name: taggedFileName(request.number, request.fileName), path: request.filePath, copies })
+        models.push({
+          requestId,
+          name: taggedFileName(request.number, request.fileName),
+          path: request.filePath,
+          copies,
+          updatedAt: request.updatedAt,
+        })
     }
     if (!models.length) throw new Response(this.text.plates.noModels, { status: 409 })
     return { plate: { number: plate.number }, models, skipped: plate.items.length - models.length }

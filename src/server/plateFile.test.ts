@@ -1,11 +1,12 @@
 import fs from 'node:fs'
 import os from 'node:os'
-import { afterEach, describe, expect, it } from 'vitest'
+import { join } from 'node:path'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { strFromU8, unzipSync } from 'fflate'
 import { MAX_PLATE_FILE_BYTES } from '../core/plates'
 import { parseThreeMf } from '../core/mesh/threeMf'
 import { type PlateObject, writePlateObject } from './assets/plateObject'
-import { checkedPlateModels, PlateFiles, PlateModelError } from './plateFile'
+import { checkedPlateModels, MAX_CACHED_PLATES, PlateFiles, PlateModelError, sweepPlateDirectories } from './plateFile'
 
 // One triangle in ASCII STL, so any two files differ only by name.
 const triangle = new TextEncoder().encode(`solid t
@@ -53,8 +54,8 @@ const assets = {
 }
 
 const models = [
-  { requestId: 'hull', name: 'SQ-7 hull.stl', path: 'todo/hull.stl', copies: 2 },
-  { requestId: 'turret', name: 'SQ-8 turret.stl', path: 'todo/turret.stl', copies: 1 },
+  { requestId: 'hull', name: 'SQ-7 hull.stl', path: 'todo/hull.stl', copies: 2, updatedAt: 0 },
+  { requestId: 'turret', name: 'SQ-8 turret.stl', path: 'todo/turret.stl', copies: 1, updatedAt: 0 },
 ]
 
 function context(listed = models) {
@@ -66,11 +67,12 @@ function context(listed = models) {
 }
 
 /** Converts in process, as the asset queue does under tests, counting the models it converts. */
-function plateFiles(keepMs?: number) {
+function plateFiles(keepMs?: number, before: () => Promise<void> = async () => undefined) {
   const converted: string[] = []
   const converter = {
     writePlateObject: async (path: string, object: PlateObject, xmlPath: string) => {
       converted.push(path)
+      await before()
       return writePlateObject(files.get(path)!, object, xmlPath)
     },
   }
@@ -79,8 +81,13 @@ function plateFiles(keepMs?: number) {
 
 const opened: PlateFiles[] = []
 afterEach(async () => {
+  vi.restoreAllMocks()
   await Promise.all(opened.splice(0).map((plates) => plates.close()))
 })
+
+function within<T>(promise: Promise<T>, ms = 2000) {
+  return Promise.race([promise.then(() => 'settled'), new Promise((resolve) => setTimeout(resolve, ms, 'stuck'))])
+}
 
 async function bytes(listed = models) {
   const { files: plates } = plateFiles()
@@ -93,7 +100,7 @@ async function written() {
   return { archive, model: strFromU8(archive['3D/3dmodel.model']) }
 }
 
-const bigPlate = [{ requestId: 'big', name: 'SQ-5 big.stl', path: 'todo/big.stl', copies: 1 }]
+const bigPlate = [{ requestId: 'big', name: 'SQ-5 big.stl', path: 'todo/big.stl', copies: 1, updatedAt: 0 }]
 
 describe('PlateFiles', () => {
   it('holds every copy of every model', async () => {
@@ -117,21 +124,23 @@ describe('PlateFiles', () => {
 
   it('refuses the plate before sending anything when a model cannot be read as a mesh', async () => {
     files.set('todo/broken.stl', new TextEncoder().encode('not a mesh'))
-    await expect(bytes([{ requestId: 'broken', name: 'SQ-9 broken.stl', path: 'todo/broken.stl', copies: 1 }])).rejects.toMatchObject({
+    await expect(
+      bytes([{ requestId: 'broken', name: 'SQ-9 broken.stl', path: 'todo/broken.stl', copies: 1, updatedAt: 0 }]),
+    ).rejects.toMatchObject({
       model: { requestId: 'broken' },
     })
   })
 
   it('refuses a model with no triangle that has any area', async () => {
     files.set('todo/flat.stl', new TextEncoder().encode(new TextDecoder().decode(triangle).replace('vertex 10 0 0', 'vertex 0 0 0')))
-    await expect(bytes([{ requestId: 'flat', name: 'SQ-6 flat.stl', path: 'todo/flat.stl', copies: 1 }])).rejects.toBeInstanceOf(
-      PlateModelError,
-    )
+    await expect(
+      bytes([{ requestId: 'flat', name: 'SQ-6 flat.stl', path: 'todo/flat.stl', copies: 1, updatedAt: 0 }]),
+    ).rejects.toBeInstanceOf(PlateModelError)
   })
 
   it('leaves no temporary file behind when a build fails', async () => {
     const before = await plateDirectories()
-    await bytes([{ requestId: 'broken', name: 'SQ-9 broken.stl', path: 'todo/broken.stl', copies: 1 }]).catch(() => undefined)
+    await bytes([{ requestId: 'broken', name: 'SQ-9 broken.stl', path: 'todo/broken.stl', copies: 1, updatedAt: 0 }]).catch(() => undefined)
     expect(await plateDirectories()).toEqual(before)
   })
 
@@ -160,6 +169,39 @@ describe('PlateFiles', () => {
     expect(await plateDirectories()).toEqual(before)
   })
 
+  it('closes while a build runs and another waits', async () => {
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const { files: plates } = plateFiles(undefined, () => gate)
+    const running = plates.open('plate', models).catch(() => undefined)
+    const queued = plates.open('plate', models.slice(1)).catch(() => undefined)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    const closing = plates.close()
+    release()
+    await expect(within(Promise.all([closing, running, queued]))).resolves.toBe('settled')
+  })
+
+  it('rebuilds a plate file that expired while it was being opened', async () => {
+    const { files: plates } = plateFiles(20)
+    opened.push(plates)
+    await new Response((await plates.open('plate', models)).stream).arrayBuffer()
+    const open = fs.promises.open
+    vi.spyOn(fs.promises, 'open').mockImplementationOnce(async (...args) => {
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      return await open(...args)
+    })
+    expect(parseThreeMf(new Uint8Array(await new Response((await plates.open('plate', models)).stream).arrayBuffer())).length / 9).toBe(3)
+  })
+
+  it('keeps only the most recent plate files', async () => {
+    const before = await plateDirectories()
+    const { files: plates } = plateFiles()
+    opened.push(plates)
+    for (let copies = 1; copies <= MAX_CACHED_PLATES + 2; copies++)
+      await new Response((await plates.open('plate', [{ ...models[1], copies }])).stream).arrayBuffer()
+    expect((await plateDirectories()).filter((name) => !before.includes(name))).toHaveLength(MAX_CACHED_PLATES)
+  })
+
   it('does not hold up the next plate while a download is paused', async () => {
     const { files: plates } = plateFiles()
     opened.push(plates)
@@ -177,6 +219,39 @@ async function plateDirectories() {
   return (await fs.promises.readdir(os.tmpdir())).filter((name) => name.startsWith('stlquest-plate-')).sort()
 }
 
+describe('sweepPlateDirectories', () => {
+  async function directory(name: string, ageMs: number) {
+    const made = join(os.tmpdir(), name)
+    await fs.promises.mkdir(made, { recursive: true })
+    const at = new Date(Date.now() - ageMs)
+    await fs.promises.utimes(made, at, at)
+    return made
+  }
+
+  afterEach(async () => {
+    for (const name of ['stlquest-plate-swept', 'stlquest-plate-fresh', 'other-plate-swept'])
+      await fs.promises.rm(join(os.tmpdir(), name), { recursive: true, force: true })
+  })
+
+  it('removes plate files older than their links', async () => {
+    await directory('stlquest-plate-swept', 60_000)
+    await sweepPlateDirectories(30_000)
+    expect(await plateDirectories()).not.toContain('stlquest-plate-swept')
+  })
+
+  it('keeps plate files whose links may still work', async () => {
+    await directory('stlquest-plate-fresh', 0)
+    await sweepPlateDirectories(30_000)
+    expect(await plateDirectories()).toContain('stlquest-plate-fresh')
+  })
+
+  it('keeps other temporary files', async () => {
+    const other = await directory('other-plate-swept', 60_000)
+    await sweepPlateDirectories(30_000)
+    expect(fs.existsSync(other)).toBe(true)
+  })
+})
+
 describe('checkedPlateModels', () => {
   it('sums the copies on the plate', async () => {
     expect(await checkedPlateModels(context(), 'plate')).toMatchObject({ copies: 3 })
@@ -184,19 +259,19 @@ describe('checkedPlateModels', () => {
 
   it('refuses a model missing from storage', async () => {
     await expect(
-      checkedPlateModels(context([{ requestId: 'gone', name: 'SQ-1 gone.stl', path: 'todo/gone.stl', copies: 1 }]), 'plate'),
+      checkedPlateModels(context([{ requestId: 'gone', name: 'SQ-1 gone.stl', path: 'todo/gone.stl', copies: 1, updatedAt: 0 }]), 'plate'),
     ).rejects.toMatchObject({ status: 404 })
   })
 
   it('refuses models that add up to more than one plate file holds', async () => {
     sizes.set('todo/huge.stl', MAX_PLATE_FILE_BYTES / 2 + 1)
-    const huge = { requestId: 'huge', name: 'SQ-2 huge.stl', path: 'todo/huge.stl', copies: 4 }
+    const huge = { requestId: 'huge', name: 'SQ-2 huge.stl', path: 'todo/huge.stl', copies: 4, updatedAt: 0 }
     await expect(checkedPlateModels(context([huge, { ...huge, requestId: 'again' }]), 'plate')).rejects.toMatchObject({ status: 413 })
   })
 
   it('counts a model once however many copies it has', async () => {
     sizes.set('todo/big.stl', MAX_PLATE_FILE_BYTES / 2)
-    const big = { requestId: 'big', name: 'SQ-4 big.stl', path: 'todo/big.stl', copies: 4 }
+    const big = { requestId: 'big', name: 'SQ-4 big.stl', path: 'todo/big.stl', copies: 4, updatedAt: 0 }
     expect(await checkedPlateModels(context([big]), 'plate')).toMatchObject({ copies: 4 })
   })
 })

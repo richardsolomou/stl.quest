@@ -3795,11 +3795,28 @@ describe('STLQuestService crash recovery', () => {
       it('lists a plate’s models named by their request tags', async () => {
         const requestId = await filamentPrint()
         const { id } = await plate(requestId)
-        const { number } = (await repository.getRequest(requestId))!
+        const { number, updatedAt } = (await repository.getRequest(requestId))!
 
         expect((await service.plateModels(id, admin)).models).toEqual([
-          { requestId, name: `SQ-${number} model.stl`, path: 'todo/model.stl', copies: 1 },
+          { requestId, name: `SQ-${number} model.stl`, path: 'todo/model.stl', copies: 1, updatedAt },
         ])
+      })
+
+      it('lists a replaced model of the same name as changed', async () => {
+        const requestId = await filamentPrint()
+        const { id } = await plate(requestId)
+        async function replace(uploadId: string, contents: string) {
+          const part = staging.uploadPart(uploadId)
+          await fs.promises.writeFile(part, contents)
+          await repository.createUploadSession(uploadId, admin.id, Date.now() + 60_000, contents.length)
+          await service.attachModel(uploadId, part, requestId, 'model.stl', admin)
+        }
+        await replace('replace-first', 'broken mesh')
+        const before = (await service.plateModels(id, admin)).models
+        await new Promise((resolve) => setTimeout(resolve, 2))
+        await replace('replace-second', 'fixed mesh')
+
+        expect((await service.plateModels(id, admin)).models).not.toEqual(before)
       })
 
       it('leaves prints without a model out of a plate’s models', async () => {

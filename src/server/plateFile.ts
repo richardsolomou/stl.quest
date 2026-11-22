@@ -25,7 +25,8 @@ import { SLICER_LINK_TTL_MS } from './slicerLinks'
 /** Room between copies, in millimetres, so the slicer opens the plate with nothing overlapping. */
 const COPY_GAP = 5
 
-export type PlateFileModel = { requestId: string; name: string; path: string; copies: number }
+/** `updatedAt` is in the cache key because a replacement model of the same file name lands on the same path. */
+export type PlateFileModel = { requestId: string; name: string; path: string; copies: number; updatedAt: number }
 
 /** A plate's models once each is in storage and together they fit in one file, or the Response saying why not. */
 export async function checkedPlateModels(
@@ -60,6 +61,22 @@ export class PlateModelError extends Error {
 
 type BuiltPlate = { file: Promise<string>; expiry?: ReturnType<typeof setTimeout> }
 
+const PLATE_DIRECTORY_PREFIX = 'stlquest-plate-'
+
+/** The most built plate files a workspace keeps, so changing a plate and fetching it again does not fill the disk. */
+export const MAX_CACHED_PLATES = 4
+
+/** Removes plate files a previous process left behind once no link to them can still work. */
+export async function sweepPlateDirectories(maxAgeMs = SLICER_LINK_TTL_MS) {
+  const root = os.tmpdir()
+  for (const name of await fs.promises.readdir(root)) {
+    if (!name.startsWith(PLATE_DIRECTORY_PREFIX)) continue
+    const directory = path.join(root, name)
+    const stats = await fs.promises.stat(directory).catch(() => undefined)
+    if (stats?.isDirectory() && Date.now() - stats.mtimeMs > maxAgeMs) await fs.promises.rm(directory, { recursive: true, force: true })
+  }
+}
+
 /**
  * A workspace's plate files, each built whole into a temporary file before anything is sent, so a failed conversion
  * is an error response rather than a truncated download, and a slow client only holds its own file open. A built file
@@ -69,6 +86,7 @@ export class PlateFiles {
   // One build at a time per workspace; each model's conversion also waits for the asset worker's memory budget.
   private builds = new PQueue({ concurrency: 1 })
   private built = new Map<string, BuiltPlate>()
+  private closed = false
 
   constructor(
     private converter: Pick<AssetGenerationQueue, 'writePlateObject'>,
@@ -77,29 +95,50 @@ export class PlateFiles {
 
   async open(plateId: string, models: PlateFileModel[]) {
     const key = JSON.stringify([plateId, models])
-    let entry = this.built.get(key)
-    if (!entry) {
-      const built: BuiltPlate = { file: this.builds.add(() => this.build(models)) }
-      this.built.set(key, built)
-      built.file.then(
-        () => {
-          built.expiry = setTimeout(() => void this.discard(key), this.keepMs)
-          built.expiry.unref()
-        },
-        () => this.built.delete(key),
-      )
-      entry = built
+    for (;;) {
+      const entry = this.built.get(key) ?? this.start(key, models)
+      const file = await entry.file
+      // Opened before returning, so the file outlives its removal for as long as this response reads it.
+      const handle = await fs.promises.open(file).catch((error: NodeJS.ErrnoException) => {
+        // Expiry or eviction can remove the file between its build and this open; that entry is gone, so build again.
+        if (error.code === 'ENOENT' && this.built.get(key) !== entry) return undefined
+        throw error
+      })
+      if (!handle) continue
+      const { size } = await handle.stat()
+      return { stream: Readable.toWeb(handle.createReadStream()) as ReadableStream, size }
     }
-    // Opened before returning, so the file outlives its expiry for as long as this response reads it.
-    const handle = await fs.promises.open(await entry.file)
-    const { size } = await handle.stat()
-    return { stream: Readable.toWeb(handle.createReadStream()) as ReadableStream, size }
   }
 
   async close() {
-    this.builds.clear()
+    this.closed = true
     await this.builds.onIdle()
     await Promise.all([...this.built.keys()].map((key) => this.discard(key)))
+  }
+
+  private start(key: string, models: PlateFileModel[]) {
+    const built: BuiltPlate = {
+      file: this.builds.add(async () => {
+        if (this.closed) throw new Error('plate files are closed')
+        return await this.build(models)
+      }),
+    }
+    this.built.set(key, built)
+    built.file.then(
+      () => {
+        built.expiry = setTimeout(() => void this.discard(key), this.keepMs)
+        built.expiry.unref()
+        this.evict()
+      },
+      () => this.built.delete(key),
+    )
+    return built
+  }
+
+  /** Drops the oldest built files past the limit; a response already reading one keeps its open handle. */
+  private evict() {
+    const ready = [...this.built].filter(([, entry]) => entry.expiry)
+    for (const [key] of ready.slice(0, Math.max(0, ready.length - MAX_CACHED_PLATES))) void this.discard(key)
   }
 
   private async discard(key: string) {
@@ -112,7 +151,7 @@ export class PlateFiles {
   }
 
   private async build(models: PlateFileModel[]) {
-    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stlquest-plate-'))
+    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), PLATE_DIRECTORY_PREFIX))
     try {
       const xmlPath = path.join(directory, '3dmodel.model')
       await fs.promises.writeFile(xmlPath, threeMfModelStart())

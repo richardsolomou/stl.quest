@@ -23,7 +23,7 @@ import { normalizeBoardConfig, seesOnlyOwnRequests } from '../core/visibility'
 import { workflow } from '../core/workflow'
 import { accountDeletionWorkspaces, MEMBER_ACTIVITY_INTERVAL_MS } from '../core/workspaces'
 import { AssetGenerationQueue, resolveAssetQueueLimits } from './assets/queue'
-import { PlateFiles } from './plateFile'
+import { PlateFiles, sweepPlateDirectories } from './plateFile'
 import { APIError } from 'better-auth/api'
 import { createAuth } from './auth'
 import { deliveryTracker, emailNotifier, readEmailBranding, workspaceMailer, type DeliveryTracker } from './notifications'
@@ -425,6 +425,7 @@ async function createApp() {
     await localStaging?.sweepUploads(activeUploadIds)
     const { cleanExpiredTusUploads } = await import('./uploads')
     await cleanExpiredTusUploads(uploadDatastore)
+    await sweepPlateDirectories()
     for (const workspace of await repository.listWorkspaces()) {
       const scopedRepository = await repository.scoped(workspace.id)
       if (
