@@ -3072,6 +3072,22 @@ describe('STLQuestService crash recovery', () => {
         expect((await repository.listInventory('consumables')).find(({ id }) => id === ipa.id)?.storeId).toBeUndefined()
       })
 
+      it('refuses to buy a consumable from a deleted store', async () => {
+        await service.createInventoryItem('stores', { id: 'bambu', name: 'Bambu Lab EU' }, admin)
+        await archive('stores', 'bambu')
+        await service.deleteInventoryItem('stores', 'bambu', admin)
+
+        await expect(service.updateInventoryItem('consumables', { ...ipa, storeId: 'bambu' }, admin)).rejects.toMatchObject({
+          status: 409,
+        })
+      })
+
+      it('refuses to add a consumable bought from a deleted store', async () => {
+        await expect(service.createInventoryItem('consumables', { ...ipa, id: 'new-ipa', storeId: 'gone' }, admin)).rejects.toMatchObject({
+          status: 409,
+        })
+      })
+
       it('removes the item', async () => {
         await archive('equipment', wash.id)
 

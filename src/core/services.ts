@@ -1804,9 +1804,11 @@ export class STLQuestService {
     change: (items: InventoryItems[Kind][]) => InventoryItems[Kind][],
   ) {
     this.requireAdmin(identity)
+    // Read outside the lock, so a store deleted in that moment is still refused, by the foreign key instead.
+    const stores = kind === 'consumables' ? new Set((await this.repository.listInventory('stores')).map(({ id }) => id)) : undefined
     const { previous, items } = await this.repository.changeInventory(kind, (current) => {
       const next = change(current)
-      this.validateInventory(kind, current, next)
+      this.validateInventory(kind, current, next, stores)
       return next
     })
     this.changed('inventory.changed')
@@ -1815,17 +1817,25 @@ export class STLQuestService {
   }
 
   /** Checks only what the change touched, so an item stored before a rule existed never blocks editing another. */
-  private validateInventory<Kind extends InventoryKind>(kind: Kind, previous: InventoryItems[Kind][], next: InventoryItems[Kind][]) {
+  private validateInventory<Kind extends InventoryKind>(
+    kind: Kind,
+    previous: InventoryItems[Kind][],
+    next: InventoryItems[Kind][],
+    stores: Set<string> | undefined,
+  ) {
     const active = activeItems(next).length
     if (active > INVENTORY_LIMITS[kind] && active > activeItems(previous).length)
       throw new Response(this.text.inventory.full(INVENTORY_LIMITS[kind]), { status: 409 })
-    if (kind !== 'printers') return
     const stored = new Map(previous.map((item) => [item.id, JSON.stringify(item)]))
-    for (const printer of next as PrinterProfile[]) {
-      if (stored.get(printer.id) === JSON.stringify(printer)) continue
-      const error = printerValidationError(printer, next as PrinterProfile[], this.messages())
-      if (error) throw new Response(error, { status: 400 })
+    const changed = next.filter((item) => stored.get(item.id) !== JSON.stringify(item))
+    if (kind === 'printers') {
+      for (const printer of changed as PrinterProfile[]) {
+        const error = printerValidationError(printer, next as PrinterProfile[], this.messages())
+        if (error) throw new Response(error, { status: 400 })
+      }
     }
+    if (stores && (changed as Consumable[]).some(({ storeId }) => storeId !== undefined && !stores.has(storeId)))
+      throw new Response(this.text.inventory.storeMissing, { status: 409 })
   }
 
   private captureInventory<Kind extends InventoryKind>(
