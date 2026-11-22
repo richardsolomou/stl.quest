@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { ContextMenu as ContextMenuPrimitive } from '@base-ui/react/context-menu'
+import { ChevronRight } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
@@ -67,4 +68,24 @@ function ContextMenuSeparator({ className, ...props }: ContextMenuPrimitive.Sepa
   )
 }
 
-export { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger }
+function ContextMenuSub(props: ContextMenuPrimitive.SubmenuRoot.Props) {
+  return <ContextMenuPrimitive.SubmenuRoot data-slot="context-menu-sub" {...props} />
+}
+
+function ContextMenuSubTrigger({ className, children, ...props }: ContextMenuPrimitive.SubmenuTrigger.Props) {
+  return (
+    <ContextMenuPrimitive.SubmenuTrigger
+      data-slot="context-menu-sub-trigger"
+      className={cn(
+        'flex h-7 w-full cursor-default items-center gap-2 rounded-md px-2 text-left [&_svg]:shrink-0 [&_svg:not([class*=size-])]:size-3.5 outline-none select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-popup-open:bg-accent data-popup-open:text-accent-foreground',
+        className,
+      )}
+      {...props}
+    >
+      {children}
+      <ChevronRight className="ml-auto" />
+    </ContextMenuPrimitive.SubmenuTrigger>
+  )
+}
+
+export { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubTrigger, ContextMenuTrigger }

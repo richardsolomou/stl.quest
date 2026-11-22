@@ -929,6 +929,36 @@ describe('STLQuestService crash recovery', () => {
     expect((await repository.getRequest(id))?.printerId).toBe(largeResinPrinter.id)
   })
 
+  it('assigns several prints to one printer at once', async () => {
+    await stock('printers', [slaPrinter, largeResinPrinter])
+    const ids = [await request(), await request()]
+
+    await service.assignRequests(ids, largeResinPrinter.id, admin)
+
+    expect((await Promise.all(ids.map((id) => repository.getRequest(id)))).map((print) => print?.printerId)).toEqual([
+      largeResinPrinter.id,
+      largeResinPrinter.id,
+    ])
+  })
+
+  it('lets only admins assign prints to a printer', async () => {
+    await stock('printers', [slaPrinter])
+
+    await expect(service.assignRequests([await request()], slaPrinter.id, requester)).rejects.toMatchObject({ status: 403 })
+  })
+
+  it('leaves a new print on its print type when the workspace assigns printers by hand', async () => {
+    await stock('printers', [slaPrinter, largeResinPrinter])
+    await repository.setSetting('board', { manualPrinterAssignment: true })
+
+    const id = await service.createRequest(
+      { name: 'Unassigned', fileName: 'unassigned.stl', filePath: 'todo/unassigned.stl', quantity: 1, requestedPrintType: 'resin' },
+      requester,
+    )
+
+    expect(await repository.getRequest(id)).toMatchObject({ printerId: undefined, requestedPrintType: 'resin' })
+  })
+
   it('archives prints out of the board and moves them back with their stages intact', async () => {
     const id = await request()
     await service.moveCopies({ id, from: 'todo', to: 'done', count: 1 }, admin)

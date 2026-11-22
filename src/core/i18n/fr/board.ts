@@ -88,6 +88,7 @@ export const board: typeof en = {
       `${prints} ${prints === 1 ? 'impression' : 'impressions'} · ${copies} ${copies === 1 ? 'exemplaire' : 'exemplaires'} ${copies === 1 ? 'sélectionné' : 'sélectionnés'}`,
     tooManySelected: (max) => `Sélectionnez au plus ${max} cartes pour agir dessus ensemble.`,
     selectionActions: 'Actions sur la sélection',
+    moreActions: 'Plus',
     clearSelection: 'Effacer la sélection',
     startOn: (printer) => `Lancer sur ${printer}`,
     startOnMenu: 'Lancer sur',

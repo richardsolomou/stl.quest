@@ -2407,6 +2407,24 @@ describe.each(contractBackends)('DrizzleRepository contract (%s)', (backend) => 
     await reopened.close()
   })
 
+  it('leaves prints unassigned when the repository reopens in a workspace that assigns printers by hand', async () => {
+    await stock(repository, 'printers', [{ id: 'small', name: 'Small', printType: 'resin' }])
+    await repository.setSetting('board', { manualPrinterAssignment: true })
+    const pooled = await repository.createRequest({
+      name: 'Waiting for a printer',
+      fileName: 'waiting.stl',
+      filePath: 'todo/waiting.stl',
+      quantity: 1,
+      ownerUserId: 'maker',
+      requestedPrintType: 'resin',
+    })
+
+    const reopened = await reopenRepository()
+
+    expect(await repository.getRequest(pooled)).toMatchObject({ printerId: undefined, requestedPrintType: 'resin' })
+    await reopened.close()
+  })
+
   it('keeps an archived automatic assignment when the repository reopens', async () => {
     await stock(repository, 'printers', [
       { id: 'small', name: 'Small', printType: 'resin' },

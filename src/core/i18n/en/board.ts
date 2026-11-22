@@ -84,6 +84,7 @@ export const board = {
       `${prints} ${prints === 1 ? 'print' : 'prints'} · ${copies} ${copies === 1 ? 'copy' : 'copies'} selected`,
     tooManySelected: (max: string) => `Select up to ${max} cards to act on them together.`,
     selectionActions: 'Selection actions',
+    moreActions: 'More',
     clearSelection: 'Clear selection',
     startOn: (printer: string) => `Start on ${printer}`,
     startOnMenu: 'Start on',

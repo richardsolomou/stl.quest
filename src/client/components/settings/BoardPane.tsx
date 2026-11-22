@@ -58,6 +58,7 @@ export function BoardPane({ me, workspaceName, workspaceCount }: { me: Identity;
       <PageHeader title={copy.title} description={copy.description} />
       <VisibilitySection privateRequests={current.privateRequests} overrideCount={overrideCount} />
       <PrintTypesSection />
+      <PrinterAssignmentSection manualPrinterAssignment={current.manualPrinterAssignment === true} />
       <UsageTrackingSection />
       <AutoArchiveSection autoArchiveDays={current.autoArchiveDays} />
       {canDeleteWorkspace && (
@@ -208,6 +209,31 @@ function UsageTrackingSection() {
           <FieldDescription>{copy.help}</FieldDescription>
         </FieldContent>
         <Switch id="usage-tracking" data-onboarding="tracking" checked={draft} onCheckedChange={setDraft} />
+      </Field>
+    </SettingsSection>
+  )
+}
+
+/** Whether new prints go to the least busy printer of their type or wait for someone to pick one, saved as it is switched. */
+function PrinterAssignmentSection({ manualPrinterAssignment }: { manualPrinterAssignment: boolean }) {
+  const workspaceSlug = useWorkspaceSlug()
+  const callUpdate = useServerFn(updateBoardSettings)
+  const queryClient = useQueryClient()
+  const copy = useI18n().t.settings.board.assignment
+  const { draft, setDraft, bind } = useAutosavedDraft(!manualPrinterAssignment, {
+    save: async (automatic) => {
+      await callUpdate({ data: { workspaceSlug, manualPrinterAssignment: !automatic } })
+      await queryClient.invalidateQueries({ queryKey: ['board-settings'] })
+    },
+  })
+  return (
+    <SettingsSection {...bind} title={copy.title}>
+      <Field orientation="horizontal">
+        <FieldContent>
+          <FieldLabel htmlFor="automatic-printer-assignment">{copy.label}</FieldLabel>
+          <FieldDescription>{copy.description}</FieldDescription>
+        </FieldContent>
+        <Switch id="automatic-printer-assignment" checked={draft} onCheckedChange={setDraft} />
       </Field>
     </SettingsSection>
   )

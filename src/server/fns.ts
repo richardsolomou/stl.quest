@@ -82,6 +82,7 @@ import {
   addAdminWorkspaceMemberSchema,
   removeAdminWorkspaceMemberSchema,
   archiveRequestsSchema,
+  assignRequestsSchema,
   boardSettingsSchema,
   printTypeChoiceSchema,
   usageTrackingSchema,
@@ -1463,12 +1464,18 @@ export const updateBoardSettings = createServerFn({ method: 'POST' })
     mutationRpc(async () => {
       const instance = await app()
       const context = await workspaceAdmin(instance, data.workspaceSlug)
-      const { autoArchiveDays: storedAutoArchiveDays, ...current } = await resolveBoardConfig(context.repository)
+      const {
+        autoArchiveDays: storedAutoArchiveDays,
+        manualPrinterAssignment: storedManualAssignment,
+        ...current
+      } = await resolveBoardConfig(context.repository)
       const autoArchiveDays = data.autoArchiveDays === undefined ? storedAutoArchiveDays : (data.autoArchiveDays ?? undefined)
+      const manualPrinterAssignment = data.manualPrinterAssignment ?? storedManualAssignment === true
       const config: BoardConfig = {
         ...current,
         privateRequests: data.privateRequests ?? current.privateRequests,
         ...(autoArchiveDays === undefined ? {} : { autoArchiveDays }),
+        ...(manualPrinterAssignment ? { manualPrinterAssignment: true } : {}),
       }
       await context.repository.setSetting('board', config)
       // Boards refetch through the workspace realtime channel so requester views update immediately.
@@ -2125,6 +2132,12 @@ export const archiveRequests = createServerFn({ method: 'POST' })
   .validator(inWorkspace(archiveRequestsSchema))
   .handler(async ({ data }) =>
     workspaceMutation(data.workspaceSlug, (context) => context.service.archiveRequests(data.ids, context.identity)),
+  )
+
+export const assignRequests = createServerFn({ method: 'POST' })
+  .validator(inWorkspace(assignRequestsSchema))
+  .handler(async ({ data }) =>
+    workspaceMutation(data.workspaceSlug, (context) => context.service.assignRequests(data.ids, data.printerId, context.identity)),
   )
 
 export const unarchiveRequests = createServerFn({ method: 'POST' })

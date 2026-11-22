@@ -13,6 +13,7 @@ export const requests: typeof en = {
     downloadCopies: (count) => (count === 1 ? `${count} Kopie herunterladen` : `${count} Kopien herunterladen`),
     printAgain: 'Erneut drucken…',
     estimate: 'Preis schätzen',
+    assignPrinter: 'Drucker zuweisen',
     move: 'Verschieben',
     archive: 'Archivieren',
   },
