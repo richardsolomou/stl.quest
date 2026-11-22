@@ -19,7 +19,8 @@ test('runs a plate as one and sends it back to print again when Bambuddy reports
 
   await page.goto('/settings/board')
   const tracking = page.getByRole('switch', { name: 'Track usage and stock' })
-  if (!(await tracking.isChecked())) {
+  const wasTracking = await tracking.isChecked()
+  if (!wasTracking) {
     await tracking.click()
     await expect(page.getByRole('status').filter({ hasText: /Sav/ })).toHaveText('Saved')
   }
@@ -99,6 +100,32 @@ test('runs a plate as one and sends it back to print again when Bambuddy reports
   await expect(page.getByRole('list', { name: 'Recent prints' })).toContainText(`Plate #${retried}`)
   await page.setViewportSize({ width: 320, height: 800 })
   await screenshot(page, 'bambuddy-mobile')
+  await page.setViewportSize({ width: 1280, height: 900 })
+
+  // The specs after this one share the server and expect one printer with tracking off.
+  await page.goto('/')
+  for (const name of [...prints, ...retries]) {
+    await card(page, name).click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Delete' }).click()
+    await page
+      .getByRole('alertdialog', { name: `Delete 1 copy of “${name}”?` })
+      .getByRole('button', { name: 'Delete copy' })
+      .click()
+    await expect(card(page, name)).toHaveCount(0)
+  }
+  await page.goto('/settings/printers')
+  await page.getByRole('button', { name: `Edit ${printer}` }).click()
+  await page.getByRole('dialog', { name: printer }).getByRole('button', { name: 'Archive', exact: true }).click()
+  await page
+    .getByRole('alertdialog', { name: `Archive “${printer}”?` })
+    .getByRole('button', { name: 'Archive printer' })
+    .click()
+  await expect(page.getByText('Archived printers', { exact: true })).toBeVisible()
+  if (!wasTracking) {
+    await page.goto('/settings/board')
+    await tracking.click()
+    await expect(page.getByRole('status').filter({ hasText: /Sav/ })).toHaveText('Saved')
+  }
 })
 
 async function select(page: Page, names: string[]) {
@@ -127,10 +154,10 @@ async function upload(page: Page, name: string) {
   await expect(card(page, name)).toBeVisible({ timeout: 30_000 })
 }
 
-async function choose(select: Locator, option: string) {
-  await select.click()
-  await select.page().getByRole('option', { name: option, exact: true }).click()
-  await expect(select).toContainText(option)
+async function choose(picker: Locator, option: string) {
+  await picker.click()
+  await picker.page().getByRole('option', { name: option, exact: true }).click()
+  await expect(picker).toContainText(option)
 }
 
 async function screenshot(page: Page, name: string) {
