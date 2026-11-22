@@ -11,7 +11,7 @@ import { findPreset } from '../../../core/presets'
 import { getPrinterPreset } from '../../../core/printerPresets'
 import { shoppingList, type ShoppingGroup, type ShoppingItem } from '../../../core/shopping'
 import { missingMaterials, missingWearParts, untrackedConsumables, type PartSuggestion } from '../../../core/stock'
-import { inWorkspaceCurrency, presetPage, storeCurrency, storeForProduct, type Store } from '../../../core/stores'
+import { inWorkspaceCurrency, needsNewRate, presetPage, storeCurrency, storeForProduct, type Store } from '../../../core/stores'
 import type { PrinterProfile, PrintType } from '../../../core/types'
 import type { StockLevel } from '../../../core/usage'
 import { useI18n } from '../../i18n'
@@ -229,7 +229,10 @@ function StoreOrder({
   const threshold = store?.freeShippingOver
   const totals = [
     copy.subtotal(money(subtotal)),
-    own !== currency && copy.converted(formatMoney(inWorkspaceCurrency(subtotal, store, currency), currency, locale)),
+    own !== currency &&
+      (store && needsNewRate(store, currency)
+        ? copy.needsRate
+        : copy.converted(formatMoney(inWorkspaceCurrency(subtotal, store, currency), currency, locale))),
     shipping === 0 ? copy.shipsFree : shipping !== undefined && copy.shipping(money(shipping)),
     toFreeShipping !== undefined && copy.toFreeShipping(money(toFreeShipping)),
   ].filter(Boolean)

@@ -27,7 +27,7 @@ import {
   filamentConsumableName,
   filamentsInColours,
   sameFilamentColour,
-  sameFilamentProduct,
+  samePricedColours,
   stockedColours,
   type FilamentPreset,
 } from '../../../core/filamentPresets'
@@ -40,7 +40,7 @@ import { resinPresetName, type ResinPreset } from '../../../core/resinPresets'
 import { activeItems } from '../../../core/inventory'
 import { enteredUnitScale, packSize } from '../../../core/stock'
 import type { PriceCalculatorCurrency } from '../../../core/priceCalculator'
-import { shippingShare, storeCurrency, type Store } from '../../../core/stores'
+import { movedToStore, shippingShare, storeCurrency, type Store } from '../../../core/stores'
 import type { Messages } from '../../../core/i18n'
 import type { PrinterProfile } from '../../../core/types'
 import type { StockLevel } from '../../../core/usage'
@@ -182,7 +182,7 @@ export function ConsumableDialog({
   const archive = async () => {
     if (await autosave.flush()) onArchive()
   }
-  const siblings = draft.kind === 'filament' && !isNew ? sameFilamentProduct(library, draft) : []
+  const siblings = draft.kind === 'filament' && !isNew ? samePricedColours(library, draft, stores, currency) : []
   const differing = draft.kind === 'filament' ? siblings.filter(({ pricePerKg }) => pricePerKg !== draft.pricePerKg).length : 0
   const [sharing, setSharing] = useState(false)
   const sharePrice = async () => {
@@ -341,7 +341,20 @@ export function ConsumableDialog({
         )}
         <StockFields consumable={draft} tracking={tracking} onChange={setDraft} />
         {(activeItems(stores).length > 0 || draft.storeId) && (
-          <StoreField stores={stores} value={draft.storeId} onChange={(storeId) => setDraft({ ...draft, storeId })} />
+          <StoreField
+            stores={stores}
+            value={draft.storeId}
+            onChange={(storeId) =>
+              setDraft(
+                movedToStore(
+                  draft,
+                  stores.find(({ id }) => id === storeId),
+                  stores,
+                  currency,
+                ),
+              )
+            }
+          />
         )}
       </div>
       {tracking && (draft.kind === 'resin' || draft.kind === 'filament') && (

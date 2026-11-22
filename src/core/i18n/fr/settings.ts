@@ -462,6 +462,7 @@ export const settings: typeof en = {
       toFreeShipping: (amount: string) => `encore ${amount} pour la livraison offerte`,
       freeShippingProgress: (store: string) => `Progression vers la livraison offerte chez ${store}`,
       converted: (amount: string) => `≈ ${amount}`,
+      needsRate: 'Nouveau taux de change requis',
       topUp: 'Pour la livraison offerte, ajoutez aussi',
       stillShort: (amount: string) => `il manque encore ${amount}`,
       reachesFree: 'Livraison offerte avec ces articles',
@@ -507,6 +508,13 @@ export const settings: typeof en = {
       urlHint: 'Les produits du catalogue vendus sur ce site y sont achetés, et Ce qu’il vous faut renvoie vers leurs pages.',
       urlInvalid: 'Saisissez une adresse web commençant par http:// ou https://.',
       spread: (share: string) => `ajoute ${share} de livraison aux prix`,
+      needsRate: (currency: string) => `Nouveau taux de change en ${currency} requis`,
+      staleRate: (currency: string) =>
+        `L’espace de travail compte désormais en ${currency}. Tant que vous n’avez pas saisi ce taux en ${currency}, les coûts et devis ne convertissent pas ses prix.`,
+      takeOutShipping: (share: string, count: number) =>
+        `Retirer ${share} de livraison ${count === 1 ? 'du prix déjà saisi' : `des ${count} prix déjà saisis`}`,
+      takeOutShippingHint:
+        'Ils ont été saisis livraison comprise. Les coûts l’ajoutent désormais d’après la commande habituelle : elle serait comptée deux fois.',
       shipping: (amount: string) => `Livraison ${amount}`,
       freeOver: (amount: string) => `offerte dès ${amount}`,
       noShipping: 'Aucun coût de livraison défini',

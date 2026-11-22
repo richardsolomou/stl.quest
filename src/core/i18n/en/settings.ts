@@ -447,6 +447,7 @@ export const settings = {
       toFreeShipping: (amount: string) => `${amount} more ships free`,
       freeShippingProgress: (store: string) => `Towards free shipping from ${store}`,
       converted: (amount: string) => `≈ ${amount}`,
+      needsRate: 'Needs a new exchange rate',
       topUp: 'To ship free, also add',
       stillShort: (amount: string) => `${amount} still short`,
       reachesFree: 'Ships free with these',
@@ -491,6 +492,12 @@ export const settings = {
       urlHint: 'Catalogue products sold on this site are bought here, and What you need links to their pages.',
       urlInvalid: 'Enter a web address starting with http:// or https://.',
       spread: (share: string) => `adds ${share} shipping to prices`,
+      needsRate: (currency: string) => `Needs a new exchange rate into ${currency}`,
+      staleRate: (currency: string) =>
+        `The workspace now prices in ${currency}. Until you enter this rate into ${currency}, costs and quotes leave its prices unconverted.`,
+      takeOutShipping: (share: string, count: number) =>
+        `Take ${share} shipping out of the ${count === 1 ? 'price' : `${count} prices`} already here`,
+      takeOutShippingHint: 'They were entered with shipping included. Costs now add it from the usual order, so it would count twice.',
       shipping: (amount: string) => `Shipping ${amount}`,
       freeOver: (amount: string) => `free over ${amount}`,
       noShipping: 'No shipping cost set',

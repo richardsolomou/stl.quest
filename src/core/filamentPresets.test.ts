@@ -4,10 +4,12 @@ import {
   filamentProductGroups,
   filamentsInColours,
   sameFilamentProduct,
+  samePricedColours,
   stockedColours,
   withSharedFilamentPrice,
   type FilamentPreset,
 } from './filamentPresets'
+import type { Store } from './stores'
 
 const preset: FilamentPreset = {
   id: 'bambu-pla',
@@ -99,13 +101,27 @@ describe('withSharedFilamentPrice', () => {
     filament('old', { filamentPresetId: preset.id, pricePerKg: 20, archived: true }),
     filament('other', { filamentPresetId: 'other', pricePerKg: 20 }),
   ]
-  const shared = withSharedFilamentPrice(library, 'black')
+  const shared = withSharedFilamentPrice(library, 'black', [], 'EUR')
 
   it('gives the other active colours of the product its price', () => {
     expect(shared.map((item) => (item.kind === 'filament' ? item.pricePerKg : undefined))).toEqual([26, 26, 20, 20])
   })
 
   it('leaves an unknown filament’s library as it is', () => {
-    expect(withSharedFilamentPrice(library, 'missing')).toBe(library)
+    expect(withSharedFilamentPrice(library, 'missing', [], 'EUR')).toBe(library)
+  })
+
+  describe('across currencies', () => {
+    const stores: Store[] = [{ id: 'us', name: 'US', currency: 'USD', exchangeRate: 0.9, exchangeRateCurrency: 'EUR' }]
+    const mixed = library.map((item) => (item.id === 'white' ? { ...item, storeId: 'us' } : item))
+
+    it('gives the price only to colours priced in the same currency', () => {
+      const priced = withSharedFilamentPrice(mixed, 'black', stores, 'EUR')
+      expect(priced.map((item) => (item.kind === 'filament' ? item.pricePerKg : undefined))).toEqual([26, 20, 20, 20])
+    })
+
+    it('counts only the colours priced in the same currency', () => {
+      expect(samePricedColours(mixed, mixed[0] as FilamentConsumable, stores, 'EUR')).toEqual([])
+    })
   })
 })

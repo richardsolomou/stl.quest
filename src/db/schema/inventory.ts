@@ -85,6 +85,7 @@ export const stores = sqliteTable(
     freeShippingOver: real('free_shipping_over'),
     currency: text(),
     exchangeRate: real('exchange_rate'),
+    exchangeRateCurrency: text('exchange_rate_currency'),
     usualOrder: real('usual_order'),
     url: text(),
     archivedAt: integer('archived_at'),

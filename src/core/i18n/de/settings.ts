@@ -456,6 +456,7 @@ export const settings: typeof en = {
       toFreeShipping: (amount: string) => `noch ${amount} bis versandkostenfrei`,
       freeShippingProgress: (store: string) => `Fortschritt zum kostenlosen Versand bei ${store}`,
       converted: (amount: string) => `≈ ${amount}`,
+      needsRate: 'Braucht einen neuen Wechselkurs',
       topUp: 'Für kostenlosen Versand zusätzlich',
       stillShort: (amount: string) => `fehlen noch ${amount}`,
       reachesFree: 'Damit versandkostenfrei',
@@ -501,6 +502,13 @@ export const settings: typeof en = {
       urlHint: 'Katalogprodukte von dieser Website werden hier gekauft, und „Was Sie brauchen“ verlinkt ihre Seiten.',
       urlInvalid: 'Geben Sie eine Webadresse ein, die mit http:// oder https:// beginnt.',
       spread: (share: string) => `schlägt ${share} Versand auf die Preise auf`,
+      needsRate: (currency: string) => `Braucht einen neuen Wechselkurs in ${currency}`,
+      staleRate: (currency: string) =>
+        `Der Arbeitsbereich rechnet jetzt in ${currency}. Bis Sie diesen Kurs in ${currency} eingeben, rechnen Kosten und Angebote seine Preise nicht um.`,
+      takeOutShipping: (share: string, count: number) =>
+        `${share} Versand aus ${count === 1 ? 'dem vorhandenen Preis' : `den ${count} vorhandenen Preisen`} herausrechnen`,
+      takeOutShippingHint:
+        'Sie wurden inklusive Versand eingegeben. Kosten schlagen ihn jetzt anhand der üblichen Bestellung auf, er würde also doppelt gezählt.',
       shipping: (amount: string) => `Versand ${amount}`,
       freeOver: (amount: string) => `frei ab ${amount}`,
       noShipping: 'Keine Versandkosten festgelegt',

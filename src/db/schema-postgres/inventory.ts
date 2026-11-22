@@ -85,6 +85,7 @@ export const stores = pgTable(
     freeShippingOver: doublePrecision('free_shipping_over'),
     currency: text(),
     exchangeRate: doublePrecision('exchange_rate'),
+    exchangeRateCurrency: text('exchange_rate_currency'),
     usualOrder: doublePrecision('usual_order'),
     url: text(),
     archivedAt: bigint('archived_at', { mode: 'number' }),

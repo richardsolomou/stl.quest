@@ -1,0 +1,1 @@
+ALTER TABLE `stores` ADD `exchange_rate_currency` text;

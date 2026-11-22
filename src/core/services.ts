@@ -77,11 +77,11 @@ import { imageContentType, MAX_COVER_BYTES } from './coverImage'
 import { automaticEstimateFields, requestPrintEstimate, type MaterialEstimateSettings } from './printEstimates'
 import { consumablesOfKind, withConsumablePrice, type Consumable } from './consumables'
 import type { OrderRestockInput } from './orders/orderRestock'
-import { sameFilamentProduct, withSharedFilamentPrice } from './filamentPresets'
+import { samePricedColours, withSharedFilamentPrice } from './filamentPresets'
 import type { EquipmentItem } from './equipment'
 import { activeItems, INVENTORY_LIMITS, type InventoryItems, type InventoryKind } from './inventory'
 import { dailyUse, USAGE_RATE_DAYS } from './shopping'
-import { landedConsumables, type Store } from './stores'
+import { landedConsumables, movedToStore, pricedStoreItems, type ShippingTakenOut, type Store } from './stores'
 import { canDeleteInventoryItem, deletedItemKind } from './inventoryDeletion'
 import { printerLifetimes } from './maintenance'
 import {
@@ -2097,21 +2097,47 @@ export class STLQuestService {
   /** Gives a catalogued filament's price to the other active colours of its product. */
   async shareFilamentPrice(consumableId: string, identity: Identity) {
     let colours = 0
+    const stores = await this.repository.listInventory('stores')
+    const { currency } = await this.rates()
     const library = await this.changeInventory('consumables', identity, (current) => {
       const source = current.find(({ id }) => id === consumableId)
       if (source?.kind !== 'filament') throw new Response(this.text.inventory.notFound, { status: 404 })
-      colours = sameFilamentProduct(current, source).length
-      return withSharedFilamentPrice(current, consumableId)
+      colours = samePricedColours(current, source, stores, currency).length
+      return withSharedFilamentPrice(current, consumableId, stores, currency)
     })
     this.capture(identity.id, 'filament_price_shared', { colour_count: colours })
     return library
   }
 
-  /** Stores an edit to one item; archiving has its own action, so the item stays archived or active as it is. */
-  async updateInventoryItem<Kind extends InventoryKind>(kind: Kind, item: InventoryItems[Kind], identity: Identity) {
+  /**
+   * Stores an edit to one item; archiving has its own action, so the item stays archived or active as it is. A store's
+   * edit reprices what it sells with it: its prices keep their value in its new currency, and `shippingTakenOut` moves
+   * the shipping share in them.
+   */
+  async updateInventoryItem<Kind extends InventoryKind>(
+    kind: Kind,
+    item: InventoryItems[Kind],
+    identity: Identity,
+    shippingTakenOut?: ShippingTakenOut,
+  ) {
+    if (kind === 'stores') return (await this.updateStore(item, identity, shippingTakenOut)) as InventoryItems[Kind][]
     return await this.changeInventory(kind, identity, (items) =>
       this.replacingItem(items, item.id, (stored) => ({ ...item, archived: stored.archived })),
     )
+  }
+
+  private async updateStore(store: Store, identity: Identity, shippingTakenOut: ShippingTakenOut | undefined) {
+    this.requireAdmin(identity)
+    const { currency } = await this.rates()
+    const { previous, items } = await this.repository.changeStores((stores, consumables) => {
+      const next = this.replacingItem(stores, store.id, (stored) => ({ ...store, archived: stored.archived }))
+      this.validateInventory('stores', stores, next, undefined)
+      const index = stores.findIndex(({ id }) => id === store.id)
+      return { stores: next, consumables: pricedStoreItems(consumables, stores[index], next[index], currency, shippingTakenOut) }
+    })
+    this.changed('inventory.changed')
+    this.captureInventory('stores', identity.id, previous, items)
+    return items
   }
 
   async setInventoryItemArchived(kind: InventoryKind, id: string, archived: boolean, identity: Identity) {
@@ -2129,10 +2155,16 @@ export class STLQuestService {
   /** Deletes an archived item for good; usage keeps its name and cost, and the rest that named it loses the link. */
   async deleteInventoryItem(kind: InventoryKind, id: string, identity: Identity) {
     this.requireAdmin(identity)
-    const { item, references, items } = await this.repository.deleteInventoryItem(kind, id, (stored) => {
-      if (!stored) throw new Response(this.text.inventory.notFound, { status: 404 })
-      if (!canDeleteInventoryItem(stored)) throw new Response(this.text.inventory.notArchived, { status: 409 })
-    })
+    const { currency } = await this.rates()
+    const { item, references, items } = await this.repository.deleteInventoryItem(
+      kind,
+      id,
+      (stored) => {
+        if (!stored) throw new Response(this.text.inventory.notFound, { status: 404 })
+        if (!canDeleteInventoryItem(stored)) throw new Response(this.text.inventory.notArchived, { status: 409 })
+      },
+      (consumable, store) => movedToStore(consumable, undefined, [store], currency),
+    )
     this.changed('inventory.deleted')
     this.capture(identity.id, 'inventory_item_deleted', {
       inventory_kind: kind,
