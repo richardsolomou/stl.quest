@@ -92,6 +92,52 @@ export type PlateTotals = { totals: number[]; otherShare: number }
 
 export type PlateRecordInput = { plateId: string; minutes: number; materials: PlateMaterialChoice[] } & (PlateMeasured | PlateTotals)
 
+/** Why typed totals cannot be recorded: no material, one without a material or a positive amount, or one twice. */
+export type PlateTotalsProblem = 'empty' | 'material' | 'amount' | 'duplicate'
+
+/** Checks typed totals, one row per material on the plate. */
+export function plateTotalsProblem(rows: { material?: PlateMaterialChoice; amount: number }[]): PlateTotalsProblem | undefined {
+  if (rows.length === 0) return 'empty'
+  if (rows.some(({ material }) => !material)) return 'material'
+  if (rows.some(({ amount }) => !positive(amount))) return 'amount'
+  const keys = rows.map(({ material }) =>
+    material && 'consumableId' in material ? `id:${material.consumableId}` : `name:${material?.name.trim().toLowerCase()}`,
+  )
+  return new Set(keys).size < keys.length ? 'duplicate' : undefined
+}
+
+/** What one plate transaction used of one material for one print, or for none. */
+export type PlateMaterialUse = {
+  transactionId: string
+  requestId?: string
+  consumableId?: string
+  deletedItemName?: string
+  amount: number
+}
+
+/** A material a recorded plate used, in total and per print; what no print used counts only in the total. */
+export type PlateMaterialTotal = { name: string; hex?: string; amount: number; prints: Record<string, number> }
+
+/**
+ * Totals a recording's material events per material, most used first; a material deleted from the library keeps the
+ * name its events carry.
+ */
+export function plateMaterialTotals(uses: Omit<PlateMaterialUse, 'transactionId'>[], consumables: Consumable[]): PlateMaterialTotal[] {
+  const totals = new Map<string, PlateMaterialTotal>()
+  for (const { requestId, consumableId, deletedItemName, amount } of uses) {
+    const consumable = consumableId ? consumables.find(({ id }) => id === consumableId) : undefined
+    const name = consumable?.name ?? deletedItemName
+    if (!name) continue
+    const key = consumableId ?? `deleted:${name}`
+    const hex = consumable?.kind === 'filament' ? consumable.colour?.hex : undefined
+    const total = totals.get(key) ?? { name, ...(hex && { hex }), amount: 0, prints: {} }
+    total.amount += amount
+    if (requestId) total.prints[requestId] = (total.prints[requestId] ?? 0) + amount
+    totals.set(key, total)
+  }
+  return [...totals.values()].sort((left, right) => right.amount - left.amount)
+}
+
 export function isMeasured(input: PlateMeasured | PlateTotals): input is PlateMeasured {
   return 'objects' in input
 }

@@ -11,6 +11,7 @@ const captureScreenshots = process.env.CAPTURE_E2E_SCREENSHOTS === '1'
 const printer = 'Plate run X2D'
 const prints = ['plate-run-hull', 'plate-run-turret']
 const retries = ['plate-run-retry-a', 'plate-run-retry-b']
+const filaments = ['Plate run black', 'Plate run white']
 const modifier = process.platform === 'darwin' ? 'Meta' : 'Control'
 
 test('runs a plate as one and sends it back to print again when Bambuddy reports it failed', async ({ page }) => {
@@ -89,6 +90,43 @@ test('runs a plate as one and sends it back to print again when Bambuddy reports
   await screenshot(page, 'plate-dialog-mobile')
   await page.setViewportSize({ width: 1280, height: 900 })
   await screenshot(page, 'plate-dialog')
+
+  // A multi-colour plate's typed totals take one row per filament, each split across the prints by volume.
+  await plateDialog.getByRole('button', { name: 'Enter totals' }).click()
+  await choose(plateDialog.getByRole('combobox', { name: 'Material', exact: true }), 'Something else')
+  await plateDialog.getByLabel('Name', { exact: true }).fill(filaments[0])
+  await plateDialog.getByLabel('Material used').fill('30')
+  await plateDialog.getByRole('button', { name: 'Add filament' }).click()
+  await choose(plateDialog.getByRole('combobox', { name: 'Filament 2', exact: true }), 'Something else')
+  await plateDialog.getByLabel('Name', { exact: true }).nth(1).fill(filaments[0])
+  await plateDialog.getByLabel('Filament 2 used').fill('8')
+  await expect(plateDialog.getByText('Each filament goes in once.', { exact: false })).toBeVisible()
+  await expect(plateDialog.getByRole('button', { name: 'Record usage' })).toBeDisabled()
+  await plateDialog.getByLabel('Name', { exact: true }).nth(1).fill(filaments[1])
+  await plateDialog.getByLabel('Hours').fill('1')
+  const split = plateDialog.locator('[data-plate-split] li')
+  await expect(split).toHaveCount(prints.length)
+  for (const row of await split.all()) await expect(row).toContainText(`${filaments[0]} 15 g · ${filaments[1]} 4 g`)
+  await screenshots(page, 'plate-totals')
+  await page.setViewportSize({ width: 320, height: 800 })
+  const removeFilament = plateDialog.getByRole('button', { name: 'Remove Filament 2' })
+  await removeFilament.scrollIntoViewIfNeeded()
+  await expectWithinViewportWidth(page, removeFilament)
+  await screenshots(page, 'plate-totals-mobile')
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await plateDialog.getByRole('button', { name: 'Record usage' }).click()
+  const used = plateDialog.locator('[data-plate-materials] li')
+  await expect(used).toHaveText([`${filaments[0]}30 g`, `${filaments[1]}8 g`])
+  for (const name of prints)
+    await expect(plateDialog.locator('[data-plate-prints] tr').filter({ hasText: name })).toContainText(
+      `×1 · ${filaments[0]} 15 g · ${filaments[1]} 4 g`,
+    )
+  await screenshots(page, 'plate-recorded')
+  await page.setViewportSize({ width: 320, height: 800 })
+  await used.last().scrollIntoViewIfNeeded()
+  await expectWithinViewportWidth(page, used.last())
+  await screenshots(page, 'plate-recorded-mobile')
+  await page.setViewportSize({ width: 1280, height: 900 })
   await page.keyboard.press('Escape')
   await expect(plateDialog).toHaveCount(0)
 
@@ -233,6 +271,16 @@ async function screenshot(page: Page, name: string) {
   const directory = path.join(process.cwd(), 'test-results/manual-inspection')
   await fs.mkdir(directory, { recursive: true })
   await page.screenshot({ path: path.join(directory, `${name}.png`) })
+}
+
+/** Takes the screenshot in the light theme and again in the dark one. */
+async function screenshots(page: Page, name: string) {
+  if (!captureScreenshots) return
+  await page.emulateMedia({ colorScheme: 'light' })
+  await screenshot(page, name)
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await screenshot(page, `${name}-dark`)
+  await page.emulateMedia({ colorScheme: null })
 }
 
 async function startPlateFromSelection(page: Page) {

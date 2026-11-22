@@ -74,6 +74,7 @@ export const plates: typeof en = {
     deleted: 'Plateau supprimé.',
     deleteFailed: 'Le plateau n’a pas pu être supprimé.',
     missing: 'Ce plateau n’existe plus.',
+    materials: 'Matières',
     loadError: 'Impossible de charger le plateau',
   },
   file: {
@@ -92,6 +93,10 @@ export const plates: typeof en = {
   },
   totals: {
     material: 'Matière consommée',
+    amount: (material) => `${material} : quantité`,
+    addFilament: 'Ajouter un filament',
+    remove: (material) => `Retirer ${material}`,
+    duplicate: 'Chaque filament n’apparaît qu’une fois. Additionnez ses grammes sur une seule ligne.',
     hours: 'Heures',
     minutes: 'Minutes',
     time: 'Durée d’impression',

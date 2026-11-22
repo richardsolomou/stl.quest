@@ -6,8 +6,10 @@ import {
   matchSlicedObjects,
   plateBrokenBy,
   plateFileName,
+  plateMaterialTotals,
   plateMoves,
   plateStart,
+  plateTotalsProblem,
   plateUsageDrafts,
   printingPlate,
   slicedObjectStem,
@@ -271,6 +273,90 @@ describe('splitPlate from typed totals', () => {
 
   it('splits time like the material', () => {
     expect(splitPlate({ totals: [40], otherShare: 0.25 }, 60, prints, 1).prints.map(({ minutes }) => minutes)).toEqual([33.75, 11.25])
+  })
+})
+
+describe('plateTotalsProblem', () => {
+  const black = { consumableId: 'black' }
+  const white = { consumableId: 'white' }
+
+  it('accepts one total per filament', () => {
+    expect(
+      plateTotalsProblem([
+        { material: black, amount: 30 },
+        { material: white, amount: 8 },
+      ]),
+    ).toBeUndefined()
+  })
+
+  it('needs at least one filament', () => {
+    expect(plateTotalsProblem([])).toBe('empty')
+  })
+
+  it('needs a material on every row', () => {
+    expect(plateTotalsProblem([{ material: black, amount: 30 }, { amount: 8 }])).toBe('material')
+  })
+
+  it('needs a positive amount on every row', () => {
+    expect(
+      plateTotalsProblem([
+        { material: black, amount: 30 },
+        { material: white, amount: 0 },
+      ]),
+    ).toBe('amount')
+  })
+
+  it('refuses an amount that is not a number', () => {
+    expect(plateTotalsProblem([{ material: black, amount: Number.NaN }])).toBe('amount')
+  })
+
+  it('refuses the same library material twice', () => {
+    expect(
+      plateTotalsProblem([
+        { material: black, amount: 30 },
+        { material: { consumableId: 'black' }, amount: 8 },
+      ]),
+    ).toBe('duplicate')
+  })
+
+  it('refuses the same material named on the spot twice, whatever its case', () => {
+    expect(
+      plateTotalsProblem([
+        { material: { name: 'Mystery PLA' }, amount: 30 },
+        { material: { name: ' mystery pla' }, amount: 8 },
+      ]),
+    ).toBe('duplicate')
+  })
+})
+
+describe('plateMaterialTotals', () => {
+  const black: Consumable = { id: 'black', kind: 'filament', name: 'Black PLA', colour: { name: 'Black', hex: '#000000' }, pricePerKg: 20 }
+  const white: Consumable = { id: 'white', kind: 'filament', name: 'White PLA', pricePerKg: 20 }
+  const totals = plateMaterialTotals(
+    [
+      { requestId: 'a', consumableId: 'white', amount: 2 },
+      { requestId: 'a', consumableId: 'black', amount: 6 },
+      { requestId: 'b', consumableId: 'black', amount: 3 },
+      { consumableId: 'black', amount: 1 },
+      { requestId: 'b', deletedItemName: 'Old PETG', amount: 4 },
+    ],
+    [black, white],
+  )
+
+  it('totals each material across the plate, most used first', () => {
+    expect(totals.map(({ name, amount }) => [name, amount])).toEqual([
+      ['Black PLA', 10],
+      ['Old PETG', 4],
+      ['White PLA', 2],
+    ])
+  })
+
+  it('keeps each print’s share of a material', () => {
+    expect(totals.find(({ name }) => name === 'Black PLA')?.prints).toEqual({ a: 6, b: 3 })
+  })
+
+  it('carries a filament’s colour', () => {
+    expect(totals.find(({ name }) => name === 'Black PLA')?.hex).toBe('#000000')
   })
 })
 

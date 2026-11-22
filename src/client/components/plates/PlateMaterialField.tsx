@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, type ReactNode } from 'react'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -31,6 +31,7 @@ export function PlateMaterialField({
   fromFile,
   value,
   onChange,
+  trailing,
 }: {
   label: string
   printType: PrintType
@@ -38,6 +39,8 @@ export function PlateMaterialField({
   fromFile?: SlicedFilament
   value: MaterialDraft
   onChange: (value: MaterialDraft) => void
+  /** Sits beside the picker, such as the amount the material used. */
+  trailing?: ReactNode
 }) {
   const { t } = useI18n()
   const copy = t.plates.material
@@ -55,32 +58,39 @@ export function PlateMaterialField({
   const chosen = options.find((option) => option.value === selected)
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <Field className={value.other ? undefined : 'sm:col-span-2'}>
+      <Field className={value.other && !trailing ? undefined : 'sm:col-span-2'}>
         <FieldLabel htmlFor={`${id}-material`}>{label}</FieldLabel>
-        <Select
-          items={options}
-          value={selected}
-          onValueChange={(next) =>
-            onChange(
-              next === OTHER ? { other: true, name: value.name, price: value.price } : next && next !== NONE ? { consumableId: next } : {},
-            )
-          }
-        >
-          <SelectTrigger className="w-full" id={`${id}-material`}>
-            <SelectValue>
-              {chosen?.hex && <ColourSwatch hex={chosen.hex} />}
-              <span className="truncate">{chosen?.label ?? copy.choose}</span>
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {options.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.hex && <ColourSwatch hex={option.hex} className="self-center" />}
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select
+            items={options}
+            value={selected}
+            onValueChange={(next) =>
+              onChange(
+                next === OTHER
+                  ? { other: true, name: value.name, price: value.price }
+                  : next && next !== NONE
+                    ? { consumableId: next }
+                    : {},
+              )
+            }
+          >
+            <SelectTrigger className="min-w-0 flex-1 basis-40" id={`${id}-material`}>
+              <SelectValue>
+                {chosen?.hex && <ColourSwatch hex={chosen.hex} />}
+                <span className="truncate">{chosen?.label ?? copy.choose}</span>
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {options.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.hex && <ColourSwatch hex={option.hex} className="self-center" />}
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {trailing}
+        </div>
         {fromFile?.type && (
           <FieldDescription className="flex items-center gap-1.5">
             {fromFile.color && <ColourSwatch hex={fromFile.color} />}
@@ -99,7 +109,7 @@ export function PlateMaterialField({
               onChange={(event) => onChange({ ...value, name: event.target.value })}
             />
           </Field>
-          <Field className="sm:col-span-2">
+          <Field className={trailing ? undefined : 'sm:col-span-2'}>
             <FieldLabel htmlFor={`${id}-price`}>{printType === 'resin' ? copy.pricePerLitre : copy.pricePerKg}</FieldLabel>
             <Input
               id={`${id}-price`}
