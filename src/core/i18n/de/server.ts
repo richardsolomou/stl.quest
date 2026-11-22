@@ -144,6 +144,10 @@ export const server: typeof en = {
     invalidCharge: 'gib den berechneten Betrag als Zahl ab null ein',
     printerNeeded: 'wähle den Drucker, auf dem diese Druckplatte läuft',
     onRunningPlate: (number: number) => `diese Exemplare liegen auf Druckplatte #${number}; verschiebe stattdessen die Druckplatte`,
+    noModels: 'kein Druck auf dieser Druckplatte hat eine Modelldatei',
+    unconvertible: (name: string) => `${name} lässt sich nicht in die Druckplattendatei umwandeln; öffne es stattdessen einzeln`,
+    tooLarge: (limit: string) =>
+      `die Modelle dieser Druckplatte sind zusammen größer als ${limit}, mehr fasst eine Druckplattendatei nicht; lade sie stattdessen einzeln herunter`,
   },
   prints: {
     notFound: 'Druck nicht gefunden',

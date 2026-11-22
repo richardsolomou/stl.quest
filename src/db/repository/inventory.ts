@@ -1,6 +1,7 @@
 import type { Consumable } from '../../core/consumables'
 import type { EquipmentItem } from '../../core/equipment'
 import type { InventoryItems, InventoryKind } from '../../core/inventory'
+import type { PriceCalculatorCurrency } from '../../core/priceCalculator'
 import { normalizePrinterProfile } from '../../core/printers'
 import type { Store } from '../../core/stores'
 import type { SlicerId } from '../../core/slicers'
@@ -62,6 +63,11 @@ export function inventoryItem<Kind extends InventoryKind>(kind: Kind, row: Row<K
       name: store.name,
       ...(store.shippingCost !== null && { shippingCost: store.shippingCost }),
       ...(store.freeShippingOver !== null && { freeShippingOver: store.freeShippingOver }),
+      ...(store.currency !== null && { currency: store.currency as PriceCalculatorCurrency }),
+      ...(store.exchangeRate !== null && { exchangeRate: store.exchangeRate }),
+      ...(store.exchangeRateCurrency !== null && { exchangeRateCurrency: store.exchangeRateCurrency as PriceCalculatorCurrency }),
+      ...(store.usualOrder !== null && { usualOrder: store.usualOrder }),
+      ...(store.url !== null && { url: store.url }),
       ...archived,
     } satisfies Store as InventoryItems[Kind]
   }
@@ -152,6 +158,11 @@ export function inventoryColumns<Kind extends InventoryKind>(kind: Kind, item: I
       name: store.name,
       shippingCost: store.shippingCost ?? null,
       freeShippingOver: store.freeShippingOver ?? null,
+      currency: store.currency ?? null,
+      exchangeRate: store.exchangeRate ?? null,
+      exchangeRateCurrency: store.exchangeRateCurrency ?? null,
+      usualOrder: store.usualOrder ?? null,
+      url: store.url ?? null,
     } satisfies InventoryColumns<'stores'> as unknown as InventoryColumns<Kind>
   }
   const library = item as Consumable

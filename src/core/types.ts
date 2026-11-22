@@ -15,6 +15,8 @@ import type { ChargedPrint } from './spend'
 import type { SpoolmanChange, SpoolmanLink, SpoolmanSpool } from './spoolman'
 import type { SpoolmanRestock, SpoolmanRestockResult } from './spoolmanRestocks'
 import type { SlicerId } from './slicers'
+import type { Consumable } from './consumables'
+import type { Store } from './stores'
 
 export type Role = 'admin' | 'requester'
 export type AccountRole = 'super_admin' | 'requester'
@@ -675,6 +677,13 @@ export type Repository = Omit<AsyncRepositoryShape, 'getSetting'> & {
     kind: Kind,
     change: (items: InventoryItems[Kind][]) => InventoryItems[Kind][],
   ): Promise<{ previous: InventoryItems[Kind][]; items: InventoryItems[Kind][] }>
+  /**
+   * Stores what `change` makes of the stores and consumables together under the same lock as `changeInventory`, so what a
+   * store sells is repriced with it. The same rules as `changeInventory` hold for each.
+   */
+  changeStores(
+    change: (stores: Store[], consumables: Consumable[]) => { stores: Store[]; consumables: Consumable[] },
+  ): Promise<{ previous: Store[]; items: Store[]; consumables: Consumable[] }>
   /** What names one item of `kind`; see `InventoryReferences`. */
   inventoryReferences(kind: InventoryKind, id: string): Promise<InventoryReferences>
   /**
@@ -685,6 +694,8 @@ export type Repository = Omit<AsyncRepositoryShape, 'getSetting'> & {
     kind: Kind,
     id: string,
     check: (item: InventoryItems[Kind] | undefined, references: InventoryReferences) => void,
+    /** What a consumable bought from a deleted store becomes, before it loses the store. */
+    leaveStore?: (consumable: Consumable, store: Store) => Consumable,
   ): Promise<{ item: InventoryItems[Kind]; references: InventoryReferences; items: InventoryItems[Kind][] }>
 }
 

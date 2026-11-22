@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Consumable, FilamentConsumable } from '../consumables'
 import type { FilamentPreset } from '../filamentPresets'
+import type { Store } from '../stores'
 import generated from '../../../catalogs/filaments/catalog.generated.json'
 import { BAMBU_LAB_EU_FRENCH_TEXT, BAMBU_LAB_EU_GERMAN_TEXT, BAMBU_LAB_EU_HTML, BAMBU_LAB_EU_TEXT } from './fixtures'
 import { parseOrderEmail, type OrderLine } from './orderEmail'
@@ -156,7 +157,7 @@ describe('orderLinePrice', () => {
 
 describe('orderRestock', () => {
   const consumables: Consumable[] = [filament()]
-  const context = { consumables, catalogue, currency: 'EUR' as const, updatePrices: false, newId: () => 'new-id' }
+  const context = { consumables, stores: [], catalogue, currency: 'EUR' as const, updatePrices: false, newId: () => 'new-id' }
   const order = { vendor: 'bambu-lab' as const, currency: 'EUR' as const }
 
   it('restocks a library filament by what the line holds', () => {
@@ -199,6 +200,30 @@ describe('orderRestock', () => {
     expect(
       orderRestock({ ...order, currency: 'GBP' }, [{ line: line(), consumableId: 'basic-gray' }], { ...context, updatePrices: true })
         .prices,
+    ).toEqual([])
+  })
+
+  it('takes a price from an order in the currency of the filament’s store', () => {
+    const stores: Store[] = [{ id: 'bambu-uk', name: 'Bambu Lab UK', currency: 'GBP', exchangeRate: 1.15 }]
+    expect(
+      orderRestock({ ...order, currency: 'GBP' }, [{ line: line(), consumableId: 'basic-gray' }], {
+        ...context,
+        consumables: [{ ...filament(), storeId: 'bambu-uk' }],
+        stores,
+        updatePrices: true,
+      }).prices,
+    ).toEqual([{ consumableId: 'basic-gray', price: 16.99 }])
+  })
+
+  it('takes no workspace-currency price for a filament whose store has its own', () => {
+    const stores: Store[] = [{ id: 'bambu-uk', name: 'Bambu Lab UK', currency: 'GBP', exchangeRate: 1.15 }]
+    expect(
+      orderRestock(order, [{ line: line(), consumableId: 'basic-gray' }], {
+        ...context,
+        consumables: [{ ...filament(), storeId: 'bambu-uk' }],
+        stores,
+        updatePrices: true,
+      }).prices,
     ).toEqual([])
   })
 

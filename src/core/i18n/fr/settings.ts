@@ -284,6 +284,8 @@ export const settings: typeof en = {
       fields: { name: 'un nom', price: 'un prix', density: 'une densité', lifespan: 'une durée de vie', colour: 'une couleur' },
       densityHint: 'La plupart des résines font environ 1,1 g/mL.',
       priceHint: 'Ce que vous payez, taxes et livraison comprises.',
+      priceHintSpread: (store: string, share: string) =>
+        `Ce que vous payez hors livraison, taxes comprises. ${store} ajoute ${share} pour la livraison.`,
     },
     resins: {
       title: 'Résines',
@@ -461,6 +463,13 @@ export const settings: typeof en = {
       shipsFree: 'Livraison offerte',
       toFreeShipping: (amount: string) => `encore ${amount} pour la livraison offerte`,
       freeShippingProgress: (store: string) => `Progression vers la livraison offerte chez ${store}`,
+      converted: (amount: string) => `≈ ${amount}`,
+      needsRate: 'Nouveau taux de change requis',
+      topUp: 'Pour la livraison offerte, ajoutez aussi',
+      stillShort: (amount: string) => `il manque encore ${amount}`,
+      reachesFree: 'Livraison offerte avec ces articles',
+      openStore: (store: string) => `Ouvrir ${store}`,
+      openProduct: (name: string) => `Ouvrir ${name} dans sa boutique`,
       missing: 'Absent de votre liste',
       partFits: (model: string, printers: number) => `${model} · ${printers} imprimante${printers > 1 ? 's' : ''}`,
       partGeneric: (printType: string, printers: number) => `Toute imprimante ${printType} · ${printers}`,
@@ -489,6 +498,25 @@ export const settings: typeof en = {
       shippingCostHint: 'Ce que coûte la livraison d’une commande chez vous.',
       freeShippingOver: (symbol: string) => `Livraison offerte dès (${symbol})`,
       freeShippingOverHint: 'Le montant de commande livré gratuitement dans votre pays, si la boutique en propose un.',
+      usualOrder: (symbol: string) => `Commande habituelle (${symbol})`,
+      usualOrderHint:
+        'Ce que vous dépensez d’habitude par commande. Les coûts et devis répartissent alors la livraison sur les prix de cette boutique : saisissez-les donc hors livraison.',
+      currency: 'Devise',
+      workspaceCurrency: (currency: string) => `Devise de l’espace de travail (${currency})`,
+      currencyHint: 'La devise de ses prix, de sa livraison et de son seuil de livraison offerte.',
+      exchangeRate: (from: string, to: string) => `1 ${from} en ${to}`,
+      exchangeRateHint: 'Convertit ses prix dans les coûts et devis. Mettez-le à jour quand le cours change.',
+      url: 'Site web',
+      urlHint: 'Les produits du catalogue vendus sur ce site y sont achetés, et Ce qu’il vous faut renvoie vers leurs pages.',
+      urlInvalid: 'Saisissez une adresse web commençant par http:// ou https://.',
+      spread: (share: string) => `ajoute ${share} de livraison aux prix`,
+      needsRate: (currency: string) => `Nouveau taux de change en ${currency} requis`,
+      staleRate: (currency: string) =>
+        `L’espace de travail compte désormais en ${currency}. Tant que vous n’avez pas saisi ce taux en ${currency}, les coûts et devis ne convertissent pas ses prix.`,
+      takeOutShipping: (share: string, count: number) =>
+        `Retirer ${share} de livraison ${count === 1 ? 'du prix déjà saisi' : `des ${count} prix déjà saisis`}`,
+      takeOutShippingHint:
+        'Ils ont été saisis livraison comprise. Les coûts l’ajoutent désormais d’après la commande habituelle : elle serait comptée deux fois.',
       shipping: (amount: string) => `Livraison ${amount}`,
       freeOver: (amount: string) => `offerte dès ${amount}`,
       noShipping: 'Aucun coût de livraison défini',

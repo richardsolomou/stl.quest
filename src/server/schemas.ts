@@ -280,19 +280,35 @@ const printerProfileSchema = z.object({
     .optional(),
 })
 
-const storeSchema = z.object({
-  id: z.string().trim().min(1).max(200),
-  name: z.string().trim().min(1).max(100),
-  shippingCost: z.number().nonnegative().max(100_000).optional(),
-  freeShippingOver: z.number().positive().max(1_000_000).optional(),
-})
+const storeSchema = z
+  .object({
+    id: z.string().trim().min(1).max(200),
+    name: z.string().trim().min(1).max(100),
+    shippingCost: z.number().nonnegative().max(100_000).optional(),
+    freeShippingOver: z.number().positive().max(1_000_000).optional(),
+    currency: z.enum(PRICE_CALCULATOR_CURRENCIES).optional(),
+    exchangeRate: z.number().positive().max(1_000_000).optional(),
+    exchangeRateCurrency: z.enum(PRICE_CALCULATOR_CURRENCIES).optional(),
+    usualOrder: z.number().positive().max(1_000_000).optional(),
+    url: requiredSourceUrl.optional(),
+  })
+  .refine(
+    (store) => !store.currency || (store.exchangeRate !== undefined && store.exchangeRateCurrency !== undefined),
+    'a store in its own currency needs an exchange rate and the currency it converts into',
+  )
+const shippingShareSchema = z.number().nonnegative().max(1_000)
 
 /** One printer, piece of equipment, consumable, or store; whether it is archived is changed only by `inventoryArchiveSchema`. */
 export const inventoryItemSchema = z.discriminatedUnion('inventory', [
   z.object({ inventory: z.literal('printers'), item: printerProfileSchema }),
   z.object({ inventory: z.literal('equipment'), item: equipmentItemSchema }),
   z.object({ inventory: z.literal('consumables'), item: consumableSchema }),
-  z.object({ inventory: z.literal('stores'), item: storeSchema }),
+  z.object({
+    inventory: z.literal('stores'),
+    item: storeSchema,
+    /** On an update, the shipping share to move in the prices of what the store sells; see `pricedStoreItems`. */
+    shippingTakenOut: z.object({ from: shippingShareSchema, to: shippingShareSchema }).optional(),
+  }),
 ])
 export const inventoryItemRefSchema = z.object({
   inventory: z.enum(INVENTORY_KINDS),
@@ -485,6 +501,7 @@ export const moveCopiesBatchSchema = z.object({
 })
 
 export const slicerLinkSchema = z.object({ requestId: id, slicer: z.enum(SLICER_IDS) })
+export const plateSlicerLinkSchema = z.object({ plateId: id, slicer: z.enum(SLICER_IDS).optional() })
 
 const settingsItemId = z.string().trim().min(1).max(200)
 const usageAmount = z.number().positive().max(1_000_000)

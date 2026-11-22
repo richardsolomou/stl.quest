@@ -23,6 +23,7 @@ import { normalizeBoardConfig, seesOnlyOwnRequests } from '../core/visibility'
 import { workflow } from '../core/workflow'
 import { accountDeletionWorkspaces, MEMBER_ACTIVITY_INTERVAL_MS } from '../core/workspaces'
 import { AssetGenerationQueue, resolveAssetQueueLimits } from './assets/queue'
+import { PlateFiles, sweepPlateDirectories } from './plateFile'
 import { APIError } from 'better-auth/api'
 import { createAuth } from './auth'
 import { deliveryTracker, emailNotifier, readEmailBranding, workspaceMailer, type DeliveryTracker } from './notifications'
@@ -424,6 +425,7 @@ async function createApp() {
     await localStaging?.sweepUploads(activeUploadIds)
     const { cleanExpiredTusUploads } = await import('./uploads')
     await cleanExpiredTusUploads(uploadDatastore)
+    await sweepPlateDirectories()
     for (const workspace of await repository.listWorkspaces()) {
       const scopedRepository = await repository.scoped(workspace.id)
       if (
@@ -494,7 +496,7 @@ async function createApp() {
 
     /**
      * The workspace a signed slicer link opens, as the member who asked for it, or undefined once the link no longer
-     * verifies or that member has left the workspace; the caller still checks the member may see the request.
+     * verifies or that member has left the workspace; the caller still checks the member may see what it names.
      */
     const slicerLinkWorkspace = async (payload: string, signature: string) => {
       const claims = verifySlicerLink(authSecret, payload, signature)
@@ -503,7 +505,7 @@ async function createApp() {
       if (!membership) return undefined
       return {
         ...(await runtime(membership)),
-        requestId: claims.requestId,
+        link: claims,
         identity: { id: claims.userId, role: identityRole(membership.role) },
       }
     }
@@ -942,6 +944,7 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
         'storage-failed asset generation stays failed until storage is healthy',
       ),
   })
+  const plateFiles = new PlateFiles(assetQueue)
   let closed = false
   return {
     repository,
@@ -949,6 +952,7 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
     events,
     service,
     assetQueue,
+    plateFiles,
     storageMigration,
     assertAssetsMutable: () => assertAssetsMutable(),
     storage,
@@ -966,6 +970,7 @@ export async function createWorkspaceRuntime(options: WorkspaceRuntimeOptions) {
       if (closed) return
       closed = true
       await Promise.all([autoArchive.stop(), storageFailureRecovery.stop()])
+      await plateFiles.close()
       await assetQueue.shutdown()
     },
   }

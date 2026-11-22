@@ -27,7 +27,7 @@ import {
   filamentConsumableName,
   filamentsInColours,
   sameFilamentColour,
-  sameFilamentProduct,
+  samePricedColours,
   stockedColours,
   type FilamentPreset,
 } from '../../../core/filamentPresets'
@@ -39,7 +39,8 @@ import { getPrinterPreset } from '../../../core/printerPresets'
 import { resinPresetName, type ResinPreset } from '../../../core/resinPresets'
 import { activeItems } from '../../../core/inventory'
 import { enteredUnitScale, packSize } from '../../../core/stock'
-import type { Store } from '../../../core/stores'
+import type { PriceCalculatorCurrency } from '../../../core/priceCalculator'
+import { movedToStore, shippingShare, storeCurrency, type Store } from '../../../core/stores'
 import type { Messages } from '../../../core/i18n'
 import type { PrinterProfile } from '../../../core/types'
 import type { StockLevel } from '../../../core/usage'
@@ -54,7 +55,7 @@ import { AutosaveStatus } from '../AutosaveStatus'
 import { ColourSwatch } from '../ColourSwatch'
 import { SlicerField } from './SlicerField'
 import { DialogShell } from '../DialogShell'
-import { formatNumber } from '../priceCalculator/format'
+import { currencySymbol, formatNumber, formatRate } from '../priceCalculator/format'
 import { StockPanel, useStockMovements } from './ConsumableStock'
 import { ConsumableIcon } from './ConsumableIcon'
 import { materialFacts, MaterialPicker } from './ConsumablePicker'
@@ -79,8 +80,7 @@ export function ConsumableDialog({
   workspaceSlug,
   level,
   printers,
-  symbol,
-  rate,
+  currency,
   onSave,
   onAddColours,
   onArchive,
@@ -95,9 +95,8 @@ export function ConsumableDialog({
   workspaceSlug: string
   level?: StockLevel
   printers: PrinterProfile[]
-  symbol: string
-  /** Formats a per-plate or per-hour cost. */
-  rate: (value: number) => string
+  /** The workspace currency; one bought from a store in its own currency is priced in that. */
+  currency: PriceCalculatorCurrency
   onSave: (consumable: Consumable) => Promise<void>
   /**
    * Adds the colours of one catalogue filament at once, each counted at `onHand` in grams while stock is tracked. Without
@@ -112,6 +111,11 @@ export function ConsumableDialog({
   const tracking = useUsageTracking()
   const batch = useConsumableBatch()
   const [draft, setDraft] = useState(consumable)
+  const store = stores.find(({ id }) => id === draft.storeId)
+  const priceCurrency = storeCurrency(store, currency)
+  const symbol = currencySymbol(priceCurrency, locale)
+  const rate = (value: number) => formatRate(value, priceCurrency, locale)
+  const spread = store ? shippingShare(store) : 0
   const resins = useQuery({ ...catalogueQuery('resins'), enabled: draft.kind === 'resin' }).data
   const filaments = useQuery({ ...catalogueQuery('filaments'), enabled: draft.kind === 'filament' }).data
   const parts = useQuery({ ...catalogueQuery('parts'), enabled: draft.kind === 'part' }).data
@@ -178,7 +182,7 @@ export function ConsumableDialog({
   const archive = async () => {
     if (await autosave.flush()) onArchive()
   }
-  const siblings = draft.kind === 'filament' && !isNew ? sameFilamentProduct(library, draft) : []
+  const siblings = draft.kind === 'filament' && !isNew ? samePricedColours(library, draft, stores, currency) : []
   const differing = draft.kind === 'filament' ? siblings.filter(({ pricePerKg }) => pricePerKg !== draft.pricePerKg).length : 0
   const [sharing, setSharing] = useState(false)
   const sharePrice = async () => {
@@ -308,6 +312,11 @@ export function ConsumableDialog({
               </Button>
             ) : supplyPreset?.listPrice ? (
               <SupplyListPriceHint preset={supplyPreset} />
+            ) : spread > 0 && store ? (
+              copy.dialog.priceHintSpread(
+                store.name,
+                new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 }).format(spread),
+              )
             ) : (
               copy.dialog.priceHint
             )
@@ -332,7 +341,20 @@ export function ConsumableDialog({
         )}
         <StockFields consumable={draft} tracking={tracking} onChange={setDraft} />
         {(activeItems(stores).length > 0 || draft.storeId) && (
-          <StoreField stores={stores} value={draft.storeId} onChange={(storeId) => setDraft({ ...draft, storeId })} />
+          <StoreField
+            stores={stores}
+            value={draft.storeId}
+            onChange={(storeId) =>
+              setDraft(
+                movedToStore(
+                  draft,
+                  stores.find(({ id }) => id === storeId),
+                  stores,
+                  currency,
+                ),
+              )
+            }
+          />
         )}
       </div>
       {tracking && (draft.kind === 'resin' || draft.kind === 'filament') && (

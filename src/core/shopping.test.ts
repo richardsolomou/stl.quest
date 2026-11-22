@@ -127,4 +127,45 @@ describe('shopping list', () => {
   it('knows no shipping for a store without a shipping cost', () => {
     expect(list([level('pla', 0, 500)], { stores: [{ id: 'bambu', name: 'Bambu' }] })[0].shipping).toBeUndefined()
   })
+
+  describe('topping up to free shipping', () => {
+    const abs: FilamentConsumable = { id: 'abs', kind: 'filament', name: 'ABS', pricePerKg: 22, storeId: 'bambu' }
+    const tpu: FilamentConsumable = { id: 'tpu', kind: 'filament', name: 'TPU', pricePerKg: 30, storeId: 'bambu' }
+    const consumables = [pla, petg, abs, tpu, ipa]
+    const topUp = (levels: StockLevel[], rates: [string, number][] = []) =>
+      list(levels, { consumables, rates })[0].topUp?.map(({ consumable }) => consumable.id)
+
+    it('suggests a pack of what will run out soonest until the order ships free', () => {
+      const levels = [level('pla', 0, 500), level('petg', 900), level('abs', 900), level('tpu', 900)]
+      expect(
+        topUp(levels, [
+          ['petg', 50],
+          ['abs', 10],
+          ['tpu', 5],
+        ]),
+      ).toEqual(['petg', 'abs'])
+    })
+
+    it('suggests what sits closest to its minimum when no rate is known', () => {
+      const levels = [level('pla', 0, 500), level('petg', 900, 800), level('abs', 900, 600)]
+      expect(topUp(levels)?.[0]).toBe('petg')
+    })
+
+    it('suggests nothing untracked', () => {
+      expect(topUp([level('pla', 0, 500), { ...level('petg', 0), tracked: false, missing: false }])).toEqual([])
+    })
+
+    it('suggests nothing from another store', () => {
+      expect(topUp([level('pla', 0, 500), level('ipa', 900)])).toEqual([])
+    })
+
+    it('suggests nothing once the order ships free', () => {
+      expect(topUp([level('pla', 0, 3_000), level('petg', 900)])).toBeUndefined()
+    })
+
+    it('says what the suggestions cost', () => {
+      const [order] = list([level('pla', 0, 500), level('petg', 900)], { consumables, rates: [['petg', 50]] })
+      expect(order.topUp?.[0]).toMatchObject({ packs: 1, cost: 25 })
+    })
+  })
 })

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "3331b038-93bd-4289-a09e-bb686c54aca9",
+  "id": "f8fba3c1-2662-469c-a8a5-49cdfe81f9a1",
   "prevId": "56685054-987e-4e7c-a25c-c07ba21c41ab",
   "tables": {
     "asset_generation_jobs": {
@@ -2083,123 +2083,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "spoolman_restocks": {
-      "name": "spoolman_restocks",
-      "columns": {
-        "workspace_id": {
-          "name": "workspace_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "filament_id": {
-          "name": "filament_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "filament_name": {
-          "name": "filament_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "grams": {
-          "name": "grams",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "spool_id": {
-          "name": "spool_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "error": {
-          "name": "error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "spoolman_restocks_status": {
-          "name": "spoolman_restocks_status",
-          "columns": [
-            "workspace_id",
-            "status",
-            "created_at"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "spoolman_restocks_workspace_id_spoolman_connections_workspace_id_fk": {
-          "name": "spoolman_restocks_workspace_id_spoolman_connections_workspace_id_fk",
-          "tableFrom": "spoolman_restocks",
-          "tableTo": "spoolman_connections",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "workspace_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "spoolman_restocks_workspace_id_id_pk": {
-          "columns": [
-            "workspace_id",
-            "id"
-          ],
-          "name": "spoolman_restocks_workspace_id_id_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "spoolman_restocks_status_check": {
-          "name": "spoolman_restocks_status_check",
-          "value": "\"spoolman_restocks\".\"status\" IN ('queued', 'created', 'failed')"
-        }
-      }
-    },
     "spoolman_spools": {
       "name": "spoolman_spools",
       "columns": {
@@ -2351,6 +2234,34 @@
         "free_shipping_over": {
           "name": "free_shipping_over",
           "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "exchange_rate": {
+          "name": "exchange_rate",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "usual_order": {
+          "name": "usual_order",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -3270,13 +3181,6 @@
         },
         "filament_details": {
           "name": "filament_details",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "filament_usage": {
-          "name": "filament_usage",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

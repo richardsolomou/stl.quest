@@ -1,4 +1,7 @@
 import { Worker } from 'node:worker_threads'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { expect, it } from 'vitest'
 
 function gridObj(size: number) {
@@ -25,10 +28,10 @@ function gridAsciiStl(size: number) {
   return new TextEncoder().encode(facets.join(''))
 }
 
-function runWorker(file: Uint8Array) {
+function runWorker(file: Uint8Array, job: Record<string, unknown> = { mode: 'visual', wants: { thumbnail: false, preview: false } }) {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL('./worker.ts', import.meta.url), {
-      workerData: { file, wants: { thumbnail: false, preview: false } },
+      workerData: { file, ...job },
       transferList: [file.buffer as ArrayBuffer],
       execArgv: ['--import', 'tsx'],
       resourceLimits: { maxOldGenerationSizeMb: 64 },
@@ -47,4 +50,18 @@ it('generates geometry for a large ASCII STL within a heap smaller than the file
     ok: true,
     modelDimensions: { widthMm: 50, depthMm: 50, heightMm: 6 },
   })
+}, 60_000)
+
+it('converts a large OBJ into a plate object within a heap smaller than the file', async () => {
+  const xmlPath = path.join(await fs.promises.mkdtemp(path.join(os.tmpdir(), 'plate-worker-')), '3dmodel.model')
+  try {
+    await expect(runWorker(gridObj(1000), { mode: 'plate', object: { id: 1, name: 'SQ-1 grid.obj' }, xmlPath })).resolves.toEqual({
+      ok: true,
+      stage: 'complete',
+      width: 100,
+      depth: 100,
+    })
+  } finally {
+    await fs.promises.rm(path.dirname(xmlPath), { recursive: true, force: true })
+  }
 }, 60_000)

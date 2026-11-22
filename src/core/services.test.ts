@@ -12,6 +12,7 @@ import { organization, requests, requestStatuses, user } from '../db/schema'
 import type { EventBus, Identity, Notifier, PrinterProfile, Telemetry } from './types'
 import { STLQuestService } from './services'
 import { consumablePrice, consumablesOfKind, MAX_CONSUMABLES, type Consumable } from './consumables'
+import type { Store } from './stores'
 import { MAX_EQUIPMENT, type EquipmentItem } from './equipment'
 import { PRINTERS_SKIPPED_SETTING } from './printers'
 import { summariseSpend } from './spend'
@@ -2837,7 +2838,18 @@ describe('STLQuestService crash recovery', () => {
           { resin_count: 1, filament_count: 0, part_count: 0, supply_count: 0, catalogue_supply_count: 0, with_store_count: 0 },
         ],
         [admin.id, 'equipment_saved', { equipment_count: 1, catalogue_count: 1, with_supplies_count: 0 }],
-        [admin.id, 'stores_saved', { store_count: 1, with_shipping_count: 0, with_free_shipping_count: 1 }],
+        [
+          admin.id,
+          'stores_saved',
+          {
+            store_count: 1,
+            with_shipping_count: 0,
+            with_free_shipping_count: 1,
+            with_currency_count: 0,
+            with_usual_order_count: 0,
+            with_url_count: 0,
+          },
+        ],
       ])
     })
 
@@ -2958,6 +2970,15 @@ describe('STLQuestService crash recovery', () => {
         await expect(inventory.shareFilamentPrice(black.id, requester)).rejects.toMatchObject({ status: 403 })
       })
 
+      it('leaves a colour priced in another currency as it is', async () => {
+        await stock('stores', [{ id: 'us', name: 'US', currency: 'USD', exchangeRate: 0.9, exchangeRateCurrency: 'EUR' }])
+        await stock('consumables', [black, { ...white, storeId: 'us' }])
+
+        await inventory.shareFilamentPrice(black.id, admin)
+
+        expect((await repository.listInventory('consumables')).map((item) => item.kind === 'filament' && item.pricePerKg)).toEqual([26, 20])
+      })
+
       it('reports how many colours took the price', async () => {
         await stock('consumables', [black, white, petg])
 
@@ -2992,6 +3013,7 @@ describe('STLQuestService crash recovery', () => {
     const resin: Consumable = { id: 'grey', kind: 'resin', name: 'Grey', pricePerLitre: 40, densityGramsPerMl: 1.1 }
     const filament: Consumable = { id: 'pla', kind: 'filament', name: 'PLA', pricePerKg: 20 }
     const ipa: Consumable = { id: 'ipa', kind: 'supply', name: 'IPA', unit: 'ml', price: 10, minimumStock: 500 }
+    const amazon: Store = { id: 'amazon', name: 'Amazon US', currency: 'USD', exchangeRate: 0.9, exchangeRateCurrency: 'EUR' }
     const wash: EquipmentItem = {
       id: 'wash',
       name: 'Wash station',
@@ -3091,6 +3113,71 @@ describe('STLQuestService crash recovery', () => {
         await service.updateInventoryItem('consumables', { ...ipa, storeId: 'bambu' }, admin)
 
         expect((await service.inventoryReferences('stores', 'bambu', admin)).bought).toBe(1)
+      })
+
+      it('keeps a store’s currency, exchange rate, usual order, and website', async () => {
+        const store = {
+          id: 'amazon',
+          name: 'Amazon US',
+          currency: 'USD',
+          exchangeRate: 0.9,
+          exchangeRateCurrency: 'EUR',
+          usualOrder: 50,
+          url: 'https://www.amazon.com/',
+        } as const
+
+        await service.createInventoryItem('stores', store, admin)
+
+        expect(await repository.listInventory('stores')).toEqual([store])
+      })
+
+      it('records stock bought from a store in the workspace currency, its shipping spread over it', async () => {
+        await service.createInventoryItem('stores', { ...amazon, shippingCost: 10, usualOrder: 50 }, admin)
+        await service.updateInventoryItem('consumables', { ...ipa, storeId: 'amazon' }, admin)
+
+        const { events } = await service.recordStockMovement({ consumableId: ipa.id, kind: 'restock', amount: 1_000 }, admin)
+
+        expect(events[0].unitPrice).toBeCloseTo((10 / 1_000) * 0.9 * 1.2, 9)
+      })
+
+      describe('repricing what a store sells', () => {
+        const ipaPrice = async () => {
+          const stored = (await repository.listInventory('consumables')).find(({ id }) => id === ipa.id)
+          return stored?.kind === 'supply' ? stored.price : undefined
+        }
+
+        beforeEach(async () => {
+          await service.createInventoryItem('stores', amazon, admin)
+          await service.updateInventoryItem('consumables', { ...ipa, storeId: 'amazon' }, admin)
+        })
+
+        it('converts what a deleted store sold into the workspace currency', async () => {
+          await archive('stores', 'amazon')
+
+          await service.deleteInventoryItem('stores', 'amazon', admin)
+
+          expect(await ipaPrice()).toBe(9)
+        })
+
+        it('keeps the value of what a store sells when its currency changes', async () => {
+          await service.updateInventoryItem('stores', { ...amazon, currency: 'GBP', exchangeRate: 1.2 }, admin)
+
+          expect(await ipaPrice()).toBe(7.5)
+        })
+
+        it('takes the shipping share out of a store’s prices when asked', async () => {
+          await service.updateInventoryItem('stores', { ...amazon, shippingCost: 10, usualOrder: 50 }, admin, { from: 0, to: 0.2 })
+
+          expect(await ipaPrice()).toBe(8.333)
+        })
+
+        it('keeps recorded usage as it was when a store’s currency changes', async () => {
+          await service.recordStockMovement({ consumableId: ipa.id, kind: 'restock', amount: 1_000 }, admin)
+
+          await service.updateInventoryItem('stores', { ...amazon, currency: 'GBP', exchangeRate: 1.2 }, admin)
+
+          expect((await service.listUsage({}, admin))[0].unitPrice).toBeCloseTo(0.009, 9)
+        })
       })
 
       it('leaves consumables bought from a deleted store with no store', async () => {
@@ -3761,6 +3848,17 @@ describe('STLQuestService crash recovery', () => {
         return id
       }
 
+      async function linkOnly() {
+        const id = await repository.createRequest({
+          name: 'Link',
+          sourceUrl: 'https://example.com/model',
+          quantity: 1,
+          ownerUserId: requester.id,
+        })
+        await repository.updateRequest(id, { printerId: fdm.id })
+        return id
+      }
+
       async function plate(...requestIds: string[]) {
         return await service.createPlate(
           { printerId: fdm.id, otherStuff: false, items: requestIds.map((requestId) => ({ requestId, status: 'todo', copies: 1 })) },
@@ -3781,6 +3879,61 @@ describe('STLQuestService crash recovery', () => {
       async function printing(requestId: string) {
         return (await service.listUsage({ requestId }, admin)).filter((event) => event.stage === 'printing')
       }
+
+      it('lists a plate’s models named by their request tags', async () => {
+        const requestId = await filamentPrint()
+        const { id } = await plate(requestId)
+        const { number, updatedAt } = (await repository.getRequest(requestId))!
+
+        expect((await service.plateModels(id, admin)).models).toEqual([
+          { requestId, name: `SQ-${number} model.stl`, path: 'todo/model.stl', copies: 1, updatedAt },
+        ])
+      })
+
+      it('lists a replaced model of the same name as changed', async () => {
+        const requestId = await filamentPrint()
+        const { id } = await plate(requestId)
+        async function replace(uploadId: string, contents: string) {
+          const part = staging.uploadPart(uploadId)
+          await fs.promises.writeFile(part, contents)
+          await repository.createUploadSession(uploadId, admin.id, Date.now() + 60_000, contents.length)
+          await service.attachModel(uploadId, part, requestId, 'model.stl', admin)
+        }
+        await replace('replace-first', 'broken mesh')
+        const before = (await service.plateModels(id, admin)).models
+        await new Promise((resolve) => setTimeout(resolve, 2))
+        await replace('replace-second', 'fixed mesh')
+
+        expect((await service.plateModels(id, admin)).models).not.toEqual(before)
+      })
+
+      it('leaves prints without a model out of a plate’s models', async () => {
+        const kept = await filamentPrint()
+        const { id } = await plate(kept, await linkOnly())
+
+        expect(await service.plateModels(id, admin)).toMatchObject({ models: [{ requestId: kept }], skipped: 1 })
+      })
+
+      it('refuses a plate with no models at all', async () => {
+        const { id } = await plate(await linkOnly())
+
+        await expect(service.plateModels(id, admin)).rejects.toMatchObject({ status: 409 })
+      })
+
+      it('keeps a plate’s models from members', async () => {
+        const { id } = await plate(await filamentPrint())
+
+        await expect(service.plateModels(id, requester)).rejects.toMatchObject({ status: 403 })
+      })
+
+      it('keeps a plate’s models within its workspace', async () => {
+        const { id } = await plate(await filamentPrint())
+        const other = await repository.scoped((await repository.createWorkspace({ id: admin.id }, 'Second farm')).id)
+        await other.setSetting(USAGE_TRACKING_SETTING, true)
+        const otherService = new STLQuestService(other, assets, staging, eventBus(), telemetry, { remove: removeTusUpload })
+
+        await expect(otherService.plateModels(id, admin)).rejects.toMatchObject({ status: 404 })
+      })
 
       it('lets only admins plan a plate', async () => {
         const requestId = await filamentPrint()

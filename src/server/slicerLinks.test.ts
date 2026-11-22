@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { SLICER_LINK_TTL_MS, signSlicerLink, verifySlicerLink } from './slicerLinks'
 
@@ -55,5 +56,18 @@ describe('slicer links', () => {
   it('rejects a truncated signature', () => {
     const { payload, signature } = link()
     expect(verifySlicerLink(secret, payload, signature.slice(1), now)).toBeUndefined()
+  })
+
+  it('returns the plate a plate link was signed for', () => {
+    const plate = { workspaceId: 'farm', plateId: 'plate-1', userId: 'maker' }
+    const [, , , payload, signature] = signSlicerLink(secret, plate, now).split('/')
+    expect(verifySlicerLink(secret, payload, signature, now)).toEqual({ ...plate, expiresAt: now + SLICER_LINK_TTL_MS })
+  })
+
+  it('rejects claims that name both a request and a plate', () => {
+    const both = Buffer.from(JSON.stringify({ ...claims, plateId: 'plate-1', expiresAt: now + SLICER_LINK_TTL_MS })).toString('base64url')
+    expect(
+      verifySlicerLink('k', both, crypto.createHmac('sha256', 'k').update(`stlquest-slicer-link:${both}`).digest('base64url'), now),
+    ).toBeUndefined()
   })
 })

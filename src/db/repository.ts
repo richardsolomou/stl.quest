@@ -63,6 +63,8 @@ import { ACTIVE_SUBSCRIPTION_STATUSES, BILLABLE_SUBSCRIPTION_STATUSES } from '..
 import { automaticallyAssignedPrinter, outstandingCopies } from '../core/printers'
 import { normalizeBoardConfig } from '../core/visibility'
 import type { InventoryItems, InventoryKind } from '../core/inventory'
+import type { Consumable } from '../core/consumables'
+import type { Store } from '../core/stores'
 import { deletedItemKind, keepsDeletedName, NO_REFERENCES, withoutSupply, type InventoryReferences } from '../core/inventoryDeletion'
 import type { SpoolmanChange, SpoolmanLink, SpoolmanSpool } from '../core/spoolman'
 import type { SpoolmanRestock, SpoolmanRestockResult } from '../core/spoolmanRestocks'
@@ -3090,42 +3092,67 @@ export class DrizzleRepository implements Repository {
 
   async changeInventory<Kind extends InventoryKind>(kind: Kind, change: (items: InventoryItems[Kind][]) => InventoryItems[Kind][]) {
     const workspaceId = await this.workspace()
-    const table = inventoryTables[kind] as InventoryTable
     return await this.database.transaction(async (tx) => {
       await this.lockWorkspace(tx, workspaceId)
-      const rows = await this.inventoryRows(tx, kind)
-      const previous = rows.map((row) => inventoryItem(kind, row))
-      const items = change(previous)
-      const ids = new Set(items.map(({ id }) => id))
-      if (ids.size !== items.length || previous.some(({ id }) => !ids.has(id)))
-        throw new Error('inventory items are archived, never removed or repeated')
-      const stored = new Map(rows.map((row, index) => [row.id, { row, item: previous[index] }]))
-      let position = Math.max(-1, ...rows.map((row) => row.position))
-      const now = Date.now()
-      for (const item of items) {
-        const before = stored.get(item.id)
-        const columns = inventoryColumns(kind, item)
-        if (
-          before &&
-          Boolean(before.item.archived) === Boolean(item.archived) &&
-          isDeepStrictEqual(inventoryColumns(kind, before.item), columns)
-        )
-          continue
-        const archivedAt = item.archived ? (before?.row.archivedAt ?? now) : null
-        if (!before)
-          await tx
-            .insert(table)
-            .values({ ...columns, workspaceId, id: item.id, position: ++position, archivedAt, createdAt: now, updatedAt: now } as never)
-            .run()
-        else
-          await tx
-            .update(table)
-            .set({ ...columns, archivedAt, updatedAt: now })
-            .where(and(eq(table.workspaceId, workspaceId), eq(table.id, item.id)))
-            .run()
-      }
-      return { previous, items: (await this.inventoryRows(tx, kind)).map((row) => inventoryItem(kind, row)) }
+      return await this.writeInventory(tx, workspaceId, kind, change)
     })
+  }
+
+  async changeStores(change: (stores: Store[], consumables: Consumable[]) => { stores: Store[]; consumables: Consumable[] }) {
+    const workspaceId = await this.workspace()
+    return await this.database.transaction(async (tx) => {
+      await this.lockWorkspace(tx, workspaceId)
+      const library = await this.inventoryWith(tx, 'consumables')
+      let next: Consumable[] = library
+      const stores = await this.writeInventory(tx, workspaceId, 'stores', (current) => {
+        const changed = change(current, library)
+        next = changed.consumables
+        return changed.stores
+      })
+      return { ...stores, consumables: (await this.writeInventory(tx, workspaceId, 'consumables', () => next)).items }
+    })
+  }
+
+  /** Stores what `change` makes of the items of `kind`, inside a transaction holding the workspace lock. */
+  private async writeInventory<Kind extends InventoryKind>(
+    tx: DatabaseTransaction,
+    workspaceId: string,
+    kind: Kind,
+    change: (items: InventoryItems[Kind][]) => InventoryItems[Kind][],
+  ) {
+    const table = inventoryTables[kind] as InventoryTable
+    const rows = await this.inventoryRows(tx, kind)
+    const previous = rows.map((row) => inventoryItem(kind, row))
+    const items = change(previous)
+    const ids = new Set(items.map(({ id }) => id))
+    if (ids.size !== items.length || previous.some(({ id }) => !ids.has(id)))
+      throw new Error('inventory items are archived, never removed or repeated')
+    const stored = new Map(rows.map((row, index) => [row.id, { row, item: previous[index] }]))
+    let position = Math.max(-1, ...rows.map((row) => row.position))
+    const now = Date.now()
+    for (const item of items) {
+      const before = stored.get(item.id)
+      const columns = inventoryColumns(kind, item)
+      if (
+        before &&
+        Boolean(before.item.archived) === Boolean(item.archived) &&
+        isDeepStrictEqual(inventoryColumns(kind, before.item), columns)
+      )
+        continue
+      const archivedAt = item.archived ? (before?.row.archivedAt ?? now) : null
+      if (!before)
+        await tx
+          .insert(table)
+          .values({ ...columns, workspaceId, id: item.id, position: ++position, archivedAt, createdAt: now, updatedAt: now } as never)
+          .run()
+      else
+        await tx
+          .update(table)
+          .set({ ...columns, archivedAt, updatedAt: now })
+          .where(and(eq(table.workspaceId, workspaceId), eq(table.id, item.id)))
+          .run()
+    }
+    return { previous, items: (await this.inventoryRows(tx, kind)).map((row) => inventoryItem(kind, row)) }
   }
 
   async inventoryReferences(kind: InventoryKind, id: string) {
@@ -3136,12 +3163,14 @@ export class DrizzleRepository implements Repository {
    * Deletes one item once `check` accepts it (it may throw a `Response`), with everything naming it unlinked in the same
    * transaction under the workspace lock: usage keeps the item's name and kind where it was what the event used
    * (`keepsDeletedName`), prints and plates lose their printer but keep its print type, and equipment stops using a
-   * deleted supply. Wear parts bound to a deleted printer keep their `printer_id`, which has no foreign key.
+   * deleted supply, and what a deleted store sold becomes `leaveStore` of itself with no store. Wear parts bound to a
+   * deleted printer keep their `printer_id`, which has no foreign key.
    */
   async deleteInventoryItem<Kind extends InventoryKind>(
     kind: Kind,
     id: string,
     check: (item: InventoryItems[Kind] | undefined, references: InventoryReferences) => void,
+    leaveStore: (consumable: Consumable, store: Store) => Consumable = (consumable) => consumable,
   ) {
     const workspaceId = await this.workspace()
     const table = inventoryTables[kind] as InventoryTable
@@ -3188,11 +3217,11 @@ export class DrizzleRepository implements Repository {
         }
       }
       if (kind === 'stores')
-        await tx
-          .update(consumables)
-          .set({ storeId: null, updatedAt: Date.now() })
-          .where(and(eq(consumables.workspaceId, workspaceId), eq(consumables.storeId, id)))
-          .run()
+        await this.writeInventory(tx, workspaceId, 'consumables', (library) =>
+          library.map((consumable) =>
+            consumable.storeId === id ? { ...leaveStore(consumable, item as Store), storeId: undefined } : consumable,
+          ),
+        )
 
       await tx
         .delete(table)
