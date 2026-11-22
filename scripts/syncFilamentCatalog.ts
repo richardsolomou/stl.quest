@@ -2,7 +2,13 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import os from 'node:os'
 import path from 'node:path'
 import { assertRevisions, checkoutSource, writeSourceLicense } from './catalogSources'
-import { parseSpoolmanFilaments, type FilamentCatalogSource, type GeneratedFilamentPreset } from './filamentCatalog'
+import {
+  applyFilamentPatches,
+  parseSpoolmanFilaments,
+  type FilamentCatalogSource,
+  type FilamentPatches,
+  type GeneratedFilamentPreset,
+} from './filamentCatalog'
 
 type Source = FilamentCatalogSource & {
   repository: string
@@ -17,9 +23,11 @@ type CatalogSource = { id: string; repository: string; revision: string; license
 const root = path.resolve(import.meta.dirname, '..')
 const sourcesPath = path.join(root, 'catalogs/filaments/sources.json')
 const outputPath = path.join(root, 'catalogs/filaments/catalog.generated.json')
+const overridesPath = path.join(root, 'catalogs/filaments/overrides.json')
 const update = process.argv.includes('--update')
 const check = process.argv.includes('--check')
 const manifest = JSON.parse(readFileSync(sourcesPath, 'utf8')) as { sources: Source[] }
+const overrides = JSON.parse(readFileSync(overridesPath, 'utf8')) as { patches: FilamentPatches }
 
 if (check) validateCommittedCatalog()
 else synchronizeCatalog()
@@ -27,12 +35,13 @@ else synchronizeCatalog()
 function synchronizeCatalog() {
   const temporaryRoot = mkdtempSync(path.join(os.tmpdir(), 'stlquest-filament-catalog-'))
   try {
-    const presets: GeneratedFilamentPreset[] = []
+    const parsed: GeneratedFilamentPreset[] = []
     for (const source of manifest.sources) {
       const checkout = checkoutSource(temporaryRoot, source, update)
-      presets.push(...parseSpoolmanFilaments(jsonFiles(checkout, path.join(checkout, source.catalogPath)), source))
+      parsed.push(...parseSpoolmanFilaments(jsonFiles(checkout, path.join(checkout, source.catalogPath)), source))
       writeSourceLicense(root, checkout, source)
     }
+    const presets = applyFilamentPatches(parsed, overrides.patches)
     const sources = manifest.sources.map(({ id, webRepository: repository, revision, license }) => ({ id, repository, revision, license }))
     validateCatalog(presets, sources)
     writeFileSync(outputPath, `${JSON.stringify({ sources, presets }, null, 2)}\n`)

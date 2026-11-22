@@ -251,7 +251,7 @@ const library: Consumable[] = [
   filament('filament-bambu-lab-matte-pla', 'Charcoal', 'healthy'),
   filament('filament-bambu-lab-matte-pla', 'Ivory White', 'healthy'),
   filament('filament-bambu-lab-petg', 'Black', 'healthy'),
-  filament('filament-bambu-lab-petg', 'Translucent Gray'),
+  filament('filament-bambu-lab-translucent-petg', 'Translucent Gray'),
   filament('filament-bambu-lab-pla-cf', 'Lava Gray', 'healthy'),
   filament('filament-bambu-lab-pa6-cf', 'Black', 'missing'),
   filament('filament-bambu-lab-hf-tpu-95a', 'Black', 'healthy'),

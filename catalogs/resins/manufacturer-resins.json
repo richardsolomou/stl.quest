@@ -70,7 +70,12 @@
       "brand": "HeyGears",
       "name": "PAS10",
       "type": "Modeling",
-      "source": { "id": "heygears-materials", "url": "https://www.heygears.com/material?t=1-all" }
+      "densityGramsPerMl": 1.25,
+      "densitySource": {
+        "url": "https://ultra-static.oss-cn-shenzhen.aliyuncs.com/2.0/test/static/20260226/UltraPrint-Modeling%20PAS10-SDS17304412235371772099034925.pdf",
+        "note": "Approximate midpoint of the manufacturer's stated 1.0–1.5 g/cm³ range."
+      },
+      "source": { "id": "heygears-materials", "url": "https://www.heygears.com/material/materialDetail/ultraprintmodeling-pas10-243" }
     },
     {
       "id": "resin-heygears-paww10",

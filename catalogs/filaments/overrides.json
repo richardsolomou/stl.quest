@@ -1,0 +1,6 @@
+{
+  "patches": {
+    "filament-bambu-lab-petg": { "name": "PETG Basic" },
+    "filament-bambu-lab-pla": { "name": "PLA Basic" }
+  }
+}
