@@ -338,7 +338,21 @@ function priceLabel(consumable: Consumable, symbol: string, copy: Messages['sett
 }
 
 /** The catalogue product as a card with what the catalogue knows and Change, or the user's own with a way back to it. */
-function ProductCard({ kind, name, facts, onChange }: { kind: 'resin' | 'filament'; name?: string; facts?: string; onChange: () => void }) {
+function ProductCard({
+  kind,
+  name,
+  facts,
+  image,
+  colour,
+  onChange,
+}: {
+  kind: 'resin' | 'filament'
+  name?: string
+  facts?: string
+  image?: { src: string }
+  colour?: { hex: string }
+  onChange: () => void
+}) {
   const copy = useI18n().t.settings.consumables
   return (
     <section className="grid gap-2" aria-labelledby="consumable-product">
@@ -346,7 +360,7 @@ function ProductCard({ kind, name, facts, onChange }: { kind: 'resin' | 'filamen
         {copy.dialog.product}
       </h3>
       <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/20 p-2.5">
-        <ConsumableIcon consumable={{ kind }} className="size-12" />
+        <ConsumableIcon consumable={{ kind, colour }} image={image} className="size-12" />
         <div className="min-w-0 flex-1 basis-40">
           <p className="font-medium [overflow-wrap:anywhere]">{name ?? copy.picker.custom[kind]}</p>
           <p className="text-xs leading-relaxed text-muted-foreground">{name ? facts : copy.dialog.customHint}</p>
@@ -377,6 +391,7 @@ function ResinProduct({ resin, onChange }: { resin: ResinConsumable; onChange: (
         kind="resin"
         name={preset && resinPresetName(preset)}
         facts={preset && materialFacts(preset, locale)}
+        image={preset?.image}
         onChange={() => setChanging(true)}
       />
       {changing && (
@@ -407,6 +422,7 @@ function FilamentProduct({ filament, onChange }: { filament: FilamentConsumable;
         kind="filament"
         name={preset && `${preset.brand} ${preset.name}`}
         facts={preset && materialFacts(preset, locale)}
+        colour={filament.colour}
         onChange={() => setChanging(true)}
       />
       {changing && (

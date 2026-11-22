@@ -13,6 +13,7 @@ import { ColourSwatch } from '../ColourSwatch'
 import { DialogShell } from '../DialogShell'
 import { formatNumber } from '../priceCalculator/format'
 import { CardAffordance, CardMark, catalogueCard, CustomCard } from './CatalogueCards'
+import { ConsumableIcon } from './ConsumableIcon'
 import { VirtualCatalogue } from './VirtualCatalogue'
 
 type MaterialPreset = ResinPreset | FilamentPreset
@@ -79,7 +80,14 @@ export function MaterialPicker<Preset extends MaterialPreset>({
     onClose()
   }
   const card = (preset: Preset) => (
-    <MaterialCard key={preset.id} preset={preset} mark={mark(preset)} changing={changing} onClick={() => choose(() => onSelect(preset))} />
+    <MaterialCard
+      key={preset.id}
+      kind={kind}
+      preset={preset}
+      mark={mark(preset)}
+      changing={changing}
+      onClick={() => choose(() => onSelect(preset))}
+    />
   )
 
   return (
@@ -131,11 +139,13 @@ export function MaterialPicker<Preset extends MaterialPreset>({
 }
 
 function MaterialCard({
+  kind,
   preset,
   mark,
   changing,
   onClick,
 }: {
+  kind: MaterialKind
   preset: MaterialPreset
   mark?: string
   changing: boolean
@@ -148,6 +158,10 @@ function MaterialCard({
   const facts = materialFacts(preset, locale)
   return (
     <button type="button" className={catalogueCard} aria-label={(changing ? copy.choosePreset : copy.addPreset)(name)} onClick={onClick}>
+      {/* A filament's swatches already show it; a resin shows its product photo. */}
+      {kind === 'resin' && (
+        <ConsumableIcon consumable={{ kind }} image={'image' in preset ? preset.image : undefined} className="size-14" />
+      )}
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
           <span className="min-w-0 font-medium [overflow-wrap:anywhere]">{preset.name}</span>

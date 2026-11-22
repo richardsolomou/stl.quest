@@ -16,6 +16,8 @@ HeyGears printer definitions, build volumes, and product images are synchronized
 
 Every synchronized manufacturer image records its source page and original image URL in `catalogs/printers/manufacturer-images.json`. Printer images are resized and converted to WebP. The generated catalog and images are committed so installed applications do not contact these services at runtime.
 
+Resin product images come from each manufacturer's official store or product page where one exists, and otherwise from specialist resellers or archived product pages. Each records its source page and original image URL in `catalogs/resins/images.json`. They are resized, converted to WebP, and committed under `public/resin-presets/`. Product names and images remain the property of their respective owners.
+
 The Open Resin Alliance printer plugin images are licensed under MIT. Their license texts are included in `LICENSES/Open-Resin-Alliance-df-plugin-elegoo-MIT.txt`, `LICENSES/Open-Resin-Alliance-df-plugin-anycubic-MIT.txt`, and `LICENSES/Open-Resin-Alliance-df-plugin-uniformation-MIT.txt`.
 
 OrcaSlicer, UVtools, and PrusaSlicer content is licensed under AGPL-3.0-only. Their license texts are included in `LICENSES/OrcaSlicer-AGPL-3.0.txt`, `LICENSES/UVtools-AGPL-3.0.txt`, and `LICENSES/PrusaSlicer-AGPL-3.0.txt`.

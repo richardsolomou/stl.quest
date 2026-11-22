@@ -203,7 +203,17 @@ const catalogues: { [Name in keyof Catalogues]: () => Promise<Catalogues[Name]> 
   filaments: () =>
     import('../../catalogs/filaments/catalog.generated.json').then(({ default: catalogue }) => catalogue.presets as FilamentPreset[]),
   parts: () => import('../../catalogs/parts/catalog.json').then(({ default: catalogue }) => catalogue.presets as PartPreset[]),
-  resins: () => import('../../catalogs/resins/catalog.generated.json').then(({ default: catalogue }) => catalogue.presets as ResinPreset[]),
+  resins: async () => {
+    const [{ default: catalogue }, { default: images }] = await Promise.all([
+      import('../../catalogs/resins/catalog.generated.json'),
+      import('../../catalogs/resins/images.json'),
+    ])
+    const sources = new Map(images.images.map(({ presetId, src }) => [presetId, src]))
+    return catalogue.presets.map((preset): ResinPreset => {
+      const src = sources.get(preset.id)
+      return src ? { ...preset, image: { src } } : preset
+    })
+  },
   supplies: () => import('../../catalogs/supplies/catalog.json').then(({ default: catalogue }) => catalogue.presets as SupplyPreset[]),
 }
 export const catalogueQuery = <Name extends keyof Catalogues>(name: Name) =>
