@@ -1,3 +1,5 @@
+import { appPath } from '../basePath'
+
 /** The configured public address, such as `https://example.com`, or undefined when unset or invalid. */
 function configuredOrigin() {
   return parseOrigin(process.env.BETTER_AUTH_URL)
@@ -33,6 +35,11 @@ export function acceptedOrigins(request: Request) {
 /** Where users reach the application, for absolute links: `BETTER_AUTH_URL`, then the forwarded origin, then the request's own. */
 export function publicOrigin(request: Request) {
   return configuredOrigin() ?? forwardedOrigin(request) ?? new URL(request.url).origin
+}
+
+/** An absolute link to an application path, such as `/invite/<token>`, at the public origin and under the base path. */
+export function publicUrl(request: Request, path: string) {
+  return `${publicOrigin(request)}${appPath(path)}`
 }
 
 /** The extra origins Better Auth's `trustedOrigins` callback should accept for this request. */

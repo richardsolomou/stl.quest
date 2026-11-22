@@ -6,6 +6,7 @@ import { promisify } from 'node:util'
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from './fixtures/test'
 import { createAssetKey } from '../src/core/assetKeys'
+import { e2eContainer, e2eDataRoot } from './fixtures/environment'
 import { expectTablesFitWidth, expectWithinViewportWidth } from './fixtures/layout'
 import { slicedPlateFile } from './fixtures/slicedPlate'
 import { boxStl } from './fixtures/stl'
@@ -70,7 +71,7 @@ test('manages a fair print queue and assigns work to printers', async ({ page })
   await expect(page.getByRole('heading', { name: 'Set up a folder on this server' })).toBeVisible()
   const onboardingFolder = page.getByLabel('Folder')
   const defaultFolder = await onboardingFolder.inputValue()
-  const populatedFolder = path.join(process.env.PLAYWRIGHT_DATA_ROOT ?? '/tmp/stlquest-playwright-4173', 'onboarding-populated')
+  const populatedFolder = path.join(e2eDataRoot, 'onboarding-populated')
   await fs.mkdir(populatedFolder, { recursive: true })
   await fs.chmod(populatedFolder, 0o777)
   await fs.writeFile(path.join(populatedFolder, 'existing.txt'), 'existing')
@@ -2679,7 +2680,7 @@ async function writeStoredModel(modelPath: string, contents: Buffer) {
   }
   await execFileAsync('docker', [
     'exec',
-    'stlquest-e2e-main',
+    e2eContainer('main'),
     'node',
     '-e',
     "const fs=require('node:fs');const path=require('node:path');fs.mkdirSync(path.dirname(process.argv[1]),{recursive:true});fs.writeFileSync(process.argv[1],Buffer.from(process.argv[2],'base64'))",
@@ -2702,7 +2703,7 @@ async function removeStoredModel(modelPath: string) {
   }
   await execFileAsync('docker', [
     'exec',
-    'stlquest-e2e-main',
+    e2eContainer('main'),
     'node',
     '-e',
     "require('node:fs').rmSync(process.argv[1],{force:true})",

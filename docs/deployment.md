@@ -72,7 +72,7 @@ See `.env.example` for a Docker Compose template. `DATA_HOST_DIR`, `PRINTS_HOST_
 
 ## Reverse proxy
 
-Your proxy must pass the original hostname and protocol using `Host` or `X-Forwarded-Host`, plus `X-Forwarded-Proto`. STL Quest uses these headers to work out its public URL. Set `BETTER_AUTH_URL` to enable emailed authentication links or when proxy headers cannot describe the public URL, and use `BETTER_AUTH_TRUSTED_ORIGINS` only when you need to allow extra origins.
+Your proxy must pass the original hostname and protocol using `Host` or `X-Forwarded-Host`, plus `X-Forwarded-Proto`. STL Quest uses these headers to work out its public URL. Set `BETTER_AUTH_URL` to enable emailed authentication links or when proxy headers cannot describe the public URL. Without it, invite and notification emails link to the forwarded hostname, so set it whenever SMTP is configured behind a proxy that passes a client's own `X-Forwarded-Host` through. Use `BETTER_AUTH_TRUSTED_ORIGINS` only when you need to allow extra origins.
 
 The container accepts forwarded headers only when its immediate proxy peer is on a private or loopback network. Keep the outer proxy and STL Quest on the same private container or host network; forwarded headers sent directly by public clients are replaced.
 

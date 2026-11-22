@@ -88,4 +88,17 @@ describe('cloud connections', () => {
       'https://print.example.com/stlquest/settings/storage?cloud=google-drive&outcome=connected',
     )
   })
+
+  it('redirects to the public https origin behind a TLS proxy', async () => {
+    mocks.completeGoogleDrive.mockResolvedValue('/settings/storage')
+
+    const response = await cloudStorageAuthorizationCallback(
+      new Request('http://stlquest:3000/api/storage/google-drive/callback?code=code&state=state', {
+        headers: { 'x-forwarded-host': 'print.example.com', 'x-forwarded-proto': 'https' },
+      }),
+      'google-drive',
+    )
+
+    expect(response.headers.get('location')).toBe('https://print.example.com/settings/storage?cloud=google-drive&outcome=connected')
+  })
 })

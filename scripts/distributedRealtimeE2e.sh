@@ -6,6 +6,7 @@ redis_name=stlquest-e2e-distributed-redis
 first_name=stlquest-e2e-distributed-a
 second_name=stlquest-e2e-distributed-b
 network=stlquest-e2e-distributed
+image=${STLQUEST_E2E_IMAGE:-$(sh scripts/e2eImage.sh)}
 s3_port=49000
 first_port=4273
 second_port=4274
@@ -49,7 +50,7 @@ start_replica() {
   name=$1
   port=$2
   docker run -d --name "$name" --network "$network" --read-only --tmpfs /tmp --add-host host.docker.internal:host-gateway -p "127.0.0.1:$port:3000" \
-    $(sh scripts/e2eContainerArgs.sh) \
+    $(sh scripts/e2eContainerArgs.sh "$image") \
     -e STLQUEST_DISTRIBUTED=true \
     -e DATABASE_URL=postgres://postgres:postgres@$postgres_name:5432/stlquest_realtime_test \
     -e REDIS_URL=redis://$redis_name:6379 \
@@ -73,7 +74,7 @@ start_replica() {
     -e STRIPE_SUPPORTER_PRICE_ID=price_supporter \
     -e STRIPE_PRO_PRICE_ID=price_pro \
     -e BETTER_AUTH_URL=http://127.0.0.1:$first_port \
-    stlquest-e2e >/dev/null
+    "$image" >/dev/null
 }
 
 wait_for_replica() {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { acceptedOrigins, isSameOriginRequest, publicOrigin, requireSameOrigin, trustedOrigins } from './origins'
+import { acceptedOrigins, isSameOriginRequest, publicOrigin, publicUrl, requireSameOrigin, trustedOrigins } from './origins'
 
 beforeEach(() => {
   vi.stubEnv('BETTER_AUTH_URL', undefined)
@@ -107,5 +107,20 @@ describe('public origin', () => {
 
   it('falls back to the request origin', () => {
     expect(publicOrigin(new Request('http://container:3000/page'))).toBe('http://container:3000')
+  })
+})
+
+describe('public URL', () => {
+  const proxied = new Request('http://container:3000/page', {
+    headers: { 'x-forwarded-host': 'app.example', 'x-forwarded-proto': 'https' },
+  })
+
+  it('keeps the https a TLS proxy forwards', () => {
+    expect(publicUrl(proxied, '/invite/token')).toBe('https://app.example/invite/token')
+  })
+
+  it('serves under the base path', () => {
+    vi.stubEnv('BASE_PATH', '/stlquest')
+    expect(publicUrl(proxied, '/invite/token')).toBe('https://app.example/stlquest/invite/token')
   })
 })
